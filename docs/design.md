@@ -99,7 +99,8 @@ Each step names the check that proves it. A step is done when its check passes i
    protocol documents of §1.
 5. **The colibri adapter and `examples/eliza`.** Generated code committed, and a server on
    Rotor's loop. Check: `zig build examples` runs a client against the server over an in-memory
-   link, in each protocol the client speaks.
+   link, in each protocol the client speaks; `tools/interop_check.sh` calls the socket server
+   with buf curl in each protocol.
 6. **The plugin.** `protoc-gen-connect-zig` reads a `CodeGeneratorRequest` from stdin and writes
    one `<file>.pb.zig` for each file. Check: CI runs `buf generate` with a pinned buf over
    `examples/`, and the output equals the committed code.
@@ -108,4 +109,24 @@ Each step names the check that proves it. A step is done when its check passes i
 
 ### Step records
 
-Each step records here what was run, on what, and what it printed, once its check passes.
+Each step records here what was run, on what, and what it printed, once its check passes. Each
+ran on Linux x86-64 with Zig 0.16.0.
+
+- **Steps 1 and 2.** `zig build test` printed 24 of 24 tests passed, with the lint. Each
+  mutation of a check's commit was CAUGHT once its test existed; the commits list them.
+- **Step 3.** `zig build test-protobuf` printed 39 of 39 tests passed.
+- **Step 4.** `zig build test-connect` printed 42 of 42 tests passed. `exchange_test.zig` plays
+  a client against a server for each protocol, codec and stream type.
+- **Step 5.** `zig build example-eliza` printed "every call answered as expected over h2 and
+  h11": Connect POST and GET, a gRPC-Web server stream, a Connect bidirectional stream with a
+  trailer, and a gRPC Trailers-Only error. `tools/interop_check.sh` with buf 1.74.0 printed 17
+  of 17 calls answered, gRPC's trailers among them.
+- **Step 6.** buf 1.74.0 ran the plugin over `examples/proto`, and `tools/generate_check.sh`
+  printed "examples/gen matches buf generate". `zig build test-generated` compiles the output.
+
+### What a later step owes
+
+- The connectrpc conformance suite (step 7).
+- A gRPC client over colibri, once colibri's client exposes response trailers (decision 11).
+- Long streams written at `on_writable`, and full-duplex streams (decision 12).
+- Unknown fields kept, Any, Struct, Value and ListValue in JSON, and editions in the plugin.

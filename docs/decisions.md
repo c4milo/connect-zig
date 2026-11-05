@@ -84,10 +84,21 @@ first. Cite an entry by number in code and commits ("decision 6").
     Beaten: waiting for flow control in colibri before shipping any stream. A later step writes
     long streams at `on_writable`.
 
+13. **Examples run in cleartext.** The ELIZA programs speak h2 with prior knowledge and h11, and
+    hold no TLS identity, so they need no certificate to run. colibri's `tls` module still links
+    chapulin, so each program defines `ch_assert_fail`. Beaten: colibri's test identity, which
+    colibri does not package.
+
+14. **A handler returns its error as a value.** A handler fills its response and returns null, or
+    returns the `connect.RpcError` the client reads. A Zig error from a handler is a fault, which
+    the route table's `error_handler` answers. Beaten: a Zig error set per handler, which cannot
+    carry a message or details.
+
 ## Tooling
 
-13. **pepegrillo is lazy.** `build.zig` requests it only when `b.pkg_hash.len == 0`, so a project
+15. **pepegrillo is lazy.** `build.zig` requests it only when `b.pkg_hash.len == 0`, so a project
     that depends on connect-zig never fetches it, as in colibri (colibri decision 36).
 
-14. **CI downloads Zig 0.16.0 pinned by SHA-256**, and every check a person runs is one `zig
-    build` step, as in colibri's workflow (colibri decision 47).
+16. **CI downloads Zig 0.16.0 and buf 1.74.0 pinned by SHA-256**, and every check a person runs
+    is one `zig build` step or one script of `tools/`, as in colibri's workflow (colibri decision
+    47).

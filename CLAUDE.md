@@ -74,7 +74,14 @@ confirm a test fails. Report `CAUGHT` or `NOT CAUGHT` per mutation in the commit
   generated code. `zig build test-<module>` runs one module's tests alone.
 - Lint: `zig build lint`: the cognitive-complexity score, then the rules of `tools/lint/main.zig`.
 - Commit messages: `zig build lint-commits` checks `origin/main..HEAD`.
-- Examples: `zig build examples` runs every program in `examples/`.
-- Generated code: `zig build generate` rewrites the committed `.pb.zig` files through `buf
-  generate`, and `zig build generate-check` compares them.
-- CI: `tools/ci.sh` runs every check, and `.github/workflows/main.yml` runs it on each push.
+- Examples: `zig build examples` runs every program in `examples/` that checks itself: the ELIZA
+  client against the ELIZA server over colibri's h2 and h11, in memory. `zig build
+  run-eliza-server -- [port]` serves ELIZA on a TCP socket; port 0 lets the kernel choose, and the
+  server prints `listening on port <port>`.
+- Generated code: `zig build test-generated` compiles `examples/gen` and runs its round trips.
+  `tools/generate_check.sh` regenerates it with `buf generate` and fails on a difference;
+  `--write` rewrites it. It needs buf, or `BUF` naming it.
+- Interop: `tools/interop_check.sh` calls the socket server with `buf curl` in Connect, gRPC and
+  gRPC-Web, and with curl over h11 and h2. It needs buf and curl.
+- CI: `tools/ci.sh` runs every check, and `.github/workflows/main.yml` runs it on each push. A new
+  check joins `tools/ci.sh`, never the workflow file.

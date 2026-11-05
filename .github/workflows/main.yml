@@ -1,5 +1,5 @@
 # Every check of this repository, on each push to main and each pull request: tools/ci.sh on
-# Linux x86-64 (docs/decisions.md entry 14). Each job's work
+# Linux x86-64 (docs/decisions.md entry 16). Each job's work
 # is one script or one zig build step, which a person runs by hand for the same answer. Each
 # download is pinned by checksum.
 name: main
