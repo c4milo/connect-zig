@@ -16,8 +16,9 @@ const decode = @import("decode.zig");
 const constants = @import("constants.zig");
 const Kind = descriptor.Kind;
 
+/// A message element is checked where it is decoded, not here: a message may repeat its own
+/// type, and a check here would ask for the type while it is still being defined.
 pub fn Repeated(comptime T: type, comptime element_kind: Kind) type {
-    if (element_kind == .message) assert(descriptor.is_message(T));
     return struct {
         const Self = @This();
         pub const Element = T;

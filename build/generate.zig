@@ -1,9 +1,20 @@
+//! `zig build test-generated`: compiles the code `buf generate` wrote into examples/gen and runs
+//! its round trips. `tools/generate_check.sh` compares that code with what buf writes now, which
+//! needs buf, so it runs from `tools/ci.sh` and not from `zig build test` (design §8 step 6).
 const std = @import("std");
-pub fn add(b: *std.Build, plugin: *std.Build.Step.Compile) void {
-    _ = b;
-    _ = plugin;
-}
-pub fn add_check(b: *std.Build, plugin: *std.Build.Step.Compile) *std.Build.Step {
-    _ = plugin;
-    return b.step("generate-check", "Check committed generated code");
+
+pub fn add(b: *std.Build, protobuf: *std.Build.Module, connect: *std.Build.Module, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode) *std.Build.Step {
+    const module = b.createModule(.{
+        .root_source_file = b.path("examples/generated_test.zig"),
+        .target = target,
+        .optimize = optimize,
+        .imports = &.{
+            .{ .name = "protobuf", .module = protobuf },
+            .{ .name = "connect", .module = connect },
+        },
+    });
+    const run = b.addRunArtifact(b.addTest(.{ .name = "generated", .root_module = module }));
+    const step = b.step("test-generated", "Compile the generated code of examples/gen and run its round trips");
+    step.dependOn(&run.step);
+    return step;
 }

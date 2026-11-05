@@ -1,0 +1,40 @@
+// The ELIZA service of the Connect demos, which answers like the 1966 program's psychotherapist.
+// connect-zig's examples serve it with every stream type Connect has.
+syntax = "proto3";
+
+package connectrpc.eliza.v1;
+
+service ElizaService {
+  // Say answers one sentence. It has no side effects, so a Connect client may send it as a GET.
+  rpc Say(SayRequest) returns (SayResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+  // Converse answers each sentence of a conversation.
+  rpc Converse(stream ConverseRequest) returns (stream ConverseResponse) {}
+  // Introduce answers one name with a few sentences.
+  rpc Introduce(IntroduceRequest) returns (stream IntroduceResponse) {}
+}
+
+message SayRequest {
+  string sentence = 1;
+}
+
+message SayResponse {
+  string sentence = 1;
+}
+
+message ConverseRequest {
+  string sentence = 1;
+}
+
+message ConverseResponse {
+  string sentence = 1;
+}
+
+message IntroduceRequest {
+  string name = 1;
+}
+
+message IntroduceResponse {
+  string sentence = 1;
+}

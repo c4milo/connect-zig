@@ -1,0 +1,8 @@
+// A message another file imports, to check the generator's imports between files.
+syntax = "proto3";
+
+package shared.v1;
+
+message Tag {
+  string value = 1;
+}

@@ -19,3 +19,4 @@ echo "# connect-zig checks" >"${report}"
 run format zig fmt --check build.zig build src tools examples
 run test zig build test --summary all
 run release zig build -Drelease
+run generated tools/generate_check.sh

@@ -1,0 +1,8 @@
+# `zig build generate` and CI run `buf generate` with this file over examples/proto, with the
+# plugin this repository builds (design §8 step 6).
+version: v2
+inputs:
+  - directory: examples/proto
+plugins:
+  - local: zig-out/bin/protoc-gen-connect-zig
+    out: examples/gen

@@ -37,7 +37,10 @@ pub fn build(b: *std.Build) void {
             .root_source_file = b.path("src/protoc_gen/main.zig"),
             .target = target,
             .optimize = optimize,
-            .imports = &.{.{ .name = "protobuf", .module = graph.protobuf }},
+            .imports = &.{
+                .{ .name = "protobuf", .module = graph.protobuf },
+                .{ .name = "public_names", .module = graph.public_names },
+            },
         }),
     });
     b.installArtifact(plugin);
@@ -49,8 +52,7 @@ pub fn build(b: *std.Build) void {
     const test_step = b.step("test", "Run the lint, then every module's unit tests and the examples");
     add_unit_tests(b, graph, plugin, test_step);
     test_step.dependOn(examples.add(b, graph));
-    test_step.dependOn(generate.add_check(b, plugin));
-    generate.add(b, plugin);
+    test_step.dependOn(generate.add(b, graph.protobuf, graph.connect, target, optimize));
     if (lint.add(b)) |lint_step| test_step.dependOn(lint_step);
 }
 
