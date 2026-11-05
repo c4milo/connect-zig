@@ -35,11 +35,11 @@ pub fn decode(comptime T: type, codec: Codec, octets: []const u8, scratch: Scrat
 }
 
 /// The octets an envelope's payload holds: as they are, or inflated with `coding`.
-pub fn open(compressed: bool, coding: compression.Coding, decoders: compression.Decoders, payload: []const u8, output: []u8) (compression.Error || error{InvalidEnvelope})![]const u8 {
+pub fn open(compressed: bool, coding: compression.Coding, decoders: compression.Decoders, payload: []const u8, output: []u8) (compression.Error || error{CompressedWithoutCoding})![]const u8 {
     if (!compressed) return payload;
-    // PROTOCOL-HTTP2.md, "Message-Encoding": a compressed message with no encoding named is an
-    // error.
-    if (coding == .identity) return error.InvalidEnvelope;
+    // PROTOCOL-HTTP2.md, "Message-Encoding", and the Connect protocol, "Streaming-Request": a
+    // message flagged compressed with no encoding named is an `internal` error.
+    if (coding == .identity) return error.CompressedWithoutCoding;
     return compression.decompress(coding, decoders, payload, output);
 }
 

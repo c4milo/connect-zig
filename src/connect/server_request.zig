@@ -15,8 +15,10 @@ const Code = @import("code.zig").Code;
 const RpcError = rpc_error.RpcError;
 
 pub const Error = message_codec.DecodeError || compression.Error || envelope.Error || get.Error || error{
-    /// A request envelope flagged end-stream or trailers, or compressed with no coding named.
+    /// A request envelope flagged end-stream or trailers.
     InvalidEnvelope,
+    /// A request envelope flagged compressed while the request names no coding.
+    CompressedWithoutCoding,
 };
 
 pub const Messages = struct {
@@ -77,6 +79,9 @@ pub fn failure_of(failure: Error) RpcError {
         // server set, not a fault of the message (statuscodes.md, RESOURCE_EXHAUSTED).
         error.MessageTooLarge, error.NoSpaceLeft => .{ .code = .resource_exhausted, .message = "message larger than the server reads" },
         error.UnsupportedCoding => .{ .code = .internal, .message = "unsupported compression" },
+        // PROTOCOL-HTTP2.md, "Message-Encoding", and the Connect protocol, "Streaming-Request":
+        // a compressed message with no encoding named is `internal`.
+        error.CompressedWithoutCoding => .{ .code = .internal, .message = "compressed message with no encoding" },
         error.InvalidEnvelope, error.InvalidFlags, error.Truncated => .{ .code = .invalid_argument, .message = "malformed envelope" },
         else => .{ .code = .invalid_argument, .message = "malformed message" },
     };
@@ -127,7 +132,10 @@ test "a request envelope flagged end-stream, or compressed with no coding, is re
     var ended = Messages.init(accepted_for(.connect, true), &.{ 0x02, 0, 0, 0, 0 }, scratch, .{});
     try testing.expectError(error.InvalidEnvelope, ended.next(Note));
     var compressed = Messages.init(accepted_for(.grpc, true), &.{ 0x01, 0, 0, 0, 0 }, scratch, .{});
-    try testing.expectError(error.InvalidEnvelope, compressed.next(Note));
+    if (compressed.next(Note)) |_| return error.TestExpectedError else |failure| {
+        try testing.expectEqual(error.CompressedWithoutCoding, failure);
+        try testing.expectEqual(Code.internal, failure_of(failure).code);
+    }
     var large = Messages.init(accepted_for(.grpc, true), &.{ 0, 0, 0, 1, 0 }, scratch, .{});
     if (large.next(Note)) |_| return error.TestExpectedError else |failure| {
         try testing.expectEqual(Code.resource_exhausted, failure_of(failure).code);

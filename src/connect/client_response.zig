@@ -41,6 +41,8 @@ pub const Storage = struct {
 pub const Error = message_codec.DecodeError || compression.Error || envelope.Error || error{
     /// An envelope the protocol does not allow where it stands, or a message after the end.
     InvalidEnvelope,
+    /// An envelope flagged compressed while the response names no coding.
+    CompressedWithoutCoding,
 };
 
 pub const Response = struct {
