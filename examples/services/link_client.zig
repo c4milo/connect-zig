@@ -244,8 +244,8 @@ fn report(event: client.Event, now_ns: u64) !void {
 /// Starts the connection an `open` named, over the transport the round runs. The link stands
 /// where a socket would be: the server accepts what the client connects.
 fn open_transport(open: client.Open, now_ns: u64) !void {
-    const transport: client.Transport = if (quic) .quic else .tcp;
-    if (open.transport != transport) return error.ExchangeWrong;
+    // The round checks the protocol it spoke when it ends, so a transport it did not ask for
+    // fails there.
     switch (open.transport) {
         .quic => try pool.start_quic(prng.random(), now_seconds, now_ns, null),
         .tcp => {

@@ -85,8 +85,9 @@ confirm a test fails. Report `CAUGHT` or `NOT CAUGHT` per mutation in the commit
 - Commit messages: `zig build lint-commits` checks `origin/main..HEAD`.
 - Examples: `zig build examples` runs every program in `examples/` that checks itself:
   `protobuf_messages`, `sans_io_call`, and `eliza`, `streaming`, `interceptors` and `errors`,
-  which run a client against the server of `examples/services/` over colibri's h2 and h11, in
-  memory. `zig build example-<name>` runs one; `examples/README.md` lists them. `zig build
+  which run a client against the server of `examples/services/` over colibri's h11, h2 and h3,
+  in memory; the h3 rounds use the test-only identity of `examples/testdata/tls` (decision 25).
+  `zig build example-<name>` runs one; `examples/README.md` lists them. `zig build
   run-eliza-server -- [port]` serves the ELIZA and demo services on a TCP socket; port 0 lets the
   kernel choose, and the server prints `listening on port <port>`.
 - Generated code: `zig build test-generated` compiles `examples/gen` and runs its round trips.
