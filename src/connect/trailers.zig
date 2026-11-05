@@ -74,13 +74,13 @@ pub fn percent_encode(message: []const u8, buffer: []u8) error{NoSpaceLeft}![]co
 }
 
 /// Decodes a grpc-message value. A "%" that two hex digits do not follow is kept as it is: the
-/// reader must not fail on a malformed value (PROTOCOL-HTTP2.md, "Responses").
+/// reader must not fail on a malformed value (PROTOCOL-HTTP2.md, "Responses"). A message longer
+/// than `buffer` is cut to fit: the value comes from the peer, so its length is not trusted.
 pub fn percent_decode(value: []const u8, buffer: []u8) []const u8 {
-    assert(buffer.len >= value.len);
     var len: usize = 0;
     var index: usize = 0;
     for (0..value.len) |_| {
-        if (index >= value.len) break;
+        if (index >= value.len or len == buffer.len) break;
         const escape_len = protocol.percent_escape_len;
         const decoded = if (value[index] == '%' and index + escape_len <= value.len)
             std.fmt.parseInt(u8, value[index + 1 .. index + escape_len], protocol.hex_base) catch null
@@ -114,7 +114,7 @@ pub fn read(context: anytype, comptime find: fn (@TypeOf(context), []const u8) ?
     if (code == .ok) return null;
     var failure: RpcError = .{ .code = code };
     if (find(context, "grpc-message")) |message| {
-        failure.message = percent_decode(message, storage.message[0..@min(storage.message.len, message.len)]);
+        failure.message = percent_decode(message, storage.message);
     }
     const details_text = find(context, "grpc-status-details-bin") orelse return failure;
     const bytes = decode_bin(details_text, storage.status) orelse return failure;
@@ -127,12 +127,35 @@ fn decode_bin(text: []const u8, buffer: []u8) ?[]const u8 {
     return json_read.decode_base64(std.base64.standard_no_pad.Decoder, text, buffer) catch null;
 }
 
+/// Whether a trailer is a header field line: a token for its name (RFC 9110 §5.6.2), and a value
+/// without CR, LF or NUL (RFC 9110 §5.5).
+pub fn valid_field(field: Header) bool {
+    if (field.name.len == 0) return false;
+    for (field.name) |octet| {
+        if (!is_token_octet(octet)) return false;
+    }
+    for (field.value) |octet| {
+        if (octet == '\r' or octet == '\n' or octet == 0) return false;
+    }
+    return true;
+}
+
+/// RFC 9110 §5.6.2: tchar is "!" / "#" / "$" / "%" / "&" / "'" / "*" / "+" / "-" / "." / "^" /
+/// "_" / "`" / "|" / "~" / DIGIT / ALPHA.
+fn is_token_octet(octet: u8) bool {
+    if (std.ascii.isAlphanumeric(octet)) return true;
+    return std.mem.indexOfScalar(u8, "!#$%&'*+-.^_`|~", octet) != null;
+}
+
 /// Writes gRPC-Web's trailers frame: the 0x80 envelope of the trailers as header lines.
-pub fn write_web_frame(trailers: []const Header, buffer: []u8) error{NoSpaceLeft}![]const u8 {
+pub fn write_web_frame(trailers: []const Header, buffer: []u8) error{ NoSpaceLeft, InvalidTrailer }![]const u8 {
     const prefix_len = constants.protocol.envelope_prefix_len;
     if (buffer.len < prefix_len) return error.NoSpaceLeft;
     var len: usize = prefix_len;
     for (trailers) |trailer| {
+        // A line break in a name or value would forge further trailer lines, which no HTTP layer
+        // checks here, since the frame rides in the body (RFC 9110 §5.1, §5.5).
+        if (!valid_field(trailer)) return error.InvalidTrailer;
         // PROTOCOL-WEB.md: the frame holds HTTP/1.1 header lines with lowercase names.
         const line = std.fmt.bufPrint(buffer[len..], "{s}: {s}\r\n", .{ trailer.name, trailer.value }) catch return error.NoSpaceLeft;
         for (line[0..trailer.name.len]) |*octet| octet.* = std.ascii.toLower(octet.*);
@@ -165,6 +188,10 @@ test "grpc-message is percent-encoded, and malformed escapes are kept" {
     var decoded: [64]u8 = undefined;
     try testing.expectEqualStrings("50% déjà", percent_decode("50%25 d%C3%A9j%C3%A0", &decoded));
     try testing.expectEqualStrings("%zz%4", percent_decode("%zz%4", &decoded));
+    // A message longer than the client's buffer is cut to fit, never written past its end.
+    var short: [4]u8 = undefined;
+    try testing.expectEqualStrings("50% ", percent_decode("50%25 d%C3%A9j%C3%A0", &short));
+    try testing.expectEqualStrings("aaaa", percent_decode("aaaaaaaaaaaaaaaaaaaaaaaaaaaaa", &short));
 }
 
 test "status trailers round-trip, details included" {
@@ -192,4 +219,8 @@ test "a gRPC-Web trailers frame is an 0x80 envelope of lowercase header lines" {
     var out: [4]Header = undefined;
     const read_back = try read_web_frame(frame[5..], &out);
     try testing.expectEqualStrings("0", read_back[0].value);
+    // A line break in a trailer would forge the lines after it, so the frame refuses it.
+    try testing.expectError(error.InvalidTrailer, write_web_frame(&.{.{ .name = "x-id", .value = "1\r\ngrpc-status: 0" }}, &buffer));
+    try testing.expectError(error.InvalidTrailer, write_web_frame(&.{.{ .name = "x id", .value = "1" }}, &buffer));
+    try testing.expectError(error.InvalidTrailer, write_web_frame(&.{.{ .name = "", .value = "1" }}, &buffer));
 }

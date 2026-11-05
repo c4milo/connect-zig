@@ -51,6 +51,10 @@ pub const Messages = struct {
         messages.unary_read = true;
         const coding = messages.accepted.request_coding;
         if (messages.accepted.query) |query| {
+            // The octets `decode` reads must not sit in `scratch.work`, where reading JSON writes
+            // its binary form: the output would overwrite input not yet read. With no coding the
+            // query decodes straight into `scratch.message`.
+            if (coding == .identity) return try get.message_octets(query, messages.scratch.message);
             const encoded = try get.message_octets(query, messages.scratch.work);
             return try compression.decompress(coding, messages.decoders, encoded, messages.scratch.message);
         }
@@ -128,4 +132,27 @@ test "a request envelope flagged end-stream, or compressed with no coding, is re
     if (large.next(Note)) |_| return error.TestExpectedError else |failure| {
         try testing.expectEqual(Code.resource_exhausted, failure_of(failure).code);
     }
+}
+
+const Counter = struct {
+    n: i32 = 0,
+    text: []const u8 = "",
+    pub const FieldNumber = enum(u29) { n = 1, text = 2 };
+    pub const protobuf: proto.Descriptor = .{ .full_name = "test.Counter", .fields = &.{
+        proto.field_of(FieldNumber.n, .int32, .{}),
+        proto.field_of(FieldNumber.text, .string, .{}),
+    } };
+};
+
+test "a GET's JSON message decodes in full, though its binary form is longer than its text" {
+    var buffers: [3][64]u8 = undefined;
+    const scratch: message_codec.Scratch = .{ .message = &buffers[0], .work = &buffers[1], .tokens = &buffers[2] };
+    var accepted = accepted_for(.connect, false);
+    accepted.speaks.codec = .json;
+    // -1 takes ten octets as an int32 varint, more than the JSON text that holds it.
+    accepted.query = .{ .codec = .json, .message = "%7B%22n%22%3A-1%2C%22text%22%3A%22hello%22%7D" };
+    var messages = Messages.init(accepted, "", scratch, .{});
+    const counter = (try messages.next(Counter)).?;
+    try testing.expectEqual(@as(i32, -1), counter.n);
+    try testing.expectEqualStrings("hello", counter.text);
 }

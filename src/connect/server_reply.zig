@@ -46,7 +46,7 @@ pub const Head = struct {
     }
 };
 
-pub const Error = message_codec.EncodeError || error{ WriteFailed, TooManyDetails };
+pub const Error = message_codec.EncodeError || error{ WriteFailed, TooManyDetails, InvalidTrailer };
 
 pub const Prepared = message_codec.Prepared;
 

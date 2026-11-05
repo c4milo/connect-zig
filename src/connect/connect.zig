@@ -137,6 +137,7 @@ pub const trailers = struct {
     pub const percent_decode = files.trailers.percent_decode;
     pub const write_web_frame = files.trailers.write_web_frame;
     pub const read_web_frame = files.trailers.read_web_frame;
+    pub const valid_field = files.trailers.valid_field;
 };
 
 /// The unary GET of a method with no side effects.
