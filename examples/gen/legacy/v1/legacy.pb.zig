@@ -13,6 +13,7 @@ pub const Everything = struct {
     item: proto.Repeated(Everything.Item, .group) = .{},
     child: proto.Lazy(Everything) = .{},
     counts: proto.Repeated(Everything.CountsEntry, .message) = .{},
+    _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
         count = 1,
@@ -44,6 +45,7 @@ pub const Everything = struct {
     pub const Inner = struct {
         a: ?i32 = null,
         b: ?[]const u8 = null,
+        _unknown: proto.Unknown = .{},
 
         pub const FieldNumber = enum(u29) {
             a = 7,
@@ -61,6 +63,7 @@ pub const Everything = struct {
 
     pub const Item = struct {
         x: ?i32 = null,
+        _unknown: proto.Unknown = .{},
 
         pub const FieldNumber = enum(u29) {
             x = 10,

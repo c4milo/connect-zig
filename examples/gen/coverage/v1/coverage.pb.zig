@@ -11,4 +11,5 @@ pub const Maps = @import("coverage/Maps.pb.zig").Maps;
 pub const Choice = @import("coverage/Choice.pb.zig").Choice;
 pub const WellKnown = @import("coverage/WellKnown.pb.zig").WellKnown;
 pub const Everything = @import("coverage/Everything.pb.zig").Everything;
+pub const Partial = @import("coverage/Partial.pb.zig").Partial;
 pub const Color = @import("coverage/Color.pb.zig").Color;

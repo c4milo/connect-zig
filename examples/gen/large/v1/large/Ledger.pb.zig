@@ -88,6 +88,7 @@ pub const Ledger = struct {
     owner: ?Account = null,
     visibility: Account.Profile.Visibility = @enumFromInt(0),
     children: proto.Repeated(Ledger, .message) = .{},
+    _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
         field_1 = 1,

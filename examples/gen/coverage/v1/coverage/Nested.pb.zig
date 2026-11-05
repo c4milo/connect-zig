@@ -6,6 +6,7 @@ const proto = @import("protobuf");
 pub const Nested = struct {
     a: i32 = 0,
     b: []const u8 = "",
+    _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
         a = 1,

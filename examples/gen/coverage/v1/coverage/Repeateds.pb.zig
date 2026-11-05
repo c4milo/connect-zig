@@ -28,6 +28,7 @@ pub const Repeateds = struct {
     u_double: proto.Repeated(f64, .double) = .{},
     u_bool: proto.Repeated(bool, .bool) = .{},
     u_color: proto.Repeated(Color, .@"enum") = .{},
+    _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
         r_double = 1,

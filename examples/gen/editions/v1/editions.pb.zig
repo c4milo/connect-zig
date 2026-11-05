@@ -6,6 +6,7 @@ const proto = @import("protobuf");
 pub const Note = struct {
     a: ?i32 = null,
     b: ?[]const u8 = null,
+    _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
         a = 1,
@@ -38,6 +39,7 @@ pub const Record = struct {
         pick_note: Note,
     } = null,
     child: proto.Lazy(Record) = .{},
+    _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
         count = 1,
@@ -100,6 +102,7 @@ pub const Delimited = struct {
     first: ?Note = null,
     rest: proto.Repeated(Note, .group) = .{},
     by_number: proto.Repeated(Delimited.ByNumberEntry, .message) = .{},
+    _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
         first = 1,
@@ -140,6 +143,7 @@ pub const Everything = struct {
     record: ?Record = null,
     delimited: ?Delimited = null,
     records: proto.Repeated(Record, .message) = .{},
+    _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
         record = 1,

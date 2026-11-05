@@ -26,6 +26,7 @@ pub const WellKnown = struct {
     values: proto.Repeated(proto.wkt.Value, .message) = .{},
     anys: proto.Repeated(proto.wkt.Any, .message) = .{},
     value_map: proto.Repeated(WellKnown.ValueMapEntry, .message) = .{},
+    _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
         timestamp = 1,

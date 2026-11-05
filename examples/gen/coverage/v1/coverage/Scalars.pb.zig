@@ -21,6 +21,7 @@ pub const Scalars = struct {
     f_string: []const u8 = "",
     f_bytes: []const u8 = "",
     f_color: Color = @enumFromInt(0),
+    _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
         f_double = 1,

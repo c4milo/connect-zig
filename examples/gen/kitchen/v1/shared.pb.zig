@@ -5,6 +5,7 @@ const proto = @import("protobuf");
 
 pub const Tag = struct {
     value: []const u8 = "",
+    _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
         value = 1,

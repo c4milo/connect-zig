@@ -21,6 +21,7 @@ pub const Maps = struct {
     m_bytes: proto.Repeated(Maps.MBytesEntry, .message) = .{},
     m_double: proto.Repeated(Maps.MDoubleEntry, .message) = .{},
     m_int32_int64: proto.Repeated(Maps.MInt32Int64Entry, .message) = .{},
+    _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
         m_int32 = 1,

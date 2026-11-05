@@ -15,6 +15,7 @@ pub const Choice = struct {
         c_double: f64,
         c_bool: bool,
     } = null,
+    _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
         c_int32 = 1,

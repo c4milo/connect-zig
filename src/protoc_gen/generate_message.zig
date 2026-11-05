@@ -49,6 +49,7 @@ pub fn write(out: *Out, scope: []const u8, message: pb.DescriptorProto, depth: u
     try out.indent(depth);
     try out.print("pub const {s} = struct {{\n", .{try names.identifier(out.arena, name)});
     try write_struct_fields(out, full, fields, depth + 1);
+    try write_unknown_field(out, message, depth + 1);
     try write_field_numbers(out, fields, depth + 1);
     try write_descriptor(out, full, message, fields, depth + 1);
     const path = if (nesting.path.len == 0) name else try std.fmt.allocPrint(out.arena, "{s}.{s}", .{ nesting.path, name });
@@ -127,6 +128,21 @@ fn write_struct_fields(out: *Out, full: []const u8, fields: []const Member, dept
         const typed = try zig_type(out, full, field);
         try out.print("{s}: {s} = {s},\n", .{ try names.field_identifier(out.arena, field.name orelse ""), typed.text, typed.default });
     }
+}
+
+/// The struct field a generated message keeps the fields it does not know in, which the runtime
+/// writes back (decision 24). A map entry keeps none: Go and C++ drop an entry's unknown fields.
+const unknown_field = "_unknown";
+
+fn write_unknown_field(out: *Out, message: pb.DescriptorProto, depth: usize) Error!void {
+    const map_entry = if (message.options) |options| options.map_entry orelse false else false;
+    if (map_entry) return;
+    var fields = message.field.iterator();
+    while (try fields.next()) |field| {
+        if (std.mem.eql(u8, field.name orelse "", unknown_field)) return error.NameCollision;
+    }
+    try out.indent(depth);
+    try out.print("{s}: proto.Unknown = .{{}},\n", .{unknown_field});
 }
 
 fn first_of_oneof(fields: []const Member, at: usize) bool {

@@ -21,6 +21,7 @@ pub const Optionals = struct {
     o_string: ?[]const u8 = null,
     o_bytes: ?[]const u8 = null,
     o_color: ?Color = null,
+    _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
         o_double = 1,

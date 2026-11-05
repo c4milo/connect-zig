@@ -18,6 +18,7 @@ pub const Everything = struct {
     well_known: ?WellKnown = null,
     child: proto.Lazy(Everything) = .{},
     children: proto.Repeated(Everything, .message) = .{},
+    _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
         scalars = 1,

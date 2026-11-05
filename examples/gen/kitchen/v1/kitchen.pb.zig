@@ -25,6 +25,7 @@ pub const Scalars = struct {
     packed_numbers: proto.Repeated(i32, .int32) = .{},
     unpacked_numbers: proto.Repeated(i32, .int32) = .{},
     mood: Mood = @enumFromInt(0),
+    _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
         a_double = 1,
@@ -91,6 +92,7 @@ pub const Tree = struct {
     mask: ?proto.wkt.FieldMask = null,
     nickname: ?proto.wkt.StringValue = null,
     type: []const u8 = "",
+    _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
         name = 1,
@@ -170,6 +172,7 @@ pub const Tree = struct {
     pub const Leaf = struct {
         kind: Tree.Leaf.Kind = @enumFromInt(0),
         tag: ?kitchen_v1_shared.Tag = null,
+        _unknown: proto.Unknown = .{},
 
         pub const FieldNumber = enum(u29) {
             kind = 1,

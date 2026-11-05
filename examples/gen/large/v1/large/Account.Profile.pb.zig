@@ -7,6 +7,7 @@ const Account = @import("Account.pb.zig").Account;
 pub const Profile = struct {
     display_name: []const u8 = "",
     visibility: Account.Profile.Visibility = @enumFromInt(0),
+    _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
         display_name = 1,

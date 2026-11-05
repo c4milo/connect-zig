@@ -6,6 +6,7 @@ const connect = @import("connect");
 
 pub const SayRequest = struct {
     sentence: []const u8 = "",
+    _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
         sentence = 1,
@@ -21,6 +22,7 @@ pub const SayRequest = struct {
 
 pub const SayResponse = struct {
     sentence: []const u8 = "",
+    _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
         sentence = 1,
@@ -36,6 +38,7 @@ pub const SayResponse = struct {
 
 pub const ConverseRequest = struct {
     sentence: []const u8 = "",
+    _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
         sentence = 1,
@@ -51,6 +54,7 @@ pub const ConverseRequest = struct {
 
 pub const ConverseResponse = struct {
     sentence: []const u8 = "",
+    _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
         sentence = 1,
@@ -66,6 +70,7 @@ pub const ConverseResponse = struct {
 
 pub const IntroduceRequest = struct {
     name: []const u8 = "",
+    _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
         name = 1,
@@ -81,6 +86,7 @@ pub const IntroduceRequest = struct {
 
 pub const IntroduceResponse = struct {
     sentence: []const u8 = "",
+    _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
         sentence = 1,

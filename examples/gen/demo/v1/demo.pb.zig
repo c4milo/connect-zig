@@ -5,6 +5,7 @@ const proto = @import("protobuf");
 const connect = @import("connect");
 
 pub const WhoamiRequest = struct {
+    _unknown: proto.Unknown = .{},
     pub const protobuf: proto.Descriptor = .{
         .full_name = "demo.v1.WhoamiRequest",
         .fields = &.{},
@@ -14,6 +15,7 @@ pub const WhoamiRequest = struct {
 pub const WhoamiResponse = struct {
     name: []const u8 = "",
     calls_before: i64 = 0,
+    _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
         name = 1,
@@ -31,6 +33,7 @@ pub const WhoamiResponse = struct {
 
 pub const ChatMessage = struct {
     text: []const u8 = "",
+    _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
         text = 1,
@@ -46,6 +49,7 @@ pub const ChatMessage = struct {
 
 pub const SumRequest = struct {
     number: i64 = 0,
+    _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
         number = 1,
@@ -62,6 +66,7 @@ pub const SumRequest = struct {
 pub const SumResponse = struct {
     sum: i64 = 0,
     count: i64 = 0,
+    _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
         sum = 1,
@@ -79,6 +84,7 @@ pub const SumResponse = struct {
 
 pub const CountdownRequest = struct {
     from: i32 = 0,
+    _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
         from = 1,
@@ -94,6 +100,7 @@ pub const CountdownRequest = struct {
 
 pub const CountdownResponse = struct {
     number: i32 = 0,
+    _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
         number = 1,
@@ -110,6 +117,7 @@ pub const CountdownResponse = struct {
 pub const DivideRequest = struct {
     dividend: i64 = 0,
     divisor: i64 = 0,
+    _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
         dividend = 1,
@@ -128,6 +136,7 @@ pub const DivideRequest = struct {
 pub const DivideResponse = struct {
     quotient: i64 = 0,
     remainder: i64 = 0,
+    _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
         quotient = 1,
@@ -145,6 +154,7 @@ pub const DivideResponse = struct {
 
 pub const DivisionByZero = struct {
     dividend: i64 = 0,
+    _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
         dividend = 1,

@@ -9,6 +9,7 @@ pub const Small = struct {
     active: bool = false,
     name: []const u8 = "",
     score: f64 = 0,
+    _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
         id = 1,
@@ -35,6 +36,7 @@ pub const Address = struct {
     city: []const u8 = "",
     country: []const u8 = "",
     postal_code: u32 = 0,
+    _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
         street = 1,
@@ -71,6 +73,7 @@ pub const Medium = struct {
         phone: []const u8,
         office: Address,
     } = null,
+    _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
         id = 1,
@@ -136,6 +139,7 @@ pub const Record = struct {
     values: proto.Repeated(i32, .sint32) = .{},
     weight: f64 = 0,
     status: Status = @enumFromInt(0),
+    _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
         id = 1,
@@ -162,6 +166,7 @@ pub const Record = struct {
 pub const Large = struct {
     name: []const u8 = "",
     records: proto.Repeated(Record, .message) = .{},
+    _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
         name = 1,
@@ -181,6 +186,7 @@ pub const Deep = struct {
     level: i32 = 0,
     label: []const u8 = "",
     child: proto.Lazy(Deep) = .{},
+    _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
         level = 1,

@@ -87,6 +87,7 @@ pub const Account = struct {
     field_80: i64 = 0,
     profile: ?Account.Profile = null,
     tag: ?kitchen_v1_shared.Tag = null,
+    _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
         field_1 = 1,
