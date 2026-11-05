@@ -84,15 +84,16 @@ confirm a test fails. Report `CAUGHT` or `NOT CAUGHT` per mutation in the commit
   (decision 17).
 - Commit messages: `zig build lint-commits` checks `origin/main..HEAD`.
 - Examples: `zig build examples` runs every program in `examples/` that checks itself:
-  `protobuf_messages`, `sans_io_call`, and the ELIZA client against the ELIZA server over
-  colibri's h2 and h11, in memory. `zig build example-<name>` runs one; `examples/README.md`
-  lists them. `zig build
-  run-eliza-server -- [port]` serves ELIZA on a TCP socket; port 0 lets the kernel choose, and the
-  server prints `listening on port <port>`.
+  `protobuf_messages`, `sans_io_call`, and `eliza`, `streaming`, `interceptors` and `errors`,
+  which run a client against the server of `examples/services/` over colibri's h2 and h11, in
+  memory. `zig build example-<name>` runs one; `examples/README.md` lists them. `zig build
+  run-eliza-server -- [port]` serves the ELIZA and demo services on a TCP socket; port 0 lets the
+  kernel choose, and the server prints `listening on port <port>`.
 - Generated code: `zig build test-generated` compiles `examples/gen` and runs its round trips.
   `tools/generate_check.sh` regenerates it with `buf generate` and fails on a difference;
   `--write` rewrites it. It needs buf, or `BUF` naming it.
 - Interop: `tools/interop_check.sh` calls the socket server with `buf curl` in Connect, gRPC and
-  gRPC-Web, and with curl over h11 and h2. It needs buf and curl.
+  gRPC-Web, and with curl over h11 and h2, and checks that Chat answers full-duplex. It needs buf
+  and curl.
 - CI: `tools/ci.sh` runs every check, and `.github/workflows/main.yml` runs it on each push. A new
   check joins `tools/ci.sh`, never the workflow file.

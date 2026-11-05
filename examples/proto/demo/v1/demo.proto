@@ -1,0 +1,65 @@
+// A service with one method for each feature the examples show: interceptors around a unary
+// call, every kind of stream, and errors that carry typed details.
+syntax = "proto3";
+
+package demo.v1;
+
+service DemoService {
+  // Whoami answers with the caller's name, which an interceptor reads from the request's
+  // credentials before the handler runs.
+  rpc Whoami(WhoamiRequest) returns (WhoamiResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+  // Chat answers each message as it arrives, while the client still sends: full-duplex over h2.
+  rpc Chat(stream ChatMessage) returns (stream ChatMessage) {}
+  // Sum adds every number the client sends, and answers once the client ends its stream.
+  rpc Sum(stream SumRequest) returns (SumResponse) {}
+  // Countdown sends one message for each number from `from` down to 1.
+  rpc Countdown(CountdownRequest) returns (stream CountdownResponse) {}
+  // Divide fails with invalid_argument and a DivisionByZero detail when the divisor is 0.
+  rpc Divide(DivideRequest) returns (DivideResponse) {}
+}
+
+message WhoamiRequest {}
+
+message WhoamiResponse {
+  string name = 1;
+  // The calls the server answered before this one, which a logging interceptor counts.
+  int64 calls_before = 2;
+}
+
+message ChatMessage {
+  string text = 1;
+}
+
+message SumRequest {
+  int64 number = 1;
+}
+
+message SumResponse {
+  int64 sum = 1;
+  int64 count = 2;
+}
+
+message CountdownRequest {
+  int32 from = 1;
+}
+
+message CountdownResponse {
+  int32 number = 1;
+}
+
+message DivideRequest {
+  int64 dividend = 1;
+  int64 divisor = 2;
+}
+
+message DivideResponse {
+  int64 quotient = 1;
+  int64 remainder = 2;
+}
+
+// The detail a Divide error carries, which a client decodes from the error's details.
+message DivisionByZero {
+  int64 dividend = 1;
+}

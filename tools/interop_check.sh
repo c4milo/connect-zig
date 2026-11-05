@@ -1,11 +1,14 @@
 #!/bin/sh
-# Runs the ELIZA socket server and calls it with buf curl, whose client is connect-go's, in each
+# Runs the example socket server and calls it with buf curl, whose client is connect-go's, in each
 # protocol, and with curl over h11 and h2. It requires each answer octet for octet: a gRPC
 # success, whose status rides in HTTP trailers, is checked here and nowhere else (decision 11).
 # It needs buf on the path, or BUF naming it, and curl.
 set -eu
 cd "$(dirname "$0")/.."
 buf="${BUF:-buf}"
+# Each call gets this many seconds, so a server that sends a broken reply fails the check and
+# never hangs it.
+call_seconds=10
 zig build
 log="$(mktemp)"
 trap 'kill "${server}" 2>/dev/null || true; rm -f "${log}"' EXIT
@@ -33,7 +36,7 @@ expect() {
     fi
 }
 call() {
-    "${buf}" curl --http2-prior-knowledge --schema examples/proto --protocol "$1" -d "$2" "${base}/$3" 2>&1 | tr -d ' \n'
+    timeout "${call_seconds}" "${buf}" curl --http2-prior-knowledge --schema examples/proto --protocol "$1" -d "$2" "${base}/$3" 2>&1 | tr -d ' \n'
 }
 introduced='{"sentence":"HiAda,IamEliza."}{"sentence":"Beforewebegin,Ada,tellmehowyoucamehere."}{"sentence":"Howareyoufeelingtoday,Ada?"}'
 conversed='{"sentence":"Whydoyousay\"a\"?"}{"sentence":"Whydoyousay\"b\"?"}'
@@ -60,5 +63,47 @@ expect "two messages for a unary call" '1' \
     "$(curl -sS -m 5 --http2-prior-knowledge -H 'content-type: application/grpc-web+proto' --data-binary "@${log}.body" "${base}/Say" |
         grep -ac 'grpc-status: 12')"
 rm -f "${log}.body"
+
+# The demo service: interceptors, every kind of stream, and error details.
+base="http://127.0.0.1:${port}/demo.v1.DemoService"
+demo() {
+    demo_protocol="$1"
+    shift
+    timeout "${call_seconds}" "${buf}" curl --http2-prior-knowledge --schema examples/proto --protocol "${demo_protocol}" "$@" 2>&1 | tr -d ' \n'
+}
+for protocol in connect grpc grpcweb; do
+    expect "${protocol} Whoami with a token" '{"name":"Ada"}' \
+        "$(demo "${protocol}" -H 'authorization: Bearer Ada' "${base}/Whoami" | sed 's/,"callsBefore":"[0-9]*"//')"
+    expect "${protocol} Whoami without a token" '{"code":"unauthenticated","message":"abearertokenisrequired"}' \
+        "$(demo "${protocol}" "${base}/Whoami")"
+    expect "${protocol} Sum" '{"sum":"7","count":"2"}' "$(demo "${protocol}" -d '{"number":3} {"number":4}' "${base}/Sum")"
+    expect "${protocol} Countdown" '{"number":2}{"number":1}' "$(demo "${protocol}" -d '{"from":2}' "${base}/Countdown")"
+    expect "${protocol} Divide error" \
+        '{"code":"invalid_argument","message":"divisionbyzero","details":[{"type":"demo.v1.DivisionByZero","value":"CAc"}]}' \
+        "$(demo "${protocol}" -d '{"dividend":7}' "${base}/Divide")"
+done
+# Logging's response header, and Whoami's trailer, which a Connect unary reply sends as a header.
+expect "Connect unary headers" 'demo-logged: yes|trailer-whoami-caller: Ada|' \
+    "$(curl -sS -m 5 -m 5 -H 'authorization: Bearer Ada' --json '{}' -D - -o /dev/null "${base}/Whoami" |
+        tr -d '\r' | grep -i -e '^demo-logged:' -e '^trailer-whoami-caller:' | tr '\n' '|')"
+# Full duplex: Chat's answer to the first message must arrive while the client still holds its
+# stream open, before it sends the second.
+fifo="${log}.fifo"
+mkfifo "${fifo}"
+timeout "${call_seconds}" "${buf}" curl --http2-prior-knowledge --schema examples/proto --protocol grpc -d @- "${base}/Chat" <"${fifo}" >"${log}.chat" 2>&1 &
+chat=$!
+exec 3>"${fifo}"
+echo '{"text":"first"}' >&3
+answered=no
+for _ in $(seq 1 50); do
+    grep -q 'echo: first' "${log}.chat" && { answered=yes; break; }
+    sleep 0.1
+done
+echo '{"text":"second"}' >&3
+exec 3>&-
+wait "${chat}" || true
+expect "grpc Chat answers before the client ends" 'yes' "${answered}"
+expect "grpc Chat" '{"text":"echo:first"}{"text":"echo:second"}{"text":"byeafter2"}' "$(tr -d ' \n' <"${log}.chat")"
+rm -f "${fifo}" "${log}.chat"
 [ "${failures}" -eq 0 ] || exit 1
 echo "every interop call answered as expected"

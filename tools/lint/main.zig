@@ -114,7 +114,7 @@ pub const undefined_fill = rules.undefined_fill.Rule(.{
     .stop_at_testing_import = true,
     // A copy of colibri's examples/link.zig, kept as colibri wrote it.
     .allowed = &.{
-        .{ .path = "examples/eliza/link.zig", .variable = "events" },
+        .{ .path = "examples/services/link.zig", .variable = "events" },
     },
 });
 
@@ -171,7 +171,7 @@ test "undefined-fill reports a large local array and passes the copy of colibri'
     const arena = arena_state.allocator();
     const source: [:0]const u8 = "const T = struct { a: u64 };\nfn f() void {\n    var events: [16]T = undefined;\n    _ = &events;\n}\n";
     try testing.expect((try harness.run(arena, undefined_fill, "src/connect/reply.zig", source)).len == 1);
-    try testing.expect((try harness.run(arena, undefined_fill, "examples/eliza/link.zig", source)).len == 0);
+    try testing.expect((try harness.run(arena, undefined_fill, "examples/services/link.zig", source)).len == 0);
 }
 
 test "denied-words refuses an unresolved marker in prose" {

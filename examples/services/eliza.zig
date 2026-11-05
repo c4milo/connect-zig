@@ -1,29 +1,18 @@
-//! The ELIZA service both eliza programs serve: one handler for each method of
-//! connectrpc.eliza.v1.ElizaService, and the route table of colibri's `server.router` that calls
-//! them through connect_colibri (design §8 step 5).
+//! The ELIZA service: one handler for each method of connectrpc.eliza.v1.ElizaService, and its
+//! entries in the route table of `routes.zig` (design §8 step 5).
 const std = @import("std");
 const connect = @import("connect");
-const server = @import("server");
 const adapter = @import("connect_colibri");
 const eliza = @import("eliza");
 const Service = eliza.ElizaService;
 
-/// The longest sentence ELIZA writes back.
-const sentence_len_max = 4096;
 /// The sentences Converse answers in one call, at most.
 const conversation_turns_max = 16;
 
-/// The server's own state: the calls it answered, and room for the sentences it writes. A reply
-/// is written into the response before the handler returns, so one room serves every call.
-pub const App = struct {
-    calls: u32 = 0,
-    /// The codings connect_colibri reads and writes messages in: none unless a program sets them.
-    codings: adapter.Codings = .{},
-    sentence: [sentence_len_max]u8 = undefined,
-};
+const App = @import("app.zig").App;
 
 fn reply(app: *App, comptime format: []const u8, args: anytype) []const u8 {
-    return std.fmt.bufPrint(&app.sentence, format, args) catch "I have nothing to say to that.";
+    return std.fmt.bufPrint(&app.text, format, args) catch "I have nothing to say to that.";
 }
 
 /// Say answers one sentence.
@@ -56,25 +45,16 @@ fn converse(app: *App, call: *adapter.Call, receiver: *adapter.Receiver(eliza.Co
     return null;
 }
 
-fn on_error(_: *App, _: *const server.Request, _: anyerror, response: *server.ResponseWriter) void {
-    response.status = 500;
-}
-
 const route_options: adapter.RouteOptions = .{ .message_bytes = 4096, .token_bytes = 4096 };
 
-pub const routes = server.router(App, .{
-    .error_handler = on_error,
-    .routes = .{
-        adapter.post(App, Service.say, say, route_options),
-        adapter.get(App, Service.say, say, route_options),
-        adapter.post(App, Service.introduce, introduce, route_options),
-        adapter.post(App, Service.converse, converse, route_options),
-    },
-});
-
-/// The router's pool: the calls the server answers at once, and room for each one's request and
-/// response.
-pub const Router = @TypeOf(routes).Of(.{ .requests = 4, .response_bytes = 8192, .body_bytes = 8192 });
+/// ELIZA's entries in the route table. Say is served as a POST and, since it has no side
+/// effects, as a GET.
+pub const routes = .{
+    adapter.post(App, Service.say, say, route_options),
+    adapter.get(App, Service.say, say, route_options),
+    adapter.post(App, Service.introduce, introduce, route_options),
+    adapter.post(App, Service.converse, converse, route_options),
+};
 
 /// The examples' sentences: what the client sends, and what ELIZA answers.
 pub const said = "I feel tired";

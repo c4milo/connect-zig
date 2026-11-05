@@ -1,9 +1,10 @@
-//! The ELIZA server of `exchange.zig`, over the in-memory link of `link.zig` in cleartext. A
+//! The example server, over the in-memory link of `link.zig` in cleartext. A
 //! program with sockets does the same with its own: it accepts a socket, passes what the socket
 //! read to the endpoint, hands each event to the router, and writes what the endpoint owes.
 const std = @import("std");
 const server = @import("server");
-const service = @import("service.zig");
+const App = @import("app.zig").App;
+const Router = @import("routes.zig").Router;
 const link_module = @import("link.zig");
 const Link = link_module.Link;
 
@@ -26,8 +27,8 @@ var output: [output_len]u8 = undefined;
 /// No TLS: the endpoint speaks h2 when a connection opens with h2's preface, and h11 otherwise.
 var config: server.Config align(@alignOf(server.Config)) = .{};
 var endpoint: Endpoint align(@alignOf(Endpoint)) = undefined;
-var router: service.Router align(@alignOf(service.Router)) = .{};
-pub var app: service.App align(@alignOf(service.App)) = .{};
+var router: Router align(@alignOf(Router)) = .{};
+pub var app: App align(@alignOf(App)) = .{};
 var accepted: ?server.ConnectionHandle align(@alignOf(server.ConnectionHandle)) = null;
 /// A cleartext endpoint draws no secret, so a seeded generator stands in for entropy.
 var prng: std.Random.DefaultPrng align(@alignOf(std.Random.DefaultPrng)) = .init(0x656c697a61);
@@ -63,7 +64,6 @@ pub fn turn() !void {
 }
 
 fn serve(event: server.Event, now_ns: u64) !void {
-    if (event == .request) std.debug.print("server: {s} {s}\n", .{ event.request.method, event.request.target });
     switch (router.handle(&app, &endpoint, event)) {
         .taken => {},
         .event => |other| switch (other) {

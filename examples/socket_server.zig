@@ -1,5 +1,6 @@
-//! Example: the ELIZA service on a TCP socket, in cleartext, on Rotor's loop. Run it with `zig
-//! build run-eliza-server -- [port]`, then call it with any Connect, gRPC or gRPC-Web client:
+//! Example: the ELIZA and demo services on a TCP socket, in cleartext, on Rotor's loop. Run it
+//! with `zig build run-eliza-server -- [port]`, then call it with any Connect, gRPC or gRPC-Web
+//! client:
 //!
 //! ```sh
 //! curl -sS --json '{"sentence":"I feel tired"}' \
@@ -17,7 +18,8 @@ const assert = std.debug.assert;
 const rotor = @import("rotor");
 const server = @import("server");
 const connect = @import("connect");
-const service = @import("service.zig");
+const App = @import("services/app.zig").App;
+const Router = @import("services/routes.zig").Router;
 
 /// The sockets the server holds at once.
 const sockets_max = 8;
@@ -74,8 +76,8 @@ var sockets: [sockets_max]Socket align(@alignOf(Socket)) = @splat(.{});
 var events: [loop_options.operations]rotor.Event align(@alignOf(rotor.Event)) = undefined;
 var config: server.Config align(@alignOf(server.Config)) = .{};
 var endpoint: Endpoint align(@alignOf(Endpoint)) = undefined;
-var router: service.Router align(@alignOf(service.Router)) = .{};
-var app: service.App align(@alignOf(service.App)) = .{};
+var router: Router align(@alignOf(Router)) = .{};
+var app: App align(@alignOf(App)) = .{};
 /// The server reads gzip messages and writes them when a client accepts gzip.
 var gzip_decoder: connect.GzipDecoder align(@alignOf(connect.GzipDecoder)) = undefined;
 var gzip_encoder: connect.GzipEncoder align(@alignOf(connect.GzipEncoder)) = undefined;

@@ -61,6 +61,9 @@ buf curl --http2-prior-knowledge --protocol grpc --schema examples/proto \
 | Proto and JSON codecs | ✅ | ✅ | ✅ |
 | gzip both ways | ✅ | ✅ | ✅ |
 | Unary GET for `NO_SIDE_EFFECTS` | ✅ | | |
+| Full-duplex bidirectional streams (server) | ✅ | ✅ | ✅ |
+| Interceptors, server and client | ✅ | ✅ | ✅ |
+| Error details | ✅ | ✅ | ✅ |
 
 > [!NOTE]
 > A gRPC client needs HTTP trailers, which colibri's client does not expose yet. Until it does,
@@ -133,6 +136,15 @@ Streams get a `Sender` to write messages and a `Receiver` to read them:
 | Client stream | `*Receiver(Request)`, `*Response` |
 | Bidirectional | `*Receiver(Request)`, `*Sender(Response)` |
 
+A function handler takes a client stream whole. To answer each message as it arrives, write the
+handler as a type with `on_message` and `on_end`: over h2 the stream is then full-duplex. A
+handler reads its call through `adapter.Call`: the protocol, the timeout, the request headers,
+and the response headers and trailers it adds.
+
+Interceptors are types a route lists in its options: `on_call` runs before the handler and may
+refuse the call, and `on_finish` sees the outcome. A client's `adapter.ExchangeWith` takes
+interceptors with `on_request`, which may add headers, and `on_response`.
+
 ### 4. Route it
 
 Each method becomes a route of colibri's `server.router`. One route answers every protocol and
@@ -156,20 +168,20 @@ A client call is a `connect_colibri.Exchange`. It writes a request for colibri's
 `client.ConnectionPool` and reads the response the pool fills in:
 
 ```zig
-try say_proto.init(.{}, &.{.{ .sentence = service.said }}, buffers_of(0));
-try introduce.init(.{ .protocol = .grpc_web }, &.{.{ .name = service.name }}, buffers_of(2));
+try say_proto.init(.{}, &.{.{ .sentence = "I feel tired" }}, buffers);
 _ = try pool.request(&say_proto.request, &say_proto.response);
 ```
 
-[examples/](examples) holds four programs, from generated messages alone to a server on a
-socket. Each checks itself, and [examples/README.md](examples/README.md) says where to start.
+[examples/](examples) holds seven programs, from generated messages alone to streaming,
+interceptors, error details and a server on a socket. Each checks itself, and
+[examples/README.md](examples/README.md) says where to start.
 
 ## Good to know
 
 > [!IMPORTANT]
-> In this first version, a stream is read whole and written into the router's response memory.
-> A long server stream is bounded by that memory, and a bidirectional stream is half-duplex
-> (decision 12). zstd and brotli are read but not written, because stdx has no encoder for them
+> A server stream is written into the router's response memory, so a long one is bounded by it
+> (decision 12). A type handler streams full-duplex (decision 18); colibri's client sends its
+> request body whole, so the client side of a stream is half-duplex. zstd and brotli are read but not written, because stdx has no encoder for them
 > yet (decision 10).
 
 Still to come:
@@ -177,7 +189,8 @@ Still to come:
 - [ ] The [connectrpc conformance suite](https://github.com/connectrpc/conformance) against the
   client and the server
 - [ ] A gRPC client, once colibri's client exposes trailers
-- [ ] Long and full-duplex streams
+- [ ] Long server streams, and full-duplex on the client side
+- [x] Full-duplex streams on the server, interceptors and error details
 - [ ] `Any`, `Struct`, `Value` and `ListValue` in JSON, and unknown fields kept
 
 ## Contributing
@@ -189,7 +202,7 @@ The rules of the tree are in [CLAUDE.md](CLAUDE.md), the design and its build pl
 ```sh
 zig build test            # the lint, every module's tests and the examples
 tools/generate_check.sh   # buf generate still writes examples/gen
-tools/interop_check.sh    # buf curl and curl against the ELIZA server
+tools/interop_check.sh    # buf curl and curl against the example server
 ```
 
 ## License

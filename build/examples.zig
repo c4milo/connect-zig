@@ -1,6 +1,6 @@
 //! `zig build examples` builds and runs every program in examples/, and `zig build example-<name>`
 //! runs one. Each checks what arrived and exits with an error otherwise (design §8 step 5).
-//! `zig build run-eliza-server -- [port]` runs the ELIZA server on a TCP socket.
+//! `zig build run-eliza-server -- [port]` serves the ELIZA and demo services on a TCP socket.
 const std = @import("std");
 
 const Graph = @import("graph.zig").Graph;
@@ -41,12 +41,20 @@ pub fn add(b: *std.Build, graph: Graph) *std.Build.Step {
         step.dependOn(&small_run.step);
     }
 
-    const exchange = program(b, graph, "eliza", "examples/eliza/exchange.zig", eliza, rotor);
-    const run = b.addRunArtifact(exchange);
-    b.step("example-eliza", "Run the ELIZA example over colibri's h2 and h11").dependOn(&run.step);
-    step.dependOn(&run.step);
+    const services: Services = .{ .eliza = eliza, .demo = generated(b, graph, "examples/gen/demo/v1/demo.pb.zig", &.{}), .rotor = rotor };
+    for ([_]Small{
+        .{ .name = "eliza", .description = "Run the ELIZA example over colibri's h2 and h11" },
+        .{ .name = "interceptors", .description = "Run calls through server and client interceptors" },
+        .{ .name = "streaming", .description = "Run bidirectional, client and server streams" },
+        .{ .name = "errors", .description = "Run calls that fail with typed error details" },
+    }) |linked| {
+        const exe = program(b, graph, linked.name, b.fmt("examples/{s}.zig", .{linked.name}), services);
+        const run = b.addRunArtifact(exe);
+        b.step(b.fmt("example-{s}", .{linked.name}), linked.description).dependOn(&run.step);
+        step.dependOn(&run.step);
+    }
 
-    const socket_server = program(b, graph, "eliza-server", "examples/eliza/socket_server.zig", eliza, rotor);
+    const socket_server = program(b, graph, "eliza-server", "examples/socket_server.zig", services);
     b.installArtifact(socket_server);
     const serve = b.addRunArtifact(socket_server);
     if (b.args) |args| serve.addArgs(args);
@@ -65,7 +73,10 @@ fn generated(b: *std.Build, graph: Graph, path: []const u8, extra: []const std.B
     return module;
 }
 
-fn program(b: *std.Build, graph: Graph, name: []const u8, path: []const u8, eliza: *std.Build.Module, rotor: *std.Build.Module) *std.Build.Step.Compile {
+/// The modules a program over colibri imports beyond the library's own.
+const Services = struct { eliza: *std.Build.Module, demo: *std.Build.Module, rotor: *std.Build.Module };
+
+fn program(b: *std.Build, graph: Graph, name: []const u8, path: []const u8, services: Services) *std.Build.Step.Compile {
     return b.addExecutable(.{
         .name = name,
         .root_module = b.createModule(.{
@@ -78,8 +89,9 @@ fn program(b: *std.Build, graph: Graph, name: []const u8, path: []const u8, eliz
                 .{ .name = "connect_colibri", .module = graph.connect_colibri },
                 .{ .name = "server", .module = graph.colibri.module("server") },
                 .{ .name = "client", .module = graph.colibri.module("client") },
-                .{ .name = "eliza", .module = eliza },
-                .{ .name = "rotor", .module = rotor },
+                .{ .name = "eliza", .module = services.eliza },
+                .{ .name = "demo", .module = services.demo },
+                .{ .name = "rotor", .module = services.rotor },
             },
         }),
     });
