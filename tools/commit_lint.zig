@@ -11,7 +11,8 @@ pub const config: pepegrillo.commit.Config = .{
     .known_scopes = &scopes,
     .unknown_scope_reason = "is not one of the scopes CLAUDE.md names",
     .third_person_forms = &.{ "adds", "fixes", "updates", "removes", "implements", "splits", "renames", "moves", "makes", "drops" },
-    .imperative_exceptions = &.{ "embed", "seed", "feed", "exceed", "proceed", "succeed", "string" },
+    // Verbs whose own spelling ends as a past tense or a gerund does.
+    .imperative_exceptions = &.{ "embed", "seed", "feed", "exceed", "proceed", "succeed", "string", "bring", "ring", "sing", "spring", "swing", "wring", "cling", "fling", "sting" },
     // The session link each commit made with Claude Code carries (CLAUDE.md, Commits).
     .trailer_keys = &.{ "Co-Authored-By", "Claude-Session", "Signed-off-by", "Refs", "Closes" },
 };
