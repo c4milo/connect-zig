@@ -6,17 +6,15 @@
 const descriptor = @import("descriptor.zig");
 const repeated = @import("repeated.zig");
 const Descriptor = descriptor.Descriptor;
-
-fn field(comptime name: []const u8, comptime json_name: []const u8, comptime number: u32, comptime kind: descriptor.Kind) descriptor.Field {
-    return .{ .name = name, .number = number, .kind = kind, .json_name = json_name, .proto_name = name };
-}
+const field_of = descriptor.field_of;
 
 /// An instant: seconds since the Unix epoch, and nanoseconds within the second.
 pub const Timestamp = struct {
     seconds: i64 = 0,
     nanos: i32 = 0,
+    pub const FieldNumber = enum(u29) { seconds = 1, nanos = 2 };
     pub const protobuf: Descriptor = .{ .full_name = "google.protobuf.Timestamp", .fields = &.{
-        field("seconds", "seconds", 1, .int64), field("nanos", "nanos", 2, .int32),
+        field_of(FieldNumber.seconds, .int64, .{}), field_of(FieldNumber.nanos, .int32, .{}),
     } };
 };
 
@@ -24,8 +22,9 @@ pub const Timestamp = struct {
 pub const Duration = struct {
     seconds: i64 = 0,
     nanos: i32 = 0,
+    pub const FieldNumber = enum(u29) { seconds = 1, nanos = 2 };
     pub const protobuf: Descriptor = .{ .full_name = "google.protobuf.Duration", .fields = &.{
-        field("seconds", "seconds", 1, .int64), field("nanos", "nanos", 2, .int32),
+        field_of(FieldNumber.seconds, .int64, .{}), field_of(FieldNumber.nanos, .int32, .{}),
     } };
 };
 
@@ -36,24 +35,25 @@ pub const Empty = struct {
 /// A set of field paths, written in JSON as one string of lowerCamelCase paths joined by commas.
 pub const FieldMask = struct {
     paths: repeated.Repeated([]const u8, .string) = .{},
-    pub const protobuf: Descriptor = .{ .full_name = "google.protobuf.FieldMask", .fields = &.{
-        field("paths", "paths", 1, .string),
-    } };
+    pub const FieldNumber = enum(u29) { paths = 1 };
+    pub const protobuf: Descriptor = .{ .full_name = "google.protobuf.FieldMask", .fields = &.{field_of(FieldNumber.paths, .string, .{})} };
 };
 
 /// A message of any type: its type URL and its encoded bytes.
 pub const Any = struct {
     type_url: []const u8 = "",
     value: []const u8 = "",
+    pub const FieldNumber = enum(u29) { type_url = 1, value = 2 };
     pub const protobuf: Descriptor = .{ .full_name = "google.protobuf.Any", .fields = &.{
-        field("type_url", "typeUrl", 1, .string), field("value", "value", 2, .bytes),
+        field_of(FieldNumber.type_url, .string, .{ .json_name = "typeUrl" }), field_of(FieldNumber.value, .bytes, .{}),
     } };
 };
 
 fn Wrapper(comptime full_name: []const u8, comptime V: type, comptime kind: descriptor.Kind) type {
     return struct {
         value: V = @as(V, if (V == []const u8) "" else if (V == bool) false else 0),
-        pub const protobuf: Descriptor = .{ .full_name = full_name, .fields = &.{field("value", "value", 1, kind)} };
+        pub const FieldNumber = enum(u29) { value = 1 };
+        pub const protobuf: Descriptor = .{ .full_name = full_name, .fields = &.{field_of(FieldNumber.value, kind, .{})} };
     };
 }
 

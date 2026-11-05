@@ -40,6 +40,10 @@ const integer_text_len_max = 20;
 const float_text_len_max = 32;
 /// The base64 octets one piece of a bytes field writes: 4 for each 3 input octets.
 const base64_piece_len = 64;
+/// Base64 writes 4 characters for each 3 octets (RFC 4648 §4).
+const base64_chars = 4;
+const base64_octets = 3;
+const decimal_base = 10;
 /// Below this magnitude and at or above `float_exponent_above`, a float is written with an
 /// exponent, as the proto3 JSON writers of the reference implementations do.
 const float_exponent_below = 1e-6;
@@ -89,7 +93,7 @@ pub fn write_float(comptime V: type, value: V, text: *json.TextWriter) EncodeErr
 /// Writes `octets` as one string of standard base64 with padding, in pieces.
 pub fn write_base64(octets: []const u8, text: *json.TextWriter) EncodeError!void {
     const encoder = std.base64.standard.Encoder;
-    const chunk_len = base64_piece_len / 4 * 3;
+    const chunk_len = base64_piece_len / base64_chars * base64_octets;
     var buffer: [base64_piece_len]u8 = undefined;
     var start: usize = 0;
     for (0..octets.len / chunk_len + 1) |_| {
@@ -117,7 +121,7 @@ pub fn write_key(comptime kind: Kind, comptime V: type, key: V, text: *json.Text
 /// Reads an integer from a number or a string token. A number with an exponent or a fraction is
 /// accepted when its value is integral ("JSON Mapping": "1e2" is accepted for an int32).
 pub fn parse_integer(comptime V: type, octets: []const u8) DecodeError!V {
-    if (std.fmt.parseInt(V, octets, 10)) |value| return value else |failure| switch (failure) {
+    if (std.fmt.parseInt(V, octets, decimal_base)) |value| return value else |failure| switch (failure) {
         error.Overflow => return error.NumberOutOfRange,
         error.InvalidCharacter => {},
     }
@@ -146,7 +150,7 @@ pub fn parse_float(comptime V: type, octets: []const u8, from_string: bool) Deco
 /// URL-safe base64, with or without padding ("JSON Mapping", bytes).
 pub fn write_base64_field(octets: []const u8, writer: *wire.Writer) DecodeError!void {
     const url_safe = std.mem.indexOfAny(u8, octets, "-_") != null;
-    const padded = octets.len % 4 == 0 and octets.len != 0 and octets[octets.len - 1] == '=';
+    const padded = octets.len % base64_chars == 0 and octets.len != 0 and octets[octets.len - 1] == '=';
     const decoder = if (url_safe)
         (if (padded) std.base64.url_safe.Decoder else std.base64.url_safe_no_pad.Decoder)
     else

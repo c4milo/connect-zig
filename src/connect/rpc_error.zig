@@ -34,10 +34,11 @@ pub const Status = struct {
     code: i32 = 0,
     message: []const u8 = "",
     details: proto.Repeated(proto.wkt.Any, .message) = .{},
+    pub const FieldNumber = enum(u29) { code = 1, message = 2, details = 3 };
     pub const protobuf: proto.Descriptor = .{ .full_name = "google.rpc.Status", .fields = &.{
-        .{ .name = "code", .number = 1, .kind = .int32, .json_name = "code", .proto_name = "code" },
-        .{ .name = "message", .number = 2, .kind = .string, .json_name = "message", .proto_name = "message" },
-        .{ .name = "details", .number = 3, .kind = .message, .json_name = "details", .proto_name = "details" },
+        proto.field_of(FieldNumber.code, .int32, .{}),
+        proto.field_of(FieldNumber.message, .string, .{}),
+        proto.field_of(FieldNumber.details, .message, .{}),
     } };
 };
 

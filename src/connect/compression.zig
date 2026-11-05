@@ -128,8 +128,9 @@ pub fn choose(accepted: []const u8, can_compress: bool) Coding {
 /// The weight of an entry's parameters: 1 when they name none, and 0 for one that does not
 /// parse (RFC 9110 §12.4.2).
 fn weight(parameters: []const u8) f64 {
-    const at = std.mem.indexOf(u8, parameters, "q=") orelse return 1;
-    const rest = parameters[at + 2 ..];
+    const marker = "q=";
+    const at = std.mem.indexOf(u8, parameters, marker) orelse return 1;
+    const rest = parameters[at + marker.len ..];
     const end = std.mem.indexOfAny(u8, rest, "; \t") orelse rest.len;
     return std.fmt.parseFloat(f64, rest[0..end]) catch 0;
 }

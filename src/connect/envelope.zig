@@ -39,7 +39,7 @@ pub const Error = error{
 pub fn write_prefix(flags: Flags, payload_len: usize, prefix: *[flag.envelope_prefix_len]u8) void {
     assert(payload_len <= std.math.maxInt(u32));
     prefix[0] = @bitCast(flags);
-    std.mem.writeInt(u32, prefix[1..5], @intCast(payload_len), .big);
+    std.mem.writeInt(u32, prefix[1..flag.envelope_prefix_len], @intCast(payload_len), .big);
 }
 
 /// Writes one envelope, prefix and payload, into `buffer`, and returns its octets.
@@ -70,7 +70,7 @@ pub const Reader = struct {
         const flags: Flags = @bitCast(rest[0]);
         // Connect protocol, "Streaming-Request": bits other than those defined must be zero.
         if (flags.reserved != 0) return error.InvalidFlags;
-        const payload_len = std.mem.readInt(u32, rest[1..5], .big);
+        const payload_len = std.mem.readInt(u32, rest[1..flag.envelope_prefix_len], .big);
         if (payload_len > reader.payload_len_max) return error.MessageTooLarge;
         if (payload_len > rest.len - flag.envelope_prefix_len) return error.Truncated;
         reader.position += flag.envelope_prefix_len + payload_len;

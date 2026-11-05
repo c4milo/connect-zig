@@ -16,20 +16,24 @@ const Holder = struct {
     mask: ?wkt.FieldMask = null,
     empty: ?wkt.Empty = null,
     label: ?wkt.StringValue = null,
+    pub const FieldNumber = enum(u29) { stamp = 1, span = 2, wrapped = 3, mask = 4, empty = 5, label = 6 };
     pub const protobuf: proto.Descriptor = .{ .full_name = "test.Holder", .fields = &.{
-        .{ .name = "stamp", .number = 1, .kind = .message, .json_name = "stamp", .proto_name = "stamp" },
-        .{ .name = "span", .number = 2, .kind = .message, .json_name = "span", .proto_name = "span" },
-        .{ .name = "wrapped", .number = 3, .kind = .message, .json_name = "wrapped", .proto_name = "wrapped" },
-        .{ .name = "mask", .number = 4, .kind = .message, .json_name = "mask", .proto_name = "mask" },
-        .{ .name = "empty", .number = 5, .kind = .message, .json_name = "empty", .proto_name = "empty" },
-        .{ .name = "label", .number = 6, .kind = .message, .json_name = "label", .proto_name = "label" },
+        proto.field_of(FieldNumber.stamp, .message, .{}),
+        proto.field_of(FieldNumber.span, .message, .{}),
+        proto.field_of(FieldNumber.wrapped, .message, .{}),
+        proto.field_of(FieldNumber.mask, .message, .{}),
+        proto.field_of(FieldNumber.empty, .message, .{}),
+        proto.field_of(FieldNumber.label, .message, .{}),
     } };
 };
 
+const text_len = 1024;
+const tokens_len = 256;
+
 const Buffers = struct {
-    text: [1024]u8 = undefined,
-    binary: [1024]u8 = undefined,
-    tokens: [256]u8 = undefined,
+    text: [text_len]u8 = undefined,
+    binary: [text_len]u8 = undefined,
+    tokens: [tokens_len]u8 = undefined,
 };
 
 fn decode(comptime T: type, text: []const u8, buffers: *Buffers) proto.JsonDecodeError!T {

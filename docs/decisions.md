@@ -94,6 +94,20 @@ first. Cite an entry by number in code and commits ("decision 6").
     the route table's `error_handler` answers. Beaten: a Zig error set per handler, which cannot
     carry a message or details.
 
+17. **Generated code passes every lint rule the tree runs, with no exemption.** Three choices
+    follow from it:
+    - Each message numbers its fields in a `FieldNumber` enum, and its descriptor names each
+      number through it, as the magic-numbers rule asks. An enum's table names numbers through
+      its tags. Hand-written messages use the same shape, through `proto.field_of`.
+    - A generated file imports another by module name, never by a path with `../`, as the
+      relative-import rule asks. Its header names the modules the build gives it: the module of
+      `kitchen/v1/shared.proto` is `kitchen_v1_shared`.
+    - A file over 500 lines is split, as the file-length rule asks: `<file>.pb.zig` re-exports
+      each declaration from `<file>/<Name>.pb.zig`, and a nested one has its own piece. A single
+      message of more than about 160 fields still makes one piece too long.
+    Beaten: exempting `.pb.zig` from the rules, as colibri exempts its generated tables from
+    magic-numbers, which would leave a project's own lint failing on the code it generates.
+
 ## Tooling
 
 15. **pepegrillo is lazy.** `build.zig` requests it only when `b.pkg_hash.len == 0`, so a project

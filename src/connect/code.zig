@@ -4,6 +4,7 @@
 const std = @import("std");
 const assert = std.debug.assert;
 const constants = @import("constants.zig");
+const status = constants.protocol.status;
 
 /// Each tag is the code's Connect name, and each value its gRPC number.
 pub const Code = enum(u8) {
@@ -49,29 +50,29 @@ pub const Code = enum(u8) {
         return switch (code) {
             .ok => unreachable,
             .canceled => constants.protocol.status_client_closed_request,
-            .unknown, .internal, .data_loss => 500,
-            .invalid_argument, .failed_precondition, .out_of_range => 400,
-            .deadline_exceeded => 504,
-            .not_found => 404,
-            .already_exists, .aborted => 409,
-            .permission_denied => 403,
-            .resource_exhausted => 429,
-            .unimplemented => 501,
-            .unavailable => 503,
-            .unauthenticated => 401,
+            .unknown, .internal, .data_loss => status.internal_server_error,
+            .invalid_argument, .failed_precondition, .out_of_range => status.bad_request,
+            .deadline_exceeded => status.gateway_timeout,
+            .not_found => status.not_found,
+            .already_exists, .aborted => status.conflict,
+            .permission_denied => status.forbidden,
+            .resource_exhausted => status.too_many_requests,
+            .unimplemented => status.not_implemented,
+            .unavailable => status.service_unavailable,
+            .unauthenticated => status.unauthorized,
         };
     }
 
     /// The code a client gives a response whose HTTP status is not 200 and whose body is not a
     /// Connect error (Connect protocol, "HTTP to Error Code"; gRPC's http-grpc-status-mapping.md).
-    pub fn from_http_status(status: u16) Code {
-        assert(status != 200);
-        return switch (status) {
-            400 => .internal,
-            401 => .unauthenticated,
-            403 => .permission_denied,
-            404 => .unimplemented,
-            429, 502, 503, 504 => .unavailable,
+    pub fn from_http_status(http: u16) Code {
+        assert(http != status.ok);
+        return switch (http) {
+            status.bad_request => .internal,
+            status.unauthorized => .unauthenticated,
+            status.forbidden => .permission_denied,
+            status.not_found => .unimplemented,
+            status.too_many_requests, status.bad_gateway, status.service_unavailable, status.gateway_timeout => .unavailable,
             else => .unknown,
         };
     }
@@ -90,8 +91,8 @@ test "the codes have gRPC's numbers and Connect's names" {
 
 test "each code has the HTTP status of the Connect table, and statuses map back" {
     const statuses = [_]u16{ 499, 500, 400, 504, 404, 409, 403, 429, 400, 409, 400, 501, 500, 503, 500, 401 };
-    for (statuses, 1..) |status, number| {
-        try testing.expectEqual(status, Code.from_number(number).http_status());
+    for (statuses, 1..) |expected, number| {
+        try testing.expectEqual(expected, Code.from_number(number).http_status());
     }
     try testing.expectEqual(Code.internal, Code.from_http_status(400));
     try testing.expectEqual(Code.unimplemented, Code.from_http_status(404));

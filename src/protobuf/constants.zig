@@ -16,6 +16,11 @@ pub const protocol = struct {
     /// A fixed32 field is 4 bytes and a fixed64 field 8 bytes, little-endian ("Non-varint Numbers").
     pub const fixed32_len = 4;
     pub const fixed64_len = 8;
+    /// A varint carries 7 bits in each byte, least significant group first; the high bit says
+    /// another byte follows ("Base 128 Varints").
+    pub const varint_group_bits = 7;
+    pub const varint_continuation: u8 = 0x80;
+    pub const varint_payload_mask: u8 = 0x7f;
 };
 
 /// The bounds this module chose.

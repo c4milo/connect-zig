@@ -51,8 +51,10 @@ confirm a test fails. Report `CAUGHT` or `NOT CAUGHT` per mutation in the commit
 - Names spell words out. One-letter names only for loop indices. `_len` counts bytes.
 - Functions stay at cognitive complexity 15 or less, `test` blocks included. Split the function;
   never raise the threshold.
-- A hand-written file stays at or under 500 lines, its tests included. Generated `.pb.zig` files
-  are exempt.
+- A file stays at or under 500 lines, its tests included. The plugin splits a longer output
+  (decision 17).
+- Every number beyond 0 and 1 has a name: a constant in its module's `constants.zig`, a `const`
+  of its own, or a member of an enum such as a message's `FieldNumber`.
 - Write prose in active voice with plain words: short sentences, one idea each, no metaphors.
 - Every Markdown file renders on GitHub as written: real list markers, fenced code blocks with a
   language, pipes in a table cell escaped as `\|`.
@@ -72,7 +74,10 @@ confirm a test fails. Report `CAUGHT` or `NOT CAUGHT` per mutation in the commit
 - Build: `zig build`. `-Drelease` builds ReleaseSafe.
 - Test: `zig build test` runs the lint, every module's tests, the examples and the check of the
   generated code. `zig build test-<module>` runs one module's tests alone.
-- Lint: `zig build lint`: the cognitive-complexity score, then the rules of `tools/lint/main.zig`.
+- Lint: `zig build lint`: the cognitive-complexity score, then the rules of `tools/lint/main.zig`:
+  heap, io, determinism, unbounded-loop, file-length, markdown, relative-import, magic-numbers,
+  global-state and static-alignment. They read `examples/gen` as they read hand-written code
+  (decision 17).
 - Commit messages: `zig build lint-commits` checks `origin/main..HEAD`.
 - Examples: `zig build examples` runs every program in `examples/` that checks itself: the ELIZA
   client against the ELIZA server over colibri's h2 and h11, in memory. `zig build

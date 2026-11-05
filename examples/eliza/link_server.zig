@@ -21,7 +21,7 @@ pub const Error = error{ ExchangeWrong, SendUnfinished };
 const Endpoint = server.EndpointOf(.{ .tcp_connections = 1, .quic_connections = 0 });
 
 // The endpoint holds hundreds of kilobytes, so it lives outside the stack.
-var link: *Link = undefined;
+var link: *Link align(@alignOf(*Link)) = undefined;
 var output: [output_len]u8 = undefined;
 /// No TLS: the endpoint speaks h2 when a connection opens with h2's preface, and h11 otherwise.
 var config: server.Config align(@alignOf(server.Config)) = .{};
@@ -30,7 +30,7 @@ var router: service.Router align(@alignOf(service.Router)) = .{};
 pub var app: service.App align(@alignOf(service.App)) = .{};
 var accepted: ?server.ConnectionHandle align(@alignOf(server.ConnectionHandle)) = null;
 /// A cleartext endpoint draws no secret, so a seeded generator stands in for entropy.
-var prng: std.Random.DefaultPrng = .init(0x656c697a61);
+var prng: std.Random.DefaultPrng align(@alignOf(std.Random.DefaultPrng)) = .init(0x656c697a61);
 pub var ended: u32 = 0;
 
 pub fn init(stream: *Link) !void {
@@ -48,7 +48,7 @@ pub fn turn() !void {
     const now_ns = link.now_ns(.server);
     endpoint.on_instant(now_ns);
     const connection = accepted orelse return;
-    var consumed: usize = 0;
+    var consumed: usize align(@alignOf(usize)) = 0;
     for (0..events_per_turn_max) |_| {
         const read: server.StreamBytes = .{ .connection = connection, .bytes = input[consumed..] };
         const received = endpoint.receive(.{ .stream = read }, now_ns);

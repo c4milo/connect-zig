@@ -11,6 +11,7 @@ const timeout = @import("timeout.zig");
 const get = @import("get.zig");
 const rpc_error = @import("rpc_error.zig");
 const constants = @import("constants.zig");
+const status = constants.protocol.status;
 const Speaks = protocol.Speaks;
 const Coding = compression.Coding;
 const RpcError = rpc_error.RpcError;
@@ -64,12 +65,12 @@ pub const Options = struct {
 pub fn accept(http_method: []const u8, query: ?[]const u8, headers: Lookup, options: Options) Decision {
     if (std.mem.eql(u8, http_method, "GET")) return accept_get(query orelse "", headers, options);
     // Connect protocol, "Unary-Request": a request is a POST, or a GET of a NO_SIDE_EFFECTS method.
-    if (!std.mem.eql(u8, http_method, "POST")) return .{ .refused = .{ .http_status = 405 } };
-    const content_type = headers.find("content-type") orelse return .{ .refused = .{ .http_status = 415 } };
-    const speaks = protocol.of_content_type(content_type) catch return .{ .refused = .{ .http_status = 415 } };
+    if (!std.mem.eql(u8, http_method, "POST")) return .{ .refused = .{ .http_status = status.method_not_allowed } };
+    const content_type = headers.find("content-type") orelse return .{ .refused = .{ .http_status = status.unsupported_media_type } };
+    const speaks = protocol.of_content_type(content_type) catch return .{ .refused = .{ .http_status = status.unsupported_media_type } };
     // Connect protocol: a unary method takes a unary content type, and a stream an enveloped one.
     if (speaks.protocol == .connect and speaks.enveloped != options.stream_type.enveloped()) {
-        return .{ .refused = .{ .http_status = 415 } };
+        return .{ .refused = .{ .http_status = status.unsupported_media_type } };
     }
     return accept_post(speaks, headers, options);
 }
@@ -107,8 +108,8 @@ fn accept_post(speaks: Speaks, headers: Lookup, options: Options) Decision {
 
 fn accept_get(query: []const u8, headers: Lookup, options: Options) Decision {
     // Connect protocol, "Unary-Get-Request": only methods with no side effects take a GET.
-    if (options.stream_type != .unary or options.idempotency != .no_side_effects) return .{ .refused = .{ .http_status = 405 } };
-    const read = get.read_query(query) catch return .{ .refused = .{ .http_status = 400 } };
+    if (options.stream_type != .unary or options.idempotency != .no_side_effects) return .{ .refused = .{ .http_status = status.method_not_allowed } };
+    const read = get.read_query(query) catch return .{ .refused = .{ .http_status = status.bad_request } };
     const speaks: Speaks = .{ .protocol = .connect, .codec = read.codec, .enveloped = false };
     if (!options.decoders.accepts(read.coding)) return refuse(speaks, .unimplemented, "unsupported request compression");
     const timeout_ns = read_timeout(speaks, headers.find("connect-timeout-ms")) catch return refuse(speaks, .invalid_argument, "malformed timeout");
@@ -130,7 +131,7 @@ fn read_timeout(speaks: Speaks, value: ?[]const u8) timeout.Error!?u64 {
 
 fn refuse(speaks: Speaks, code: @import("code.zig").Code, message: []const u8) Decision {
     assert(code != .ok);
-    const http_status: u16 = if (speaks.protocol == .connect) code.http_status() else 200;
+    const http_status: u16 = if (speaks.protocol == .connect) code.http_status() else status.ok;
     return .{ .refused = .{ .http_status = http_status, .failure = .{ .code = code, .message = message }, .speaks = speaks } };
 }
 

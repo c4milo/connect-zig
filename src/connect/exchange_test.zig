@@ -16,9 +16,10 @@ const Header = connect.Header;
 const Note = struct {
     text: []const u8 = "",
     count: i32 = 0,
+    pub const FieldNumber = enum(u29) { text = 1, count = 2 };
     pub const protobuf: proto.Descriptor = .{ .full_name = "test.Note", .fields = &.{
-        .{ .name = "text", .number = 1, .kind = .string, .json_name = "text", .proto_name = "text" },
-        .{ .name = "count", .number = 2, .kind = .int32, .json_name = "count", .proto_name = "count" },
+        proto.field_of(FieldNumber.text, .string, .{}),
+        proto.field_of(FieldNumber.count, .int32, .{}),
     } };
 };
 
@@ -42,19 +43,30 @@ const List = struct {
     }
 };
 
+/// The octets of each buffer a side of the exchange holds.
+const buffer_len = 4096;
+const trailers_storage_len = 1024;
+const details_max = 4;
+const metadata_max = 8;
+/// The messages one call carries, at most.
+const notes_max = 16;
+
 const Server = struct {
-    buffers: [4][4096]u8 = undefined,
-    body: [4096]u8 = undefined,
+    message: [buffer_len]u8 = undefined,
+    work: [buffer_len]u8 = undefined,
+    tokens: [buffer_len]u8 = undefined,
+    request_message: [buffer_len]u8 = undefined,
+    body: [buffer_len]u8 = undefined,
     body_len: usize = 0,
     head: server_reply.Head = .{ .status = 0 },
-    trailers_storage: [1024]u8 = undefined,
+    trailers_storage: [trailers_storage_len]u8 = undefined,
     trailers: []const Header = &.{},
     trailer_out: [connect.trailers.trailers_max]Header = undefined,
     encoder: connect.GzipEncoder = undefined,
     decoder: gzip.Decoder = undefined,
 
     fn scratch(server: *Server) message_codec.Scratch {
-        return .{ .message = &server.buffers[0], .work = &server.buffers[1], .tokens = &server.buffers[2] };
+        return .{ .message = &server.message, .work = &server.work, .tokens = &server.tokens };
     }
 
     /// Serves `method`: each request message is echoed `count` times, or the call fails with
@@ -85,9 +97,9 @@ const Server = struct {
         };
         var reply: server_reply.Reply = .{ .accepted = accepted, .scratch = server.scratch(), .encoder = &server.encoder };
         if (failure) |rpc_failure| return server.fail(&reply, rpc_failure, &body);
-        var messages = server_request.Messages.init(accepted, request.body, .{ .message = &server.buffers[3], .work = &server.buffers[1], .tokens = &server.buffers[2] }, decoders);
+        var messages = server_request.Messages.init(accepted, request.body, .{ .message = &server.request_message, .work = &server.work, .tokens = &server.tokens }, decoders);
         server.head = reply.head(false);
-        for (0..16) |_| {
+        for (0..notes_max) |_| {
             const note = try messages.next(method.Request) orelse break;
             for (0..@intCast(@max(note.count, 1))) |index| {
                 const prepared = try reply.prepare(Note, &.{ .text = note.text, .count = @intCast(index) });
@@ -109,25 +121,31 @@ const Server = struct {
 };
 
 const Client = struct {
-    buffers: [4][4096]u8 = undefined,
-    response_buffers: [4][4096]u8 = undefined,
-    details: [4]connect.Detail = undefined,
-    metadata: [8]Header = undefined,
+    body: [buffer_len]u8 = undefined,
+    message: [buffer_len]u8 = undefined,
+    work: [buffer_len]u8 = undefined,
+    values: [buffer_len]u8 = undefined,
+    response_message: [buffer_len]u8 = undefined,
+    response_work: [buffer_len]u8 = undefined,
+    response_tokens: [buffer_len]u8 = undefined,
+    response_octets: [buffer_len]u8 = undefined,
+    details: [details_max]connect.Detail = undefined,
+    metadata: [metadata_max]Header = undefined,
     decoder: gzip.Decoder = undefined,
     encoder: connect.GzipEncoder = undefined,
     head_list: List = .{ .entries = &.{} },
     trailer_list: List = .{ .entries = &.{} },
 
     fn call_buffers(client: *Client) client_call.Buffers {
-        return .{ .body = &client.buffers[0], .scratch = .{ .message = &client.buffers[1], .work = &client.buffers[2], .tokens = &.{} }, .values = &client.buffers[3] };
+        return .{ .body = &client.body, .scratch = .{ .message = &client.message, .work = &client.work, .tokens = &.{} }, .values = &client.values };
     }
 
     fn response(client: *Client, speaks: connect.Speaks, server: *const Server) client_response.Response {
         client.head_list = .{ .entries = server.head.headers() };
         client.trailer_list = .{ .entries = server.trailers };
         const storage: client_response.Storage = .{
-            .scratch = .{ .message = &client.response_buffers[0], .work = &client.response_buffers[1], .tokens = &client.response_buffers[2] },
-            .octets = &client.response_buffers[3],
+            .scratch = .{ .message = &client.response_message, .work = &client.response_work, .tokens = &client.response_tokens },
+            .octets = &client.response_octets,
             .details = &client.details,
             .metadata = &client.metadata,
         };
@@ -144,8 +162,9 @@ fn speaks_of(comptime method: connect.Method, options: client_call.Options) conn
     return .{ .protocol = options.protocol, .codec = options.codec, .enveloped = options.protocol != .connect or method.stream_type.enveloped() };
 }
 
-var server_state: Server = .{};
-var client_state: Client = .{};
+// Each test thread holds its own pair, which the test cases reuse.
+threadlocal var server_state: Server align(@alignOf(Server)) = .{};
+threadlocal var client_state: Client align(@alignOf(Client)) = .{};
 
 fn round_trip(comptime method: connect.Method, options: client_call.Options, messages: []const Note, failure: ?connect.RpcError) !client_response.Response {
     var with_codings = options;

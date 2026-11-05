@@ -68,7 +68,7 @@ pub const Reply = struct {
     /// Connect body is compressed; a stream announces its coding whatever each message does.
     pub fn head(reply: *const Reply, compressed: bool) Head {
         const speaks = reply.accepted.speaks;
-        var result: Head = .{ .status = 200 };
+        var result: Head = .{ .status = constants.protocol.status.ok };
         result.add("content-type", protocol.content_type(speaks));
         const coding = reply.accepted.response_coding;
         switch (speaks.protocol) {
@@ -108,7 +108,7 @@ pub const Reply = struct {
             result.add("content-type", "application/json");
             return result;
         }
-        var result: Head = .{ .status = 200 };
+        var result: Head = .{ .status = constants.protocol.status.ok };
         result.add("content-type", protocol.content_type(speaks));
         var status_trailers: [trailers.trailers_max]Header = undefined;
         for (try trailers.write(failure, storage, &status_trailers)) |trailer| result.add(trailer.name, trailer.value);
@@ -137,8 +137,9 @@ pub const Reply = struct {
             },
             .grpc => return trailers.write(failure, storage, out),
             .grpc_web => {
-                const status = try trailers.write(failure, storage[0 .. storage.len / 2], out);
-                const frame = try trailers.write_web_frame(status, storage[storage.len / 2 ..]);
+                const half = storage.len / constants.storage_halves;
+                const status = try trailers.write(failure, storage[0..half], out);
+                const frame = try trailers.write_web_frame(status, storage[half..]);
                 try body.writeAll(frame);
                 return out[0..0];
             },
@@ -162,20 +163,28 @@ const proto = @import("protobuf");
 
 const Greeting = struct {
     text: []const u8 = "",
+    pub const FieldNumber = enum(u29) { text = 1 };
     pub const protobuf: proto.Descriptor = .{ .full_name = "test.Greeting", .fields = &.{
-        .{ .name = "text", .number = 1, .kind = .string, .json_name = "text", .proto_name = "text" },
+        proto.field_of(FieldNumber.text, .string, .{}),
     } };
 };
 
-fn reply_for(speaks: protocol.Speaks, buffers: *[3][256]u8) Reply {
+const test_buffer_len = 256;
+const TestBuffers = struct {
+    message: [test_buffer_len]u8 = undefined,
+    work: [test_buffer_len]u8 = undefined,
+    tokens: [test_buffer_len]u8 = undefined,
+};
+
+fn reply_for(speaks: protocol.Speaks, buffers: *TestBuffers) Reply {
     return .{
         .accepted = .{ .speaks = speaks, .request_coding = .identity, .response_coding = .identity, .timeout_ns = null },
-        .scratch = .{ .message = &buffers[0], .work = &buffers[1], .tokens = &buffers[2] },
+        .scratch = .{ .message = &buffers.message, .work = &buffers.work, .tokens = &buffers.tokens },
     };
 }
 
 test "a Connect unary reply is the bare message, and its error a JSON body with a status" {
-    var buffers: [3][256]u8 = undefined;
+    var buffers: TestBuffers = .{};
     var reply = reply_for(.{ .protocol = .connect, .codec = .json, .enveloped = false }, &buffers);
     var out: [64]u8 = undefined;
     var body: std.Io.Writer = .fixed(&out);
@@ -189,7 +198,7 @@ test "a Connect unary reply is the bare message, and its error a JSON body with 
 }
 
 test "a gRPC reply ends in status trailers, and an early error is Trailers-Only" {
-    var buffers: [3][256]u8 = undefined;
+    var buffers: TestBuffers = .{};
     var reply = reply_for(.{ .protocol = .grpc, .codec = .proto, .enveloped = true }, &buffers);
     try testing.expect(reply.error_only());
     var storage: [64]u8 = undefined;
@@ -207,7 +216,7 @@ test "a gRPC reply ends in status trailers, and an early error is Trailers-Only"
 }
 
 test "a Connect stream ends with an end-stream envelope, and gRPC-Web with a trailers frame" {
-    var buffers: [3][256]u8 = undefined;
+    var buffers: TestBuffers = .{};
     var storage: [128]u8 = undefined;
     var trailer_out: [trailers.trailers_max]Header = undefined;
     const connect_reply = reply_for(.{ .protocol = .connect, .codec = .proto, .enveloped = true }, &buffers);
@@ -225,8 +234,8 @@ test "a Connect stream ends with an end-stream envelope, and gRPC-Web with a tra
 }
 
 test "a refusal with a protocol becomes a reply, and one without has none" {
-    var buffers: [3][256]u8 = undefined;
-    const scratch: message_codec.Scratch = .{ .message = &buffers[0], .work = &buffers[1], .tokens = &buffers[2] };
+    var buffers: TestBuffers = .{};
+    const scratch: message_codec.Scratch = .{ .message = &buffers.message, .work = &buffers.work, .tokens = &buffers.tokens };
     try testing.expectEqual(@as(?Reply, null), refusal_reply(.{ .http_status = 415 }, scratch));
     const refused: server_head.Refused = .{
         .http_status = 200,

@@ -62,7 +62,7 @@ pub fn Exchange(comptime method: connect.Method) type {
             const speaks = speaks_of(self.options);
             const lookup: connect.Lookup = .{ .context = self, .find_fn = find };
             if (self.response.result != .response) {
-                var response = connect.client.read(speaks, .{ .status = 200, .headers = lookup, .body = "" }, storage, self.options.decoders);
+                var response = connect.client.read(speaks, .{ .status = connect.constants.protocol.status.ok, .headers = lookup, .body = "" }, storage, self.options.decoders);
                 response.done = true;
                 response.failure = failure_of(self.response.result);
                 return response;

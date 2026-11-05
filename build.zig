@@ -9,15 +9,7 @@ const lint = @import("build/lint.zig");
 const examples = @import("build/examples.zig");
 const generate = @import("build/generate.zig");
 
-pub const Graph = struct {
-    protobuf: *std.Build.Module,
-    connect: *std.Build.Module,
-    connect_colibri: *std.Build.Module,
-    public_names: *std.Build.Module,
-    colibri: *std.Build.Dependency,
-    target: std.Build.ResolvedTarget,
-    optimize: std.builtin.OptimizeMode,
-};
+const Graph = @import("build/graph.zig").Graph;
 
 pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});

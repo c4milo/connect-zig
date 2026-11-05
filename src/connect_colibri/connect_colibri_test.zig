@@ -10,8 +10,9 @@ const adapter = @import("connect_colibri.zig");
 
 const Note = struct {
     text: []const u8 = "",
+    pub const FieldNumber = enum(u29) { text = 1 };
     pub const protobuf: proto.Descriptor = .{ .full_name = "test.Note", .fields = &.{
-        .{ .name = "text", .number = 1, .kind = .string, .json_name = "text", .proto_name = "text" },
+        proto.field_of(FieldNumber.text, .string, .{}),
     } };
 };
 
@@ -25,6 +26,9 @@ const gather = method("Gather", .client_stream, .unknown);
 const chat = method("Chat", .bidi_stream, .unknown);
 
 const App = struct { calls: u32 = 0 };
+
+/// The messages a chat answers, at most.
+const chat_turns_max = 4;
 
 fn on_say(app: *App, _: *adapter.Call, request: *const Note, response: *Note) ?connect.RpcError {
     app.calls += 1;
@@ -43,7 +47,7 @@ fn on_gather(_: *App, _: *adapter.Call, receiver: *adapter.Receiver(Note), respo
 }
 
 fn on_chat(_: *App, call: *adapter.Call, receiver: *adapter.Receiver(Note), sender: *adapter.Sender(Note)) ?connect.RpcError {
-    for (0..4) |_| {
+    for (0..chat_turns_max) |_| {
         const note = receiver.next() orelse break;
         sender.send(&note) catch return .{ .code = .resource_exhausted };
     }
@@ -52,10 +56,12 @@ fn on_chat(_: *App, call: *adapter.Call, receiver: *adapter.Receiver(Note), send
 }
 
 fn on_error(_: *App, _: *const server.Request, _: anyerror, response: *server.ResponseWriter) void {
-    response.status = 500;
+    response.status = connect.constants.protocol.status.internal_server_error;
 }
 
-const options: adapter.RouteOptions = .{ .message_bytes = 1024, .token_bytes = 256 };
+const message_bytes = 1024;
+const token_bytes = 256;
+const options: adapter.RouteOptions = .{ .message_bytes = message_bytes, .token_bytes = token_bytes };
 
 const routes = server.router(App, .{
     .error_handler = on_error,

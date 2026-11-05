@@ -53,21 +53,21 @@ var output: [client.constants.limits.stream_output_len_min]u8 = undefined;
 var client_config: client.Config align(@alignOf(client.Config)) = undefined;
 var pool: client.ConnectionPool align(@alignOf(client.ConnectionPool)) = undefined;
 var pool_memory: [client.ConnectionPool.memory_bytes(.{})]u8 align(client.ConnectionPool.memory_alignment) = undefined;
-var prng: std.Random.DefaultPrng = .init(0x636c69656e74);
-var tcp: client.ConnectionHandle = .{ .slot = 0, .generation = 0 };
+var prng: std.Random.DefaultPrng align(@alignOf(std.Random.DefaultPrng)) = .init(0x636c69656e74);
+var tcp: client.ConnectionHandle align(@alignOf(client.ConnectionHandle)) = .{ .slot = 0, .generation = 0 };
 var finished: u32 = 0;
-var pool_closed = false;
-var spoken: ?client.Protocol = null;
+var pool_closed: bool = false;
+var spoken: ?client.Protocol align(@alignOf(client.Protocol)) = null;
 
-var say_proto: adapter.Exchange(Service.say) = undefined;
-var say_get: adapter.Exchange(Service.say) = undefined;
-var introduce: adapter.Exchange(Service.introduce) = undefined;
-var converse: adapter.Exchange(Service.converse) = undefined;
-var say_empty: adapter.Exchange(Service.say) = undefined;
+var say_proto: adapter.Exchange(Service.say) align(@alignOf(adapter.Exchange(Service.say))) = undefined;
+var say_get: adapter.Exchange(Service.say) align(@alignOf(adapter.Exchange(Service.say))) = undefined;
+var introduce: adapter.Exchange(Service.introduce) align(@alignOf(adapter.Exchange(Service.introduce))) = undefined;
+var converse: adapter.Exchange(Service.converse) align(@alignOf(adapter.Exchange(Service.converse))) = undefined;
+var say_empty: adapter.Exchange(Service.say) align(@alignOf(adapter.Exchange(Service.say))) = undefined;
 var buffers: [calls_count][6][buffer_len]u8 = undefined;
 var read_buffers: [4][buffer_len]u8 = undefined;
-var details: [4]connect.Detail = undefined;
-var metadata: [8]connect.Header = undefined;
+var details: [4]connect.Detail align(@alignOf(connect.Detail)) = undefined;
+var metadata: [8]connect.Header align(@alignOf(connect.Header)) = undefined;
 
 pub fn main() !void {
     try link.init();
@@ -122,7 +122,7 @@ fn client_turn() !void {
     const now_ns = link.now_ns(.client);
     pool.on_instant(now_ns);
     const input = try link.receive(.client);
-    var consumed: usize = 0;
+    var consumed: usize align(@alignOf(usize)) = 0;
     for (0..receive_calls_max) |_| {
         const held = input[consumed..];
         const read: client.Input = if (held.len > 0) .{ .stream = .{ .connection = tcp, .bytes = held } } else .none;
@@ -170,7 +170,7 @@ fn send_owed(connection: client.ConnectionHandle, now_ns: u64) !void {
 }
 
 fn sleep_ns() u64 {
-    var wait_ns: u64 = wait_ns_max;
+    var wait_ns: u64 align(@alignOf(u64)) = wait_ns_max;
     if (pool.deadline_ns()) |deadline_ns| wait_ns = @min(wait_ns, deadline_ns -| link.now_ns(.client));
     if (link_server.deadline_ns()) |deadline_ns| wait_ns = @min(wait_ns, deadline_ns -| link.now_ns(.server));
     return @max(wait_ns, 1);

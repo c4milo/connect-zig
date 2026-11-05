@@ -13,6 +13,10 @@ const constants = @import("constants.zig");
 const Codec = protocol.Codec;
 const Coding = compression.Coding;
 
+/// Base64 pads with at most two "=", which a query may percent-encode.
+const base64_padding_max = 2;
+const escaped_padding = "%3D";
+
 pub const Error = error{
     /// The query holds no `message` or no `encoding`, or names one this module does not read.
     InvalidQuery,
@@ -86,8 +90,9 @@ pub fn message_octets(query: Query, buffer: []u8) Error![]const u8 {
     if (!query.base64) return percent_decode(query.message, buffer);
     // Padding arrives as "=" or as "%3D", and either alphabet is read.
     var text = query.message;
-    for (0..2) |_| {
-        if (std.mem.endsWith(u8, text, "%3D")) text = text[0 .. text.len - 3];
+    // Base64 pads with at most two "=".
+    for (0..base64_padding_max) |_| {
+        if (std.mem.endsWith(u8, text, escaped_padding)) text = text[0 .. text.len - escaped_padding.len];
         if (std.mem.endsWith(u8, text, "=")) text = text[0 .. text.len - 1];
     }
     const url_safe = std.mem.indexOfAny(u8, text, "+/") == null;
@@ -118,9 +123,10 @@ fn decode_one(text: []const u8) Error!struct { octet: u8, len: usize } {
     // WHATWG URL, application/x-www-form-urlencoded: "+" stands for a space.
     if (text[0] == '+') return .{ .octet = ' ', .len = 1 };
     if (text[0] != '%') return .{ .octet = text[0], .len = 1 };
-    if (text.len < 3) return error.InvalidQuery;
-    const octet = std.fmt.parseInt(u8, text[1..3], 16) catch return error.InvalidQuery;
-    return .{ .octet = octet, .len = 3 };
+    const escape_len = constants.protocol.percent_escape_len;
+    if (text.len < escape_len) return error.InvalidQuery;
+    const octet = std.fmt.parseInt(u8, text[1..escape_len], constants.protocol.hex_base) catch return error.InvalidQuery;
+    return .{ .octet = octet, .len = escape_len };
 }
 
 const testing = std.testing;

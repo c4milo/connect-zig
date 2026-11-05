@@ -7,6 +7,7 @@ const std = @import("std");
 const assert = std.debug.assert;
 const wire = @import("wire.zig");
 const descriptor = @import("descriptor.zig");
+const constants = @import("constants.zig");
 const Kind = descriptor.Kind;
 
 /// Reads one value of `kind` as `V`. The caller checked the wire type.
@@ -54,7 +55,7 @@ fn varint_of(comptime kind: Kind, comptime V: type, value: V) u64 {
         .int32 => @bitCast(@as(i64, value)),
         .int64 => @bitCast(value),
         .uint32, .uint64 => value,
-        .sint32 => @as(u32, @bitCast((value << 1) ^ (value >> 31))),
+        .sint32 => @as(u32, @bitCast((value << 1) ^ (value >> (@bitSizeOf(i32) - 1)))),
         .sint64 => wire.zigzag_encode(value),
         .bool => @intFromBool(value),
         .@"enum" => @bitCast(@as(i64, @intFromEnum(value))),
@@ -81,8 +82,8 @@ pub fn write(comptime kind: Kind, comptime V: type, value: V, writer: *wire.Writ
 pub fn len(comptime kind: Kind, comptime V: type, value: V) usize {
     return switch (comptime kind.wire_type()) {
         .varint => wire.varint_len(varint_of(kind, V, value)),
-        .i32 => 4,
-        .i64 => 8,
+        .i32 => constants.protocol.fixed32_len,
+        .i64 => constants.protocol.fixed64_len,
         .len => wire.varint_len(value.len) + value.len,
         else => unreachable,
     };

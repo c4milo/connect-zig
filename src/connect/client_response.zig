@@ -17,6 +17,7 @@ const message_codec = @import("message_codec.zig");
 const server_head = @import("server_head.zig");
 const rpc_error = @import("rpc_error.zig");
 const Code = @import("code.zig").Code;
+const constants = @import("constants.zig");
 const Header = rpc_error.Header;
 const RpcError = rpc_error.RpcError;
 const Lookup = server_head.Lookup;
@@ -124,7 +125,7 @@ pub const Response = struct {
 };
 
 fn status_storage(storage: Storage) trailers.Storage {
-    const half = storage.octets.len / 2;
+    const half = storage.octets.len / constants.storage_halves;
     return .{ .message = storage.octets[0..half], .status = storage.octets[half..], .details = storage.details };
 }
 
@@ -149,7 +150,7 @@ pub fn read(speaks: protocol.Speaks, incoming: Incoming, storage: Storage, decod
         .coding = .identity,
         .reader = .{ .body = incoming.body, .payload_len_max = storage.scratch.message.len },
     };
-    if (incoming.status != 200) {
+    if (incoming.status != constants.protocol.status.ok) {
         response.done = true;
         response.failure = http_failure(speaks, incoming, storage);
         return response;

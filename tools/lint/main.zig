@@ -52,14 +52,43 @@ pub const unbounded_loop = rules.unbounded_loop.Rule(.{
     },
 });
 
-/// CLAUDE.md, Conventions: a hand-written file stays at or under 500 lines. Generated code is
-/// exempt: it is as long as its .proto file makes it.
+/// CLAUDE.md, Conventions: a file stays at or under 500 lines, generated code included: the plugin
+/// splits a long output into a file for each declaration.
 pub const file_length = rules.file_length.Rule(.{
-    .scope = .{
-        .extensions = &.{ ".zig", ".sh" },
-        .exclude_basename_suffixes = &.{".pb.zig"},
-    },
+    .scope = .{ .extensions = &.{ ".zig", ".sh" } },
     .message_suffix = "; split the file",
+});
+
+/// CLAUDE.md, Conventions: a module reaches another by the name the build gives it. Inside `src/`
+/// a file stays in its module's directory; elsewhere no path climbs with `../`.
+pub const relative_import = rules.relative_import.Rule(.{
+    .scope = .{ .extensions = &.{lint.paths.zig_extension}, .include_directories = &.{"src"} },
+    .mode = .leaves_subsystem,
+});
+pub const relative_import_outside = rules.relative_import.Rule(.{
+    .name = "relative-import-outside",
+    .scope = .{ .extensions = &.{lint.paths.zig_extension}, .include_directories = &.{ "examples", "tools", "build" } },
+    .mode = .parent_or_absolute,
+});
+
+/// CLAUDE.md, Conventions: every limit is a named constant, never an inline literal, in the
+/// library and in the code the plugin writes.
+pub const magic_numbers = rules.magic_numbers.Rule(.{
+    .scope = .{
+        .extensions = &.{lint.paths.zig_extension},
+        .include_directories = &.{ "src", "examples/gen" },
+        .exclude_basenames = &.{"constants.zig"},
+    },
+});
+
+/// The library keeps no state every thread shares.
+pub const global_state = rules.global_state.Rule(.{
+    .scope = .{ .extensions = &.{lint.paths.zig_extension}, .include_directories = &.{ "src", "examples/gen" } },
+});
+
+/// A container-level `var` states its alignment, which Zig 0.16's x86_64 backend needs.
+pub const static_alignment = rules.static_alignment.Rule(.{
+    .scope = .{ .extensions = &.{lint.paths.zig_extension}, .include_directories = &.{ "src", "examples" } },
 });
 
 /// CLAUDE.md, Conventions: every Markdown file renders on GitHub as written.
@@ -72,7 +101,10 @@ pub const markdown = rules.markdown.Rule(.{
     .trailing_whitespace = true,
 });
 
-const Linter = lint.Linter(.{ heap, io, determinism, unbounded_loop, file_length, markdown });
+const Linter = lint.Linter(.{
+    heap,            io,                      determinism,   unbounded_loop, file_length,      markdown,
+    relative_import, relative_import_outside, magic_numbers, global_state,   static_alignment,
+});
 
 pub fn main(init: std.process.Init) !void {
     return Linter.main(init);

@@ -11,6 +11,7 @@ const assert = std.debug.assert;
 const rpc_error = @import("rpc_error.zig");
 const envelope = @import("envelope.zig");
 const constants = @import("constants.zig");
+const protocol = constants.protocol;
 const Code = @import("code.zig").Code;
 const RpcError = rpc_error.RpcError;
 const Header = rpc_error.Header;
@@ -28,34 +29,41 @@ pub fn write(failure: ?RpcError, buffer: []u8, out: *[trailers_max]Header) Error
     };
     assert(status.code != .ok);
     var used: usize = 0;
+    var count: usize = 0;
     const number = std.fmt.bufPrint(buffer, "{d}", .{@intFromEnum(status.code)}) catch return error.NoSpaceLeft;
     used += number.len;
-    out[0] = .{ .name = "grpc-status", .value = number };
+    count = add(out, count, "grpc-status", number);
     const message = try percent_encode(status.message, buffer[used..]);
     used += message.len;
-    out[1] = .{ .name = "grpc-message", .value = message };
-    if (status.details.len == 0) return out[0..2];
-    // The Status's octets go at the end of the buffer, and their base64 after the message.
-    const room = buffer.len - used;
-    const status_bytes = try rpc_error.encode_status(status, buffer[used + room / 2 ..], buffer[used..][0 .. room / 2]);
+    count = add(out, count, "grpc-message", message);
+    if (status.details.len == 0) return out[0..count];
+    // The Status's octets go in the second half of the room, and their base64 in the first.
+    const half = (buffer.len - used) / constants.storage_halves;
+    const status_bytes = try rpc_error.encode_status(status, buffer[used + half ..], buffer[used..][0..half]);
     const encoder = std.base64.standard_no_pad.Encoder;
-    if (encoder.calcSize(status_bytes.len) > room / 2) return error.NoSpaceLeft;
-    const details = encoder.encode(buffer[used..][0 .. room / 2], status_bytes);
-    out[2] = .{ .name = "grpc-status-details-bin", .value = details };
-    return out[0..3];
+    if (encoder.calcSize(status_bytes.len) > half) return error.NoSpaceLeft;
+    const details = encoder.encode(buffer[used..][0..half], status_bytes);
+    count = add(out, count, "grpc-status-details-bin", details);
+    return out[0..count];
+}
+
+fn add(out: *[trailers_max]Header, count: usize, name: []const u8, value: []const u8) usize {
+    assert(count < trailers_max);
+    out[count] = .{ .name = name, .value = value };
+    return count + 1;
 }
 
 /// Percent-encodes a grpc-message value (PROTOCOL-HTTP2.md, "Responses": Status-Message).
 pub fn percent_encode(message: []const u8, buffer: []u8) error{NoSpaceLeft}![]const u8 {
     var len: usize = 0;
     for (message) |octet| {
-        const plain = octet >= 0x20 and octet <= 0x7e and octet != '%';
-        const width: usize = if (plain) 1 else 3;
+        const plain = octet >= protocol.printable_first and octet <= protocol.printable_last and octet != '%';
+        const width: usize = if (plain) 1 else protocol.percent_escape_len;
         if (len + width > buffer.len) return error.NoSpaceLeft;
         if (plain) {
             buffer[len] = octet;
         } else {
-            _ = std.fmt.bufPrint(buffer[len..][0..3], "%{X:0>2}", .{octet}) catch unreachable;
+            _ = std.fmt.bufPrint(buffer[len..][0..protocol.percent_escape_len], "%{X:0>2}", .{octet}) catch unreachable;
         }
         len += width;
     }
@@ -70,13 +78,14 @@ pub fn percent_decode(value: []const u8, buffer: []u8) []const u8 {
     var index: usize = 0;
     for (0..value.len) |_| {
         if (index >= value.len) break;
-        const decoded = if (value[index] == '%' and index + 3 <= value.len)
-            std.fmt.parseInt(u8, value[index + 1 .. index + 3], 16) catch null
+        const escape_len = protocol.percent_escape_len;
+        const decoded = if (value[index] == '%' and index + escape_len <= value.len)
+            std.fmt.parseInt(u8, value[index + 1 .. index + escape_len], protocol.hex_base) catch null
         else
             null;
         if (decoded) |octet| {
             buffer[len] = octet;
-            index += 3;
+            index += escape_len;
         } else {
             buffer[len] = value[index];
             index += 1;
@@ -97,7 +106,7 @@ pub const Storage = struct {
 /// success. A missing or malformed grpc-status reads as `unknown`.
 pub fn read(context: anytype, comptime find: fn (@TypeOf(context), []const u8) ?[]const u8, storage: Storage) ?RpcError {
     const status_text = find(context, "grpc-status") orelse return .{ .code = .unknown, .message = "missing grpc-status" };
-    const number = std.fmt.parseInt(u32, status_text, 10) catch return .{ .code = .unknown, .message = "malformed grpc-status" };
+    const number = std.fmt.parseInt(u32, status_text, protocol.decimal_base) catch return .{ .code = .unknown, .message = "malformed grpc-status" };
     const code = Code.from_number(number);
     if (code == .ok) return null;
     var failure: RpcError = .{ .code = code };

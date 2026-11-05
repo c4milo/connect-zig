@@ -122,7 +122,9 @@ ran on Linux x86-64 with Zig 0.16.0.
   trailer, and a gRPC Trailers-Only error. `tools/interop_check.sh` with buf 1.74.0 printed 17
   of 17 calls answered, gRPC's trailers among them.
 - **Step 6.** buf 1.74.0 ran the plugin over `examples/proto`, and `tools/generate_check.sh`
-  printed "examples/gen matches buf generate". `zig build test-generated` compiles the output.
+  printed "examples/gen matches buf generate". `zig build test-generated` compiles the output,
+  `large.proto`'s split pieces among it, and `zig build lint` reads it with every rule and reports
+  no finding (decision 17).
 
 ### What a later step owes
 

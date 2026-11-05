@@ -156,8 +156,9 @@ const proto = @import("protobuf");
 
 const Note = struct {
     text: []const u8 = "",
+    pub const FieldNumber = enum(u29) { text = 1 };
     pub const protobuf: proto.Descriptor = .{ .full_name = "test.Note", .fields = &.{
-        .{ .name = "text", .number = 1, .kind = .string, .json_name = "text", .proto_name = "text" },
+        proto.field_of(FieldNumber.text, .string, .{}),
     } };
 };
 

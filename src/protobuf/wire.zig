@@ -5,6 +5,9 @@
 const std = @import("std");
 const assert = std.debug.assert;
 const constants = @import("constants.zig");
+const group_bits = constants.protocol.varint_group_bits;
+const continuation = constants.protocol.varint_continuation;
+const payload_mask = constants.protocol.varint_payload_mask;
 
 /// The six wire types of "Message Structure". 6 and 7 are not wire types.
 pub const WireType = enum(u3) {
@@ -56,7 +59,7 @@ pub const Tag = struct {
 
 /// Maps a signed number to an unsigned one so that small magnitudes stay short ("Signed Integers").
 pub fn zigzag_encode(value: i64) u64 {
-    return @bitCast((value << 1) ^ (value >> 63));
+    return @bitCast((value << 1) ^ (value >> (@bitSizeOf(i64) - 1)));
 }
 
 pub fn zigzag_decode(value: u64) i64 {
@@ -67,8 +70,8 @@ pub fn zigzag_decode(value: u64) i64 {
 
 /// The bytes a varint of `value` takes.
 pub fn varint_len(value: u64) usize {
-    const bits: usize = 64 - @clz(value | 1);
-    const len = (bits + 6) / 7;
+    const bits: usize = @bitSizeOf(u64) - @clz(value | 1);
+    const len = std.math.divCeil(usize, bits, group_bits) catch unreachable;
     assert(len >= 1 and len <= constants.protocol.varint_len_max);
     return len;
 }
@@ -92,9 +95,9 @@ pub const Reader = struct {
             reader.position += 1;
             // The tenth byte carries bit 63 alone; higher bits fall off the 64-bit value, as
             // "Base 128 Varints" decodes into a 64-bit integer.
-            const shift: u6 = @intCast(index * 7);
-            value |= @as(u64, byte & 0x7f) << shift;
-            if (byte & 0x80 == 0) return value;
+            const shift: u6 = @intCast(index * group_bits);
+            value |= @as(u64, byte & payload_mask) << shift;
+            if (byte & continuation == 0) return value;
         }
         // "Base 128 Varints": a varint holds at most 10 bytes.
         return error.VarintTooLong;
@@ -102,12 +105,12 @@ pub const Reader = struct {
 
     pub fn fixed32(reader: *Reader) Error!u32 {
         const octets = try reader.take(constants.protocol.fixed32_len);
-        return std.mem.readInt(u32, octets[0..4], .little);
+        return std.mem.readInt(u32, octets[0..constants.protocol.fixed32_len], .little);
     }
 
     pub fn fixed64(reader: *Reader) Error!u64 {
         const octets = try reader.take(constants.protocol.fixed64_len);
-        return std.mem.readInt(u64, octets[0..8], .little);
+        return std.mem.readInt(u64, octets[0..constants.protocol.fixed64_len], .little);
     }
 
     /// A length-delimited record's payload: a varint length, then that many bytes.
@@ -195,9 +198,9 @@ pub const Writer = struct {
         var octets: [constants.protocol.varint_len_max]u8 = undefined;
         const len = varint_len(value);
         for (octets[0..len], 0..) |*octet, index| {
-            const more: u8 = if (index + 1 < len) 0x80 else 0;
-            octet.* = @as(u8, @truncate(rest & 0x7f)) | more;
-            rest >>= 7;
+            const more: u8 = if (index + 1 < len) continuation else 0;
+            octet.* = @as(u8, @truncate(rest & payload_mask)) | more;
+            rest >>= group_bits;
         }
         assert(rest == 0);
         try writer.bytes(octets[0..len]);
@@ -214,23 +217,23 @@ pub const Writer = struct {
 
     pub fn patch_padded(writer: *Writer, at: usize, value: u64) void {
         assert(at + constants.limits.padded_length_len <= writer.len);
-        assert(value < (1 << (7 * constants.limits.padded_length_len)));
+        assert(value < (1 << (group_bits * constants.limits.padded_length_len)));
         var rest = value;
         for (writer.buffer[at..][0..constants.limits.padded_length_len], 0..) |*octet, index| {
-            const more: u8 = if (index + 1 < constants.limits.padded_length_len) 0x80 else 0;
-            octet.* = @as(u8, @truncate(rest & 0x7f)) | more;
-            rest >>= 7;
+            const more: u8 = if (index + 1 < constants.limits.padded_length_len) continuation else 0;
+            octet.* = @as(u8, @truncate(rest & payload_mask)) | more;
+            rest >>= group_bits;
         }
     }
 
     pub fn fixed32(writer: *Writer, value: u32) WriteError!void {
-        var octets: [4]u8 = undefined;
+        var octets: [constants.protocol.fixed32_len]u8 = undefined;
         std.mem.writeInt(u32, &octets, value, .little);
         try writer.bytes(&octets);
     }
 
     pub fn fixed64(writer: *Writer, value: u64) WriteError!void {
-        var octets: [8]u8 = undefined;
+        var octets: [constants.protocol.fixed64_len]u8 = undefined;
         std.mem.writeInt(u64, &octets, value, .little);
         try writer.bytes(&octets);
     }
@@ -240,7 +243,8 @@ pub const Writer = struct {
     }
 };
 
-const padded_zero = [_]u8{ 0x80, 0x80, 0x80, 0x80, 0x00 };
+/// A padded varint of 0: every byte but the last carries the continuation bit alone.
+const padded_zero: [constants.limits.padded_length_len]u8 = .{continuation} ** (constants.limits.padded_length_len - 1) ++ .{0};
 
 comptime {
     assert(padded_zero.len == constants.limits.padded_length_len);

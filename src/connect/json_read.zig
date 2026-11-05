@@ -90,11 +90,16 @@ pub const Tokens = struct {
     }
 };
 
+const base64_chars = 4;
+const base64_octets = 3;
+
 /// Writes `octets` as one string of unpadded standard base64, in pieces.
 pub fn write_base64(octets: []const u8, text: *json.TextWriter) (json.EncodeError || error{NoSpaceLeft})!void {
     const encoder = std.base64.standard_no_pad.Encoder;
-    const chunk_len = 48;
-    var buffer: [64]u8 = undefined;
+    const piece_len = constants.limits.base64_piece_len;
+    // Base64 writes 4 characters for each 3 octets.
+    const chunk_len = piece_len / base64_chars * base64_octets;
+    var buffer: [piece_len]u8 = undefined;
     var start: usize = 0;
     for (0..octets.len / chunk_len + 1) |_| {
         const end = @min(start + chunk_len, octets.len);

@@ -25,9 +25,20 @@ plugins:
     out: gen
 ```
 
-`buf generate` writes one `<file>.pb.zig` for each `.proto` file. A message is a struct, an enum a
-non-exhaustive `enum(i32)`, and each RPC a `connect.Method`. The generated code imports the
-modules `protobuf` and `connect` by name.
+`buf generate` writes one `<file>.pb.zig` for each `.proto` file, split into a file for each
+declaration past 500 lines. A message is a struct with a `FieldNumber` enum, an enum a
+non-exhaustive `enum(i32)`, and each RPC a `connect.Method`. The code passes the same lint rules
+as the library (decision 17).
+
+A generated file imports other modules by name, and its header lists them: `protobuf`, `connect`
+when it declares a service, and one module for each `.proto` file it imports. The module of
+`kitchen/v1/shared.proto` is `kitchen_v1_shared`:
+
+```zig
+const shared = b.createModule(.{ .root_source_file = b.path("gen/kitchen/v1/shared.pb.zig") });
+shared.addImport("protobuf", connect_zig.module("protobuf"));
+kitchen.addImport("kitchen_v1_shared", shared);
+```
 
 ## Serve
 

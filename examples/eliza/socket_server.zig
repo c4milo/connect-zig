@@ -67,20 +67,20 @@ comptime {
 const Endpoint = server.EndpointOf(.{ .tcp_connections = sockets_max, .quic_connections = 0 });
 
 var loop_memory: [rotor.Loop.memory_bytes(loop_options)]u8 align(rotor.memory_alignment) = undefined;
-var loop: rotor.Loop = undefined;
-var listener: rotor.Descriptor = undefined;
-var accepting = false;
-var sockets: [sockets_max]Socket = @splat(.{});
-var events: [loop_options.operations]rotor.Event = undefined;
+var loop: rotor.Loop align(@alignOf(rotor.Loop)) = undefined;
+var listener: rotor.Descriptor align(@alignOf(rotor.Descriptor)) = undefined;
+var accepting: bool = false;
+var sockets: [sockets_max]Socket align(@alignOf(Socket)) = @splat(.{});
+var events: [loop_options.operations]rotor.Event align(@alignOf(rotor.Event)) = undefined;
 var config: server.Config align(@alignOf(server.Config)) = .{};
 var endpoint: Endpoint align(@alignOf(Endpoint)) = undefined;
 var router: service.Router align(@alignOf(service.Router)) = .{};
 var app: service.App align(@alignOf(service.App)) = .{};
 /// The server reads gzip messages and writes them when a client accepts gzip.
-var gzip_decoder: connect.GzipDecoder = undefined;
-var gzip_encoder: connect.GzipEncoder = undefined;
+var gzip_decoder: connect.GzipDecoder align(@alignOf(connect.GzipDecoder)) = undefined;
+var gzip_encoder: connect.GzipEncoder align(@alignOf(connect.GzipEncoder)) = undefined;
 /// A cleartext endpoint draws no secret, so a seeded generator stands in for entropy.
-var prng: std.Random.DefaultPrng = .init(0x656c697a61);
+var prng: std.Random.DefaultPrng align(@alignOf(std.Random.DefaultPrng)) = .init(0x656c697a61);
 
 pub fn main(init: std.process.Init) !void {
     const port = try port_of(init);
@@ -209,7 +209,7 @@ fn on_accept(event: rotor.Event, now_ns: u64) void {
 /// Passes the endpoint what a socket read, and keeps what it did not take.
 fn serve_input(socket: *Socket, now_ns: u64) !void {
     if (socket.input_len == 0) return;
-    var consumed: usize = 0;
+    var consumed: usize align(@alignOf(usize)) = 0;
     for (0..events_per_input_max) |_| {
         const read: server.StreamBytes = .{ .connection = socket.connection, .bytes = socket.input[consumed..socket.input_len] };
         const received = endpoint.receive(.{ .stream = read }, now_ns);

@@ -235,11 +235,11 @@ fn write_time(transcoder: *Transcoder, value: json.Item, comptime parse: anytype
     };
     const writer = &transcoder.writer;
     if (instant.seconds != 0) {
-        try writer.tag(1, .varint);
+        try writer.tag(@intFromEnum(wkt.Timestamp.FieldNumber.seconds), .varint);
         try scalar.write(.int64, i64, instant.seconds, writer);
     }
     if (instant.nanos != 0) {
-        try writer.tag(2, .varint);
+        try writer.tag(@intFromEnum(wkt.Timestamp.FieldNumber.nanos), .varint);
         try scalar.write(.int32, i32, instant.nanos, writer);
     }
 }
@@ -277,8 +277,9 @@ const testing = std.testing;
 
 const Chain = struct {
     next: repeated.Lazy(Chain) = .{},
+    pub const FieldNumber = enum(u29) { next = 1 };
     pub const protobuf: descriptor.Descriptor = .{ .full_name = "test.Chain", .fields = &.{
-        .{ .name = "next", .number = 1, .kind = .message, .json_name = "next", .proto_name = "next" },
+        descriptor.field_of(FieldNumber.next, .message, .{}),
     } };
 };
 

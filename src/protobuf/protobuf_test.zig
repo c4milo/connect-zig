@@ -15,34 +15,37 @@ pub const Color = enum(i32) {
     pub const protobuf: proto.EnumDescriptor = .{ .full_name = "test.Color", .values = &.{
         .{ .name = "COLOR_UNSPECIFIED", .number = 0 },
         .{ .name = "COLOR_RED", .number = 1 },
-        .{ .name = "COLOR_GREEN", .number = 2 },
+        .{ .name = "COLOR_GREEN", .number = @intFromEnum(@This().green) },
     } };
 };
 
 pub const Inner = struct {
     a: i32 = 0,
     tags: Repeated([]const u8, .string) = .{},
+    pub const FieldNumber = enum(u29) { a = 1, tags = 2 };
     pub const protobuf: proto.Descriptor = .{ .full_name = "test.Inner", .fields = &.{
-        .{ .name = "a", .number = 1, .kind = .int32, .json_name = "a", .proto_name = "a" },
-        .{ .name = "tags", .number = 2, .kind = .string, .json_name = "tags", .proto_name = "tags" },
+        proto.field_of(FieldNumber.a, .int32, .{}),
+        proto.field_of(FieldNumber.tags, .string, .{}),
     } };
 };
 
 pub const Node = struct {
     value: i64 = 0,
     next: Lazy(Node) = .{},
+    pub const FieldNumber = enum(u29) { value = 1, next = 2 };
     pub const protobuf: proto.Descriptor = .{ .full_name = "test.Node", .fields = &.{
-        .{ .name = "value", .number = 1, .kind = .int64, .json_name = "value", .proto_name = "value" },
-        .{ .name = "next", .number = 2, .kind = .message, .json_name = "next", .proto_name = "next" },
+        proto.field_of(FieldNumber.value, .int64, .{}),
+        proto.field_of(FieldNumber.next, .message, .{}),
     } };
 };
 
 pub const Entry = struct {
     key: []const u8 = "",
     value: i32 = 0,
+    pub const FieldNumber = enum(u29) { key = 1, value = 2 };
     pub const protobuf: proto.Descriptor = .{ .full_name = "test.All.CountsEntry", .map_entry = true, .fields = &.{
-        .{ .name = "key", .number = 1, .kind = .string, .json_name = "key", .proto_name = "key" },
-        .{ .name = "value", .number = 2, .kind = .int32, .json_name = "value", .proto_name = "value" },
+        proto.field_of(FieldNumber.key, .string, .{}),
+        proto.field_of(FieldNumber.value, .int32, .{}),
     } };
 };
 
@@ -67,35 +70,37 @@ pub const All = struct {
     choice: ?union(enum) { name: []const u8, number: i32, sub: Inner } = null,
     node: Lazy(Node) = .{},
 
+    pub const FieldNumber = enum(u29) { int32_field = 1, uint64_field = 2, sint32_field = 3, fixed64_field = 4, sfixed32_field = 5, float_field = 6, double_field = 7, bool_field = 8, string_field = 9, bytes_field = 10, color = 11, optional_int = 12, inner = 13, numbers = 14, unpacked = 15, inners = 16, counts = 17, name = 18, number = 19, sub = 20, node = 21 };
     pub const protobuf: proto.Descriptor = .{ .full_name = "test.All", .fields = &.{
-        .{ .name = "int32_field", .number = 1, .kind = .int32, .json_name = "int32Field", .proto_name = "int32_field" },
-        .{ .name = "uint64_field", .number = 2, .kind = .uint64, .json_name = "uint64Field", .proto_name = "uint64_field" },
-        .{ .name = "sint32_field", .number = 3, .kind = .sint32, .json_name = "sint32Field", .proto_name = "sint32_field" },
-        .{ .name = "fixed64_field", .number = 4, .kind = .fixed64, .json_name = "fixed64Field", .proto_name = "fixed64_field" },
-        .{ .name = "sfixed32_field", .number = 5, .kind = .sfixed32, .json_name = "sfixed32Field", .proto_name = "sfixed32_field" },
-        .{ .name = "float_field", .number = 6, .kind = .float, .json_name = "floatField", .proto_name = "float_field" },
-        .{ .name = "double_field", .number = 7, .kind = .double, .json_name = "doubleField", .proto_name = "double_field" },
-        .{ .name = "bool_field", .number = 8, .kind = .bool, .json_name = "boolField", .proto_name = "bool_field" },
-        .{ .name = "string_field", .number = 9, .kind = .string, .json_name = "stringField", .proto_name = "string_field" },
-        .{ .name = "bytes_field", .number = 10, .kind = .bytes, .json_name = "bytesField", .proto_name = "bytes_field" },
-        .{ .name = "color", .number = 11, .kind = .@"enum", .json_name = "color", .proto_name = "color" },
-        .{ .name = "optional_int", .number = 12, .kind = .int32, .json_name = "optionalInt", .proto_name = "optional_int" },
-        .{ .name = "inner", .number = 13, .kind = .message, .json_name = "inner", .proto_name = "inner" },
-        .{ .name = "numbers", .number = 14, .kind = .int32, .json_name = "numbers", .proto_name = "numbers" },
-        .{ .name = "unpacked", .number = 15, .kind = .uint32, .json_name = "unpacked", .proto_name = "unpacked", .@"packed" = false },
-        .{ .name = "inners", .number = 16, .kind = .message, .json_name = "inners", .proto_name = "inners" },
-        .{ .name = "counts", .number = 17, .kind = .message, .json_name = "counts", .proto_name = "counts" },
-        .{ .name = "name", .number = 18, .kind = .string, .json_name = "name", .proto_name = "name", .oneof = "choice" },
-        .{ .name = "number", .number = 19, .kind = .int32, .json_name = "number", .proto_name = "number", .oneof = "choice" },
-        .{ .name = "sub", .number = 20, .kind = .message, .json_name = "sub", .proto_name = "sub", .oneof = "choice" },
-        .{ .name = "node", .number = 21, .kind = .message, .json_name = "node", .proto_name = "node" },
+        proto.field_of(FieldNumber.int32_field, .int32, .{ .json_name = "int32Field" }),
+        proto.field_of(FieldNumber.uint64_field, .uint64, .{ .json_name = "uint64Field" }),
+        proto.field_of(FieldNumber.sint32_field, .sint32, .{ .json_name = "sint32Field" }),
+        proto.field_of(FieldNumber.fixed64_field, .fixed64, .{ .json_name = "fixed64Field" }),
+        proto.field_of(FieldNumber.sfixed32_field, .sfixed32, .{ .json_name = "sfixed32Field" }),
+        proto.field_of(FieldNumber.float_field, .float, .{ .json_name = "floatField" }),
+        proto.field_of(FieldNumber.double_field, .double, .{ .json_name = "doubleField" }),
+        proto.field_of(FieldNumber.bool_field, .bool, .{ .json_name = "boolField" }),
+        proto.field_of(FieldNumber.string_field, .string, .{ .json_name = "stringField" }),
+        proto.field_of(FieldNumber.bytes_field, .bytes, .{ .json_name = "bytesField" }),
+        proto.field_of(FieldNumber.color, .@"enum", .{}),
+        proto.field_of(FieldNumber.optional_int, .int32, .{ .json_name = "optionalInt" }),
+        proto.field_of(FieldNumber.inner, .message, .{}),
+        proto.field_of(FieldNumber.numbers, .int32, .{}),
+        proto.field_of(FieldNumber.unpacked, .uint32, .{ .@"packed" = false }),
+        proto.field_of(FieldNumber.inners, .message, .{}),
+        proto.field_of(FieldNumber.counts, .message, .{}),
+        proto.field_of(FieldNumber.name, .string, .{ .oneof = "choice" }),
+        proto.field_of(FieldNumber.number, .int32, .{ .oneof = "choice" }),
+        proto.field_of(FieldNumber.sub, .message, .{ .oneof = "choice" }),
+        proto.field_of(FieldNumber.node, .message, .{}),
     } };
 };
 
 pub const Test1 = struct {
     a: i32 = 0,
+    pub const FieldNumber = enum(u29) { a = 1 };
     pub const protobuf: proto.Descriptor = .{ .full_name = "test.Test1", .fields = &.{
-        .{ .name = "a", .number = 1, .kind = .int32, .json_name = "a", .proto_name = "a" },
+        proto.field_of(FieldNumber.a, .int32, .{}),
     } };
 };
 
@@ -107,8 +112,9 @@ test "the encoding guide's Test1 with a = 150 is 08 96 01" {
     try testing.expectEqual(@as(usize, 0), try proto.encoded_len(Test1, &.{}));
 }
 
-fn sample(node: *const Node) All {
-    return .{
+test "every kind round-trips, and a decoded message encodes to the same bytes" {
+    const node: Node = .{ .value = 3 };
+    const all: All = .{
         .int32_field = -5,
         .uint64_field = std.math.maxInt(u64),
         .sint32_field = -300,
@@ -127,13 +133,8 @@ fn sample(node: *const Node) All {
         .inners = .of(&.{ .{ .a = 1 }, .{ .a = 2 } }),
         .counts = .of(&.{ .{ .key = "k", .value = 1 }, .{ .key = "k", .value = 9 } }),
         .choice = .{ .number = 0 },
-        .node = .of(node),
+        .node = .of(&node),
     };
-}
-
-test "every kind round-trips, and a decoded message encodes to the same bytes" {
-    const node: Node = .{ .value = 3 };
-    const all = sample(&node);
     var buffer: [512]u8 = undefined;
     const bytes = try proto.encode(All, &all, &buffer);
     try testing.expectEqual(bytes.len, try proto.encoded_len(All, &all));
@@ -198,26 +199,28 @@ test "unknown fields and groups are skipped, and bad strings and wire types are 
     try testing.expectError(error.Truncated, proto.decode(All, &.{ 0x08, 0x80 }));
 }
 
-/// Writes `depth` nested `next` fields into the end of `buffer` and returns them.
-fn nested(buffer: []u8, depth: usize) []const u8 {
-    var start = buffer.len;
-    for (0..depth) |_| {
-        const inner_len = buffer.len - start;
-        std.debug.assert(inner_len < 128 * 128);
-        if (inner_len < 128) {
-            start -= 2;
-            buffer[start + 1] = @intCast(inner_len);
-        } else {
-            start -= 3;
-            buffer[start + 1] = @as(u8, @intCast(inner_len & 0x7f)) | 0x80;
-            buffer[start + 2] = @intCast(inner_len >> 7);
-        }
-        buffer[start] = 0x12;
-    }
-    return buffer[start..];
-}
-
 test "messages nested past the depth limit are refused" {
+    const helpers = struct {
+        /// Writes `depth` nested `next` fields into the end of `buffer` and returns them.
+        fn nested(buffer: []u8, depth: usize) []const u8 {
+            var start = buffer.len;
+            for (0..depth) |_| {
+                const inner_len = buffer.len - start;
+                std.debug.assert(inner_len < 128 * 128);
+                if (inner_len < 128) {
+                    start -= 2;
+                    buffer[start + 1] = @intCast(inner_len);
+                } else {
+                    start -= 3;
+                    buffer[start + 1] = @as(u8, @intCast(inner_len & 0x7f)) | 0x80;
+                    buffer[start + 2] = @intCast(inner_len >> 7);
+                }
+                buffer[start] = 0x12;
+            }
+            return buffer[start..];
+        }
+    };
+    const nested = helpers.nested;
     var buffer: [512]u8 = undefined;
     const deep = nested(&buffer, proto.constants.limits.depth_max);
     try testing.expectError(error.DepthExceeded, proto.decode(Node, deep));

@@ -3,7 +3,7 @@
 //! `zig build run-eliza-server -- [port]` runs the ELIZA server on a TCP socket.
 const std = @import("std");
 
-const Graph = @import("../build.zig").Graph;
+const Graph = @import("graph.zig").Graph;
 
 pub fn add(b: *std.Build, graph: Graph) *std.Build.Step {
     const step = b.step("examples", "Build and run every example");
