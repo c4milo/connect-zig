@@ -9,16 +9,13 @@ const names = @import("names.zig");
 
 pub const Error = Allocator.Error || proto.Error || error{UnknownType};
 
-pub const Kind = enum { message, @"enum" };
-
 pub const Entry = struct {
     /// The .proto file that declares it.
     file: []const u8,
     /// Its Zig path within that file: "Outer.Inner".
     zig_path: []const u8,
-    kind: Kind,
+    /// The message's descriptor, or null for an enum.
     message: ?pb.DescriptorProto = null,
-    map_entry: bool = false,
 };
 
 /// The well-known types the runtime's `proto.wkt` holds, which no file generates.
@@ -47,8 +44,7 @@ pub const Index = struct {
         const full = try std.fmt.allocPrint(arena, "{s}{s}", .{ prefix, name });
         const zig_name = try names.identifier(arena, name);
         const zig_path = if (parent.len == 0) zig_name else try std.fmt.allocPrint(arena, "{s}.{s}", .{ parent, zig_name });
-        const map_entry = if (message.options) |options| options.map_entry orelse false else false;
-        try index.entries.put(arena, full, .{ .file = file, .zig_path = zig_path, .kind = .message, .message = message, .map_entry = map_entry });
+        try index.entries.put(arena, full, .{ .file = file, .zig_path = zig_path, .message = message });
         const nested_prefix = try std.fmt.allocPrint(arena, "{s}.", .{full});
         var nested = message.nested_type.iterator();
         while (try nested.next()) |child| try index.add_message(arena, file, nested_prefix, zig_path, child);
@@ -61,7 +57,7 @@ pub const Index = struct {
         const full = try std.fmt.allocPrint(arena, "{s}{s}", .{ prefix, name });
         const zig_name = try names.identifier(arena, name);
         const zig_path = if (parent.len == 0) zig_name else try std.fmt.allocPrint(arena, "{s}.{s}", .{ parent, zig_name });
-        try index.entries.put(arena, full, .{ .file = file, .zig_path = zig_path, .kind = .@"enum" });
+        try index.entries.put(arena, full, .{ .file = file, .zig_path = zig_path });
     }
 
     pub fn get(index: *const Index, full_name: []const u8) Error!Entry {

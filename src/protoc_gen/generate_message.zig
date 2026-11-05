@@ -117,11 +117,8 @@ fn write_struct_fields(out: *Out, full: []const u8, fields: []const Member, dept
         }
         const field = member.field;
         try out.indent(depth);
-        try out.print("{s}: {s} = {s},\n", .{
-            try names.field_identifier(out.arena, field.name orelse ""),
-            try zig_type(out, full, field),
-            try default_value(out, full, field),
-        });
+        const typed = try zig_type(out, full, field);
+        try out.print("{s}: {s} = {s},\n", .{ try names.field_identifier(out.arena, field.name orelse ""), typed.text, typed.default });
     }
 }
 
@@ -171,12 +168,30 @@ fn message_type(out: *Out, container: []const u8, field: pb.FieldDescriptorProto
     return reference;
 }
 
-fn zig_type(out: *Out, container: []const u8, field: pb.FieldDescriptorProto) Error![]const u8 {
+/// A field's Zig type and the default value its struct field takes.
+const Typed = struct { text: []const u8, default: []const u8 };
+
+fn zig_type(out: *Out, container: []const u8, field: pb.FieldDescriptorProto) Error!Typed {
+    if (field.label == .repeated) {
+        const value = try value_type(out, container, field);
+        return .{ .text = try std.fmt.allocPrint(out.arena, "proto.Repeated({s}, .{s})", .{ value, kind_name(field.type.?) }), .default = ".{}" };
+    }
+    if (field.type == .message) {
+        const target = index_file.strip_dot(field.type_name orelse "");
+        const reference = try out.reference(target);
+        // A message that contains itself, at any depth, is held as `proto.Lazy`: a struct
+        // cannot contain itself by value.
+        if (try out.index.is_recursive(out.arena, container, target)) return .{ .text = try std.fmt.allocPrint(out.arena, "proto.Lazy({s})", .{reference}), .default = ".{}" };
+        return .{ .text = try std.fmt.allocPrint(out.arena, "?{s}", .{reference}), .default = "null" };
+    }
     const value = try value_type(out, container, field);
-    if (field.label == .repeated) return std.fmt.allocPrint(out.arena, "proto.Repeated({s}, .{s})", .{ value, kind_name(field.type.?) });
-    if (field.type == .message) return if (std.mem.startsWith(u8, value, "proto.Lazy(")) value else std.fmt.allocPrint(out.arena, "?{s}", .{value});
-    if (has_presence(out, field)) return std.fmt.allocPrint(out.arena, "?{s}", .{value});
-    return value;
+    if (has_presence(out, field)) return .{ .text = try std.fmt.allocPrint(out.arena, "?{s}", .{value}), .default = "null" };
+    return .{ .text = value, .default = switch (field.type.?) {
+        .string, .bytes => "\"\"",
+        .bool => "false",
+        .@"enum" => "@enumFromInt(0)",
+        else => "0",
+    } };
 }
 
 /// Whether a scalar field has explicit presence: proto3 `optional`, or a proto2 singular field
@@ -197,18 +212,6 @@ fn unpacked(out: *const Out, field: pb.FieldDescriptorProto) bool {
     const stated: ?bool = if (field.options) |options| options.@"packed" else null;
     if (stated) |packed_flag| return !packed_flag;
     return out.proto2;
-}
-
-fn default_value(out: *Out, container: []const u8, field: pb.FieldDescriptorProto) Error![]const u8 {
-    const type_text = try zig_type(out, container, field);
-    if (field.label == .repeated or std.mem.startsWith(u8, type_text, "proto.Lazy(")) return ".{}";
-    if (type_text[0] == '?') return "null";
-    return switch (field.type.?) {
-        .string, .bytes => "\"\"",
-        .bool => "false",
-        .@"enum" => "@enumFromInt(0)",
-        else => "0",
-    };
 }
 
 pub fn kind_name(kind: pb.Type) []const u8 {
