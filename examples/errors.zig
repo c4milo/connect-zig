@@ -3,12 +3,14 @@
 //! Divide in `services/demo.zig` fails with invalid_argument when the divisor is 0, and attaches
 //! a `demo.v1.DivisionByZero` message as a detail. The client reads the detail back in each
 //! protocol: from the Connect error body, from gRPC's grpc-status-details-bin header, and from
-//! gRPC-Web's trailers frame. A call to a method the server lacks fails with unimplemented.
+//! gRPC-Web's trailers frame. A call to a method the server lacks fails with unimplemented. One
+//! round runs over h2, and one over h3.
 //!
 //! Run it with `zig build example-errors`.
 const std = @import("std");
 const connect = @import("connect");
 const proto = @import("protobuf");
+const client = @import("client");
 const rpc = @import("connect_colibri");
 const demo = @import("demo");
 const harness = @import("services/link_client.zig");
@@ -45,7 +47,13 @@ const zero_options = [_]connect.client.Options{
 pub fn main() !void {
     try harness.init();
     defer harness.deinit();
-    try harness.begin(.{ .h11 = false, .h3 = false });
+    try round(.{ .h11 = false, .h3 = false }, .h2);
+    try round(.{ .h11 = false, .h2 = false }, .h3);
+    std.debug.print("errors: every call answered as expected over h2 and h3\n", .{});
+}
+
+fn round(protocols: client.Protocols, expected: client.Protocol) !void {
+    try harness.begin(protocols);
     for (&by_zero, zero_options, 0..) |*exchange, options, index| {
         try exchange.init(options, &.{.{ .dividend = dividend, .divisor = 0 }}, harness.buffers(&buffers[index]));
         try harness.request(&exchange.request, &exchange.response);
@@ -54,7 +62,7 @@ pub fn main() !void {
     try harness.request(&by_two.request, &by_two.response);
     try multiply.init(.{}, &.{.{}}, harness.buffers(&buffers[4]));
     try harness.request(&multiply.request, &multiply.response);
-    try harness.finish(.h2);
+    try harness.finish(expected);
 
     for (&by_zero, zero_options) |*exchange, options| try expect_detail(exchange, options.protocol);
     try expect_quotient();
@@ -62,7 +70,7 @@ pub fn main() !void {
     if (try missed.next(demo.DivideResponse) != null) return error.ExchangeWrong;
     const failure = missed.failure orelse return error.ExchangeWrong;
     if (failure.code != .unimplemented) return error.ExchangeWrong;
-    std.debug.print("errors: {s} answered {s}\n", .{ comptime missing.path(), failure.code.name() });
+    std.debug.print("errors: over {s}, {s} answered {s}\n", .{ @tagName(expected), comptime missing.path(), failure.code.name() });
 }
 
 /// Checks a call failed with invalid_argument and a DivisionByZero detail that names the dividend.

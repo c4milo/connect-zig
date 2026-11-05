@@ -11,11 +11,12 @@
 //! - `BearerToken` adds the authorization header to each request it builds;
 //! - `Tally` sees each response before the program reads it, and counts them.
 //!
-//! One round runs over h2: Whoami with a token over Connect as a POST, with a token over Connect
-//! as a GET in JSON, and without one over gRPC-Web, which `Auth` refuses. Run it with `zig build
-//! example-interceptors`.
+//! Two rounds run, one over h2 and one over h3: Whoami with a token over Connect as a POST, with a
+//! token over Connect as a GET in JSON, and without one over gRPC-Web, which `Auth` refuses. Run
+//! it with `zig build example-interceptors`.
 const std = @import("std");
 const connect = @import("connect");
+const client = @import("client");
 const rpc = @import("connect_colibri");
 const demo = @import("demo");
 const harness = @import("services/link_client.zig");
@@ -59,19 +60,32 @@ var buffers: [calls_count]harness.CallBuffers align(@alignOf(harness.CallBuffers
 pub fn main() !void {
     try harness.init();
     defer harness.deinit();
-    try harness.begin(.{ .h11 = false, .h3 = false });
+    try round(.{ .h11 = false, .h3 = false }, .h2);
+    try round(.{ .h11 = false, .h2 = false }, .h3);
+    std.debug.print("interceptors: every call answered as expected over h2 and h3\n", .{});
+}
+
+/// Runs the three calls over `expected`. The server's and the client's counts go on across
+/// rounds, so the round checks what it added to them.
+fn round(protocols: client.Protocols, expected: client.Protocol) !void {
+    const logged_before = harness.app.logged;
+    const failed_before = harness.app.failed;
+    const read_before = Tally.read;
+    const http_ok_before = Tally.http_ok;
+    try harness.begin(protocols);
     try signed_post.init(.{}, &.{.{}}, harness.buffers(&buffers[0]));
     try signed_get.init(.{ .codec = .json, .use_get = true }, &.{.{}}, harness.buffers(&buffers[1]));
     try anonymous.init(.{ .protocol = .grpc_web }, &.{.{}}, harness.buffers(&buffers[2]));
     try harness.request(&signed_post.request, &signed_post.response);
     try harness.request(&signed_get.request, &signed_get.response);
     try harness.request(&anonymous.request, &anonymous.response);
-    try harness.finish(.h2);
+    try harness.finish(expected);
 
-    const first = try expect_caller(&signed_post);
-    const second = try expect_caller(&signed_get);
+    const first = try expect_caller(&signed_post) - logged_before;
+    const second = try expect_caller(&signed_get) - logged_before;
     // `Logging` counted the calls in the order they arrived, so each saw a different count.
-    if (first == second or first >= calls_count or second >= calls_count) return error.ExchangeWrong;
+    if (first == second or first < 0 or second < 0) return error.ExchangeWrong;
+    if (first >= calls_count or second >= calls_count) return error.ExchangeWrong;
     var refused = anonymous.read(harness.storage());
     if (try refused.next(demo.WhoamiResponse) != null) return error.ExchangeWrong;
     const failure = refused.failure orelse return error.ExchangeWrong;
@@ -79,9 +93,11 @@ pub fn main() !void {
     std.debug.print("interceptors: refused without a token: {s}: {s}\n", .{ failure.code.name(), failure.message });
 
     // The server's interceptors saw all three calls, and the one `Auth` refused.
-    if (harness.app.logged != calls_count or harness.app.failed != 1) return error.ExchangeWrong;
-    if (Tally.read != calls_count or Tally.http_ok != calls_count) return error.ExchangeWrong;
-    std.debug.print("interceptors: server logged {d} calls, {d} failed; client read {d}\n", .{ harness.app.logged, harness.app.failed, Tally.read });
+    const logged = harness.app.logged - logged_before;
+    const failed = harness.app.failed - failed_before;
+    if (logged != calls_count or failed != 1) return error.ExchangeWrong;
+    if (Tally.read - read_before != calls_count or Tally.http_ok - http_ok_before != calls_count) return error.ExchangeWrong;
+    std.debug.print("interceptors: over {s}, server logged {d} calls, {d} failed; client read {d}\n", .{ @tagName(expected), logged, failed, Tally.read - read_before });
 }
 
 /// Reads a Whoami answer, checks the name, and returns the calls the server logged before it.

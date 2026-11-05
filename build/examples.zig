@@ -47,7 +47,15 @@ pub fn add(b: *std.Build, graph: Graph) *std.Build.Step {
         step.dependOn(&small_run.step);
     }
 
-    const services: Services = .{ .eliza = eliza, .demo = generated(b, graph, "examples/gen/demo/v1/demo.pb.zig", &.{}), .rotor = rotor };
+    // The test-only TLS identity of the h3 rounds (decision 25), a module of its own so that
+    // `@embedFile` reaches its PEM files.
+    const test_identity = b.createModule(.{ .root_source_file = b.path("examples/testdata/tls/identity.zig"), .target = graph.target, .optimize = graph.optimize });
+    const services: Services = .{
+        .eliza = eliza,
+        .demo = generated(b, graph, "examples/gen/demo/v1/demo.pb.zig", &.{}),
+        .rotor = rotor,
+        .test_identity = test_identity,
+    };
     for ([_]Small{
         .{ .name = "eliza", .description = "Run the ELIZA example over colibri's h2 and h11" },
         .{ .name = "interceptors", .description = "Run calls through server and client interceptors" },
@@ -80,7 +88,12 @@ fn generated(b: *std.Build, graph: Graph, path: []const u8, extra: []const std.B
 }
 
 /// The modules a program over colibri imports beyond the library's own.
-const Services = struct { eliza: *std.Build.Module, demo: *std.Build.Module, rotor: *std.Build.Module };
+const Services = struct {
+    eliza: *std.Build.Module,
+    demo: *std.Build.Module,
+    rotor: *std.Build.Module,
+    test_identity: *std.Build.Module,
+};
 
 fn program(b: *std.Build, graph: Graph, name: []const u8, path: []const u8, services: Services) *std.Build.Step.Compile {
     return b.addExecutable(.{
@@ -95,6 +108,8 @@ fn program(b: *std.Build, graph: Graph, name: []const u8, path: []const u8, serv
                 .{ .name = "connect_colibri", .module = graph.connect_colibri },
                 .{ .name = "server", .module = graph.colibri.module("server") },
                 .{ .name = "client", .module = graph.colibri.module("client") },
+                .{ .name = "tls", .module = graph.colibri.module("tls") },
+                .{ .name = "test_identity", .module = services.test_identity },
                 .{ .name = "eliza", .module = services.eliza },
                 .{ .name = "demo", .module = services.demo },
                 .{ .name = "rotor", .module = services.rotor },

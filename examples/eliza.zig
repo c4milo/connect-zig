@@ -41,7 +41,8 @@ pub fn main() !void {
     defer harness.deinit();
     try round(.{ .h11 = false, .h3 = false }, .h2);
     try round(.{ .h2 = false, .h3 = false }, .h11);
-    std.debug.print("eliza: every call answered as expected over h2 and h11\n", .{});
+    try round(.{ .h11 = false, .h2 = false }, .h3);
+    std.debug.print("eliza: every call answered as expected over h2, h11 and h3\n", .{});
 }
 
 fn round(protocols: client.Protocols, expected: client.Protocol) !void {

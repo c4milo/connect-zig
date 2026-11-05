@@ -1,7 +1,7 @@
-//! Example: every kind of stream, over Connect and gRPC-Web, on h2 and on h11.
+//! Example: every kind of stream, over Connect and gRPC-Web, on h2, h11 and h3.
 //!
 //! - Chat is a bidirectional stream, which an empty message fails. Its handler in `services/demo.zig` is a type whose
-//!   `on_message` answers each message the moment it arrives, so over h2 the server writes
+//!   `on_message` answers each message the moment it arrives, so over h2 and h3 the server writes
 //!   answers while the client still sends. colibri's client sends its body whole, so here the
 //!   client sends all of its messages first; `buf curl` shows the full-duplex side, see
 //!   `tools/interop_check.sh`.
@@ -44,7 +44,8 @@ pub fn main() !void {
     defer harness.deinit();
     try round(.{ .h11 = false, .h3 = false }, .h2);
     try round(.{ .h2 = false, .h3 = false }, .h11);
-    std.debug.print("streaming: every stream answered as expected over h2 and h11\n", .{});
+    try round(.{ .h11 = false, .h2 = false }, .h3);
+    std.debug.print("streaming: every stream answered as expected over h2, h11 and h3\n", .{});
 }
 
 fn round(protocols: client.Protocols, expected: client.Protocol) !void {
