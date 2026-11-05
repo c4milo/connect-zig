@@ -18,6 +18,29 @@ pub fn add(b: *std.Build, graph: Graph) *std.Build.Step {
             .{ .name = "connect", .module = graph.connect },
         },
     });
+    // The kitchen-sink messages, which reach shared.proto's through its module (decision 17).
+    const shared = generated(b, graph, "examples/gen/kitchen/v1/shared.pb.zig", &.{});
+    const kitchen = generated(b, graph, "examples/gen/kitchen/v1/kitchen.pb.zig", &.{.{ .name = "kitchen_v1_shared", .module = shared }});
+    for ([_]Small{
+        .{ .name = "protobuf_messages", .description = "Encode and decode generated messages in binary and JSON" },
+        .{ .name = "sans_io_call", .description = "Run Connect and gRPC-Web calls through the connect module alone" },
+    }) |small| {
+        const exe = b.addExecutable(.{ .name = small.name, .root_module = b.createModule(.{
+            .root_source_file = b.path(b.fmt("examples/{s}.zig", .{small.name})),
+            .target = graph.target,
+            .optimize = graph.optimize,
+            .imports = &.{
+                .{ .name = "protobuf", .module = graph.protobuf },
+                .{ .name = "connect", .module = graph.connect },
+                .{ .name = "eliza", .module = eliza },
+                .{ .name = "kitchen", .module = kitchen },
+            },
+        }) });
+        const small_run = b.addRunArtifact(exe);
+        b.step(b.fmt("example-{s}", .{small.name}), small.description).dependOn(&small_run.step);
+        step.dependOn(&small_run.step);
+    }
+
     const exchange = program(b, graph, "eliza", "examples/eliza/exchange.zig", eliza, rotor);
     const run = b.addRunArtifact(exchange);
     b.step("example-eliza", "Run the ELIZA example over colibri's h2 and h11").dependOn(&run.step);
@@ -29,6 +52,17 @@ pub fn add(b: *std.Build, graph: Graph) *std.Build.Step {
     if (b.args) |args| serve.addArgs(args);
     b.step("run-eliza-server", "Serve ELIZA on a TCP socket: zig build run-eliza-server -- [port]").dependOn(&serve.step);
     return step;
+}
+
+/// An example that needs no HTTP library: its name, which is its file's, and what it shows.
+const Small = struct { name: []const u8, description: []const u8 };
+
+fn generated(b: *std.Build, graph: Graph, path: []const u8, extra: []const std.Build.Module.Import) *std.Build.Module {
+    const module = b.createModule(.{ .root_source_file = b.path(path), .target = graph.target, .optimize = graph.optimize });
+    module.addImport("protobuf", graph.protobuf);
+    module.addImport("connect", graph.connect);
+    for (extra) |import| module.addImport(import.name, import.module);
+    return module;
 }
 
 fn program(b: *std.Build, graph: Graph, name: []const u8, path: []const u8, eliza: *std.Build.Module, rotor: *std.Build.Module) *std.Build.Step.Compile {

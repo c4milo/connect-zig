@@ -161,8 +161,8 @@ try introduce.init(.{ .protocol = .grpc_web }, &.{.{ .name = service.name }}, bu
 _ = try pool.request(&say_proto.request, &say_proto.response);
 ```
 
-The whole client and server are in [examples/eliza](examples/eliza). They are the best place to
-start reading.
+[examples/](examples) holds four programs, from generated messages alone to a server on a
+socket. Each checks itself, and [examples/README.md](examples/README.md) says where to start.
 
 ## Good to know
 
