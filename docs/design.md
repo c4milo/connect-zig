@@ -115,6 +115,10 @@ Each step names the check that proves it. A step is done when its check passes i
    `ExchangeWith`. Check: `zig build examples` runs `interceptors`, `streaming` and `errors`
    over the in-memory link; `tools/interop_check.sh` calls the demo service with buf curl in
    each protocol, and requires Chat's first answer before the client's second message.
+9. **Every protobuf type against a reference.** `examples/proto/coverage` holds each scalar in
+   each cardinality, every map key type, oneofs, enums, recursion and each well-known type.
+   Check: `tools/coverage_check.sh` converts each case in `examples/testdata/coverage` with Zig
+   and with Go, through buf convert, and requires the same message both ways.
 
 ### Step records
 
@@ -138,6 +142,11 @@ ran on Linux x86-64 with Zig 0.16.0.
 - **Step 8.** `zig build examples` printed every call answered over h2 and h11 for `eliza` and
   `streaming`, and over h2 for `interceptors` and `errors`. `tools/interop_check.sh` with buf
   1.74.0 printed 35 of 35 calls answered, Chat's full-duplex check among them.
+
+- **Step 9.** `tools/coverage_check.sh` with buf 1.74.0 printed "every coverage case matches
+  Go": 14 cases of `coverage.v1.Everything`, 70 checks against Go's runtime, in each direction
+  between binary and JSON. It found three faults, now fixed: float's maximum refused, an Any of
+  Empty read differently from Go, and map entries and Any bytes not written as Go writes them.
 
 ### What a later step owes
 

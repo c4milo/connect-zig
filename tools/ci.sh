@@ -21,3 +21,4 @@ run test zig build test --summary all
 run release zig build -Drelease
 run generated tools/generate_check.sh
 run interop tools/interop_check.sh
+run coverage tools/coverage_check.sh

@@ -7,6 +7,18 @@ const Graph = @import("graph.zig").Graph;
 
 pub fn add(b: *std.Build, graph: Graph) *std.Build.Step {
     const step = b.step("examples", "Build and run every example");
+    // The converter tools/coverage_check.sh runs against buf convert; `zig build` installs it.
+    const coverage_module = generated(b, graph, "examples/gen/coverage/v1/coverage.pb.zig", &.{});
+    const coverage = b.addExecutable(.{ .name = "coverage", .root_module = b.createModule(.{
+        .root_source_file = b.path("examples/coverage.zig"),
+        .target = graph.target,
+        .optimize = graph.optimize,
+        .imports = &.{
+            .{ .name = "protobuf", .module = graph.protobuf },
+            .{ .name = "coverage", .module = coverage_module },
+        },
+    }) });
+    b.installArtifact(coverage);
     const rotor_dependency = b.lazyDependency("rotor", .{ .target = graph.target, .release = graph.optimize == .ReleaseSafe }) orelse return step;
     const rotor = rotor_dependency.module("rotor");
     const eliza = generated(b, graph, "examples/gen/connectrpc/eliza/v1/eliza.pb.zig", &.{});

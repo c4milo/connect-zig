@@ -77,6 +77,8 @@ A client interceptor is a type an `ExchangeWith` lists, with `on_request` and `o
 
 - `connectrpc/eliza/v1/eliza.proto`: the ELIZA service;
 - `demo/v1/demo.proto`: the demo service;
+- `coverage/v1/coverage.proto`: every protobuf type, which `tools/coverage_check.sh` converts with
+  [coverage.zig](coverage.zig) and with Go, over the cases in [testdata/coverage](testdata/coverage);
 - `kitchen/v1/kitchen.proto`: every shape the generator writes, from maps and oneofs to
   recursion and well-known types;
 - `large/v1/large.proto`: a file long enough that the plugin splits it into a file for each

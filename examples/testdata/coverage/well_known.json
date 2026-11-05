@@ -1,0 +1,100 @@
+{
+ "wellKnown": {
+  "timestamp": "1970-01-01T00:00:00.000000001Z",
+  "duration": "-315576000000s",
+  "fieldMask": "foo.barBaz,qux",
+  "empty": {},
+  "structValue": {
+   "a": [
+    1,
+    "two",
+    true,
+    null,
+    {
+     "b": {
+      "c": []
+     }
+    }
+   ],
+   "n": null
+  },
+  "value": {
+   "x": 1.5
+  },
+  "listValue": [
+   [],
+   {},
+   "s",
+   0
+  ],
+  "any": {
+   "@type": "type.googleapis.com/google.protobuf.Duration",
+   "value": "1.5s"
+  },
+  "nullValue": null,
+  "doubleValue": 0,
+  "floatValue": "NaN",
+  "int64Value": "-1",
+  "uint64Value": "18446744073709551615",
+  "int32Value": -2147483648,
+  "uint32Value": 0,
+  "boolValue": false,
+  "stringValue": "",
+  "bytesValue": "AA==",
+  "timestamps": [
+   "0001-01-01T00:00:00Z",
+   "9999-12-31T23:59:59.999999999Z",
+   "2024-02-29T12:00:00.120Z"
+  ],
+  "values": [
+   null,
+   0,
+   "",
+   false,
+   {},
+   []
+  ],
+  "anys": [
+   {
+    "@type": "type.googleapis.com/coverage.v1.Nested",
+    "a": 1,
+    "b": "x"
+   },
+   {
+    "@type": "type.googleapis.com/google.protobuf.Struct",
+    "value": {
+     "k": "v"
+    }
+   },
+   {
+    "@type": "type.googleapis.com/google.protobuf.Timestamp",
+    "value": "2000-01-01T00:00:00Z"
+   },
+   {
+    "@type": "type.googleapis.com/coverage.v1.Everything",
+    "scalars": {
+     "fInt32": 3
+    },
+    "child": {
+     "choice": {
+      "cInt32": 4
+     }
+    }
+   },
+   {
+    "@type": "type.googleapis.com/google.protobuf.Empty",
+    "value": {}
+   }
+  ],
+  "valueMap": {
+   "null": null,
+   "list": [
+    1,
+    2
+   ],
+   "obj": {
+    "z": false
+   }
+  }
+ }
+}

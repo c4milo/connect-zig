@@ -1,0 +1,32 @@
+{
+ "scalars": {
+  "fDouble": "NaN",
+  "fFloat": "Infinity",
+  "fInt32": 2147483647,
+  "fInt64": "9223372036854775807",
+  "fUint64": "1",
+  "fSint64": "9223372036854775807",
+  "fSfixed64": "-9223372036854775808",
+  "fString": "",
+  "fBytes": "",
+  "fColor": 99
+ },
+ "optionals": {
+  "oDouble": "-Infinity",
+  "oFloat": 3.4028235e+38,
+  "oInt32": 0,
+  "oInt64": "0",
+  "oUint32": 0,
+  "oUint64": "0",
+  "oSint32": 0,
+  "oSint64": "0",
+  "oFixed32": 0,
+  "oFixed64": "0",
+  "oSfixed32": 0,
+  "oSfixed64": "0",
+  "oBool": false,
+  "oString": "",
+  "oBytes": "",
+  "oColor": "COLOR_UNSPECIFIED"
+ }
+}

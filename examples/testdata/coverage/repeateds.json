@@ -1,0 +1,96 @@
+{
+ "repeateds": {
+  "rDouble": [
+   0,
+   -0.5,
+   1e+300,
+   "Infinity"
+  ],
+  "rFloat": [
+   1.25,
+   -2
+  ],
+  "rInt32": [
+   -1,
+   0,
+   1,
+   2147483647
+  ],
+  "rInt64": [
+   "-1",
+   "1"
+  ],
+  "rUint32": [
+   0,
+   4294967295
+  ],
+  "rUint64": [
+   "18446744073709551615"
+  ],
+  "rSint32": [
+   -1,
+   1
+  ],
+  "rSint64": [
+   "-2",
+   "2"
+  ],
+  "rFixed32": [
+   7
+  ],
+  "rFixed64": [
+   "8"
+  ],
+  "rSfixed32": [
+   -9
+  ],
+  "rSfixed64": [
+   "-10"
+  ],
+  "rBool": [
+   true,
+   false,
+   true
+  ],
+  "rString": [
+   "a",
+   "",
+   "ß"
+  ],
+  "rBytes": [
+   "AQID",
+   ""
+  ],
+  "rColor": [
+   "COLOR_RED",
+   "COLOR_BLUE",
+   42
+  ],
+  "rNested": [
+   {
+    "a": 1,
+    "b": "one"
+   },
+   {},
+   {
+    "b": "three"
+   }
+  ],
+  "uInt32": [
+   5,
+   -6
+  ],
+  "uSint64": [
+   "-7"
+  ],
+  "uDouble": [
+   8.5
+  ],
+  "uBool": [
+   false
+  ],
+  "uColor": [
+   "COLOR_BLUE"
+  ]
+ }
+}

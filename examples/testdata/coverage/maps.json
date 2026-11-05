@@ -1,0 +1,63 @@
+{
+ "maps": {
+  "mInt32": {
+   "-1": "a",
+   "2147483647": "b"
+  },
+  "mInt64": {
+   "-9223372036854775808": "c"
+  },
+  "mUint32": {
+   "4294967295": "d"
+  },
+  "mUint64": {
+   "18446744073709551615": "e"
+  },
+  "mSint32": {
+   "-5": "f"
+  },
+  "mSint64": {
+   "6": "g"
+  },
+  "mFixed32": {
+   "7": "h"
+  },
+  "mFixed64": {
+   "8": "i"
+  },
+  "mSfixed32": {
+   "-9": "j"
+  },
+  "mSfixed64": {
+   "10": "k"
+  },
+  "mBool": {
+   "true": "t",
+   "false": "f"
+  },
+  "mString": {
+   "": "empty key",
+   "key": ""
+  },
+  "mNested": {
+   "n": {
+    "a": 3
+   },
+   "e": {}
+  },
+  "mColor": {
+   "c": "COLOR_BLUE",
+   "z": "COLOR_UNSPECIFIED"
+  },
+  "mBytes": {
+   "b": "AAEC"
+  },
+  "mDouble": {
+   "d": -0.25,
+   "nan": "NaN"
+  },
+  "mInt32Int64": {
+   "1": "-1"
+  }
+ }
+}
