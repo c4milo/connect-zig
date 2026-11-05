@@ -9,7 +9,7 @@
 const std = @import("std");
 const connect = @import("connect");
 const proto = @import("protobuf");
-const adapter = @import("connect_colibri");
+const rpc = @import("connect_colibri");
 const demo = @import("demo");
 const harness = @import("services/link_client.zig");
 const Service = demo.DemoService;
@@ -29,10 +29,10 @@ const missing: connect.Method = .{
     .stream_type = .unary,
 };
 
-const Divide = adapter.Exchange(Service.divide);
+const Divide = rpc.Exchange(Service.divide);
 var by_zero: [3]Divide align(@alignOf(Divide)) = undefined;
 var by_two: Divide align(@alignOf(Divide)) = undefined;
-var multiply: adapter.Exchange(missing) align(@alignOf(adapter.Exchange(missing))) = undefined;
+var multiply: rpc.Exchange(missing) align(@alignOf(rpc.Exchange(missing))) = undefined;
 var buffers: [calls_count]harness.CallBuffers align(@alignOf(harness.CallBuffers)) = undefined;
 
 /// The protocol and codec of each call that divides by zero.

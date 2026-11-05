@@ -10,7 +10,7 @@
 const std = @import("std");
 const connect = @import("connect");
 const proto = @import("protobuf");
-const adapter = @import("connect_colibri");
+const rpc = @import("connect_colibri");
 const demo = @import("demo");
 const app_file = @import("app.zig");
 const App = app_file.App;
@@ -36,13 +36,13 @@ pub const caller_trailer = "whoami-caller";
 /// Counts each call and marks its reply. It wraps `Auth`, so it also sees the calls `Auth`
 /// refuses, and counts them as failed.
 pub const Logging = struct {
-    pub fn on_call(app: *App, call: *adapter.Call) ?connect.RpcError {
+    pub fn on_call(app: *App, call: *rpc.Call) ?connect.RpcError {
         app.logged += 1;
         call.set_header(logged_header, logged_value) catch return .{ .code = .internal, .message = "no room for a header" };
         return null;
     }
 
-    pub fn on_finish(app: *App, _: *adapter.Call, failure: ?connect.RpcError) ?connect.RpcError {
+    pub fn on_finish(app: *App, _: *rpc.Call, failure: ?connect.RpcError) ?connect.RpcError {
         if (failure != null) app.failed += 1;
         return failure;
     }
@@ -50,14 +50,14 @@ pub const Logging = struct {
 
 /// Refuses a call whose request has no "authorization: Bearer <name>" header.
 pub const Auth = struct {
-    pub fn on_call(_: *App, call: *adapter.Call) ?connect.RpcError {
+    pub fn on_call(_: *App, call: *rpc.Call) ?connect.RpcError {
         _ = caller_of(call) orelse return .{ .code = .unauthenticated, .message = "a bearer token is required" };
         return null;
     }
 };
 
 /// The name a request's bearer token carries, or null.
-pub fn caller_of(call: *const adapter.Call) ?[]const u8 {
+pub fn caller_of(call: *const rpc.Call) ?[]const u8 {
     const value = call.request_header("authorization") orelse return null;
     if (!std.mem.startsWith(u8, value, bearer_prefix)) return null;
     const name = value[bearer_prefix.len..];
@@ -68,7 +68,7 @@ pub fn caller_of(call: *const adapter.Call) ?[]const u8 {
 /// Adds trailers that count the messages a call read and wrote, once it ends. The trailers go
 /// out as soon as `on_finish` returns, so one room in `app` serves every call.
 pub const Counting = struct {
-    pub fn on_finish(app: *App, call: *adapter.Call, failure: ?connect.RpcError) ?connect.RpcError {
+    pub fn on_finish(app: *App, call: *rpc.Call, failure: ?connect.RpcError) ?connect.RpcError {
         const received = std.fmt.bufPrint(app.counts[0..count_len_max], "{d}", .{call.received}) catch unreachable;
         const sent = std.fmt.bufPrint(app.counts[count_len_max..], "{d}", .{call.sent}) catch unreachable;
         call.add_trailer(received_trailer, received) catch {};
@@ -81,7 +81,7 @@ pub const Counting = struct {
 const count_len_max = 10;
 
 /// Whoami answers with the caller's name, which `Auth` already checked.
-fn whoami(app: *App, call: *adapter.Call, _: *const demo.WhoamiRequest, response: *demo.WhoamiResponse) ?connect.RpcError {
+fn whoami(app: *App, call: *rpc.Call, _: *const demo.WhoamiRequest, response: *demo.WhoamiResponse) ?connect.RpcError {
     response.name = caller_of(call).?;
     call.add_trailer(caller_trailer, response.name) catch {};
     // `Logging` counted this call before the handler ran.
@@ -93,7 +93,7 @@ fn whoami(app: *App, call: *adapter.Call, _: *const demo.WhoamiRequest, response
 const Chat = struct {
     pub const State = struct { turns: u32 = 0 };
 
-    pub fn on_message(app: *App, _: *adapter.Call, state: *State, request: *const demo.ChatMessage, sender: *adapter.Sender(demo.ChatMessage)) ?connect.RpcError {
+    pub fn on_message(app: *App, _: *rpc.Call, state: *State, request: *const demo.ChatMessage, sender: *rpc.Sender(demo.ChatMessage)) ?connect.RpcError {
         // An error from `on_message` ends the call at once, after the answers already sent.
         if (request.text.len == 0) return .{ .code = .invalid_argument, .message = "empty message" };
         state.turns += 1;
@@ -102,7 +102,7 @@ const Chat = struct {
         return null;
     }
 
-    pub fn on_end(app: *App, call: *adapter.Call, state: *State, sender: *adapter.Sender(demo.ChatMessage)) ?connect.RpcError {
+    pub fn on_end(app: *App, call: *rpc.Call, state: *State, sender: *rpc.Sender(demo.ChatMessage)) ?connect.RpcError {
         sender.send(&.{ .text = text_of(app, "bye after {d}", .{state.turns}) }) catch return .{ .code = .resource_exhausted };
         call.add_trailer(turns_trailer, if (state.turns == 0) "none" else "some") catch {};
         return null;
@@ -113,20 +113,20 @@ const Chat = struct {
 const Sum = struct {
     pub const State = struct { sum: i64 = 0, count: i64 = 0 };
 
-    pub fn on_message(_: *App, _: *adapter.Call, state: *State, request: *const demo.SumRequest) ?connect.RpcError {
+    pub fn on_message(_: *App, _: *rpc.Call, state: *State, request: *const demo.SumRequest) ?connect.RpcError {
         state.sum +|= request.number;
         state.count += 1;
         return null;
     }
 
-    pub fn on_end(_: *App, _: *adapter.Call, state: *State, response: *demo.SumResponse) ?connect.RpcError {
+    pub fn on_end(_: *App, _: *rpc.Call, state: *State, response: *demo.SumResponse) ?connect.RpcError {
         response.* = .{ .sum = state.sum, .count = state.count };
         return null;
     }
 };
 
 /// Countdown sends `from`, `from - 1`, ... down to 1.
-fn countdown(_: *App, _: *adapter.Call, request: *const demo.CountdownRequest, sender: *adapter.Sender(demo.CountdownResponse)) ?connect.RpcError {
+fn countdown(_: *App, _: *rpc.Call, request: *const demo.CountdownRequest, sender: *rpc.Sender(demo.CountdownResponse)) ?connect.RpcError {
     if (request.from < 0 or request.from > countdown_max) return .{ .code = .out_of_range, .message = "from must be between 0 and 64" };
     const from: u32 = @intCast(request.from);
     for (0..from) |index| {
@@ -137,7 +137,7 @@ fn countdown(_: *App, _: *adapter.Call, request: *const demo.CountdownRequest, s
 }
 
 /// Divide fails with a DivisionByZero detail when the divisor is 0.
-fn divide(app: *App, _: *adapter.Call, request: *const demo.DivideRequest, response: *demo.DivideResponse) ?connect.RpcError {
+fn divide(app: *App, _: *rpc.Call, request: *const demo.DivideRequest, response: *demo.DivideResponse) ?connect.RpcError {
     if (request.divisor == 0) {
         const detail: demo.DivisionByZero = .{ .dividend = request.dividend };
         const bytes = proto.encode(demo.DivisionByZero, &detail, &app.detail_bytes) catch return .{ .code = .internal };
@@ -154,7 +154,7 @@ const plain = app_file.route_options;
 const counted = with_interceptors(&.{Counting});
 const guarded = with_interceptors(&.{ Logging, Auth });
 
-fn with_interceptors(comptime interceptors: []const type) adapter.RouteOptions {
+fn with_interceptors(comptime interceptors: []const type) rpc.RouteOptions {
     var options = app_file.route_options;
     options.interceptors = interceptors;
     return options;
@@ -163,10 +163,10 @@ fn with_interceptors(comptime interceptors: []const type) adapter.RouteOptions {
 /// The demo's entries in the route table. Whoami runs behind its interceptors, as a POST and as
 /// a GET.
 pub const routes = .{
-    adapter.post(App, Service.whoami, whoami, guarded),
-    adapter.get(App, Service.whoami, whoami, guarded),
-    adapter.post(App, Service.chat, Chat, counted),
-    adapter.post(App, Service.sum, Sum, plain),
-    adapter.post(App, Service.countdown, countdown, plain),
-    adapter.post(App, Service.divide, divide, counted),
+    rpc.post(App, Service.whoami, whoami, guarded),
+    rpc.get(App, Service.whoami, whoami, guarded),
+    rpc.post(App, Service.chat, Chat, counted),
+    rpc.post(App, Service.sum, Sum, plain),
+    rpc.post(App, Service.countdown, countdown, plain),
+    rpc.post(App, Service.divide, divide, counted),
 };

@@ -18,7 +18,7 @@
 const std = @import("std");
 const connect = @import("connect");
 const client = @import("client");
-const adapter = @import("connect_colibri");
+const rpc = @import("connect_colibri");
 const eliza = @import("eliza");
 const service = @import("services/eliza.zig");
 const harness = @import("services/link_client.zig");
@@ -29,11 +29,11 @@ const calls_count = 5;
 pub const Error = error{ExchangeWrong};
 
 // colibri reads and writes each exchange until the round ends, so they live outside the stack.
-var say_proto: adapter.Exchange(Service.say) align(@alignOf(adapter.Exchange(Service.say))) = undefined;
-var say_get: adapter.Exchange(Service.say) align(@alignOf(adapter.Exchange(Service.say))) = undefined;
-var introduce: adapter.Exchange(Service.introduce) align(@alignOf(adapter.Exchange(Service.introduce))) = undefined;
-var converse: adapter.Exchange(Service.converse) align(@alignOf(adapter.Exchange(Service.converse))) = undefined;
-var say_empty: adapter.Exchange(Service.say) align(@alignOf(adapter.Exchange(Service.say))) = undefined;
+var say_proto: rpc.Exchange(Service.say) align(@alignOf(rpc.Exchange(Service.say))) = undefined;
+var say_get: rpc.Exchange(Service.say) align(@alignOf(rpc.Exchange(Service.say))) = undefined;
+var introduce: rpc.Exchange(Service.introduce) align(@alignOf(rpc.Exchange(Service.introduce))) = undefined;
+var converse: rpc.Exchange(Service.converse) align(@alignOf(rpc.Exchange(Service.converse))) = undefined;
+var say_empty: rpc.Exchange(Service.say) align(@alignOf(rpc.Exchange(Service.say))) = undefined;
 var buffers: [calls_count]harness.CallBuffers align(@alignOf(harness.CallBuffers)) = undefined;
 
 pub fn main() !void {

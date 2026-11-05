@@ -119,7 +119,7 @@ plugins:
 A handler fills its response and returns `null`, or returns the error the client reads:
 
 ```zig
-fn say(app: *App, _: *adapter.Call, request: *const eliza.SayRequest, response: *eliza.SayResponse) ?connect.RpcError {
+fn say(app: *App, _: *rpc.Call, request: *const eliza.SayRequest, response: *eliza.SayResponse) ?connect.RpcError {
     app.calls += 1;
     if (request.sentence.len == 0) return .{ .code = .invalid_argument, .message = "say something" };
     response.sentence = reply(app, "You said \"{s}\". How does that make you feel?", .{request.sentence});
@@ -138,11 +138,11 @@ Streams get a `Sender` to write messages and a `Receiver` to read them:
 
 A function handler takes a client stream whole. To answer each message as it arrives, write the
 handler as a type with `on_message` and `on_end`: over h2 the stream is then full-duplex. A
-handler reads its call through `adapter.Call`: the protocol, the timeout, the request headers,
+handler reads its call through `rpc.Call`: the protocol, the timeout, the request headers,
 and the response headers and trailers it adds.
 
 Interceptors are types a route lists in its options: `on_call` runs before the handler and may
-refuse the call, and `on_finish` sees the outcome. A client's `adapter.ExchangeWith` takes
+refuse the call, and `on_finish` sees the outcome. A client's `rpc.ExchangeWith` takes
 interceptors with `on_request`, which may add headers, and `on_response`.
 
 ### 4. Route it
@@ -153,20 +153,20 @@ GET too. A method you have no handler for fails to compile. One route answers ev
 codec:
 
 ```zig
-const adapter = @import("connect_colibri");
+const rpc = @import("connect_colibri");
 
-pub fn say(app: *App, call: *adapter.Call, request: *const eliza.SayRequest, response: *eliza.SayResponse) ?connect.RpcError { ... }
+pub fn say(app: *App, call: *rpc.Call, request: *const eliza.SayRequest, response: *eliza.SayResponse) ?connect.RpcError { ... }
 pub fn introduce(...) ?connect.RpcError { ... }
 pub fn converse(...) ?connect.RpcError { ... }
 
 pub const routes = server.router(App, .{
     .error_handler = on_error,
-    .routes = Service.Routes(adapter, App, @This(), route_options).routes,
+    .routes = Service.Routes(rpc, App, @This(), route_options).routes,
 });
 ```
 
 To give methods different options, such as their own interceptors, list routes by hand:
-`adapter.post(App, Service.say, say, options)` for each method, and `adapter.get` for a GET.
+`rpc.post(App, Service.say, say, options)` for each method, and `rpc.get` for a GET.
 
 ### 5. Call it
 

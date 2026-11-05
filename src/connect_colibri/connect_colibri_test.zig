@@ -1,4 +1,4 @@
-//! The adapter's tests: a router table holding a route of each stream type compiles, and a
+//! connect_colibri's tests: a router table holding a route of each stream type compiles, and a
 //! client `Exchange` reads what colibri wrote into its response. `zig build examples` runs both
 //! sides over colibri's h2 and h11 (design §8 step 5).
 const std = @import("std");
@@ -6,7 +6,7 @@ const testing = std.testing;
 const connect = @import("connect");
 const proto = @import("protobuf");
 const server = @import("server");
-const adapter = @import("connect_colibri.zig");
+const rpc = @import("connect_colibri.zig");
 
 const Note = struct {
     text: []const u8 = "",
@@ -30,22 +30,22 @@ const App = struct {};
 /// The messages a chat answers, at most.
 const chat_turns_max = 4;
 
-fn on_say(_: *App, _: *adapter.Call, request: *const Note, response: *Note) ?connect.RpcError {
+fn on_say(_: *App, _: *rpc.Call, request: *const Note, response: *Note) ?connect.RpcError {
     response.text = request.text;
     return null;
 }
 
-fn on_count(_: *App, _: *adapter.Call, request: *const Note, sender: *adapter.Sender(Note)) ?connect.RpcError {
+fn on_count(_: *App, _: *rpc.Call, request: *const Note, sender: *rpc.Sender(Note)) ?connect.RpcError {
     sender.send(request) catch return .{ .code = .resource_exhausted };
     return null;
 }
 
-fn on_gather(_: *App, _: *adapter.Call, receiver: *adapter.Receiver(Note), response: *Note) ?connect.RpcError {
+fn on_gather(_: *App, _: *rpc.Call, receiver: *rpc.Receiver(Note), response: *Note) ?connect.RpcError {
     response.* = receiver.next() orelse return .{ .code = .invalid_argument };
     return null;
 }
 
-fn on_chat(_: *App, call: *adapter.Call, receiver: *adapter.Receiver(Note), sender: *adapter.Sender(Note)) ?connect.RpcError {
+fn on_chat(_: *App, call: *rpc.Call, receiver: *rpc.Receiver(Note), sender: *rpc.Sender(Note)) ?connect.RpcError {
     for (0..chat_turns_max) |_| {
         const note = receiver.next() orelse break;
         sender.send(&note) catch return .{ .code = .resource_exhausted };
@@ -60,16 +60,16 @@ fn on_error(_: *App, _: *const server.Request, _: anyerror, response: *server.Re
 
 const message_bytes = 1024;
 const token_bytes = 256;
-const options: adapter.RouteOptions = .{ .message_bytes = message_bytes, .token_bytes = token_bytes };
+const options: rpc.RouteOptions = .{ .message_bytes = message_bytes, .token_bytes = token_bytes };
 
 const routes = server.router(App, .{
     .error_handler = on_error,
     .routes = .{
-        adapter.post(App, say, on_say, options),
-        adapter.get(App, say, on_say, options),
-        adapter.post(App, count, on_count, options),
-        adapter.post(App, gather, on_gather, options),
-        adapter.post(App, chat, on_chat, options),
+        rpc.post(App, say, on_say, options),
+        rpc.get(App, say, on_say, options),
+        rpc.post(App, count, on_count, options),
+        rpc.post(App, gather, on_gather, options),
+        rpc.post(App, chat, on_chat, options),
     },
 });
 
@@ -82,7 +82,7 @@ test "a route table holds a route of each stream type, and a GET beside a POST" 
 }
 
 test "an exchange writes its request for colibri and reads what colibri filled in" {
-    const Call = adapter.Exchange(say);
+    const Call = rpc.Exchange(say);
     var call: Call = undefined;
     var buffers: [6][512]u8 = undefined;
     try call.init(.{ .protocol = .grpc_web }, &.{.{ .text = "hi" }}, .{
@@ -116,8 +116,8 @@ test "an exchange writes its request for colibri and reads what colibri filled i
 }
 
 test "an exchange that ends with no response maps to the code a client retries on" {
-    try testing.expectEqual(connect.Code.unavailable, adapter.failure_of(.refused).code);
-    try testing.expectEqual(connect.Code.unavailable, adapter.failure_of(.closed).code);
-    try testing.expectEqual(connect.Code.resource_exhausted, adapter.failure_of(.too_large).code);
-    try testing.expectEqual(connect.Code.internal, adapter.failure_of(.malformed).code);
+    try testing.expectEqual(connect.Code.unavailable, rpc.failure_of(.refused).code);
+    try testing.expectEqual(connect.Code.unavailable, rpc.failure_of(.closed).code);
+    try testing.expectEqual(connect.Code.resource_exhausted, rpc.failure_of(.too_large).code);
+    try testing.expectEqual(connect.Code.internal, rpc.failure_of(.malformed).code);
 }

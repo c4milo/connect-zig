@@ -11,7 +11,7 @@
 const std = @import("std");
 const connect = @import("connect");
 const client = @import("client");
-const adapter = @import("connect_colibri");
+const rpc = @import("connect_colibri");
 const link_server = @import("link_server.zig");
 const Link = @import("link.zig").Link;
 
@@ -36,7 +36,7 @@ pub const call_buffer_len = 4096;
 pub const CallBuffers = [6][call_buffer_len]u8;
 
 /// The `Exchange` buffers that `set` holds.
-pub fn buffers(set: *CallBuffers) adapter.ExchangeBuffers {
+pub fn buffers(set: *CallBuffers) rpc.ExchangeBuffers {
     return .{
         .request = .{ .body = &set[0], .scratch = .{ .message = &set[1], .work = &set[2], .tokens = &.{} }, .values = &set[3] },
         .values = &set[4],

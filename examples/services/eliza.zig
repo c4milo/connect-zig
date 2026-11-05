@@ -2,7 +2,7 @@
 //! entries in the route table of `routes.zig` (design §8 step 5).
 const std = @import("std");
 const connect = @import("connect");
-const adapter = @import("connect_colibri");
+const rpc = @import("connect_colibri");
 const eliza = @import("eliza");
 const Service = eliza.ElizaService;
 
@@ -14,14 +14,14 @@ const App = app_file.App;
 const reply = app_file.text_of;
 
 /// Say answers one sentence.
-pub fn say(app: *App, _: *adapter.Call, request: *const eliza.SayRequest, response: *eliza.SayResponse) ?connect.RpcError {
+pub fn say(app: *App, _: *rpc.Call, request: *const eliza.SayRequest, response: *eliza.SayResponse) ?connect.RpcError {
     if (request.sentence.len == 0) return .{ .code = .invalid_argument, .message = "say something" };
     response.sentence = reply(app, "You said \"{s}\". How does that make you feel?", .{request.sentence});
     return null;
 }
 
 /// Introduce answers a name with three sentences.
-pub fn introduce(app: *App, _: *adapter.Call, request: *const eliza.IntroduceRequest, sender: *adapter.Sender(eliza.IntroduceResponse)) ?connect.RpcError {
+pub fn introduce(app: *App, _: *rpc.Call, request: *const eliza.IntroduceRequest, sender: *rpc.Sender(eliza.IntroduceResponse)) ?connect.RpcError {
     const who = if (request.name.len == 0) "friend" else request.name;
     const lines = [_][]const u8{ "Hi {s}, I am Eliza.", "Before we begin, {s}, tell me how you came here.", "How are you feeling today, {s}?" };
     inline for (lines) |line| {
@@ -31,7 +31,7 @@ pub fn introduce(app: *App, _: *adapter.Call, request: *const eliza.IntroduceReq
 }
 
 /// Converse answers each sentence it reads, in order.
-pub fn converse(app: *App, call: *adapter.Call, receiver: *adapter.Receiver(eliza.ConverseRequest), sender: *adapter.Sender(eliza.ConverseResponse)) ?connect.RpcError {
+pub fn converse(app: *App, call: *rpc.Call, receiver: *rpc.Receiver(eliza.ConverseRequest), sender: *rpc.Sender(eliza.ConverseResponse)) ?connect.RpcError {
     for (0..conversation_turns_max) |_| {
         const sentence = receiver.next() orelse break;
         sender.send(&.{ .sentence = reply(app, "Why do you say \"{s}\"?", .{sentence.sentence}) }) catch return .{ .code = .resource_exhausted };
@@ -44,7 +44,7 @@ const route_options = app_file.route_options;
 
 /// ELIZA's entries in the route table, which its generated `routes` lists: each method served by
 /// the function of this file it names, and Say also as a GET, since it has no side effects.
-pub const routes = Service.Routes(adapter, App, @This(), route_options).routes;
+pub const routes = Service.Routes(rpc, App, @This(), route_options).routes;
 
 /// The examples' sentences: what the client sends, and what ELIZA answers.
 pub const said = "I feel tired";

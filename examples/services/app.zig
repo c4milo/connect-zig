@@ -2,7 +2,7 @@
 //! ELIZA and demo services reads as its `app`.
 const std = @import("std");
 const connect = @import("connect");
-const adapter = @import("connect_colibri");
+const rpc = @import("connect_colibri");
 
 /// The longest sentence or detail a handler writes.
 pub const text_len_max = 4096;
@@ -16,7 +16,7 @@ pub const App = struct {
     logged: u32 = 0,
     failed: u32 = 0,
     /// The codings connect_colibri reads and writes messages in: none unless a program sets them.
-    codings: adapter.Codings = .{},
+    codings: rpc.Codings = .{},
     text: [text_len_max]u8 = undefined,
     /// A Divide error's detail: its encoding, and the list that names it.
     detail_bytes: [text_len_max]u8 = undefined,
@@ -32,4 +32,4 @@ pub fn text_of(app: *App, comptime format: []const u8, args: anytype) []const u8
 
 /// The route options both services start from: room for a message and a JSON token of
 /// `text_len_max` octets.
-pub const route_options: adapter.RouteOptions = .{ .message_bytes = text_len_max, .token_bytes = text_len_max };
+pub const route_options: rpc.RouteOptions = .{ .message_bytes = text_len_max, .token_bytes = text_len_max };

@@ -13,7 +13,7 @@
 const std = @import("std");
 const connect = @import("connect");
 const client = @import("client");
-const adapter = @import("connect_colibri");
+const rpc = @import("connect_colibri");
 const demo = @import("demo");
 const service = @import("services/demo.zig");
 const harness = @import("services/link_client.zig");
@@ -29,14 +29,14 @@ const echoes = [_][]const u8{ "echo: hello", "echo: how are you", "echo: goodbye
 const numbers = [_]demo.SumRequest{ .{ .number = 1 }, .{ .number = 2 }, .{ .number = 3 }, .{ .number = 4 } };
 const numbers_sum = 10;
 
-var chat: adapter.Exchange(Service.chat) align(@alignOf(adapter.Exchange(Service.chat))) = undefined;
-var chat_refused: adapter.Exchange(Service.chat) align(@alignOf(adapter.Exchange(Service.chat))) = undefined;
-var chat_cut: adapter.Exchange(Service.chat) align(@alignOf(adapter.Exchange(Service.chat))) = undefined;
-var chat_silent: adapter.Exchange(Service.chat) align(@alignOf(adapter.Exchange(Service.chat))) = undefined;
-var sum: adapter.Exchange(Service.sum) align(@alignOf(adapter.Exchange(Service.sum))) = undefined;
-var sum_web: adapter.Exchange(Service.sum) align(@alignOf(adapter.Exchange(Service.sum))) = undefined;
-var countdown: adapter.Exchange(Service.countdown) align(@alignOf(adapter.Exchange(Service.countdown))) = undefined;
-var countdown_far: adapter.Exchange(Service.countdown) align(@alignOf(adapter.Exchange(Service.countdown))) = undefined;
+var chat: rpc.Exchange(Service.chat) align(@alignOf(rpc.Exchange(Service.chat))) = undefined;
+var chat_refused: rpc.Exchange(Service.chat) align(@alignOf(rpc.Exchange(Service.chat))) = undefined;
+var chat_cut: rpc.Exchange(Service.chat) align(@alignOf(rpc.Exchange(Service.chat))) = undefined;
+var chat_silent: rpc.Exchange(Service.chat) align(@alignOf(rpc.Exchange(Service.chat))) = undefined;
+var sum: rpc.Exchange(Service.sum) align(@alignOf(rpc.Exchange(Service.sum))) = undefined;
+var sum_web: rpc.Exchange(Service.sum) align(@alignOf(rpc.Exchange(Service.sum))) = undefined;
+var countdown: rpc.Exchange(Service.countdown) align(@alignOf(rpc.Exchange(Service.countdown))) = undefined;
+var countdown_far: rpc.Exchange(Service.countdown) align(@alignOf(rpc.Exchange(Service.countdown))) = undefined;
 var buffers: [calls_count]harness.CallBuffers align(@alignOf(harness.CallBuffers)) = undefined;
 
 pub fn main() !void {
@@ -121,7 +121,7 @@ fn check_cut() !void {
     try harness.expect_trailer(cut.metadata, service.received_trailer, "2");
 }
 
-fn check_sum(exchange: *const adapter.Exchange(Service.sum)) !void {
+fn check_sum(exchange: *const rpc.Exchange(Service.sum)) !void {
     var summed = exchange.read(harness.storage());
     const answer = try summed.next(demo.SumResponse) orelse return error.ExchangeWrong;
     if (answer.sum != numbers_sum or answer.count != numbers.len) return error.ExchangeWrong;

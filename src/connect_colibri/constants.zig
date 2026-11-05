@@ -7,7 +7,7 @@ pub const token_bytes_default = 16 * 1024;
 /// The octets of a route's status trailers: grpc-status, grpc-message and the details, twice
 /// over for gRPC-Web's frame, and an end-stream message.
 pub const trailer_bytes = 4096;
-/// The headers and trailers the adapter copies into colibri's field lists at once, at most.
+/// The headers and trailers connect_colibri copies into colibri's field lists at once, at most.
 pub const fields_max = 8;
 /// The octets of a request's headers a route copies at its head, names and values together.
 pub const request_header_bytes = 4096;

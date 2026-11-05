@@ -1,8 +1,8 @@
 # connect-zig rules
 
 connect-zig is Connect RPC for Zig 0.16: a protobuf runtime, a protocol core for Connect, gRPC
-and gRPC-Web, an adapter over colibri, and the protoc plugin `protoc-gen-connect-zig`. Home:
-github.com/c4milo/connect-zig.
+and gRPC-Web, `connect_colibri` over colibri, and the protoc plugin `protoc-gen-connect-zig`.
+Home: github.com/c4milo/connect-zig.
 
 It follows the conventions of the libraries it builds on: colibri, stdx and pepegrillo. Read their
 `CLAUDE.md` before changing behaviour here.

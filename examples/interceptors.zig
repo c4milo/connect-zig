@@ -16,7 +16,7 @@
 //! example-interceptors`.
 const std = @import("std");
 const connect = @import("connect");
-const adapter = @import("connect_colibri");
+const rpc = @import("connect_colibri");
 const demo = @import("demo");
 const harness = @import("services/link_client.zig");
 const Service = demo.DemoService;
@@ -48,8 +48,8 @@ const Tally = struct {
 
 const http_ok_status = 200;
 
-const Signed = adapter.ExchangeWith(Service.whoami, &.{ BearerToken, Tally });
-const Anonymous = adapter.ExchangeWith(Service.whoami, &.{Tally});
+const Signed = rpc.ExchangeWith(Service.whoami, &.{ BearerToken, Tally });
+const Anonymous = rpc.ExchangeWith(Service.whoami, &.{Tally});
 
 var signed_post: Signed align(@alignOf(Signed)) = undefined;
 var signed_get: Signed align(@alignOf(Signed)) = undefined;

@@ -41,13 +41,13 @@ arrives, so it answers while the client still sends: over h2 the stream is full-
 const Chat = struct {
     pub const State = struct { turns: u32 = 0 };
 
-    pub fn on_message(_: *App, _: *adapter.Call, state: *State, request: *const demo.ChatMessage, sender: *adapter.Sender(demo.ChatMessage)) ?connect.RpcError {
+    pub fn on_message(_: *App, _: *rpc.Call, state: *State, request: *const demo.ChatMessage, sender: *rpc.Sender(demo.ChatMessage)) ?connect.RpcError {
         state.turns += 1;
         sender.send(&.{ .text = request.text }) catch return .{ .code = .resource_exhausted };
         return null;
     }
 
-    pub fn on_end(_: *App, _: *adapter.Call, _: *State, _: *adapter.Sender(demo.ChatMessage)) ?connect.RpcError {
+    pub fn on_end(_: *App, _: *rpc.Call, _: *State, _: *rpc.Sender(demo.ChatMessage)) ?connect.RpcError {
         return null;
     }
 };
@@ -60,13 +60,13 @@ may refuse the call; `on_finish` runs after it and returns the outcome the clien
 
 ```zig
 pub const Auth = struct {
-    pub fn on_call(_: *App, call: *adapter.Call) ?connect.RpcError {
+    pub fn on_call(_: *App, call: *rpc.Call) ?connect.RpcError {
         _ = caller_of(call) orelse return .{ .code = .unauthenticated, .message = "a bearer token is required" };
         return null;
     }
 };
 
-const guarded: adapter.RouteOptions = .{ .interceptors = &.{ Logging, Auth } };
+const guarded: rpc.RouteOptions = .{ .interceptors = &.{ Logging, Auth } };
 ```
 
 A client interceptor is a type an `ExchangeWith` lists, with `on_request` and `on_response`.

@@ -1,9 +1,9 @@
 # connect-zig design
 
 connect-zig is [Connect RPC](https://connectrpc.com/docs/protocol/) for Zig 0.16: a protobuf
-runtime, a protocol core, an adapter over [colibri](https://github.com/c4milo/colibri), and the
-protoc plugin `protoc-gen-connect-zig`. This document holds the module graph, the formats, and
-the numbered build plan. Decisions are numbered in [decisions.md](decisions.md).
+runtime, a protocol core, `connect_colibri` over [colibri](https://github.com/c4milo/colibri),
+and the protoc plugin `protoc-gen-connect-zig`. This document holds the module graph, the
+formats, and the numbered build plan. Decisions are numbered in [decisions.md](decisions.md).
 
 ## 1. Sources
 
@@ -79,7 +79,7 @@ Empty, FieldMask, Struct, Value, ListValue and Any. An Any names its type from a
 - `Method`: what generated code names for each RPC: the service, the method, the request and
   response types, the stream type and the idempotency.
 
-## 7. The colibri adapter
+## 7. connect_colibri
 
 `connect_colibri` maps a `connect.Method` onto a route of `server.router`, and onto
 `client.Request` and `client.Response`. A function handler's route sets `.whole_body` and takes
@@ -100,7 +100,7 @@ Each step names the check that proves it. A step is done when its check passes i
    trips through JSON and the JSON forms of each well-known type.
 4. **The protocol core.** Check: `zig build test-connect`, with each rule's vector from the
    protocol documents of §1.
-5. **The colibri adapter and `examples/eliza`.** Generated code committed, and a server on
+5. **`connect_colibri` and `examples/eliza`.** Generated code committed, and a server on
    Rotor's loop. Check: `zig build examples` runs a client against the server over an in-memory
    link, in each protocol the client speaks; `tools/interop_check.sh` calls the socket server
    with buf curl in each protocol.
