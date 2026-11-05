@@ -103,8 +103,15 @@ fn encode_member(comptime T: type, comptime field: Field, comptime oneof: []cons
 }
 
 fn encode_child(comptime M: type, number: u32, child: *const M, sink: *Sink) Error!void {
+    const child_len = try encoded_len(M, child);
     try sink.tag(number, .len);
-    try sink.varint(try encoded_len(M, child));
+    try sink.varint(child_len);
+    // A counting sink needs the length alone. Walking the child again would make each level
+    // count its subtree twice, which doubles the work at every level of nesting.
+    if (sink.writer == null) {
+        sink.len += child_len;
+        return;
+    }
     try encode_message(M, child, sink);
 }
 
@@ -134,6 +141,10 @@ fn encode_packed(comptime field: Field, comptime F: type, item: *const F, sink: 
     if (payload_len == 0) return;
     try sink.tag(field.number, .len);
     try sink.varint(payload_len);
+    if (sink.writer == null) {
+        sink.len += payload_len;
+        return;
+    }
     var elements = item.iterator();
     for (0..constants.limits.elements_max) |_| {
         const element = try elements.next() orelse return;

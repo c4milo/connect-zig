@@ -126,11 +126,6 @@ pub const View = struct {
     number: u32 = 0,
 };
 
-/// Whether `T` is a generated message.
-pub fn is_message(comptime T: type) bool {
-    return @typeInfo(T) == .@"struct" and @hasDecl(T, "protobuf") and @TypeOf(T.protobuf) == Descriptor;
-}
-
 /// Whether `T` is a generated enum.
 pub fn is_enum(comptime T: type) bool {
     return @typeInfo(T) == .@"enum" and @hasDecl(T, "protobuf") and @TypeOf(T.protobuf) == EnumDescriptor;

@@ -196,13 +196,7 @@ pub const Writer = struct {
     pub fn varint(writer: *Writer, value: u64) WriteError!void {
         const len = varint_len(value);
         if (len > writer.buffer.len - writer.len) return error.NoSpaceLeft;
-        var rest = value;
-        for (writer.buffer[writer.len..][0..len], 0..) |*octet, index| {
-            const more: u8 = if (index + 1 < len) continuation else 0;
-            octet.* = @as(u8, @truncate(rest & payload_mask)) | more;
-            rest >>= group_bits;
-        }
-        assert(rest == 0);
+        write_groups(writer.buffer[writer.len..][0..len], value);
         writer.len += len;
     }
 
@@ -218,12 +212,7 @@ pub const Writer = struct {
     pub fn patch_padded(writer: *Writer, at: usize, value: u64) void {
         assert(at + constants.limits.padded_length_len <= writer.len);
         assert(value < (1 << (group_bits * constants.limits.padded_length_len)));
-        var rest = value;
-        for (writer.buffer[at..][0..constants.limits.padded_length_len], 0..) |*octet, index| {
-            const more: u8 = if (index + 1 < constants.limits.padded_length_len) continuation else 0;
-            octet.* = @as(u8, @truncate(rest & payload_mask)) | more;
-            rest >>= group_bits;
-        }
+        write_groups(writer.buffer[at..][0..constants.limits.padded_length_len], value);
     }
 
     pub fn fixed32(writer: *Writer, value: u32) WriteError!void {
@@ -257,6 +246,18 @@ comptime {
 }
 
 const testing = std.testing;
+
+/// Writes `value` as 7-bit groups into all of `octets`, low group first, with the continuation
+/// bit on every octet but the last ("Base 128 Varints"). `octets` holds every group of `value`.
+fn write_groups(octets: []u8, value: u64) void {
+    var rest = value;
+    for (octets, 0..) |*octet, index| {
+        const more: u8 = if (index + 1 < octets.len) continuation else 0;
+        octet.* = @as(u8, @truncate(rest & payload_mask)) | more;
+        rest >>= group_bits;
+    }
+    assert(rest == 0);
+}
 
 test "varints round-trip at each length boundary" {
     const values = [_]u64{ 0, 1, 127, 128, 16383, 16384, std.math.maxInt(u32), std.math.maxInt(u64) };

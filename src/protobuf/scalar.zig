@@ -20,7 +20,8 @@ pub fn read(comptime kind: Kind, comptime V: type, reader: *wire.Reader) wire.Er
         .uint32 => @truncate(try reader.varint()),
         .int64 => @bitCast(try reader.varint()),
         .uint64 => try reader.varint(),
-        .sint32 => zigzag32(@truncate(try reader.varint())),
+        // Encoding guide, "Signed Integers": a sint32 decodes from the low 32 bits.
+        .sint32 => @intCast(wire.zigzag_decode(@as(u32, @truncate(try reader.varint())))),
         .sint64 => wire.zigzag_decode(try reader.varint()),
         .bool => (try reader.varint()) != 0,
         .@"enum" => @enumFromInt(@as(i32, @bitCast(@as(u32, @truncate(try reader.varint()))))),
@@ -43,20 +44,14 @@ fn read_string(reader: *wire.Reader) wire.Error![]const u8 {
     return octets;
 }
 
-fn zigzag32(value: u32) i32 {
-    const shifted: i32 = @bitCast(value >> 1);
-    const sign: i32 = -@as(i32, @intCast(value & 1));
-    return shifted ^ sign;
-}
-
 /// The integer a varint kind writes for `value`.
 fn varint_of(comptime kind: Kind, comptime V: type, value: V) u64 {
     return switch (kind) {
         .int32 => @bitCast(@as(i64, value)),
         .int64 => @bitCast(value),
         .uint32, .uint64 => value,
-        .sint32 => @as(u32, @bitCast((value << 1) ^ (value >> (@bitSizeOf(i32) - 1)))),
-        .sint64 => wire.zigzag_encode(value),
+        // Zigzag of an i32 widened to i64 equals its 32-bit zigzag, so one function serves both.
+        .sint32, .sint64 => wire.zigzag_encode(value),
         .bool => @intFromBool(value),
         .@"enum" => @bitCast(@as(i64, @intFromEnum(value))),
         else => unreachable,
@@ -121,6 +116,13 @@ test "sint32 zigzags, and a string that is not UTF-8 is refused" {
     try testing.expectEqualSlices(u8, &.{0x03}, writer.written());
     var reader: wire.Reader = .{ .bytes = writer.written() };
     try testing.expectEqual(@as(i32, -2), try read(.sint32, i32, &reader));
+    // A sint32 decodes from the varint's low 32 bits, whatever the bits above them hold.
+    var wide_writer: wire.Writer = .{ .buffer = &buffer };
+    // Bit 32 shifts into bit 31 if zigzag ran before the truncation.
+    const high_bits: u64 = 1 << 32;
+    try wide_writer.varint(high_bits | 0x03);
+    var wide: wire.Reader = .{ .bytes = wide_writer.written() };
+    try testing.expectEqual(@as(i32, -2), try read(.sint32, i32, &wide));
     var bad: wire.Reader = .{ .bytes = &.{ 0x01, 0xff } };
     try testing.expectError(error.InvalidUtf8, read(.string, []const u8, &bad));
 }
