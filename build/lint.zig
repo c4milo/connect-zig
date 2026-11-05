@@ -1,5 +1,5 @@
 //! `zig build lint` and `zig build lint-commits`, from pepegrillo, which is lazy and requested only
-//! when connect-zig is the root build (docs/decisions.md entry 13).
+//! when connect-zig is the root build (docs/decisions.md entry 15).
 const std = @import("std");
 
 /// CLAUDE.md, Conventions: the cognitive-complexity threshold. Never raised.
