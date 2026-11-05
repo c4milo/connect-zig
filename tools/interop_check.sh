@@ -6,6 +6,9 @@
 set -eu
 cd "$(dirname "$0")/.."
 buf="${BUF:-buf}"
+# buf curl's h3 runs on quic-go, which warns on stderr when the kernel caps its UDP buffers, as
+# CI's runners do. The checks compare stderr too, so the warning is turned off.
+export QUIC_GO_DISABLE_RECEIVE_BUFFER_WARNING=true
 # Each call gets this many seconds, so a server that sends a broken reply fails the check and
 # never hangs it.
 call_seconds=10
