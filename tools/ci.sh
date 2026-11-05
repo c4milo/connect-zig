@@ -16,9 +16,12 @@ run() {
     fi
 }
 echo "# connect-zig checks" >"${report}"
-run format zig fmt --check build.zig build src tools examples
+run format zig fmt --check build.zig build src tools examples bench
 run test zig build test --summary all
 run release zig build -Drelease
+# The benchmark's smoke run: every operation on every message, a few short batches each. The full
+# run, and the comparison with Go, is tools/bench_check.sh.
+run bench zig build bench -- --quick
 run generated tools/generate_check.sh
 run interop tools/interop_check.sh
 run coverage tools/coverage_check.sh
