@@ -147,20 +147,26 @@ interceptors with `on_request`, which may add headers, and `on_response`.
 
 ### 4. Route it
 
-Each method becomes a route of colibri's `server.router`. One route answers every protocol and
-codec, so there is nothing else to configure:
+Each generated service has a `Routes` function. It lists every method as a route of colibri's
+`server.router`, with the handler of the same name, and a unary method with no side effects as a
+GET too. A method you have no handler for fails to compile. One route answers every protocol and
+codec:
 
 ```zig
+const adapter = @import("connect_colibri");
+
+pub fn say(app: *App, call: *adapter.Call, request: *const eliza.SayRequest, response: *eliza.SayResponse) ?connect.RpcError { ... }
+pub fn introduce(...) ?connect.RpcError { ... }
+pub fn converse(...) ?connect.RpcError { ... }
+
 pub const routes = server.router(App, .{
     .error_handler = on_error,
-    .routes = .{
-        adapter.post(App, Service.say, say, route_options),
-        adapter.get(App, Service.say, say, route_options),
-        adapter.post(App, Service.introduce, introduce, route_options),
-        adapter.post(App, Service.converse, converse, route_options),
-    },
+    .routes = Service.Routes(adapter, App, @This(), route_options).routes,
 });
 ```
+
+To give methods different options, such as their own interceptors, list routes by hand:
+`adapter.post(App, Service.say, say, options)` for each method, and `adapter.get` for a GET.
 
 ### 5. Call it
 

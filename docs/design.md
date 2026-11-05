@@ -150,6 +150,11 @@ ran on Linux x86-64 with Zig 0.16.0.
   between binary and JSON. It found three faults, now fixed: float's maximum refused, an Any of
   Empty read differently from Go, and map entries and Any bytes not written as Go writes them.
 
+- **Step 6, later.** Each generated service gains `Routes(transport, App, Handlers, options)`,
+  whose `routes` list every method for a transport such as `connect_colibri`, and a unary method
+  with no side effects as a GET too. Generated code still imports no HTTP library (decision 2).
+  `examples/services/eliza.zig` routes ELIZA through it.
+
 ### What a later step owes
 
 - The connectrpc conformance suite (step 7).

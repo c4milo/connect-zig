@@ -14,14 +14,14 @@ const App = app_file.App;
 const reply = app_file.text_of;
 
 /// Say answers one sentence.
-fn say(app: *App, _: *adapter.Call, request: *const eliza.SayRequest, response: *eliza.SayResponse) ?connect.RpcError {
+pub fn say(app: *App, _: *adapter.Call, request: *const eliza.SayRequest, response: *eliza.SayResponse) ?connect.RpcError {
     if (request.sentence.len == 0) return .{ .code = .invalid_argument, .message = "say something" };
     response.sentence = reply(app, "You said \"{s}\". How does that make you feel?", .{request.sentence});
     return null;
 }
 
 /// Introduce answers a name with three sentences.
-fn introduce(app: *App, _: *adapter.Call, request: *const eliza.IntroduceRequest, sender: *adapter.Sender(eliza.IntroduceResponse)) ?connect.RpcError {
+pub fn introduce(app: *App, _: *adapter.Call, request: *const eliza.IntroduceRequest, sender: *adapter.Sender(eliza.IntroduceResponse)) ?connect.RpcError {
     const who = if (request.name.len == 0) "friend" else request.name;
     const lines = [_][]const u8{ "Hi {s}, I am Eliza.", "Before we begin, {s}, tell me how you came here.", "How are you feeling today, {s}?" };
     inline for (lines) |line| {
@@ -31,7 +31,7 @@ fn introduce(app: *App, _: *adapter.Call, request: *const eliza.IntroduceRequest
 }
 
 /// Converse answers each sentence it reads, in order.
-fn converse(app: *App, call: *adapter.Call, receiver: *adapter.Receiver(eliza.ConverseRequest), sender: *adapter.Sender(eliza.ConverseResponse)) ?connect.RpcError {
+pub fn converse(app: *App, call: *adapter.Call, receiver: *adapter.Receiver(eliza.ConverseRequest), sender: *adapter.Sender(eliza.ConverseResponse)) ?connect.RpcError {
     for (0..conversation_turns_max) |_| {
         const sentence = receiver.next() orelse break;
         sender.send(&.{ .sentence = reply(app, "Why do you say \"{s}\"?", .{sentence.sentence}) }) catch return .{ .code = .resource_exhausted };
@@ -42,14 +42,9 @@ fn converse(app: *App, call: *adapter.Call, receiver: *adapter.Receiver(eliza.Co
 
 const route_options = app_file.route_options;
 
-/// ELIZA's entries in the route table. Say is served as a POST and, since it has no side
-/// effects, as a GET.
-pub const routes = .{
-    adapter.post(App, Service.say, say, route_options),
-    adapter.get(App, Service.say, say, route_options),
-    adapter.post(App, Service.introduce, introduce, route_options),
-    adapter.post(App, Service.converse, converse, route_options),
-};
+/// ELIZA's entries in the route table, which its generated `routes` lists: each method served by
+/// the function of this file it names, and Say also as a GET, since it has no side effects.
+pub const routes = Service.Routes(adapter, App, @This(), route_options).routes;
 
 /// The examples' sentences: what the client sends, and what ELIZA answers.
 pub const said = "I feel tired";

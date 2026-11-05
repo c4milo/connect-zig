@@ -19,8 +19,8 @@ Start at the top: each example adds one layer to the one before it.
 
 [services/](services) holds what the programs share:
 
-- [services/eliza.zig](services/eliza.zig) serves `connectrpc.eliza.v1.ElizaService`, with one
-  method of each kind: `Say`, unary, which a Connect client may also send as a GET;
+- [services/eliza.zig](services/eliza.zig) serves `connectrpc.eliza.v1.ElizaService` through
+  its generated `Routes`, with one method of each kind: `Say`, unary, which a Connect client may also send as a GET;
   `Introduce`, a server stream; `Converse`, a bidirectional stream.
 - [services/demo.zig](services/demo.zig) serves `demo.v1.DemoService`, from
   [proto/demo/v1/demo.proto](proto/demo/v1/demo.proto): `Whoami` behind the `Logging` and `Auth`
