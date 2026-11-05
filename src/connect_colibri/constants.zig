@@ -20,6 +20,8 @@ pub const request_query_bytes = 8192;
 /// The messages one read of a streaming body passes on, at most. Each takes at least an
 /// envelope's 5-octet prefix, and a router entry holds far fewer octets than this many prefixes.
 pub const messages_per_read_max = 65_536;
+/// RFC 9110 §15.5.6: Method Not Allowed.
+pub const status_method_not_allowed: u16 = 405;
 /// RFC 9110 §15.5.15: URI Too Long.
 pub const status_uri_too_long: u16 = 414;
 /// RFC 6585 §5: Request Header Fields Too Large.

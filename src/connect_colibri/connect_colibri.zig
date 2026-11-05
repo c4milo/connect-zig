@@ -8,6 +8,7 @@ pub const constants = @import("constants.zig");
 
 const files = struct {
     pub const route = @import("route.zig");
+    pub const refusal = @import("refusal.zig");
     pub const call = @import("call.zig");
     pub const exchange = @import("exchange.zig");
     pub const dispatch = @import("dispatch.zig");
@@ -19,6 +20,8 @@ pub const RouteOptions = files.route.Options;
 pub const Codings = files.route.Codings;
 pub const post = files.route.post;
 pub const get = files.route.get;
+/// The router entries that answer 405 for the HTTP methods Connect does not serve.
+pub const Refusals = files.refusal.Refusals;
 /// What a handler reads about its call, and the streams it reads and writes.
 pub const Call = files.call.Call;
 pub const Sender = files.call.Sender;
@@ -42,9 +45,9 @@ comptime {
 
 test "the root exports the names a program calls" {
     try @import("public_names").expect(@This(), &.{
-        "constants",    "Route",      "RouteOptions", "Codings",  "post",         "get",
-        "Call",         "Sender",     "Receiver",     "Exchange", "ExchangeWith", "ExchangeBuffers",
-        "wanted_names", "failure_of",
+        "constants",       "Route",        "RouteOptions", "Codings",  "post",     "get",
+        "Refusals",        "Call",         "Sender",       "Receiver", "Exchange", "ExchangeWith",
+        "ExchangeBuffers", "wanted_names", "failure_of",
     });
 }
 

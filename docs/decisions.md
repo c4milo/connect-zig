@@ -188,6 +188,16 @@ first. Cite an entry by number in code and commits ("decision 6").
     client (decision 11). Beaten: the runner's reference server against our client alone, which
     leaves the server untested; and a copy of the loop in each program.
 
+27. **A method Connect does not serve gets 405.** colibri's router answers 501 for a method no
+    route of the table names, and 405 with an Allow header for one that a route names on another
+    path (colibri decision 122). connect-go answers 405, and the conformance suite asks it. So a
+    table joins `rpc.Refusals(App, method).routes` once: on that method's path they answer 405
+    with Allow, and on every other path colibri answers 405 itself. A method outside RFC 9110's
+    eight and PATCH still gets 501, as RFC 9110 §15.6.2 says. Beaten: refusal routes on every
+    path, which multiply the table for no other answer; adding the entries to the generated
+    `Routes`, which a table of several services would then name twice; and a change to
+    colibri's router, which is colibri's ruling.
+
 ## Tooling
 
 15. **pepegrillo is lazy.** `build.zig` requests it only when `b.pkg_hash.len == 0`, so a project

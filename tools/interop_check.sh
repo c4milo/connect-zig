@@ -52,6 +52,14 @@ expect "curl h2 GET" '{"sentence":"You said \"hi\". How does that make you feel?
     "$(curl -sS -m 5 --http2-prior-knowledge "${base}/Say?connect=v1&encoding=json&message=%7B%22sentence%22%3A%22hi%22%7D")"
 expect "curl error status" '400' \
     "$(curl -sS -m 5 -o /dev/null -w '%{http_code}' --json '{}' "${base}/Say")"
+# A method Connect does not serve gets 405, with the methods the path serves in Allow: on the
+# path of the table's refusal entries, and on any other.
+expect "DELETE refused" '405|allow: GET, HEAD, POST|' \
+    "$(curl -sS -m 5 -X DELETE -o /dev/null -D - "${base}/Say" | tr -d '\r' |
+        sed -n -e 's/^HTTP[^ ]* \([0-9]*\).*$/\1/p' -e '/^allow:/Ip' | tr '\n' '|')"
+expect "PUT refused" '405|allow: POST|' \
+    "$(curl -sS -m 5 -X PUT -o /dev/null -D - "${base}/Converse" | tr -d '\r' |
+        sed -n -e 's/^HTTP[^ ]* \([0-9]*\).*$/\1/p' -e '/^allow:/Ip' | tr '\n' '|')"
 # A long answer to a client that accepts gzip goes out compressed.
 long="$(printf 'a%.0s' $(seq 1 2000))"
 expect "gzip answer" 'gzip' \

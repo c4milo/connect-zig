@@ -166,8 +166,9 @@ ran on Linux x86-64 with Zig 0.16.0.
   of Chat and Sum. It found one fault, now fixed: a GET's route read its query from colibri's
   head memory after the head's event, and h3 had reused those octets.
 
-- **Step 7, the server half.** `tools/conformance_check.sh` with runner v1.0.4 printed 2712
-  of 2714 cases passed, and the two known failures (decision 26). The suite found three faults,
+- **Step 7, the server half.** `tools/conformance_check.sh` with runner v1.0.4 printed 2714
+  of 2714 cases passed (decision 26), once `rpc.Refusals`, a new public name, answers 405 to a
+  DELETE (decision 27). The suite found three faults,
   now fixed. A unary request with no message now fails `unimplemented`, as connect-go answers.
   A compressed message with no coding named now fails `internal`, as gRPC's Message-Encoding
   and Connect's Streaming-Request ask. A gRPC error after response headers keeps its own head.

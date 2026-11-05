@@ -33,7 +33,7 @@ pub const routes = server.router(App, .{
         rpc.post(App, Service.server_stream, unary.server_stream, options),
         rpc.post(App, Service.client_stream, streams.ClientStream, options),
         rpc.post(App, Service.bidi_stream, streams.BidiStream, options),
-    },
+    } ++ rpc.Refusals(App, Service.unary).routes,
 });
 
 pub const Router = @TypeOf(routes).Of(.{

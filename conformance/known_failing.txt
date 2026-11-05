@@ -1,7 +1,2 @@
 # The conformance cases the server fails on purpose, each with its reason. The runner fails when a
-# case listed here passes, so the list cannot go stale (decision 26).
-
-# A DELETE to a Connect method: the suite wants 405 Method Not Allowed. colibri's router answers
-# 501 Not Implemented for a method no route in the table uses (colibri decision 122), and 405 only
-# for a method another route of the same path uses. connect-zig follows colibri's ruling.
-Connect Unexpected Requests/**/unexpected-verb
+# case listed here passes, so the list cannot go stale (decision 26). None fails today.

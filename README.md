@@ -172,9 +172,13 @@ pub fn converse(...) ?connect.RpcError { ... }
 
 pub const routes = server.router(App, .{
     .error_handler = on_error,
-    .routes = Service.Routes(rpc, App, @This(), route_options).routes,
+    .routes = Service.Routes(rpc, App, @This(), route_options).routes ++
+        rpc.Refusals(App, Service.say).routes,
 });
 ```
+
+`rpc.Refusals` makes a method Connect does not serve, such as DELETE, get 405 with an Allow
+header on every path, as connect-go answers. A table names it once, for any one method.
 
 To give methods different options, such as their own interceptors, list routes by hand:
 `rpc.post(App, Service.say, say, options)` for each method, and `rpc.get` for a GET.
@@ -220,7 +224,7 @@ Each cell is Go's time over connect-zig's: above 1 means connect-zig is faster.
 - `tools/conformance_check.sh` runs the [connectrpc conformance
   suite](https://github.com/connectrpc/conformance) v1.0.4 against a conformance server: 2714
   cases in Connect, gRPC and gRPC-Web, over h11 and h2, in proto and JSON, with gzip and zstd.
-  2712 pass. The two left are listed, with the reason, in `conformance/known_failing.txt`.
+  All 2714 pass.
 
 ## Good to know
 
