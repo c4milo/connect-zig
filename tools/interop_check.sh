@@ -112,6 +112,22 @@ expect "x-ratelimit headers" 'x-ratelimit-limit: 100|x-ratelimit-remaining: 96|'
     "$(curl -sS -m 5 -H "${octocat}" --json '{"owner":"octocat","name":"secrets"}' -D - -o /dev/null \
         "${github}.RepositoryService/GetRepository" | tr -d '\r' | grep -i '^x-ratelimit' | tr '\n' '|')"
 
+# A connection beyond the server's sockets is closed at once, not left in the kernel's queue
+# until the client's deadline: 64 idle connections fill the example server, and a 65th must read
+# the end of its stream within 2 s.
+expect "a connection beyond the limit is refused" 'closed' "$(python3 -I - "${port}" <<'PYTHON'
+import socket, sys
+port = int(sys.argv[1])
+held = [socket.create_connection(("127.0.0.1", port)) for _ in range(64)]
+extra = socket.create_connection(("127.0.0.1", port))
+extra.settimeout(2)
+try:
+    print("closed" if extra.recv(1) == b"" else "answered")
+except (socket.timeout, ConnectionResetError) as failure:
+    print("closed" if isinstance(failure, ConnectionResetError) else "hung")
+PYTHON
+)"
+
 # The demo service: interceptors, every kind of stream, and error details.
 base="http://127.0.0.1:${port}/demo.v1.DemoService"
 demo() {

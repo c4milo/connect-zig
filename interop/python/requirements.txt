@@ -1,0 +1,16 @@
+# The client's packages and their dependencies, pinned by hash. run.sh installs them with
+# --require-hashes --only-binary=:all:. The hashes cover the Linux x86-64 wheels for CPython 3.12
+# and 3.13.
+grpcio==1.85.1 \
+    --hash=sha256:a1a72d19c0ab84b4b73b6c47eeaade76d84b1973a51593ff1160a73df33d03d9 \
+    --hash=sha256:de520b1555ae445cdc4f8f1cc7ccba12a19992bfafa7c292ebe7fe1fe5da6c53
+grpcio-tools==1.85.1 \
+    --hash=sha256:207e2e65147a744d7cb43949b0c8b898a6f290984d10f025409311563804163f \
+    --hash=sha256:7fdc3b869ad79254cb570eb043b5a940a775f367fd43682ce51aa518f45fec8f
+protobuf==7.36.2 \
+    --hash=sha256:89f23aa53c24553a2416fd4fd1ec06f74fa42b14b546d8883128813f775bbfd2 \
+    --hash=sha256:bdb3a345d48db958e6ce1f18e508beb0cc981d64f24088427549c866cd039f1e
+setuptools==84.2.1 \
+    --hash=sha256:ca140b45d5325a9478f880e351484f62fef15f336462e449ca0c03c873d589c2
+typing-extensions==4.16.0 \
+    --hash=sha256:481caa481374e813c1b176ada14e97f1f67a4539ce9cfeb3f350d78d6370c2e8

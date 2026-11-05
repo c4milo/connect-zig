@@ -1,0 +1,18 @@
+[package]
+name = "interop-rust"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+prost = "0.14.4"
+prost-types = "0.14.4"
+tokio = { version = "1.54.1", features = ["macros", "rt-multi-thread", "sync", "time"] }
+tokio-stream = "0.1.19"
+tonic = { version = "0.14.9", features = ["gzip"] }
+tonic-prost = "0.14.9"
+
+[build-dependencies]
+prost = "0.14.4"
+prost-types = "0.14.4"
+tonic-prost-build = "0.14.9"

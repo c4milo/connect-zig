@@ -54,6 +54,8 @@ pub fn add(b: *std.Build, graph: Graph) *std.Build.Step {
         .eliza = eliza,
         .demo = generated(b, graph, "examples/gen/demo/v1/demo.pb.zig", &.{}),
         .github = generated(b, graph, "examples/gen/github/v1/github.pb.zig", &.{}),
+        .coverage = coverage_module,
+        .interop = generated(b, graph, "examples/gen/interop/v1/interop.pb.zig", &.{.{ .name = "coverage_v1_coverage", .module = coverage_module }}),
         .rotor = rotor,
         .test_identity = test_identity,
     };
@@ -108,6 +110,8 @@ const Services = struct {
     eliza: *std.Build.Module,
     demo: *std.Build.Module,
     github: *std.Build.Module,
+    coverage: *std.Build.Module,
+    interop: *std.Build.Module,
     rotor: *std.Build.Module,
     test_identity: *std.Build.Module,
 };
@@ -130,6 +134,8 @@ fn program(b: *std.Build, graph: Graph, name: []const u8, path: []const u8, serv
                 .{ .name = "eliza", .module = services.eliza },
                 .{ .name = "demo", .module = services.demo },
                 .{ .name = "github", .module = services.github },
+                .{ .name = "coverage", .module = services.coverage },
+                .{ .name = "interop", .module = services.interop },
                 .{ .name = "rotor", .module = services.rotor },
             },
         }),

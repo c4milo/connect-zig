@@ -4,6 +4,7 @@ const std = @import("std");
 const connect = @import("connect");
 const rpc = @import("connect_colibri");
 const github = @import("github.zig");
+const interop = @import("interop.zig");
 
 /// The longest sentence or detail a handler writes.
 pub const text_len_max = 4096;
@@ -28,6 +29,8 @@ pub const App = struct {
     counts: [count_digits_max]u8 = undefined,
     /// The GitHub-style service's store, and the room its replies take.
     github: github.Room = .{},
+    /// The interop service's room for its replies' headers and details.
+    interop: interop.Room = .{},
 };
 
 /// Writes a reply into `app.text`, which stays valid until the next call writes there.

@@ -20,12 +20,17 @@ const connect = @import("connect");
 const tls = @import("tls");
 const identity = @import("test_identity");
 const socket_loop = @import("socket_loop");
+const coverage = @import("coverage");
 const App = @import("services/app.zig").App;
 const Router = @import("services/routes.zig").Router;
 
 const port_default = 8080;
 
-const Server = socket_loop.SocketServer(App, Router, .{ .sockets_max = 8, .socket_buffer_len = 64 * 1024, .quic_connections = 8 });
+/// The types an Any in a JSON message may name: the coverage cases' (decision 21), which the
+/// interop service echoes.
+pub const protobuf_any_types = .{ coverage.Everything, coverage.Nested, coverage.Scalars };
+
+const Server = socket_loop.SocketServer(App, Router, .{ .sockets_max = 64, .socket_buffer_len = 64 * 1024, .quic_connections = 8 });
 
 /// Room for the DER of the chain: a PEM file's DER is at most three quarters of its length.
 const chain_der_len = identity.chain_pem.len / 4 * 3;

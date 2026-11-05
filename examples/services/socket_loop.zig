@@ -188,9 +188,10 @@ fn submit(self: anytype, operation: rotor.Operation) void {
 /// while a socket has room, a write of what the endpoint wrote, and a close once nothing
 /// is owed.
 fn arm(self: anytype, now_ns: u64) void {
-    if (!self.accepting and free_index(
-        self,
-    ) != null) {
+    // The listener accepts even while every socket is taken: `on_accept` closes a connection the
+    // server has no room for, so its client learns it at once instead of waiting in the kernel's
+    // queue until its deadline.
+    if (!self.accepting) {
         submit(self, rotor.Operation.accept(accept_user_data, self.listener, false));
         self.accepting = true;
     }

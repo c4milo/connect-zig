@@ -1,0 +1,55 @@
+// The service tools/interop_languages_check.sh calls from clients in other languages: Go's
+// connect-go and grpc-go, TypeScript's connect-es, Python's grpcio and Rust's tonic. Each RPC
+// shape is here once, and each message carries coverage.v1.Everything, which holds every protobuf
+// type, so a client checks the protocol and the data types together.
+syntax = "proto3";
+
+package interop.v1;
+
+import "coverage/v1/coverage.proto";
+
+service InteropService {
+  // Echo answers with the message it was sent.
+  rpc Echo(coverage.v1.Everything) returns (coverage.v1.Everything) {}
+  // EchoGet is Echo with no side effects, which a Connect client may send as a GET.
+  rpc EchoGet(coverage.v1.Everything) returns (coverage.v1.Everything) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+  // Repeat sends the message `count` times.
+  rpc Repeat(RepeatRequest) returns (stream coverage.v1.Everything) {}
+  // Collect counts the messages the client sends, and answers with the last.
+  rpc Collect(stream coverage.v1.Everything) returns (CollectResponse) {}
+  // Chat answers each message as it arrives, while the client still sends.
+  rpc Chat(stream coverage.v1.Everything) returns (stream coverage.v1.Everything) {}
+  // Fail fails with the code and message asked for, and the request as a detail.
+  rpc Fail(FailRequest) returns (coverage.v1.Everything) {}
+  // Inspect answers with what the server saw of the call: its protocol's timeout and the
+  // request headers named "x-interop-*". It sends each such header back as a response header
+  // and as a trailer.
+  rpc Inspect(InspectRequest) returns (InspectResponse) {}
+}
+
+message RepeatRequest {
+  coverage.v1.Everything message = 1;
+  int32 count = 2;
+}
+
+message CollectResponse {
+  int32 count = 1;
+  coverage.v1.Everything last = 2;
+}
+
+message FailRequest {
+  // A gRPC status code, 1 to 16.
+  int32 code = 1;
+  string message = 2;
+}
+
+message InspectRequest {}
+
+message InspectResponse {
+  // The timeout the client sent, in milliseconds, or 0 for none.
+  int64 timeout_ms = 1;
+  // Each "x-interop-*" request header, as "name: value".
+  repeated string headers = 2;
+}

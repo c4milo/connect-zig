@@ -7,6 +7,7 @@ const App = @import("app.zig").App;
 const eliza = @import("eliza.zig");
 const demo = @import("demo.zig");
 const github = @import("github.zig");
+const interop = @import("interop.zig");
 
 /// A route's error that is not an RPC's: the router answers 500.
 fn on_error(_: *App, _: *const server.Request, _: anyerror, response: *server.ResponseWriter) void {
@@ -16,9 +17,10 @@ fn on_error(_: *App, _: *const server.Request, _: anyerror, response: *server.Re
 pub const routes = server.router(App, .{
     .error_handler = on_error,
     // A method Connect does not serve gets 405, on every path of the table.
-    .routes = eliza.routes ++ demo.routes ++ github.routes ++ rpc.Refusals(App, Service.say).routes,
+    .routes = eliza.routes ++ demo.routes ++ github.routes ++ interop.routes ++ rpc.Refusals(App, Service.say).routes,
 });
 
 /// The router's pool: the calls the server answers at once, and room for each one's request and
 /// response.
-pub const Router = @TypeOf(routes).Of(.{ .requests = 8, .response_bytes = 8192, .body_bytes = 8192 });
+/// The interop service's messages, each a coverage case, take up to 64 KiB.
+pub const Router = @TypeOf(routes).Of(.{ .requests = 8, .response_bytes = 64 * 1024, .body_bytes = 64 * 1024 });
