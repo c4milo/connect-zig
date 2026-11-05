@@ -1,0 +1,238 @@
+//! What a server writes back, in the protocol its request spoke: the head, each message, and the
+//! end of the response (Connect protocol, "Unary-Response" and "Streaming-Response";
+//! PROTOCOL-HTTP2.md, "Responses"; PROTOCOL-WEB.md).
+//!
+//! - Connect unary: the message is the body, and an error is a JSON body with its HTTP status.
+//! - Connect streams: envelopes, then an end-stream message flagged 0x02.
+//! - gRPC: envelopes, then the status in HTTP trailers. An error before any message is sent
+//!   "Trailers-Only": the status goes in the head and the body is empty.
+//! - gRPC-Web: envelopes, then the status in a trailers frame flagged 0x80.
+const std = @import("std");
+const assert = std.debug.assert;
+const protocol = @import("protocol.zig");
+const compression = @import("compression.zig");
+const envelope = @import("envelope.zig");
+const error_json = @import("error_json.zig");
+const end_stream = @import("end_stream.zig");
+const trailers = @import("trailers.zig");
+const message_codec = @import("message_codec.zig");
+const rpc_error = @import("rpc_error.zig");
+const server_head = @import("server_head.zig");
+const constants = @import("constants.zig");
+const Header = rpc_error.Header;
+const RpcError = rpc_error.RpcError;
+
+/// The most headers `head` and `error_head` return.
+pub const head_headers_max = 4;
+
+pub const Head = struct {
+    status: u16,
+    storage: [head_headers_max]Header = undefined,
+    count: usize = 0,
+
+    pub fn headers(head: *const Head) []const Header {
+        return head.storage[0..head.count];
+    }
+
+    fn add(head: *Head, name: []const u8, value: []const u8) void {
+        assert(head.count < head_headers_max);
+        head.storage[head.count] = .{ .name = name, .value = value };
+        head.count += 1;
+    }
+};
+
+pub const Error = message_codec.EncodeError || error{ WriteFailed, TooManyDetails };
+
+/// A message encoded, and compressed when that saves octets, ready for the body.
+pub const Prepared = struct {
+    octets: []const u8,
+    compressed: bool,
+};
+
+pub const Reply = struct {
+    accepted: server_head.Accepted,
+    scratch: message_codec.Scratch,
+    encoder: ?*compression.GzipEncoder = null,
+    /// Whether a message went out, which rules out gRPC's Trailers-Only form.
+    sent: bool = false,
+
+    /// Encodes a message into the scratch storage, compressing it when the response coding is
+    /// gzip and the message is long enough.
+    pub fn prepare(reply: *Reply, comptime T: type, message: *const T) Error!Prepared {
+        const octets = try message_codec.encode(T, reply.accepted.speaks.codec, message, reply.scratch.message);
+        const result = message_codec.compress(reply.accepted.response_coding, reply.encoder, octets, reply.scratch.work);
+        return .{ .octets = result.octets, .compressed = result.compressed };
+    }
+
+    /// The head of a response that carries messages. `compressed` says whether a unary
+    /// Connect body is compressed; a stream announces its coding whatever each message does.
+    pub fn head(reply: *const Reply, compressed: bool) Head {
+        const speaks = reply.accepted.speaks;
+        var result: Head = .{ .status = 200 };
+        result.add("content-type", protocol.content_type(speaks));
+        const coding = reply.accepted.response_coding;
+        switch (speaks.protocol) {
+            .connect => if (!speaks.enveloped) {
+                if (compressed) result.add("content-encoding", coding.name());
+            } else if (coding != .identity) result.add("connect-content-encoding", coding.name()),
+            .grpc, .grpc_web => if (coding != .identity) result.add("grpc-encoding", coding.name()),
+        }
+        return result;
+    }
+
+    /// Writes one message: the whole body of a Connect unary response, or one envelope.
+    pub fn write_message(reply: *Reply, prepared: Prepared, body: *std.Io.Writer) Error!void {
+        reply.sent = true;
+        if (!reply.accepted.speaks.enveloped) return body.writeAll(prepared.octets);
+        var prefix: [constants.protocol.envelope_prefix_len]u8 = undefined;
+        envelope.write_prefix(.{ .compressed = prepared.compressed }, prepared.octets.len, &prefix);
+        try body.writeAll(&prefix);
+        try body.writeAll(prepared.octets);
+    }
+
+    /// Whether `failure` is answered with `error_head` and `write_error_body` alone: a Connect
+    /// unary error, or a gRPC error before any message (Trailers-Only).
+    pub fn error_only(reply: *const Reply) bool {
+        const speaks = reply.accepted.speaks;
+        if (speaks.protocol == .connect) return !speaks.enveloped;
+        return speaks.protocol == .grpc and !reply.sent;
+    }
+
+    /// The head of an error answered by `error_only`. For gRPC it holds the status trailers,
+    /// whose values are written into `storage`.
+    pub fn error_head(reply: *const Reply, failure: RpcError, storage: []u8) Error!Head {
+        assert(reply.error_only());
+        const speaks = reply.accepted.speaks;
+        if (speaks.protocol == .connect) {
+            var result: Head = .{ .status = failure.code.http_status() };
+            result.add("content-type", "application/json");
+            return result;
+        }
+        var result: Head = .{ .status = 200 };
+        result.add("content-type", protocol.content_type(speaks));
+        var status_trailers: [trailers.trailers_max]Header = undefined;
+        for (try trailers.write(failure, storage, &status_trailers)) |trailer| result.add(trailer.name, trailer.value);
+        return result;
+    }
+
+    /// Writes a Connect unary error's JSON body. A gRPC Trailers-Only error has no body.
+    pub fn write_error_body(reply: *const Reply, failure: RpcError, body: *std.Io.Writer) Error!void {
+        if (reply.accepted.speaks.protocol != .connect) return;
+        try body.writeAll(error_json.encode(failure, reply.scratch.work) catch return error.NoSpaceLeft);
+    }
+
+    /// Ends a response that carried messages. A Connect stream and gRPC-Web write their end into
+    /// the body; gRPC returns the trailers the HTTP library sends, with values in `storage`.
+    pub fn finish(reply: *const Reply, failure: ?RpcError, metadata: []const Header, body: *std.Io.Writer, storage: []u8, out: *[trailers.trailers_max]Header) Error![]const Header {
+        const speaks = reply.accepted.speaks;
+        assert(speaks.enveloped);
+        switch (speaks.protocol) {
+            .connect => {
+                const text = end_stream.encode(.{ .failure = failure, .metadata = metadata }, storage) catch return error.NoSpaceLeft;
+                var prefix: [constants.protocol.envelope_prefix_len]u8 = undefined;
+                envelope.write_prefix(.{ .end_stream = true }, text.len, &prefix);
+                try body.writeAll(&prefix);
+                try body.writeAll(text);
+                return out[0..0];
+            },
+            .grpc => return trailers.write(failure, storage, out),
+            .grpc_web => {
+                const status = try trailers.write(failure, storage[0 .. storage.len / 2], out);
+                const frame = try trailers.write_web_frame(status, storage[storage.len / 2 ..]);
+                try body.writeAll(frame);
+                return out[0..0];
+            },
+        }
+    }
+};
+
+/// The reply that carries the error of a request `server_head.accept` refused, or null when the
+/// refusal names no protocol: the server then answers `refusal.http_status` with no body.
+pub fn refusal_reply(refusal: server_head.Refused, scratch: message_codec.Scratch) ?Reply {
+    _ = refusal.failure orelse return null;
+    const speaks = refusal.speaks.?;
+    return .{
+        .accepted = .{ .speaks = speaks, .request_coding = .identity, .response_coding = .identity, .timeout_ns = null },
+        .scratch = scratch,
+    };
+}
+
+const testing = std.testing;
+const proto = @import("protobuf");
+
+const Greeting = struct {
+    text: []const u8 = "",
+    pub const protobuf: proto.Descriptor = .{ .full_name = "test.Greeting", .fields = &.{
+        .{ .name = "text", .number = 1, .kind = .string, .json_name = "text", .proto_name = "text" },
+    } };
+};
+
+fn reply_for(speaks: protocol.Speaks, buffers: *[3][256]u8) Reply {
+    return .{
+        .accepted = .{ .speaks = speaks, .request_coding = .identity, .response_coding = .identity, .timeout_ns = null },
+        .scratch = .{ .message = &buffers[0], .work = &buffers[1], .tokens = &buffers[2] },
+    };
+}
+
+test "a Connect unary reply is the bare message, and its error a JSON body with a status" {
+    var buffers: [3][256]u8 = undefined;
+    var reply = reply_for(.{ .protocol = .connect, .codec = .json, .enveloped = false }, &buffers);
+    var out: [64]u8 = undefined;
+    var body: std.Io.Writer = .fixed(&out);
+    const prepared = try reply.prepare(Greeting, &.{ .text = "hi" });
+    try testing.expectEqualStrings("application/json", reply.head(prepared.compressed).headers()[0].value);
+    try reply.write_message(prepared, &body);
+    try testing.expectEqualStrings("{\"text\":\"hi\"}", body.buffered());
+    var storage: [64]u8 = undefined;
+    const failure: RpcError = .{ .code = .not_found };
+    try testing.expectEqual(@as(u16, 404), (try reply.error_head(failure, &storage)).status);
+}
+
+test "a gRPC reply ends in status trailers, and an early error is Trailers-Only" {
+    var buffers: [3][256]u8 = undefined;
+    var reply = reply_for(.{ .protocol = .grpc, .codec = .proto, .enveloped = true }, &buffers);
+    try testing.expect(reply.error_only());
+    var storage: [64]u8 = undefined;
+    const early = try reply.error_head(.{ .code = .unavailable, .message = "x" }, &storage);
+    try testing.expectEqualStrings("grpc-status", early.headers()[1].name);
+    try testing.expectEqualStrings("14", early.headers()[1].value);
+    var out: [64]u8 = undefined;
+    var body: std.Io.Writer = .fixed(&out);
+    try reply.write_message(try reply.prepare(Greeting, &.{ .text = "a" }), &body);
+    try testing.expectEqualSlices(u8, &.{ 0, 0, 0, 0, 3, 0x0a, 1, 'a' }, body.buffered());
+    try testing.expect(!reply.error_only());
+    var trailer_out: [trailers.trailers_max]Header = undefined;
+    const ending = try reply.finish(null, &.{}, &body, &storage, &trailer_out);
+    try testing.expectEqualStrings("0", ending[0].value);
+}
+
+test "a Connect stream ends with an end-stream envelope, and gRPC-Web with a trailers frame" {
+    var buffers: [3][256]u8 = undefined;
+    var storage: [128]u8 = undefined;
+    var trailer_out: [trailers.trailers_max]Header = undefined;
+    const connect_reply = reply_for(.{ .protocol = .connect, .codec = .proto, .enveloped = true }, &buffers);
+    var out: [128]u8 = undefined;
+    var body: std.Io.Writer = .fixed(&out);
+    _ = try connect_reply.finish(.{ .code = .internal }, &.{}, &body, &storage, &trailer_out);
+    try testing.expectEqual(@as(u8, 0x02), body.buffered()[0]);
+    try testing.expectEqualStrings("{\"error\":{\"code\":\"internal\"}}", body.buffered()[5..]);
+    const web_reply = reply_for(.{ .protocol = .grpc_web, .codec = .proto, .enveloped = true }, &buffers);
+    var web_out: [128]u8 = undefined;
+    var web_body: std.Io.Writer = .fixed(&web_out);
+    _ = try web_reply.finish(null, &.{}, &web_body, &storage, &trailer_out);
+    try testing.expectEqual(@as(u8, 0x80), web_body.buffered()[0]);
+    try testing.expectEqualStrings("grpc-status: 0\r\n", web_body.buffered()[5..]);
+}
+
+test "a refusal with a protocol becomes a reply, and one without has none" {
+    var buffers: [3][256]u8 = undefined;
+    const scratch: message_codec.Scratch = .{ .message = &buffers[0], .work = &buffers[1], .tokens = &buffers[2] };
+    try testing.expectEqual(@as(?Reply, null), refusal_reply(.{ .http_status = 415 }, scratch));
+    const refused: server_head.Refused = .{
+        .http_status = 200,
+        .failure = .{ .code = .unimplemented },
+        .speaks = .{ .protocol = .grpc_web, .codec = .proto, .enveloped = true },
+    };
+    const reply = refusal_reply(refused, scratch).?;
+    try testing.expect(!reply.error_only());
+}

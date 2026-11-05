@@ -12,6 +12,7 @@ pub fn expect(comptime Root: type, comptime names: []const []const u8) !void {
 
 /// The first name listed and missing from the root, or exported and not listed, or null.
 pub fn first_difference(comptime Root: type, comptime names: []const []const u8) ?[]const u8 {
+    @setEvalBranchQuota(names.len * names.len * name_len_max + branch_quota_base);
     inline for (names) |name| {
         if (!@hasDecl(Root, name)) return name;
     }
@@ -21,7 +22,12 @@ pub fn first_difference(comptime Root: type, comptime names: []const []const u8)
     return null;
 }
 
+/// The longest public name the check compares, and the branches it needs beside the comparisons.
+const name_len_max = 64;
+const branch_quota_base = 10_000;
+
 fn listed(comptime names: []const []const u8, comptime name: []const u8) bool {
+    @setEvalBranchQuota(names.len * name_len_max + branch_quota_base);
     inline for (names) |each| {
         if (comptime std.mem.eql(u8, each, name)) return true;
     }
