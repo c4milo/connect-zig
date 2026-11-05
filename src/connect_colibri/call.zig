@@ -52,6 +52,23 @@ pub const RequestHeaders = struct {
     }
 };
 
+/// A GET's query, copied at its head into the request's entry of the router pool. colibri holds
+/// the head's octets only while the head's event lasts, and a GET's route reads its message once
+/// the request ends, which over h3 is a later event.
+pub const RequestQuery = struct {
+    octets: [constants.request_query_bytes]u8 = undefined,
+
+    /// Copies `from` and returns the copy, or null for a request with no query. A query longer
+    /// than the storage fails.
+    pub fn copy(query: *RequestQuery, from: ?[]const u8) error{QueryTooLong}!?[]const u8 {
+        const held = from orelse return null;
+        if (held.len > query.octets.len) return error.QueryTooLong;
+        const copied = query.octets[0..held.len];
+        @memcpy(copied, held);
+        return copied;
+    }
+};
+
 /// What a call writes into while it answers: the response headers and trailers its handler adds,
 /// their octets, and the lists of them that connect and colibri each take. A route keeps one in
 /// each request's entry of the router pool.
@@ -310,6 +327,23 @@ test "request headers refuse octets beyond their storage" {
     try headers.copy(.of(&test_section));
     try test_section.append("b", &value);
     try testing.expectError(error.HeadersTooLarge, headers.copy(.of(&test_section)));
+}
+
+test "a request's query is copied, so it outlives the octets it came from" {
+    var source = "connect=v1&message=e30".*;
+    var query: RequestQuery = .{};
+    const copied = (try query.copy(&source)).?;
+    @memset(&source, 'x');
+    try testing.expectEqualStrings("connect=v1&message=e30", copied);
+    try testing.expectEqual(@as(?[]const u8, null), try query.copy(null));
+}
+
+test "a request's query longer than its storage is refused" {
+    const fits = [_]u8{'q'} ** constants.request_query_bytes;
+    var query: RequestQuery = .{};
+    try testing.expectEqual(fits.len, (try query.copy(&fits)).?.len);
+    const longer = fits ++ "q";
+    try testing.expectError(error.QueryTooLong, query.copy(longer));
 }
 
 test "a response header is refused once the head went out, or once the room is full" {

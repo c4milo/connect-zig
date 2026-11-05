@@ -37,6 +37,7 @@ pub fn CallState(comptime options: Options, comptime handler: anytype) type {
         reply_work: [options.message_bytes]u8 = undefined,
         room: call_file.Room = .{},
         headers: call_file.RequestHeaders = .{},
+        query: call_file.RequestQuery = .{},
         handler_state: dispatch.HandlerState(handler) = .{},
     };
 }
@@ -91,7 +92,8 @@ pub fn Route(comptime App: type, comptime method: connect.Method, comptime handl
 /// What a route's free functions need to know about it at compile time.
 const RouteSpec = struct { method: connect.Method, options: Options };
 
-/// Reads the head: copies the headers, accepts or refuses the request, and starts the call.
+/// Reads the head: copies the headers and the query, accepts or refuses the request, and starts
+/// the call.
 fn begin(comptime spec: RouteSpec, comptime handler: anytype, app: anytype, state: *CallState(spec.options, handler), request: *const server.Request, response: *server.ResponseWriter) !void {
     const codings = codings_of(app);
     state.headers.copy(request.headers) catch {
@@ -100,7 +102,14 @@ fn begin(comptime spec: RouteSpec, comptime handler: anytype, app: anytype, stat
         response.status = constants.status_headers_too_large;
         return response.end();
     };
-    const decision = connect.server.accept(request.method, request.query, state.headers.lookup(), .{
+    // The accepted GET's query points into this copy, which lasts until the call ends.
+    const query = state.query.copy(request.query) catch {
+        state.done = true;
+        // RFC 9110 §15.5.15: a target longer than the server reads gets 414.
+        response.status = constants.status_uri_too_long;
+        return response.end();
+    };
+    const decision = connect.server.accept(request.method, query, state.headers.lookup(), .{
         .stream_type = spec.method.stream_type,
         .idempotency = spec.method.idempotency,
         .decoders = codings.decoders,
