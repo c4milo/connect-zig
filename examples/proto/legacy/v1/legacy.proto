@@ -1,8 +1,15 @@
 // proto2, which tools/coverage_check.sh compares with Go: groups, presence on every singular
-// field, unpacked repeated scalars, and the packed option.
+// field, unpacked repeated scalars, the packed option, closed enums and strings no parser checks.
 syntax = "proto2";
 
 package legacy.v1;
+
+// A proto2 enum is closed: a number it does not name goes to the unknown fields.
+enum Size {
+  SIZE_UNSPECIFIED = 0;
+  SMALL = 1;
+  LARGE = 2;
+}
 
 message Everything {
   optional int32 count = 1;
@@ -19,4 +26,13 @@ message Everything {
   }
   optional Everything child = 11;
   map<string, int32> counts = 12;
+  optional Size size = 13;
+  repeated Size sizes = 14;
+  repeated Size packed_sizes = 15 [packed = true];
+  map<string, Size> sizes_by_name = 16;
+  oneof pick {
+    Size picked_size = 17;
+    string picked_label = 18;
+  }
+  repeated string labels = 19;
 }

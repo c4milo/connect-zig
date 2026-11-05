@@ -29,7 +29,9 @@ pub fn write(out: *Out, scope: []const u8, enumeration: pb.EnumDescriptorProto, 
     try out.indent(depth + 1);
     try out.print("_,\n\n", .{});
     try out.indent(depth + 1);
-    try out.print("pub const protobuf: proto.EnumDescriptor = .{{ .full_name = {s}, .values = &.{{\n", .{try names.string_literal(out.arena, full)});
+    // Editions, "enum_type": a closed enum, as every proto2 enum is, says so to the runtime.
+    const closed = if (out.features.of_enum(enumeration).closed) ".closed = true, " else "";
+    try out.print("pub const protobuf: proto.EnumDescriptor = .{{ .full_name = {s}, {s}.values = &.{{\n", .{ try names.string_literal(out.arena, full), closed });
     var named = enumeration.value.iterator();
     while (try named.next()) |value| {
         try out.indent(depth + 1 + 1);

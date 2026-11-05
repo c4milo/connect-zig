@@ -11,6 +11,7 @@ const wire = @import("wire.zig");
 const descriptor = @import("descriptor.zig");
 const scalar = @import("scalar.zig");
 const repeated = @import("repeated.zig");
+const decode = @import("decode.zig");
 const constants = @import("constants.zig");
 const Field = descriptor.Field;
 const Kind = descriptor.Kind;
@@ -83,9 +84,35 @@ fn encode_unknown(comptime T: type, bytes: []const u8, sink: *Sink) Error!void {
         const start = reader.position;
         const tag = try reader.tag();
         try reader.skip(tag, constants.limits.depth_max);
-        if (!descriptor.knows(T, tag.number)) try sink.raw(bytes[start..reader.position]);
+        const record = bytes[start..reader.position];
+        if (!descriptor.knows(T, tag.number) or try closed_value_unknown(T, record)) try sink.raw(record);
     }
     unreachable;
+}
+
+/// Whether `record` holds a number its singular field's closed enum does not name. `decode` kept
+/// it with the unknown fields and left the field as it was, so it goes back out from here. A
+/// repeated field's records go out from its view, unknown numbers among them.
+fn closed_value_unknown(comptime T: type, record: []const u8) Error!bool {
+    var reader: wire.Reader = .{ .bytes = record };
+    const tag = try reader.tag();
+    if (tag.wire_type != .varint) return false;
+    inline for (T.protobuf.fields) |field| {
+        if (comptime field.kind != .@"enum") continue;
+        const V = comptime singular_enum(T, field) orelse continue;
+        if (tag.number == field.number) return decode.unknown_to_closed(.@"enum", V, try scalar.read(.@"enum", V, &reader));
+    }
+    return false;
+}
+
+/// The enum type of a singular or oneof enum field, or null for a repeated one.
+fn singular_enum(comptime T: type, comptime field: Field) ?type {
+    const F = if (field.oneof) |oneof| @FieldType(@typeInfo(@FieldType(T, oneof)).optional.child, field.name) else @FieldType(T, field.name);
+    if (repeated.is_repeated(F)) return null;
+    return switch (@typeInfo(F)) {
+        .optional => |optional| optional.child,
+        else => F,
+    };
 }
 
 /// A map entry writes its key and its value even at their defaults, as Go and C++ write them, so
@@ -200,7 +227,58 @@ fn write_child_once(comptime M: type, child: *const M, sink: *Sink, writer: *wir
 
 fn encode_repeated(comptime field: Field, comptime F: type, item: *const F, sink: *Sink) Error!void {
     if (item.is_empty()) return;
-    if (comptime F.kind.packable() and field.@"packed") return encode_packed(field, F, item, sink);
+    if (comptime F.kind.packable() and field.@"packed") {
+        try encode_packed(field, F, item, sink);
+    } else {
+        try encode_each(field, F, item, sink);
+    }
+    if (comptime repeated.holds_closed(F)) try encode_closed_unknown(field, F, item.view, sink);
+}
+
+/// Writes back what a decoded closed-enum field kept out of its elements: each number the enum
+/// does not name, as a record of its own, and each map entry that holds one, whole. Go's and
+/// upb's runtimes keep them with the unknown fields in the same form (editions, "enum_type").
+fn encode_closed_unknown(comptime field: Field, comptime F: type, view: descriptor.View, sink: *Sink) Error!void {
+    var reader: wire.Reader = .{ .bytes = view.bytes };
+    // Each record takes at least one byte.
+    for (0..view.bytes.len + 1) |_| {
+        if (reader.at_end()) return;
+        const start = reader.position;
+        const tag = try reader.tag();
+        if (tag.number != view.number) {
+            try reader.skip(tag, constants.limits.depth_max);
+            continue;
+        }
+        if (comptime F.kind == .@"enum") {
+            try encode_unknown_numbers(field, F.Element, tag, &reader, sink);
+        } else {
+            const payload = try decode.message_payload(F.kind, tag, &reader, constants.limits.depth_max);
+            if (try repeated.entry_value_unknown(F.Element, payload)) try sink.raw(view.bytes[start..reader.position]);
+        }
+    }
+    unreachable;
+}
+
+/// Writes each number of one record, packed or not, that the closed enum `V` does not name.
+fn encode_unknown_numbers(comptime field: Field, comptime V: type, tag: wire.Tag, reader: *wire.Reader, sink: *Sink) Error!void {
+    var values: wire.Reader = if (tag.wire_type == .len) .{ .bytes = try reader.length_delimited() } else reader.*;
+    // Each number takes at least one byte; an unpacked record holds one.
+    for (0..values.bytes.len + 1) |_| {
+        const value = try scalar.read(.@"enum", V, &values);
+        if (decode.unknown_to_closed(.@"enum", V, value)) {
+            try sink.tag(field.number, .varint);
+            try sink.value(.@"enum", V, value);
+        }
+        if (tag.wire_type != .len) {
+            reader.* = values;
+            return;
+        }
+        if (values.at_end()) return;
+    }
+    unreachable;
+}
+
+fn encode_each(comptime field: Field, comptime F: type, item: *const F, sink: *Sink) Error!void {
     var elements = item.iterator();
     for (0..constants.limits.elements_max) |_| {
         const element = try elements.next() orelse return;

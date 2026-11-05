@@ -1,6 +1,8 @@
-//! The edition features that change the code the generator writes, resolved for one field from
-//! its file down through each enclosing message (protobuf editions, "Feature Resolution"). A
-//! proto2 or proto3 file has no features of its own; its syntax sets the same three choices.
+//! The edition features that change the code the generator writes, resolved for one field or enum
+//! from its file down through each enclosing message (protobuf editions, "Feature Resolution"). A
+//! proto2 or proto3 file has no features of its own; its syntax sets the same choices, as the
+//! editions overview maps them ("Migrating to Editions"). json_format changes nothing here: the
+//! JSON codec is strict for every file, which LEGACY_BEST_EFFORT also allows.
 const std = @import("std");
 const pb = @import("descriptor_pb.zig");
 
@@ -11,35 +13,36 @@ pub const Features = struct {
     @"packed": bool,
     /// Whether a message field is written between group tags rather than after its length.
     delimited: bool,
+    /// Whether an enum is closed: a number it does not name goes to the unknown fields.
+    closed: bool,
+    /// Whether a string field's octets are checked to be UTF-8.
+    verify_utf8: bool,
 
     /// The features a file's syntax or edition starts from. Editions 2023 and 2024 default to
     /// explicit presence, packed repeated scalars and length-prefixed messages.
     pub fn of_file(file: pb.FileDescriptorProto) Features {
         const syntax = file.syntax orelse "proto2";
-        if (std.mem.eql(u8, syntax, "proto3")) return .{ .explicit_presence = false, .@"packed" = true, .delimited = false };
+        if (std.mem.eql(u8, syntax, "proto3")) return .{ .explicit_presence = false, .@"packed" = true, .delimited = false, .closed = false, .verify_utf8 = true };
         if (std.mem.eql(u8, syntax, "editions")) {
-            const defaults: Features = .{ .explicit_presence = true, .@"packed" = true, .delimited = false };
+            const defaults: Features = .{ .explicit_presence = true, .@"packed" = true, .delimited = false, .closed = false, .verify_utf8 = true };
             const options = file.options orelse return defaults;
             return defaults.merge(options.features);
         }
-        return .{ .explicit_presence = true, .@"packed" = false, .delimited = false };
+        // proto2: closed enums, and strings no parser checks.
+        return .{ .explicit_presence = true, .@"packed" = false, .delimited = false, .closed = true, .verify_utf8 = false };
     }
 
     /// These features, with each one `set` names in its place.
     pub fn merge(features: Features, set: ?pb.FeatureSet) Features {
         const named = set orelse return features;
         var result = features;
-        if (named.field_presence) |presence| {
-            // LEGACY_REQUIRED is a field with presence that must be set; the runtime does not
-            // check required fields, so it reads as explicit (decision 23).
-            if (presence != 0) result.explicit_presence = presence != pb.presence_implicit;
-        }
-        if (named.repeated_field_encoding) |encoding| {
-            if (encoding != 0) result.@"packed" = encoding == pb.encoding_packed;
-        }
-        if (named.message_encoding) |encoding| {
-            if (encoding != 0) result.delimited = encoding == pb.message_delimited;
-        }
+        // LEGACY_REQUIRED is a field with presence that must be set; the runtime does not check
+        // required fields, so it reads as explicit (decision 23).
+        if (is(named.field_presence, pb.presence_implicit)) |implicit| result.explicit_presence = !implicit;
+        if (is(named.repeated_field_encoding, pb.encoding_packed)) |packs| result.@"packed" = packs;
+        if (is(named.message_encoding, pb.message_delimited)) |delimits| result.delimited = delimits;
+        if (is(named.enum_type, pb.enum_closed)) |closes| result.closed = closes;
+        if (is(named.utf8_validation, pb.utf8_none)) |unchecked| result.verify_utf8 = !unchecked;
         return result;
     }
 
@@ -56,12 +59,26 @@ pub const Features = struct {
         return result;
     }
 
+    /// The features of an enum declared where these are in effect.
+    pub fn of_enum(features: Features, enumeration: pb.EnumDescriptorProto) Features {
+        const options = enumeration.options orelse return features;
+        return features.merge(options.features);
+    }
+
     /// The features of one field.
     pub fn of_field(features: Features, field: pb.FieldDescriptorProto) Features {
         const options = field.options orelse return features;
         return features.merge(options.features);
     }
 };
+
+/// Whether a feature `set` says `choice`, or null when it says nothing: unset, or 0, which names
+/// no choice.
+fn is(set: ?i32, choice: i32) ?bool {
+    const value = set orelse return null;
+    if (value == 0) return null;
+    return value == choice;
+}
 
 const testing = std.testing;
 

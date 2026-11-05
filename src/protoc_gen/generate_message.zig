@@ -245,6 +245,8 @@ fn unpacked(out: *const Out, field: pb.FieldDescriptorProto) bool {
 fn field_kind(out: *const Out, field: pb.FieldDescriptorProto) Error![]const u8 {
     const kind = field.type orelse return error.UnknownType;
     if (kind == .message and out.features.of_field(field).delimited and !try is_map(out, field)) return "group";
+    // Editions, "utf8_validation": NONE, as every proto2 string has, leaves the octets unchecked.
+    if (kind == .string and !out.features.of_field(field).verify_utf8) return "unvalidated_string";
     return kind_name(kind);
 }
 

@@ -238,8 +238,11 @@ Each cell is Go's time over connect-zig's: above 1 means connect-zig is faster.
 > request body whole, so the client side of a stream is half-duplex. brotli is read but not
 > written yet, since stdx has no brotli encoder (decision 10).
 
-The library is stricter than the spec in three places: it does not report a missing required
-field, a closed enum keeps an unknown value, and every string must be valid UTF-8 (decision 23).
+Editions 2023 and 2024 follow [protobuf.dev's editions
+overview](https://protobuf.dev/editions/overview/): field presence, packed and expanded repeated
+fields, delimited messages, closed enums and `utf8_validation`. A number a closed enum does not
+name goes to the unknown fields, as upb keeps it, and is written back. One difference remains: the
+library does not report a missing required field (decision 23).
 
 Still to come:
 

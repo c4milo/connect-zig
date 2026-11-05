@@ -175,6 +175,12 @@ ran on Linux x86-64 with Zig 0.16.0.
   `connect_colibri` gains `Call.request_headers`, `Call.request_query` and a context's
   `message_receive_limit`. It also gains 16 KiB of trailer room, for details that echo headers.
 
+- **Closed enums and unchecked strings.** The plugin resolves `enum_type` and
+  `utf8_validation` (decision 23). `proto.EnumDescriptor` gains `closed` and `names`, and
+  `proto.Kind` gains `unvalidated_string`. `tools/coverage_check.sh` printed 117 checks passed,
+  eight of them binary cases checked against upb 5.29.3. Strings of 32 bytes and longer are
+  checked with stdx's vector UTF-8 check, shorter ones with the standard library's.
+
 - **`ClientCall`.** `connect_colibri.Exchange`, `ExchangeWith` and `ExchangeBuffers` become
   `ClientCall`, `ClientCallWith` and `ClientCallBuffers`, so the client's side of a call reads as
   the pair of the server's `Call`. The records above keep the names of their day.

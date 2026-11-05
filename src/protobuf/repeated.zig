@@ -73,10 +73,20 @@ pub fn RepeatedIterator(comptime T: type, comptime element_kind: Kind) type {
 
         pub fn next(it: *Self) wire.Error!?T {
             if (it.items.len != 0) return next_item(T, it);
-            if (!it.packed_reader.at_end()) return try read_scalar(T, element_kind, &it.packed_reader);
-            return next_in_view(T, element_kind, it);
+            // A number a closed enum does not name stays with the unknown fields, so the
+            // iterator passes over it (editions, "enum_type"). Each one takes an octet at least.
+            for (0..it.reader.bytes.len + it.packed_reader.bytes.len + 1) |_| {
+                const value = try next_read(T, element_kind, it) orelse return null;
+                if (!decode.unknown_to_closed(element_kind, T, value)) return value;
+            }
+            unreachable;
         }
     };
+}
+
+fn next_read(comptime T: type, comptime element_kind: Kind, it: anytype) wire.Error!?T {
+    if (!it.packed_reader.at_end()) return try read_scalar(T, element_kind, &it.packed_reader);
+    return next_in_view(T, element_kind, it);
 }
 
 fn next_item(comptime T: type, it: anytype) ?T {
@@ -111,7 +121,11 @@ fn element(comptime T: type, comptime element_kind: Kind, it: anytype, tag: wire
     // "Message Structure": a known field with another wire type is malformed.
     if (tag.wire_type != element_kind.wire_type()) return error.WireTypeMismatch;
     if (comptime element_kind.holds_message()) {
-        return try decode.decode_shallow(T, try decode.message_payload(element_kind, tag, &it.reader, constants.limits.depth_max));
+        const payload = try decode.message_payload(element_kind, tag, &it.reader, constants.limits.depth_max);
+        // A map entry whose value its closed enum does not name goes with the unknown fields,
+        // whole, as Go's runtime keeps it (editions, "enum_type").
+        if (try entry_value_unknown(T, payload)) return null;
+        return try decode.decode_shallow(T, payload);
     }
     return try read_scalar(T, element_kind, &it.reader);
 }
@@ -119,6 +133,37 @@ fn element(comptime T: type, comptime element_kind: Kind, it: anytype, tag: wire
 fn read_scalar(comptime T: type, comptime element_kind: Kind, reader: *wire.Reader) wire.Error!T {
     if (comptime element_kind.holds_message()) unreachable;
     return scalar.read(element_kind, T, reader);
+}
+
+/// Whether a repeated field's elements are numbers of a closed enum, or map entries whose values
+/// are: the elements a decoded view holds and its iterator passes over.
+pub fn holds_closed(comptime F: type) bool {
+    if (F.kind == .@"enum") return F.Element.protobuf.closed;
+    if (!F.kind.holds_message() or !F.Element.protobuf.map_entry) return false;
+    const V = @FieldType(F.Element, "value");
+    return @typeInfo(V) == .@"enum" and @hasDecl(V, "protobuf") and V.protobuf.closed;
+}
+
+/// Whether `payload` is a map entry whose last value is a number its closed enum does not name.
+pub fn entry_value_unknown(comptime Entry: type, payload: []const u8) wire.Error!bool {
+    if (comptime !Entry.protobuf.map_entry) return false;
+    const V = @FieldType(Entry, "value");
+    if (comptime @typeInfo(V) != .@"enum" or !@hasDecl(V, "protobuf")) return false;
+    if (comptime !V.protobuf.closed) return false;
+    const number = comptime @intFromEnum(Entry.FieldNumber.value);
+    var reader: wire.Reader = .{ .bytes = payload };
+    var unknown = false;
+    // Each record takes at least one byte. The last value wins ("Last One Wins").
+    for (0..payload.len + 1) |_| {
+        if (reader.at_end()) return unknown;
+        const tag = try reader.tag();
+        if (tag.number != number or tag.wire_type != .varint) {
+            try reader.skip(tag, constants.limits.depth_max);
+            continue;
+        }
+        unknown = decode.unknown_to_closed(.@"enum", V, try scalar.read(.@"enum", V, &reader));
+    }
+    unreachable;
 }
 
 /// Whether `T` is a type `Repeated` returned.

@@ -25,6 +25,10 @@ pub const protocol = struct {
 
 /// The bounds this module chose.
 pub const limits = struct {
+    /// The shortest string stdx's vector UTF-8 check takes. Below it the standard library's
+    /// octet-at-a-time check is faster: on x86-64 with AVX2, 7 ns against 13 to 25 ns for 8 bytes,
+    /// even at 26 bytes, and 4 to 20 times slower from 248 bytes up (`zig build bench`, 2026-11-05).
+    pub const utf8_vector_len_min = 32;
     /// The deepest nesting of messages and groups `decode` follows. The reference implementations
     /// use 100 as their default recursion limit, and the conformance suite expects it.
     pub const depth_max = 100;

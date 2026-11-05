@@ -48,11 +48,15 @@ pub const Type = enum(i32) {
 /// choice, and 0 is unknown; a field with none set inherits its parent's.
 pub const FeatureSet = struct {
     field_presence: ?i32 = null,
+    enum_type: ?i32 = null,
     repeated_field_encoding: ?i32 = null,
+    utf8_validation: ?i32 = null,
     message_encoding: ?i32 = null,
-    pub const FieldNumber = enum(u29) { field_presence = 1, repeated_field_encoding = 3, message_encoding = 5 };
+    pub const FieldNumber = enum(u29) { field_presence = 1, enum_type = 2, repeated_field_encoding = 3, utf8_validation = 4, message_encoding = 5 };
     pub const protobuf: Descriptor = .{ .full_name = "google.protobuf.FeatureSet", .fields = &.{
-        field_of(FieldNumber.field_presence, .int32, .{}), field_of(FieldNumber.repeated_field_encoding, .int32, .{}), field_of(FieldNumber.message_encoding, .int32, .{}),
+        field_of(FieldNumber.field_presence, .int32, .{}),          field_of(FieldNumber.enum_type, .int32, .{}),
+        field_of(FieldNumber.repeated_field_encoding, .int32, .{}), field_of(FieldNumber.utf8_validation, .int32, .{}),
+        field_of(FieldNumber.message_encoding, .int32, .{}),
     } };
 };
 
@@ -63,6 +67,12 @@ pub const presence_legacy_required = 3;
 /// FeatureSet.RepeatedFieldEncoding's values.
 pub const encoding_packed = 1;
 pub const encoding_expanded = 2;
+/// FeatureSet.EnumType's values.
+pub const enum_open = 1;
+pub const enum_closed = 2;
+/// FeatureSet.Utf8Validation's values.
+pub const utf8_verify = 2;
+pub const utf8_none = 3;
 /// FeatureSet.MessageEncoding's values.
 pub const message_length_prefixed = 1;
 pub const message_delimited = 2;
@@ -124,12 +134,19 @@ pub const EnumValueDescriptorProto = struct {
     } };
 };
 
+pub const EnumOptions = struct {
+    features: ?FeatureSet = null,
+    pub const FieldNumber = enum(u29) { features = 7 };
+    pub const protobuf: Descriptor = .{ .full_name = "google.protobuf.EnumOptions", .fields = &.{field_of(FieldNumber.features, .message, .{})} };
+};
+
 pub const EnumDescriptorProto = struct {
     name: ?[]const u8 = null,
     value: Repeated(EnumValueDescriptorProto, .message) = .{},
-    pub const FieldNumber = enum(u29) { name = 1, value = 2 };
+    options: ?EnumOptions = null,
+    pub const FieldNumber = enum(u29) { name = 1, value = 2, options = 3 };
     pub const protobuf: Descriptor = .{ .full_name = "google.protobuf.EnumDescriptorProto", .fields = &.{
-        field_of(FieldNumber.name, .string, .{}), field_of(FieldNumber.value, .message, .{}),
+        field_of(FieldNumber.name, .string, .{}), field_of(FieldNumber.value, .message, .{}), field_of(FieldNumber.options, .message, .{}),
     } };
 };
 

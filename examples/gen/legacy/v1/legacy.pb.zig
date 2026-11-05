@@ -13,6 +13,15 @@ pub const Everything = struct {
     item: proto.Repeated(Everything.Item, .group) = .{},
     child: proto.Lazy(Everything) = .{},
     counts: proto.Repeated(Everything.CountsEntry, .message) = .{},
+    size: ?Size = null,
+    sizes: proto.Repeated(Size, .@"enum") = .{},
+    packed_sizes: proto.Repeated(Size, .@"enum") = .{},
+    sizes_by_name: proto.Repeated(Everything.SizesByNameEntry, .message) = .{},
+    pick: ?union(enum) {
+        picked_size: Size,
+        picked_label: []const u8,
+    } = null,
+    labels: proto.Repeated([]const u8, .unvalidated_string) = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -25,13 +34,20 @@ pub const Everything = struct {
         item = 9,
         child = 11,
         counts = 12,
+        size = 13,
+        sizes = 14,
+        packed_sizes = 15,
+        sizes_by_name = 16,
+        picked_size = 17,
+        picked_label = 18,
+        labels = 19,
     };
 
     pub const protobuf: proto.Descriptor = .{
         .full_name = "legacy.v1.Everything",
         .fields = &.{
             .{ .name = "count", .number = @intFromEnum(@This().FieldNumber.count), .kind = .int32, .json_name = "count", .proto_name = "count" },
-            .{ .name = "label", .number = @intFromEnum(@This().FieldNumber.label), .kind = .string, .json_name = "label", .proto_name = "label" },
+            .{ .name = "label", .number = @intFromEnum(@This().FieldNumber.label), .kind = .unvalidated_string, .json_name = "label", .proto_name = "label" },
             .{ .name = "id", .number = @intFromEnum(@This().FieldNumber.id), .kind = .int64, .json_name = "id", .proto_name = "id" },
             .{ .name = "unpacked", .number = @intFromEnum(@This().FieldNumber.unpacked), .kind = .int32, .json_name = "unpacked", .proto_name = "unpacked", .@"packed" = false },
             .{ .name = "packed", .number = @intFromEnum(@This().FieldNumber.@"packed"), .kind = .int32, .json_name = "packed", .proto_name = "packed" },
@@ -39,6 +55,13 @@ pub const Everything = struct {
             .{ .name = "item", .number = @intFromEnum(@This().FieldNumber.item), .kind = .group, .json_name = "item", .proto_name = "item" },
             .{ .name = "child", .number = @intFromEnum(@This().FieldNumber.child), .kind = .message, .json_name = "child", .proto_name = "child" },
             .{ .name = "counts", .number = @intFromEnum(@This().FieldNumber.counts), .kind = .message, .json_name = "counts", .proto_name = "counts" },
+            .{ .name = "size", .number = @intFromEnum(@This().FieldNumber.size), .kind = .@"enum", .json_name = "size", .proto_name = "size" },
+            .{ .name = "sizes", .number = @intFromEnum(@This().FieldNumber.sizes), .kind = .@"enum", .json_name = "sizes", .proto_name = "sizes", .@"packed" = false },
+            .{ .name = "packed_sizes", .number = @intFromEnum(@This().FieldNumber.packed_sizes), .kind = .@"enum", .json_name = "packedSizes", .proto_name = "packed_sizes" },
+            .{ .name = "sizes_by_name", .number = @intFromEnum(@This().FieldNumber.sizes_by_name), .kind = .message, .json_name = "sizesByName", .proto_name = "sizes_by_name" },
+            .{ .name = "picked_size", .number = @intFromEnum(@This().FieldNumber.picked_size), .kind = .@"enum", .json_name = "pickedSize", .proto_name = "picked_size", .oneof = "pick" },
+            .{ .name = "picked_label", .number = @intFromEnum(@This().FieldNumber.picked_label), .kind = .unvalidated_string, .json_name = "pickedLabel", .proto_name = "picked_label", .oneof = "pick" },
+            .{ .name = "labels", .number = @intFromEnum(@This().FieldNumber.labels), .kind = .unvalidated_string, .json_name = "labels", .proto_name = "labels" },
         },
     };
 
@@ -56,7 +79,7 @@ pub const Everything = struct {
             .full_name = "legacy.v1.Everything.Inner",
             .fields = &.{
                 .{ .name = "a", .number = @intFromEnum(@This().FieldNumber.a), .kind = .int32, .json_name = "a", .proto_name = "a" },
-                .{ .name = "b", .number = @intFromEnum(@This().FieldNumber.b), .kind = .string, .json_name = "b", .proto_name = "b" },
+                .{ .name = "b", .number = @intFromEnum(@This().FieldNumber.b), .kind = .unvalidated_string, .json_name = "b", .proto_name = "b" },
             },
         };
     };
@@ -90,9 +113,41 @@ pub const Everything = struct {
             .full_name = "legacy.v1.Everything.CountsEntry",
             .map_entry = true,
             .fields = &.{
-                .{ .name = "key", .number = @intFromEnum(@This().FieldNumber.key), .kind = .string, .json_name = "key", .proto_name = "key" },
+                .{ .name = "key", .number = @intFromEnum(@This().FieldNumber.key), .kind = .unvalidated_string, .json_name = "key", .proto_name = "key" },
                 .{ .name = "value", .number = @intFromEnum(@This().FieldNumber.value), .kind = .int32, .json_name = "value", .proto_name = "value" },
             },
         };
     };
+
+    pub const SizesByNameEntry = struct {
+        key: []const u8 = "",
+        value: Size = @enumFromInt(0),
+
+        pub const FieldNumber = enum(u29) {
+            key = 1,
+            value = 2,
+        };
+
+        pub const protobuf: proto.Descriptor = .{
+            .full_name = "legacy.v1.Everything.SizesByNameEntry",
+            .map_entry = true,
+            .fields = &.{
+                .{ .name = "key", .number = @intFromEnum(@This().FieldNumber.key), .kind = .unvalidated_string, .json_name = "key", .proto_name = "key" },
+                .{ .name = "value", .number = @intFromEnum(@This().FieldNumber.value), .kind = .@"enum", .json_name = "value", .proto_name = "value" },
+            },
+        };
+    };
+};
+
+pub const Size = enum(i32) {
+    size_unspecified = 0,
+    small = 1,
+    large = 2,
+    _,
+
+    pub const protobuf: proto.EnumDescriptor = .{ .full_name = "legacy.v1.Size", .closed = true, .values = &.{
+        .{ .name = "SIZE_UNSPECIFIED", .number = @intFromEnum(@This().size_unspecified) },
+        .{ .name = "SMALL", .number = @intFromEnum(@This().small) },
+        .{ .name = "LARGE", .number = @intFromEnum(@This().large) },
+    } };
 };

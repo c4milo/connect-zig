@@ -3,7 +3,8 @@
 //!
 //! Merge semantics follow "Last One Wins" in the encoding guide: a scalar that repeats keeps its
 //! last value, a singular message that repeats merges, and a oneof keeps the member read last.
-//! Unknown fields, groups included, are skipped and dropped (docs/decisions.md entry 5).
+//! A message that keeps unknown fields keeps them as one span of the input (decision 24). A
+//! number a closed enum does not name joins them, and its field stays as it was.
 const std = @import("std");
 const assert = std.debug.assert;
 const wire = @import("wire.zig");
@@ -52,43 +53,57 @@ pub fn merge_depth(comptime T: type, message: *T, bytes: []const u8, depth_left:
         if (reader.at_end()) return;
         const field_start = reader.position;
         const tag = try reader.tag();
-        const known = try read_known(T, message, field_start, bytes, tag, &reader, depth_left, mode);
-        if (!known) {
-            try reader.skip(tag, depth_left);
-            if (comptime descriptor.keeps_unknown(T)) try keep_unknown(&@field(message, descriptor.unknown_field), bytes, field_start, reader.position);
-        }
+        const read = try read_known(T, message, field_start, bytes, tag, &reader, depth_left, mode);
+        if (read == .field) continue;
+        if (read == .absent) try reader.skip(tag, depth_left);
+        if (comptime descriptor.keeps_unknown(T)) try keep_unknown(&@field(message, descriptor.unknown_field), bytes, field_start, reader.position);
     }
     unreachable;
 }
 
+/// What became of a record: its field took it, its value is unknown to the field's closed enum, or
+/// the message has no field of its number.
+const Read = enum { field, unknown_value, absent };
+
 /// `field_start` is where the field's tag starts in `bytes`, where a repeated field's view
 /// starts, so the view holds the field's records and not the whole message.
-fn read_known(comptime T: type, message: *T, field_start: usize, bytes: []const u8, tag: wire.Tag, reader: *wire.Reader, depth_left: u32, comptime mode: Mode) Error!bool {
+fn read_known(comptime T: type, message: *T, field_start: usize, bytes: []const u8, tag: wire.Tag, reader: *wire.Reader, depth_left: u32, comptime mode: Mode) Error!Read {
     inline for (T.protobuf.fields) |field| {
-        if (tag.number == field.number) {
-            try read_field(T, field, message, field_start, bytes, tag, reader, depth_left, mode);
-            return true;
-        }
+        if (tag.number == field.number) return read_field(T, field, message, field_start, bytes, tag, reader, depth_left, mode);
     }
-    return false;
+    return .absent;
 }
 
-fn read_field(comptime T: type, comptime field: Field, message: *T, field_start: usize, bytes: []const u8, tag: wire.Tag, reader: *wire.Reader, depth_left: u32, comptime mode: Mode) Error!void {
+/// Whether `value` is a number its closed enum does not name, which a parser keeps with the
+/// unknown fields (editions, "enum_type").
+pub fn unknown_to_closed(comptime kind: Kind, comptime V: type, value: V) bool {
+    if (comptime kind != .@"enum") return false;
+    if (comptime !V.protobuf.closed) return false;
+    return !V.protobuf.names(@intFromEnum(value));
+}
+
+fn read_field(comptime T: type, comptime field: Field, message: *T, field_start: usize, bytes: []const u8, tag: wire.Tag, reader: *wire.Reader, depth_left: u32, comptime mode: Mode) Error!Read {
     if (field.oneof) |oneof| return read_oneof(T, field, oneof, message, tag, reader, depth_left, mode);
     const F = @FieldType(T, field.name);
     const slot = &@field(message, field.name);
-    if (comptime repeated.is_repeated(F)) return read_repeated(F, slot, field_start, bytes, field.number, tag, reader, depth_left, mode);
-    if (comptime repeated.is_lazy(F)) return read_lazy(F, field.kind, slot, tag, reader, depth_left, mode);
-    if (comptime field.kind.holds_message()) {
+    if (comptime repeated.is_repeated(F)) {
+        try read_repeated(F, slot, field_start, bytes, field.number, tag, reader, depth_left, mode);
+    } else if (comptime repeated.is_lazy(F)) {
+        try read_lazy(F, field.kind, slot, tag, reader, depth_left, mode);
+    } else if (comptime field.kind.holds_message()) {
         const Child = @typeInfo(F).optional.child;
         if (slot.* == null) slot.* = .{};
-        return read_message(Child, field.kind, &slot.*.?, tag, reader, depth_left, mode);
+        try read_message(Child, field.kind, &slot.*.?, tag, reader, depth_left, mode);
+    } else {
+        const V = switch (@typeInfo(F)) {
+            .optional => |optional| optional.child,
+            else => F,
+        };
+        const value = try read_value(field.kind, V, tag, reader);
+        if (unknown_to_closed(field.kind, V, value)) return .unknown_value;
+        slot.* = value;
     }
-    const V = switch (@typeInfo(F)) {
-        .optional => |optional| optional.child,
-        else => F,
-    };
-    slot.* = try read_value(field.kind, V, tag, reader);
+    return .field;
 }
 
 fn read_value(comptime kind: Kind, comptime V: type, tag: wire.Tag, reader: *wire.Reader) Error!V {
@@ -172,22 +187,26 @@ fn check_packed(comptime F: type, payload: []const u8) Error!void {
     unreachable;
 }
 
-fn read_oneof(comptime T: type, comptime field: Field, comptime oneof: []const u8, message: *T, tag: wire.Tag, reader: *wire.Reader, depth_left: u32, comptime mode: Mode) Error!void {
+fn read_oneof(comptime T: type, comptime field: Field, comptime oneof: []const u8, message: *T, tag: wire.Tag, reader: *wire.Reader, depth_left: u32, comptime mode: Mode) Error!Read {
     const U = @typeInfo(@FieldType(T, oneof)).optional.child;
     const V = @FieldType(U, field.name);
     const slot = &@field(message, oneof);
     if (comptime !field.kind.holds_message()) {
-        slot.* = @unionInit(U, field.name, try read_value(field.kind, V, tag, reader));
-        return;
+        const value = try read_value(field.kind, V, tag, reader);
+        // A number the closed enum does not name leaves the oneof as it was.
+        if (unknown_to_closed(field.kind, V, value)) return .unknown_value;
+        slot.* = @unionInit(U, field.name, value);
+        return .field;
     }
     if (comptime repeated.is_lazy(V)) {
         var lazy: V = .{};
         try read_lazy(V, field.kind, &lazy, tag, reader, depth_left, mode);
         slot.* = @unionInit(U, field.name, lazy);
-        return;
+        return .field;
     }
     // "Oneof": a member that repeats merges when it is still the one set.
     const same = if (slot.*) |active| active == @field(std.meta.Tag(U), field.name) else false;
     if (!same) slot.* = @unionInit(U, field.name, .{});
     try read_message(V, field.kind, &@field(slot.*.?, field.name), tag, reader, depth_left, mode);
+    return .field;
 }

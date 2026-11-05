@@ -14,8 +14,11 @@
 # 6. for coverage, Zig reads Go's binary with an older schema, coverage.v1.Partial, and writes
 #    back the same message: each field Partial does not know passes through.
 #
+# Checks 7 and 8, at the end, take Python's upb as the reference for the binary cases.
+#
 # JSON texts are compared after jq sorts their keys, since a map's members have no order. It
-# needs buf on the path, or BUF naming it, and jq.
+# needs buf on the path, or BUF naming it, jq, and python3 with venv, which installs the pinned
+# protobuf of tools/upb_requirements.txt into a cache unless UPB_PYTHON names a Python that has it.
 set -eu
 cd "$(dirname "$0")/.."
 buf="${BUF:-buf}"
@@ -77,5 +80,50 @@ for case in examples/testdata/coverage/*.json examples/testdata/editions/*.json 
         }
     fi
 done
+
+# The binary cases hold what JSON cannot: numbers a closed enum does not name, and strings that
+# are not UTF-8 where a field's utf8_validation is NONE. Go keeps such numbers in their fields
+# (protobuf.dev, "Enum Behavior"), so upb, Python's runtime, is the reference here. For each:
+# 7. upb writes the same octets from Zig's binary as from the case;
+# 8. Zig's JSON equals upb's, or, where Go refuses to write JSON, Zig refuses too.
+python="${UPB_PYTHON:-}"
+if [ -z "${python}" ]; then
+    venv="${XDG_CACHE_HOME:-${HOME}/.cache}/connect-zig/upb-$(sha256sum tools/upb_requirements.txt | cut -c1-12)"
+    if [ ! -x "${venv}/bin/python" ]; then
+        python3 -m venv "${venv}"
+        "${venv}/bin/pip" install --quiet --disable-pip-version-check --require-hashes -r tools/upb_requirements.txt
+    fi
+    python="${venv}/bin/python"
+fi
+"${buf}" build examples/proto --as-file-descriptor-set -o "${work}/descriptors.binpb"
+upb() {
+    "${python}" -I tools/upb_reference.py "$@"
+}
+for case in examples/testdata/legacy/*.binpb examples/testdata/editions/*.binpb; do
+    set="$(basename "$(dirname "${case}")")"
+    name="${set}/$(basename "${case}" .binpb)"
+    type="${set}.v1.Everything"
+    "${converter}" "${set}" binary-to-binary <"${case}" >"${work}/${name}.zig.binpb"
+    if upb binary "${work}/descriptors.binpb" "${type}" "${case}" "${work}/${name}.zig.binpb"; then
+        echo "ok: ${name}: upb reads Zig's binary as the case"
+    else
+        echo "FAIL: ${name}: upb reads Zig's binary as another message" >&2
+        failures=$((failures + 1))
+    fi
+    if go_convert "${case}#format=binpb" "${work}/${name}.go.json#format=json" 2>/dev/null; then
+        "${converter}" "${set}" binary-to-json <"${case}" >"${work}/${name}.zig.json"
+        if upb json "${work}/descriptors.binpb" "${type}" "${case}" "${work}/${name}.zig.json"; then
+            echo "ok: ${name}: Zig's JSON equals upb's"
+        else
+            echo "FAIL: ${name}: Zig's JSON differs from upb's" >&2
+            failures=$((failures + 1))
+        fi
+    elif "${converter}" "${set}" binary-to-json <"${case}" >/dev/null 2>&1; then
+        echo "FAIL: ${name}: Zig wrote JSON that Go refuses to write" >&2
+        failures=$((failures + 1))
+    else
+        echo "ok: ${name}: Zig, as Go, refuses to write it as JSON"
+    fi
+done
 [ "${failures}" -eq 0 ] || exit 1
-echo "every coverage case matches Go"
+echo "every coverage case matches Go, and every binary case matches upb"

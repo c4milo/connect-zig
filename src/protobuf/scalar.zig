@@ -8,6 +8,8 @@ const assert = std.debug.assert;
 const wire = @import("wire.zig");
 const descriptor = @import("descriptor.zig");
 const constants = @import("constants.zig");
+const json = @import("json");
+const codec = @import("codec");
 const Kind = descriptor.Kind;
 
 /// Reads one value of `kind` as `V`. The caller checked the wire type.
@@ -33,6 +35,8 @@ pub fn read(comptime kind: Kind, comptime V: type, reader: *wire.Reader) wire.Er
         .double => @bitCast(try reader.fixed64()),
         .bytes => try reader.length_delimited(),
         .string => try read_string(reader),
+        // Editions, "utf8_validation": NONE leaves the octets unchecked.
+        .unvalidated_string => try reader.length_delimited(),
         .message, .group => unreachable,
     };
 }
@@ -40,8 +44,15 @@ pub fn read(comptime kind: Kind, comptime V: type, reader: *wire.Reader) wire.Er
 fn read_string(reader: *wire.Reader) wire.Error![]const u8 {
     const octets = try reader.length_delimited();
     // Language guide, "Scalar Value Types": a string must always contain UTF-8.
-    if (!std.unicode.utf8ValidateSlice(octets)) return error.InvalidUtf8;
+    if (!is_utf8(octets)) return error.InvalidUtf8;
     return octets;
+}
+
+/// Whether `octets` is UTF-8 (RFC 3629 §4): stdx's vector check for a long string, the standard
+/// library's for a short one, where the vector path costs more than it saves.
+pub fn is_utf8(octets: []const u8) bool {
+    if (octets.len < constants.limits.utf8_vector_len_min) return std.unicode.utf8ValidateSlice(octets);
+    return json.is_utf8(octets, codec.Features.target());
 }
 
 /// The integer a varint kind writes for `value`.
@@ -125,6 +136,24 @@ test "sint32 zigzags, and a string that is not UTF-8 is refused" {
     try testing.expectEqual(@as(i32, -2), try read(.sint32, i32, &wide));
     var bad: wire.Reader = .{ .bytes = &.{ 0x01, 0xff } };
     try testing.expectError(error.InvalidUtf8, read(.string, []const u8, &bad));
+}
+
+test "a string is checked as UTF-8 on both paths, short and long" {
+    const long_len = constants.limits.utf8_vector_len_min * 4;
+    var text: [long_len]u8 = @splat('a');
+    // "ñ" in the middle of a long string, and in a short one.
+    text[long_len / 2] = 0xc3;
+    text[long_len / 2 + 1] = 0xb1;
+    try testing.expect(is_utf8(&text));
+    try testing.expect(is_utf8(text[long_len / 2 - 1 ..][0..4]));
+    // A lone continuation octet fails both.
+    text[long_len / 2] = 0xb1;
+    try testing.expect(!is_utf8(&text));
+    try testing.expect(!is_utf8(text[long_len / 2 - 1 ..][0..4]));
+    // An overlong form, which UTF-8 forbids (RFC 3629 §3), fails the long path too.
+    text[long_len - 2] = 0xc0;
+    text[long_len - 1] = 0x80;
+    try testing.expect(!is_utf8(text[long_len - constants.limits.utf8_vector_len_min ..]));
 }
 
 test "defaults: +0.0 is default and -0.0 is not" {

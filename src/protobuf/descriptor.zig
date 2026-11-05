@@ -17,6 +17,10 @@ pub const Kind = enum {
     fixed32,
     bool,
     string,
+    /// A string whose field's `utf8_validation` feature is NONE, as every proto2 string's is: the
+    /// parser does not check it is UTF-8 (editions, "utf8_validation"). JSON, whose text is
+    /// UTF-8, still refuses one that is not.
+    unvalidated_string,
     message,
     bytes,
     uint32,
@@ -35,7 +39,7 @@ pub const Kind = enum {
             .int32, .int64, .uint32, .uint64, .sint32, .sint64, .bool, .@"enum" => .varint,
             .fixed64, .sfixed64, .double => .i64,
             .fixed32, .sfixed32, .float => .i32,
-            .string, .bytes, .message => .len,
+            .string, .unvalidated_string, .bytes, .message => .len,
             .group => .start_group,
         };
     }
@@ -43,6 +47,11 @@ pub const Kind = enum {
     /// Whether a value of this kind is a message, written with a length or between group tags.
     pub fn holds_message(kind: Kind) bool {
         return kind == .message or kind == .group;
+    }
+
+    /// Whether a value of this kind is text: a string, checked or not.
+    pub fn is_string(kind: Kind) bool {
+        return kind == .string or kind == .unvalidated_string;
     }
 
     /// Whether a repeated field of this kind may be packed: every scalar numeric kind
@@ -111,6 +120,10 @@ pub const EnumValue = struct {
 pub const EnumDescriptor = struct {
     full_name: []const u8,
     values: []const EnumValue,
+    /// Whether the enum is closed: its `enum_type` feature is CLOSED, as a proto2 enum's is. A
+    /// parser keeps a number a closed enum does not name with the unknown fields, not in the
+    /// field (editions, "enum_type"; language guide, "Enum Default Value").
+    closed: bool = false,
 
     /// The first name of `number`, or null for a number the enum does not name.
     pub fn name_of(comptime descriptor: EnumDescriptor, number: i32) ?[]const u8 {
@@ -118,6 +131,11 @@ pub const EnumDescriptor = struct {
             if (value.number == number) return value.name;
         }
         return null;
+    }
+
+    /// Whether `number` is one the enum names.
+    pub fn names(comptime descriptor: EnumDescriptor, number: i32) bool {
+        return descriptor.name_of(number) != null;
     }
 
     pub fn number_of(comptime descriptor: EnumDescriptor, name: []const u8) ?i32 {

@@ -39,6 +39,9 @@ pub const Record = struct {
         pick_note: Note,
     } = null,
     child: proto.Lazy(Record) = .{},
+    tone: ?Tone = null,
+    tones: proto.Repeated(Tone, .@"enum") = .{},
+    raw: ?[]const u8 = null,
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -56,6 +59,9 @@ pub const Record = struct {
         pick_number = 12,
         pick_note = 13,
         child = 14,
+        tone = 15,
+        tones = 16,
+        raw = 17,
     };
 
     pub const protobuf: proto.Descriptor = .{
@@ -75,6 +81,9 @@ pub const Record = struct {
             .{ .name = "pick_number", .number = @intFromEnum(@This().FieldNumber.pick_number), .kind = .int32, .json_name = "pickNumber", .proto_name = "pick_number", .oneof = "choice" },
             .{ .name = "pick_note", .number = @intFromEnum(@This().FieldNumber.pick_note), .kind = .group, .json_name = "pickNote", .proto_name = "pick_note", .oneof = "choice" },
             .{ .name = "child", .number = @intFromEnum(@This().FieldNumber.child), .kind = .group, .json_name = "child", .proto_name = "child" },
+            .{ .name = "tone", .number = @intFromEnum(@This().FieldNumber.tone), .kind = .@"enum", .json_name = "tone", .proto_name = "tone" },
+            .{ .name = "tones", .number = @intFromEnum(@This().FieldNumber.tones), .kind = .@"enum", .json_name = "tones", .proto_name = "tones", .@"packed" = false },
+            .{ .name = "raw", .number = @intFromEnum(@This().FieldNumber.raw), .kind = .unvalidated_string, .json_name = "raw", .proto_name = "raw" },
         },
     };
 
@@ -171,5 +180,18 @@ pub const Shade = enum(i32) {
         .{ .name = "SHADE_UNSPECIFIED", .number = @intFromEnum(@This().shade_unspecified) },
         .{ .name = "SHADE_LIGHT", .number = @intFromEnum(@This().shade_light) },
         .{ .name = "SHADE_DARK", .number = @intFromEnum(@This().shade_dark) },
+    } };
+};
+
+pub const Tone = enum(i32) {
+    tone_unspecified = 0,
+    tone_warm = 1,
+    tone_cool = 2,
+    _,
+
+    pub const protobuf: proto.EnumDescriptor = .{ .full_name = "editions.v1.Tone", .closed = true, .values = &.{
+        .{ .name = "TONE_UNSPECIFIED", .number = @intFromEnum(@This().tone_unspecified) },
+        .{ .name = "TONE_WARM", .number = @intFromEnum(@This().tone_warm) },
+        .{ .name = "TONE_COOL", .number = @intFromEnum(@This().tone_cool) },
     } };
 };

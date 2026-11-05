@@ -187,7 +187,7 @@ pub fn patch(writer: *wire.Writer, at: usize) void {
 fn write_key(comptime field: Field, comptime K: type, writer: *wire.Writer, key: []const u8) Error!void {
     try writer.tag(field.number, field.kind.wire_type());
     switch (field.kind) {
-        .string => try scalar.write(.string, []const u8, key, writer),
+        .string, .unvalidated_string => try scalar.write(field.kind, []const u8, key, writer),
         // "JSON Mapping": a bool key is the string "true" or "false".
         .bool => try scalar.write(.bool, bool, try parse_bool_key(key), writer),
         else => try scalar.write(field.kind, K, try json_scalar.parse_integer(K, key), writer),
@@ -217,7 +217,7 @@ fn write_single(comptime field: Field, comptime V: type, transcoder: *Transcoder
     }
     try writer.tag(field.number, field.kind.wire_type());
     switch (comptime field.kind) {
-        .string => try scalar.write(.string, []const u8, try string_of(value), writer),
+        .string, .unvalidated_string => try scalar.write(field.kind, []const u8, try string_of(value), writer),
         .bytes => try json_scalar.write_base64_field(try string_of(value), writer),
         .bool => try scalar.write(.bool, bool, try bool_of(value), writer),
         .float, .double => try scalar.write(field.kind, V, try float_of(V, value), writer),
@@ -259,10 +259,19 @@ fn float_of(comptime V: type, value: json.Item) Error!V {
 fn enum_of(comptime V: type, value: json.Item) Error!V {
     return switch (value) {
         .string => |name| @enumFromInt(V.protobuf.number_of(name) orelse return error.InvalidEnum),
-        .number => |octets| @enumFromInt(try json_scalar.parse_integer(i32, octets)),
+        .number => |octets| try number_of_enum(V, try json_scalar.parse_integer(i32, octets)),
         .null => @enumFromInt(0),
         else => error.UnexpectedToken,
     };
+}
+
+/// An enum's value from its number. A closed enum takes only the numbers it names, as Go's protojson
+/// takes them: its field has no room for another (editions, "enum_type").
+fn number_of_enum(comptime V: type, number: i32) Error!V {
+    if (comptime V.protobuf.closed) {
+        if (!V.protobuf.names(number)) return error.InvalidEnum;
+    }
+    return @enumFromInt(number);
 }
 
 fn write_time(transcoder: *Transcoder, value: json.Item, comptime parse: anytype) Error!void {

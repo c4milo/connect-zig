@@ -101,7 +101,9 @@ confirm a test fails. Report `CAUGHT` or `NOT CAUGHT` per mutation in the commit
   `tools/bench_check.sh` runs the Go benchmark in `bench/go` beside it and checks both write the
   same bytes. `tools/ci.sh` runs `zig build bench -- --quick`.
 - Coverage: `tools/coverage_check.sh` compares every protobuf type with Go's runtime through
-  `buf convert`, over the cases in `examples/testdata/coverage`. It needs buf and jq.
+  `buf convert`, over the JSON cases in `examples/testdata/`, and the binary cases with upb's,
+  Python's protobuf pinned in `tools/upb_requirements.txt`, for closed enums and unchecked
+  strings. It needs buf, jq and python3 with venv.
 - Conformance: `tools/conformance_check.sh` runs connectrpc's conformance runner v1.0.4 against
   `zig build conformance-server`, with the features of `conformance/config.yaml`. It downloads
   the runner pinned by SHA-256, unless `CONNECTCONFORMANCE` names one. A case that fails on

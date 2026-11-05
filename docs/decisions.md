@@ -156,10 +156,15 @@ first. Cite an entry by number in code and commits ("decision 6").
     which makes a singular field a `?T`; repeated encoding, packed or expanded; and message
     encoding, where DELIMITED makes a message field a `.group`, written between start and end
     tags as a proto2 group is. A map entry's fields never have presence. LEGACY_REQUIRED reads
-    as explicit, since the runtime checks no required field. A closed enum keeps an unknown
-    number as a value of its non-exhaustive enum, and `utf8_validation = NONE` is still checked:
-    both are stricter than the spec asks, never looser. Beaten: refusing edition files, which
-    buf generates by default for new modules.
+    as explicit, since the runtime checks no required field. Beaten: refusing edition files, which
+    buf generates by default for new modules. Amended on 2026-11-05: the plugin resolves
+    `enum_type` and `utf8_validation` too, as protobuf.dev's editions overview defines them. A
+    closed enum's descriptor says `closed`, and a number it does not name goes to the unknown
+    fields: a singular or oneof field stays as it was, a repeated field's iterator passes over it,
+    a map passes over the whole entry, and `encode` writes each back. A string field with NONE has
+    the kind `.unvalidated_string`, which no parser checks and JSON still refuses when it is not
+    UTF-8. upb is the reference for both, through `tools/coverage_check.sh`, since Go treats closed
+    enums as open. `json_format` changes nothing: JSON is strict for every file.
 
 24. **A generated message keeps the fields it does not know.** Its struct ends with
     `_unknown: proto.Unknown`, the span of the input from its first unknown record to its last.

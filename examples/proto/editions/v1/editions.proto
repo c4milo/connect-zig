@@ -12,6 +12,14 @@ enum Shade {
   SHADE_DARK = 2;
 }
 
+// Closed, as a proto2 enum is: a number it does not name goes to the unknown fields.
+enum Tone {
+  option features.enum_type = CLOSED;
+  TONE_UNSPECIFIED = 0;
+  TONE_WARM = 1;
+  TONE_COOL = 2;
+}
+
 message Note {
   int32 a = 1;
   string b = 2;
@@ -36,6 +44,10 @@ message Record {
     Note pick_note = 13 [features.message_encoding = DELIMITED];
   }
   Record child = 14 [features.message_encoding = DELIMITED];
+  Tone tone = 15;
+  repeated Tone tones = 16;
+  // No parser checks these octets are UTF-8.
+  string raw = 17 [features.utf8_validation = NONE];
 }
 
 // A message's fields delimited one by one, beside a map, whose entries keep their lengths.

@@ -67,7 +67,10 @@ pub fn write(comptime kind: Kind, comptime V: type, value: V, text: *json.TextWr
         .int64, .sint64, .sfixed64, .uint64, .fixed64 => try write_integer_string(value, text),
         .bool => try text.boolean(value),
         .float, .double => try write_float(V, value, text),
-        .string => try text.string(value),
+        // stdx's writer refuses a string that is not UTF-8, which a parser left unchecked where
+        // utf8_validation is NONE: JSON text is UTF-8 (RFC 8259 §8.1), and Go's protojson refuses
+        // it too.
+        .string, .unvalidated_string => try text.string(value),
         .bytes => try write_base64(value, text),
         .@"enum" => try write_enum(V, value, text),
         .message, .group => unreachable,
@@ -121,7 +124,7 @@ pub fn write_base64(octets: []const u8, text: *json.TextWriter) EncodeError!void
 pub fn write_key(comptime kind: Kind, comptime V: type, key: V, text: *json.TextWriter) EncodeError!void {
     var buffer: [integer_text_len_max]u8 = undefined;
     const name = switch (kind) {
-        .string => key,
+        .string, .unvalidated_string => key,
         .bool => if (key) "true" else "false",
         else => std.fmt.bufPrint(&buffer, "{d}", .{key}) catch unreachable,
     };

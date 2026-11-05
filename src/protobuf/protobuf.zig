@@ -149,4 +149,5 @@ test {
     _ = @import("protobuf_json_wkt_test.zig");
     _ = @import("protobuf_group_test.zig");
     _ = @import("protobuf_unknown_test.zig");
+    _ = @import("protobuf_closed_test.zig");
 }
