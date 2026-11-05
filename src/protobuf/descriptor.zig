@@ -64,6 +64,9 @@ pub const Field = struct {
 pub const Descriptor = struct {
     full_name: []const u8,
     fields: []const Field,
+    /// Whether the message is a map field's entry, whose JSON form is a member of an object
+    /// ("Maps", language guide).
+    map_entry: bool = false,
 };
 
 pub const EnumValue = struct {

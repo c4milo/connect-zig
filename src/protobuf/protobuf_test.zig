@@ -40,7 +40,7 @@ pub const Node = struct {
 pub const Entry = struct {
     key: []const u8 = "",
     value: i32 = 0,
-    pub const protobuf: proto.Descriptor = .{ .full_name = "test.All.CountsEntry", .fields = &.{
+    pub const protobuf: proto.Descriptor = .{ .full_name = "test.All.CountsEntry", .map_entry = true, .fields = &.{
         .{ .name = "key", .number = 1, .kind = .string, .json_name = "key", .proto_name = "key" },
         .{ .name = "value", .number = 2, .kind = .int32, .json_name = "value", .proto_name = "value" },
     } };

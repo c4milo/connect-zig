@@ -6,6 +6,8 @@
 //! nothing: strings, bytes and repeated fields point into the input, which must outlive the
 //! message. The caller owns every buffer.
 const std = @import("std");
+const json = @import("json");
+const codec = @import("codec");
 
 pub const constants = @import("constants.zig");
 
@@ -16,6 +18,11 @@ const files = struct {
     pub const repeated = @import("repeated.zig");
     pub const decode = @import("decode.zig");
     pub const encode = @import("encode.zig");
+    pub const json_scalar = @import("json_scalar.zig");
+    pub const json_encode = @import("json_encode.zig");
+    pub const json_decode = @import("json_decode.zig");
+    pub const time_text = @import("time_text.zig");
+    pub const wkt = @import("wkt.zig");
 };
 
 /// A field's type in the .proto file.
@@ -59,18 +66,58 @@ pub fn encode(comptime T: type, message: *const T, buffer: []u8) EncodeError![]u
     return writer.written();
 }
 
+/// What `encode_json` fails with.
+pub const JsonEncodeError = files.json_scalar.EncodeError;
+/// What `decode_json` refuses a text with, or fails with for want of room.
+pub const JsonDecodeError = files.json_scalar.DecodeError;
+
+/// Writes `message` as one proto3 JSON text into `buffer`, and returns the text.
+pub fn encode_json(comptime T: type, message: *const T, buffer: []u8) JsonEncodeError![]const u8 {
+    var text = json.TextWriter.init(buffer, .text, codec.Features.target());
+    try files.json_encode.write_message(T, message, &text);
+    return text.written();
+}
+
+/// Reads the proto3 JSON text `text` as a `T` (decision 9). It writes the binary encoding into
+/// `binary`, and the message's strings and bytes point into it. `tokens` holds one token's octets
+/// at a time, so a string as long as the longest one in the text fits.
+pub fn decode_json(comptime T: type, text: []const u8, binary: []u8, tokens: []u8) JsonDecodeError!T {
+    const bytes = try files.json_decode.transcode(T, text, binary, tokens);
+    return decode(T, bytes);
+}
+
+/// The well-known types with their own JSON form (design §5).
+pub const wkt = struct {
+    pub const Timestamp = files.wkt.Timestamp;
+    pub const Duration = files.wkt.Duration;
+    pub const Empty = files.wkt.Empty;
+    pub const FieldMask = files.wkt.FieldMask;
+    pub const Any = files.wkt.Any;
+    pub const DoubleValue = files.wkt.DoubleValue;
+    pub const FloatValue = files.wkt.FloatValue;
+    pub const Int64Value = files.wkt.Int64Value;
+    pub const UInt64Value = files.wkt.UInt64Value;
+    pub const Int32Value = files.wkt.Int32Value;
+    pub const UInt32Value = files.wkt.UInt32Value;
+    pub const BoolValue = files.wkt.BoolValue;
+    pub const StringValue = files.wkt.StringValue;
+    pub const BytesValue = files.wkt.BytesValue;
+};
+
 /// The value of the last entry of a map field whose key is `key` ("Maps": the last key wins).
 pub const map_get = files.repeated.map_get;
 
 test "the root exports the names a program calls" {
     try @import("public_names").expect(@This(), &.{
-        "constants", "Kind",        "Field",  "Descriptor", "EnumValue",   "EnumDescriptor",
-        "View",      "Repeated",    "Lazy",   "Error",      "EncodeError", "decode",
-        "merge",     "encoded_len", "encode", "map_get",
+        "constants",   "Kind",        "Field",  "Descriptor", "EnumValue",       "EnumDescriptor",
+        "View",        "Repeated",    "Lazy",   "Error",      "EncodeError",     "decode",
+        "merge",       "encoded_len", "encode", "map_get",    "JsonEncodeError", "JsonDecodeError",
+        "encode_json", "decode_json", "wkt",
     });
 }
 
 test {
     std.testing.refAllDecls(files);
     _ = @import("protobuf_test.zig");
+    _ = @import("protobuf_json_test.zig");
 }
