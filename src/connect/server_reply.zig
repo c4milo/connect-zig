@@ -48,11 +48,7 @@ pub const Head = struct {
 
 pub const Error = message_codec.EncodeError || error{ WriteFailed, TooManyDetails };
 
-/// A message encoded, and compressed when that saves octets, ready for the body.
-pub const Prepared = struct {
-    octets: []const u8,
-    compressed: bool,
-};
+pub const Prepared = message_codec.Prepared;
 
 pub const Reply = struct {
     accepted: server_head.Accepted,
@@ -64,9 +60,7 @@ pub const Reply = struct {
     /// Encodes a message into the scratch storage, compressing it when the response coding is
     /// gzip and the message is long enough.
     pub fn prepare(reply: *Reply, comptime T: type, message: *const T) Error!Prepared {
-        const octets = try message_codec.encode(T, reply.accepted.speaks.codec, message, reply.scratch.message);
-        const result = message_codec.compress(reply.accepted.response_coding, reply.encoder, octets, reply.scratch.work);
-        return .{ .octets = result.octets, .compressed = result.compressed };
+        return message_codec.prepare(T, reply.accepted.speaks.codec, reply.accepted.response_coding, reply.encoder, message, reply.scratch);
     }
 
     /// The head of a response that carries messages. `compressed` says whether a unary
@@ -142,7 +136,11 @@ pub const Reply = struct {
             .grpc_web => {
                 const half = storage.len / constants.storage_halves;
                 const status = try trailers.write(failure, storage[0..half], out);
-                const frame = try trailers.write_web_frame(status, storage[half..]);
+                // gRPC-Web carries the call's own trailers in the same frame as its status
+                // (PROTOCOL-WEB.md, "Message framing").
+                if (metadata.len > out.len - status.len) return error.NoSpaceLeft;
+                @memcpy(out[status.len..][0..metadata.len], metadata);
+                const frame = try trailers.write_web_frame(out[0 .. status.len + metadata.len], storage[half..]);
                 try body.writeAll(frame);
                 return out[0..0];
             },
@@ -231,9 +229,11 @@ test "a Connect stream ends with an end-stream envelope, and gRPC-Web with a tra
     const web_reply = reply_for(.{ .protocol = .grpc_web, .codec = .proto, .enveloped = true }, &buffers);
     var web_out: [128]u8 = undefined;
     var web_body: std.Io.Writer = .fixed(&web_out);
-    _ = try web_reply.finish(null, &.{}, &web_body, &storage, &trailer_out);
+    const metadata = [_]Header{.{ .name = "x-turns", .value = "2" }};
+    _ = try web_reply.finish(null, &metadata, &web_body, &storage, &trailer_out);
     try testing.expectEqual(@as(u8, 0x80), web_body.buffered()[0]);
-    try testing.expectEqualStrings("grpc-status: 0\r\n", web_body.buffered()[5..]);
+    // The call's own trailers ride in the same frame as the status (PROTOCOL-WEB.md).
+    try testing.expectEqualStrings("grpc-status: 0\r\nx-turns: 2\r\n", web_body.buffered()[5..]);
 }
 
 test "a refusal with a protocol becomes a reply, and one without has none" {

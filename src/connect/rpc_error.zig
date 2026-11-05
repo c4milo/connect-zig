@@ -13,6 +13,14 @@ pub const Header = struct {
     value: []const u8,
 };
 
+/// The value of the first header named `name`, compared without case (RFC 9110 §5.1), or null.
+pub fn find_header(headers: []const Header, name: []const u8) ?[]const u8 {
+    for (headers) |header| {
+        if (std.ascii.eqlIgnoreCase(header.name, name)) return header.value;
+    }
+    return null;
+}
+
 pub const Detail = struct {
     /// The message's full name, "google.rpc.ErrorInfo", without Any's "type.googleapis.com/".
     type_name: []const u8,

@@ -8,6 +8,16 @@ const constants = @import("constants.zig");
 
 pub const Error = json.DecodeError || error{ Truncated, NoSpaceLeft, UnexpectedToken, DepthExceeded, InvalidBase64, TooManyDetails, TooManyMetadata };
 
+/// Decodes base64 into the start of `buffer`, with its padding or without: a decoder accepts
+/// both (Connect protocol, "Error End-Stream"; gRPC PROTOCOL-HTTP2.md, "-bin" headers).
+pub fn decode_base64(decoder: std.base64.Base64Decoder, text: []const u8, buffer: []u8) error{ InvalidBase64, NoSpaceLeft }![]u8 {
+    const trimmed = std.mem.trimEnd(u8, text, "=");
+    const len = decoder.calcSizeForSlice(trimmed) catch return error.InvalidBase64;
+    if (len > buffer.len) return error.NoSpaceLeft;
+    decoder.decode(buffer[0..len], trimmed) catch return error.InvalidBase64;
+    return buffer[0..len];
+}
+
 pub const Tokens = struct {
     reader: json.TextReader,
     /// Where octets that outlive their token are copied.
@@ -55,13 +65,8 @@ pub const Tokens = struct {
             .string => |octets| octets,
             else => return error.UnexpectedToken,
         };
-        const trimmed = std.mem.trimEnd(u8, octets, "=");
-        const decoder = std.base64.standard_no_pad.Decoder;
-        const len = decoder.calcSizeForSlice(trimmed) catch return error.InvalidBase64;
-        if (len > self.storage.len - self.used) return error.NoSpaceLeft;
-        const kept = self.storage[self.used..][0..len];
-        decoder.decode(kept, trimmed) catch return error.InvalidBase64;
-        self.used += len;
+        const kept = try decode_base64(std.base64.standard_no_pad.Decoder, octets, self.storage[self.used..]);
+        self.used += kept.len;
         return kept;
     }
 

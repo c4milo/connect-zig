@@ -1,6 +1,7 @@
 //! Calls from a client to a server through this module alone, with the HTTP layer reduced to
 //! header lists and bodies in memory: each protocol, each codec, each stream type, and errors.
 const std = @import("std");
+const rpc_error = @import("rpc_error.zig");
 const testing = std.testing;
 const proto = @import("protobuf");
 const gzip = @import("gzip");
@@ -32,10 +33,7 @@ const List = struct {
 
     fn find(context: *const anyopaque, name: []const u8) ?[]const u8 {
         const self: *const List = @ptrCast(@alignCast(context));
-        for (self.entries) |entry| {
-            if (std.ascii.eqlIgnoreCase(entry.name, name)) return entry.value;
-        }
-        return null;
+        return rpc_error.find_header(self.entries, name);
     }
 
     fn lookup(self: *const List) server_head.Lookup {

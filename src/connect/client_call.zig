@@ -48,6 +48,8 @@ const protocol_headers_max = 6;
 pub const extra_headers_max = 8;
 
 pub const Request = struct {
+    /// The protocol, codec and framing the request speaks, which its response is read with.
+    speaks: protocol.Speaks,
     http_method: []const u8,
     /// The path, and for a GET its query.
     target: []const u8,
@@ -87,12 +89,11 @@ pub fn request(comptime method: method_file.Method, options: Options, messages: 
     const speaks = speaks_of(method, options);
     const get_allowed = method.stream_type == .unary and method.idempotency == .no_side_effects;
     if (options.use_get and options.protocol == .connect and get_allowed) return request_get(method, options, &messages[0], buffers);
-    var result: Request = .{ .http_method = "POST", .target = comptime method.path(), .body = "" };
+    var result: Request = .{ .speaks = speaks, .http_method = "POST", .target = comptime method.path(), .body = "" };
     var compressed_any = false;
     var len: usize = 0;
     for (messages) |*message| {
-        const octets = try message_codec.encode(method.Request, options.codec, message, buffers.scratch.message);
-        const packed_message = message_codec.compress(options.request_coding, options.encoder, octets, buffers.scratch.work);
+        const packed_message = try message_codec.prepare(method.Request, options.codec, options.request_coding, options.encoder, message, buffers.scratch);
         compressed_any = compressed_any or packed_message.compressed;
         len += try place(speaks, packed_message.compressed, packed_message.octets, buffers.body[len..]);
     }
@@ -150,15 +151,14 @@ fn add_grpc_headers(result: *Request, speaks: protocol.Speaks, options: Options,
 }
 
 fn request_get(comptime method: method_file.Method, options: Options, message: *const method.Request, buffers: Buffers) Error!Request {
-    const octets = try message_codec.encode(method.Request, options.codec, message, buffers.scratch.message);
-    const packed_message = message_codec.compress(options.request_coding, options.encoder, octets, buffers.scratch.work);
+    const packed_message = try message_codec.prepare(method.Request, options.codec, options.request_coding, options.encoder, message, buffers.scratch);
     const path = comptime method.path();
     if (buffers.body.len < path.len + 1) return error.NoSpaceLeft;
     @memcpy(buffers.body[0..path.len], path);
     buffers.body[path.len] = '?';
     const coding: Coding = if (packed_message.compressed) .gzip else .identity;
     const query = try get.write_query(options.codec, coding, packed_message.octets, buffers.body[path.len + 1 ..]);
-    var result: Request = .{ .http_method = "GET", .target = buffers.body[0 .. path.len + 1 + query.len], .body = "" };
+    var result: Request = .{ .speaks = speaks_of(method, options), .http_method = "GET", .target = buffers.body[0 .. path.len + 1 + query.len], .body = "" };
     if (buffers.values.len < compression.accept_list_len_max) return error.NoSpaceLeft;
     const accept = options.decoders.accept_list(buffers.values[0..compression.accept_list_len_max]);
     if (accept.len != 0) result.add("accept-encoding", accept);
@@ -180,12 +180,7 @@ const Note = struct {
 const say: method_file.Method = .{ .service = "test.Svc", .name = "Say", .Request = Note, .Response = Note, .stream_type = .unary, .idempotency = .no_side_effects };
 const upload: method_file.Method = .{ .service = "test.Svc", .name = "Upload", .Request = Note, .Response = Note, .stream_type = .client_stream };
 
-fn find(headers: []const Header, name: []const u8) ?[]const u8 {
-    for (headers) |header| {
-        if (std.mem.eql(u8, header.name, name)) return header.value;
-    }
-    return null;
-}
+const find = @import("rpc_error.zig").find_header;
 
 test "a Connect unary request is the bare message with the protocol's headers" {
     var buffers: [4][128]u8 = undefined;

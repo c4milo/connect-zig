@@ -73,9 +73,7 @@ pub const Response = struct {
             try response.read_end(next_one);
             return null;
         }
-        if (!next_one.flags.compressed) return next_one.payload;
-        if (response.coding == .identity) return error.InvalidEnvelope;
-        return try compression.decompress(response.coding, response.decoders, next_one.payload, response.storage.scratch.message);
+        return try message_codec.open(next_one.flags.compressed, response.coding, response.decoders, next_one.payload, response.storage.scratch.message);
     }
 
     fn read_end(response: *Response, last: envelope.Envelope) Error!void {
@@ -103,7 +101,7 @@ pub const Response = struct {
                     return;
                 };
                 response.metadata = lines;
-                response.failure = trailers.read(lines, find_in, status_storage(response.storage));
+                response.failure = trailers.read(lines, rpc_error.find_header, status_storage(response.storage));
             },
             .grpc => return error.InvalidEnvelope,
         }
@@ -127,13 +125,6 @@ pub const Response = struct {
 fn status_storage(storage: Storage) trailers.Storage {
     const half = storage.octets.len / constants.storage_halves;
     return .{ .message = storage.octets[0..half], .status = storage.octets[half..], .details = storage.details };
-}
-
-fn find_in(headers: []const Header, name: []const u8) ?[]const u8 {
-    for (headers) |header| {
-        if (std.ascii.eqlIgnoreCase(header.name, name)) return header.value;
-    }
-    return null;
 }
 
 fn find_lookup(lookup: Lookup, name: []const u8) ?[]const u8 {

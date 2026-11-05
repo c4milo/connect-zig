@@ -34,15 +34,59 @@ pub fn decode(comptime T: type, codec: Codec, octets: []const u8, scratch: Scrat
     };
 }
 
+/// The octets an envelope's payload holds: as they are, or inflated with `coding`.
+pub fn open(compressed: bool, coding: compression.Coding, decoders: compression.Decoders, payload: []const u8, output: []u8) (compression.Error || error{InvalidEnvelope})![]const u8 {
+    if (!compressed) return payload;
+    // PROTOCOL-HTTP2.md, "Message-Encoding": a compressed message with no encoding named is an
+    // error.
+    if (coding == .identity) return error.InvalidEnvelope;
+    return compression.decompress(coding, decoders, payload, output);
+}
+
 /// The smallest message a sender compresses. Below it, gzip's header and trailer outweigh what
 /// compression saves.
 pub const compress_len_min = 1024;
 
-/// Compresses `octets` into `buffer` when `coding` is gzip and the message is long enough, and
-/// says whether it did.
-pub fn compress(coding: compression.Coding, encoder: ?*compression.GzipEncoder, octets: []const u8, buffer: []u8) struct { octets: []const u8, compressed: bool } {
+/// A message encoded, and compressed when that saves octets, ready for an envelope or a body.
+pub const Prepared = struct {
+    octets: []const u8,
+    compressed: bool,
+};
+
+/// Encodes `message` into `scratch.message`, then compresses it into `scratch.work` as `compress`
+/// decides.
+pub fn prepare(comptime T: type, codec: Codec, coding: compression.Coding, encoder: ?*compression.GzipEncoder, message: *const T, scratch: Scratch) EncodeError!Prepared {
+    const octets = try encode(T, codec, message, scratch.message);
+    return compress(coding, encoder, octets, scratch.work);
+}
+
+/// Compresses `octets` into `buffer` when `coding` is gzip, the message is long enough, and gzip
+/// makes it shorter, and says whether it did.
+pub fn compress(coding: compression.Coding, encoder: ?*compression.GzipEncoder, octets: []const u8, buffer: []u8) Prepared {
     if (coding != .gzip or octets.len < compress_len_min) return .{ .octets = octets, .compressed = false };
     const gzip_encoder = encoder orelse return .{ .octets = octets, .compressed = false };
     const packed_octets = compression.compress_gzip(gzip_encoder, octets, buffer) catch return .{ .octets = octets, .compressed = false };
+    // A message gzip cannot shrink goes out as it is: the peer would pay to inflate it for nothing.
+    if (packed_octets.len >= octets.len) return .{ .octets = octets, .compressed = false };
     return .{ .octets = packed_octets, .compressed = true };
+}
+
+const testing = std.testing;
+
+test "gzip is used only when it shrinks the message" {
+    var encoder: compression.GzipEncoder = undefined;
+    var buffer: [compress_len_min * 2]u8 = undefined;
+    const repetitive = [_]u8{'a'} ** (compress_len_min + 1);
+    try testing.expect(compress(.gzip, &encoder, &repetitive, &buffer).compressed);
+    // Hash output has no redundancy gzip can find, so its stored form is longer than the input.
+    const Sha256 = std.crypto.hash.sha2.Sha256;
+    var noise: [compress_len_min]u8 = undefined;
+    var block: [Sha256.digest_length]u8 = @splat(0);
+    for (0..compress_len_min / block.len) |index| {
+        Sha256.hash(&block, &block, .{});
+        @memcpy(noise[index * block.len ..][0..block.len], &block);
+    }
+    const kept = compress(.gzip, &encoder, &noise, &buffer);
+    try testing.expect(!kept.compressed);
+    try testing.expectEqual(@as(usize, compress_len_min), kept.octets.len);
 }

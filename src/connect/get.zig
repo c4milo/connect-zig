@@ -6,6 +6,7 @@
 //! - `compression`: the coding, when the message is compressed;
 //! - `connect=v1`: the protocol version.
 const std = @import("std");
+const json_read = @import("json_read.zig");
 const assert = std.debug.assert;
 const protocol = @import("protocol.zig");
 const compression = @import("compression.zig");
@@ -97,10 +98,7 @@ pub fn message_octets(query: Query, buffer: []u8) Error![]const u8 {
     }
     const url_safe = std.mem.indexOfAny(u8, text, "+/") == null;
     const decoder = if (url_safe) std.base64.url_safe_no_pad.Decoder else std.base64.standard_no_pad.Decoder;
-    const len = decoder.calcSizeForSlice(text) catch return error.InvalidBase64;
-    if (len > buffer.len) return error.NoSpaceLeft;
-    decoder.decode(buffer[0..len], text) catch return error.InvalidBase64;
-    return buffer[0..len];
+    return json_read.decode_base64(decoder, text, buffer);
 }
 
 fn percent_decode(text: []const u8, buffer: []u8) Error![]const u8 {

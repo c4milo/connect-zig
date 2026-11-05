@@ -62,11 +62,7 @@ pub const Messages = struct {
         // Connect protocol, "Streaming-Request": a client never sends the end-stream flag, and
         // gRPC-Web's trailers flag is the server's alone.
         if (next_one.flags.end_stream or next_one.flags.trailers) return error.InvalidEnvelope;
-        if (!next_one.flags.compressed) return next_one.payload;
-        // PROTOCOL-HTTP2.md, "Message-Encoding": a compressed message with no grpc-encoding is
-        // an error.
-        if (messages.accepted.request_coding == .identity) return error.InvalidEnvelope;
-        return try compression.decompress(messages.accepted.request_coding, messages.decoders, next_one.payload, messages.scratch.message);
+        return try message_codec.open(next_one.flags.compressed, messages.accepted.request_coding, messages.decoders, next_one.payload, messages.scratch.message);
     }
 };
 

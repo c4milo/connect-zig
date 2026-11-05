@@ -9,6 +9,7 @@
 const std = @import("std");
 const assert = std.debug.assert;
 const rpc_error = @import("rpc_error.zig");
+const json_read = @import("json_read.zig");
 const envelope = @import("envelope.zig");
 const constants = @import("constants.zig");
 const protocol = constants.protocol;
@@ -123,12 +124,7 @@ pub fn read(context: anytype, comptime find: fn (@TypeOf(context), []const u8) ?
 }
 
 fn decode_bin(text: []const u8, buffer: []u8) ?[]const u8 {
-    const trimmed = std.mem.trimEnd(u8, text, "=");
-    const decoder = std.base64.standard_no_pad.Decoder;
-    const len = decoder.calcSizeForSlice(trimmed) catch return null;
-    if (len > buffer.len) return null;
-    decoder.decode(buffer[0..len], trimmed) catch return null;
-    return buffer[0..len];
+    return json_read.decode_base64(std.base64.standard_no_pad.Decoder, text, buffer) catch null;
 }
 
 /// Writes gRPC-Web's trailers frame: the 0x80 envelope of the trailers as header lines.
@@ -163,13 +159,6 @@ pub fn read_web_frame(payload: []const u8, out: []Header) error{ MalformedTraile
 
 const testing = std.testing;
 
-fn find_in(headers: []const Header, name: []const u8) ?[]const u8 {
-    for (headers) |header| {
-        if (std.ascii.eqlIgnoreCase(header.name, name)) return header.value;
-    }
-    return null;
-}
-
 test "grpc-message is percent-encoded, and malformed escapes are kept" {
     var buffer: [64]u8 = undefined;
     try testing.expectEqualStrings("50%25 d%C3%A9j%C3%A0", try percent_encode("50% déjà", &buffer));
@@ -187,12 +176,12 @@ test "status trailers round-trip, details included" {
     var message: [16]u8 = undefined;
     var status: [64]u8 = undefined;
     var details: [2]rpc_error.Detail = undefined;
-    const back = read(written, find_in, .{ .message = &message, .status = &status, .details = &details }).?;
+    const back = read(written, rpc_error.find_header, .{ .message = &message, .status = &status, .details = &details }).?;
     try testing.expectEqual(Code.permission_denied, back.code);
     try testing.expectEqualStrings("no", back.message);
     try testing.expectEqualStrings("a.B", back.details[0].type_name);
     const ok = try write(null, &buffer, &out);
-    try testing.expectEqual(@as(?RpcError, null), read(ok, find_in, .{ .message = &message, .status = &status, .details = &details }));
+    try testing.expectEqual(@as(?RpcError, null), read(ok, rpc_error.find_header, .{ .message = &message, .status = &status, .details = &details }));
 }
 
 test "a gRPC-Web trailers frame is an 0x80 envelope of lowercase header lines" {

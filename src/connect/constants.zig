@@ -60,8 +60,6 @@ pub const protocol = struct {
 
 /// The bounds this module chose.
 pub const limits = struct {
-    /// The most envelopes one body holds that a reader walks: each takes at least 5 octets.
-    pub const envelopes_max: usize = std.math.maxInt(u32);
     /// The most error details an error carries.
     pub const details_max = 32;
     /// The most metadata entries an end-stream message or a trailers frame carries.

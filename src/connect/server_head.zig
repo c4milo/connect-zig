@@ -142,10 +142,7 @@ const TestHeaders = struct {
 
     fn find(context: *const anyopaque, name: []const u8) ?[]const u8 {
         const self: *const TestHeaders = @ptrCast(@alignCast(context));
-        for (self.entries) |entry| {
-            if (std.ascii.eqlIgnoreCase(entry.name, name)) return entry.value;
-        }
-        return null;
+        return rpc_error.find_header(self.entries, name);
     }
 
     fn lookup(self: *const TestHeaders) Lookup {
