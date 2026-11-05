@@ -18,13 +18,14 @@ pub const LedgerService = struct {
         .idempotency = .unknown,
     };
 
-    /// Every method as a route of `transport`, such as `connect_colibri`. Each handler is the
-    /// declaration of `Handlers` the method names, so one a service lacks fails to compile.
-    pub fn routes(comptime transport: type, comptime App: type, comptime Handlers: type, comptime options: transport.RouteOptions) @TypeOf(.{
-        transport.post(App, get_ledger, Handlers.get_ledger, options),
-    }) {
-        return .{
-            transport.post(App, get_ledger, Handlers.get_ledger, options),
+    /// Every method as a route of `transport`, such as `connect_colibri`, in `routes`. Each
+    /// handler is the declaration of `Handlers` the method names, so one a service lacks fails
+    /// to compile.
+    pub fn Routes(comptime transport: type, comptime App: type, comptime Handlers: type, comptime options: transport.RouteOptions) type {
+        return struct {
+            pub const routes = .{
+                transport.post(App, get_ledger, Handlers.get_ledger, options),
+            };
         };
     }
 };

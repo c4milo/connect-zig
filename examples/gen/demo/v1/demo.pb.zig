@@ -206,23 +206,19 @@ pub const DemoService = struct {
         .idempotency = .unknown,
     };
 
-    /// Every method as a route of `transport`, such as `connect_colibri`. Each handler is the
-    /// declaration of `Handlers` the method names, so one a service lacks fails to compile.
-    pub fn routes(comptime transport: type, comptime App: type, comptime Handlers: type, comptime options: transport.RouteOptions) @TypeOf(.{
-        transport.post(App, whoami, Handlers.whoami, options),
-        transport.get(App, whoami, Handlers.whoami, options),
-        transport.post(App, chat, Handlers.chat, options),
-        transport.post(App, sum, Handlers.sum, options),
-        transport.post(App, countdown, Handlers.countdown, options),
-        transport.post(App, divide, Handlers.divide, options),
-    }) {
-        return .{
-            transport.post(App, whoami, Handlers.whoami, options),
-            transport.get(App, whoami, Handlers.whoami, options),
-            transport.post(App, chat, Handlers.chat, options),
-            transport.post(App, sum, Handlers.sum, options),
-            transport.post(App, countdown, Handlers.countdown, options),
-            transport.post(App, divide, Handlers.divide, options),
+    /// Every method as a route of `transport`, such as `connect_colibri`, in `routes`. Each
+    /// handler is the declaration of `Handlers` the method names, so one a service lacks fails
+    /// to compile.
+    pub fn Routes(comptime transport: type, comptime App: type, comptime Handlers: type, comptime options: transport.RouteOptions) type {
+        return struct {
+            pub const routes = .{
+                transport.post(App, whoami, Handlers.whoami, options),
+                transport.get(App, whoami, Handlers.whoami, options),
+                transport.post(App, chat, Handlers.chat, options),
+                transport.post(App, sum, Handlers.sum, options),
+                transport.post(App, countdown, Handlers.countdown, options),
+                transport.post(App, divide, Handlers.divide, options),
+            };
         };
     }
 };

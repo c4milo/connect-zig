@@ -109,6 +109,10 @@ test "messages, enums, oneofs, maps, recursion and services are generated" {
     try expect_contains(text, ".{ .name = \"COLOR_ROJO\", .number = @intFromEnum(@This().color_red) },");
     try expect_contains(text, "    pub const get_node: connect.Method = .{\n        .service = service_name,\n        .name = \"GetNode\",\n");
     try expect_contains(text, "        .stream_type = .server_stream,\n        .idempotency = .no_side_effects,\n");
+    // Routes lists each method for a transport. GetNode has no side effects but is a stream,
+    // and only a unary call may be a GET, so it has no GET route.
+    try expect_contains(text, "    pub fn Routes(comptime transport: type, comptime App: type, comptime Handlers: type, comptime options: transport.RouteOptions) type {\n");
+    try expect_contains(text, "                transport.post(App, get_node, Handlers.get_node, options),\n            };\n");
 }
 
 test "a request that names a missing file gets an error response" {

@@ -55,42 +55,37 @@ pub fn write_service(out: *Out, package: []const u8, service: pb.ServiceDescript
     try out.print("}};\n", .{});
 }
 
-/// The name of the function that lists a service's routes, which no method may take.
-const routes_name = "routes";
-
-/// `routes`: every method as a route of a transport such as `connect_colibri`, which a program
+/// `Routes`: every method as a route of a transport such as `connect_colibri`, which a program
 /// passes in, so generated code imports no HTTP library (decision 2). A method with no side
-/// effects is served as a GET too (Connect protocol, "Unary-Get-Request").
+/// effects is served as a GET too (Connect protocol, "Unary-Get-Request"). The routes are a
+/// declaration's literal, not a function's result, so a router joins them with `++` at comptime.
 fn write_routes(out: *Out, service: pb.ServiceDescriptorProto) Error!void {
-    const type_entries = try route_entries(out, service, "        ");
-    const value_entries = try route_entries(out, service, "            ");
-    try out.print(
-        \\
-        \\    /// Every method as a route of `transport`, such as `connect_colibri`. Each handler is the
-        \\    /// declaration of `Handlers` the method names, so one a service lacks fails to compile.
-        \\    pub fn {s}(comptime transport: type, comptime App: type, comptime Handlers: type, comptime options: transport.RouteOptions) @TypeOf(.{{
-        \\{s}    }}) {{
-        \\        return .{{
-        \\{s}        }};
-        \\    }}
-        \\
-    , .{ routes_name, type_entries, value_entries });
-}
-
-/// One line for each route, at `indent`: the type of `routes` and its value list the same ones.
-fn route_entries(out: *Out, service: pb.ServiceDescriptorProto, indent: []const u8) Error![]const u8 {
     var entries: std.ArrayList(u8) = .empty;
     var methods = service.method.iterator();
     while (try methods.next()) |method| {
         const field = try names.identifier(out.arena, try names.snake_case(out.arena, method.name orelse ""));
-        if (std.mem.eql(u8, field, routes_name)) return error.NameCollision;
-        try entries.print(out.arena, "{s}transport.post(App, {s}, Handlers.{s}, options),\n", .{ indent, field, field });
-        if (no_side_effects(method)) try entries.print(out.arena, "{s}transport.get(App, {s}, Handlers.{s}, options),\n", .{ indent, field, field });
+        try entries.print(out.arena, "                transport.post(App, {s}, Handlers.{s}, options),\n", .{ field, field });
+        if (no_side_effects(method)) try entries.print(out.arena, "                transport.get(App, {s}, Handlers.{s}, options),\n", .{ field, field });
     }
-    return entries.items;
+    try out.print(
+        \\
+        \\    /// Every method as a route of `transport`, such as `connect_colibri`, in `routes`. Each
+        \\    /// handler is the declaration of `Handlers` the method names, so one a service lacks fails
+        \\    /// to compile.
+        \\    pub fn Routes(comptime transport: type, comptime App: type, comptime Handlers: type, comptime options: transport.RouteOptions) type {{
+        \\        return struct {{
+        \\            pub const routes = .{{
+        \\{s}            }};
+        \\        }};
+        \\    }}
+        \\
+    , .{entries.items});
 }
 
+/// Whether a method is served as a GET too: a unary method with no side effects (Connect
+/// protocol, "Unary-Get-Request"). A stream is never a GET, whatever its idempotency.
 fn no_side_effects(method: pb.MethodDescriptorProto) bool {
+    if ((method.client_streaming orelse false) or (method.server_streaming orelse false)) return false;
     const options = method.options orelse return false;
     return (options.idempotency_level orelse .idempotency_unknown) == .no_side_effects;
 }
