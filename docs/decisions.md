@@ -31,7 +31,7 @@ first. Cite an entry by number in code and commits ("decision 6").
 
 5. **Unknown fields are dropped in v0.** `decode` skips a field it does not know, groups included,
    and `encode` writes only known fields. Beaten: keeping them as a span of the input, which costs
-   a field in every struct before any user needs it. A later step can add `unknown: View`.
+   a field in every struct before any user needs it. Decision 24 keeps them.
 
 6. **Decoding copies nothing.** A string or bytes field is a slice of the input. A repeated field
    is a `Repeated(T, kind)`: either `items`, which a program sets to encode, or a view of the
@@ -155,6 +155,15 @@ first. Cite an entry by number in code and commits ("decision 6").
     number as a value of its non-exhaustive enum, and `utf8_validation = NONE` is still checked:
     both are stricter than the spec asks, never looser. Beaten: refusing edition files, which
     buf generates by default for new modules.
+
+24. **A generated message keeps the fields it does not know.** Its struct ends with
+    `_unknown: proto.Unknown`, the span of the input from its first unknown record to its last.
+    `encode` writes those records back after the known fields, as Go and C++ do, and skips the
+    known records the span also holds. So a service built on an older schema passes a newer
+    client's fields on, as `tools/coverage_check.sh` checks against Go. A map entry keeps none,
+    and a message merged from two inputs fails with `MergeUnsupported`, as a view does
+    (decision 6). JSON writes no unknown field (proto3 JSON mapping). Beaten: dropping them, as
+    v0 did (decision 5), which loses data a proxy forwards.
 
 ## Tooling
 

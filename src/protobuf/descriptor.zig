@@ -135,6 +135,29 @@ pub const View = struct {
     number: u32 = 0,
 };
 
+/// The fields of a message its type does not know, kept as the span of the input from the first
+/// such record to the last. `encode` writes them back after the known fields, as Go and C++ do,
+/// and skips the known records the span also holds (decision 24).
+pub const Unknown = struct {
+    bytes: []const u8 = &.{},
+};
+
+/// The struct field a message keeps its unknown fields in, which the plugin writes.
+pub const unknown_field = "_unknown";
+
+/// Whether `T` keeps the fields it does not know.
+pub fn keeps_unknown(comptime T: type) bool {
+    return @hasField(T, unknown_field) and @FieldType(T, unknown_field) == Unknown;
+}
+
+/// Whether `number` names a field of `T`.
+pub fn knows(comptime T: type, number: u32) bool {
+    inline for (T.protobuf.fields) |field| {
+        if (field.number == number) return true;
+    }
+    return false;
+}
+
 /// Whether `T` is a generated enum.
 pub fn is_enum(comptime T: type) bool {
     return @typeInfo(T) == .@"enum" and @hasDecl(T, "protobuf") and @TypeOf(T.protobuf) == EnumDescriptor;

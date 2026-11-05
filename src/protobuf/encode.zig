@@ -34,6 +34,11 @@ const Sink = struct {
         try sink.varint((wire.Tag{ .number = number, .wire_type = wire_type }).encode());
     }
 
+    fn raw(sink: *Sink, octets: []const u8) Error!void {
+        if (sink.writer) |writer| try writer.bytes(octets);
+        sink.len += octets.len;
+    }
+
     fn value(sink: *Sink, comptime kind: Kind, comptime V: type, item: V) Error!void {
         if (sink.writer) |writer| try scalar.write(kind, V, item, writer);
         sink.len += scalar.len(kind, V, item);
@@ -65,6 +70,22 @@ fn encode_message(comptime T: type, message: *const T, sink: *Sink) Error!void {
             try encode_field(field, @field(message, field.name), sink);
         }
     }
+    if (comptime descriptor.keeps_unknown(T)) try encode_unknown(T, @field(message, descriptor.unknown_field).bytes, sink);
+}
+
+/// Writes the unknown fields a message kept, as they came, after its known fields. The span may
+/// hold known records between unknown ones; those were written above, from the struct.
+fn encode_unknown(comptime T: type, bytes: []const u8, sink: *Sink) Error!void {
+    var reader: wire.Reader = .{ .bytes = bytes };
+    // Each record takes at least one byte.
+    for (0..bytes.len + 1) |_| {
+        if (reader.at_end()) return;
+        const start = reader.position;
+        const tag = try reader.tag();
+        try reader.skip(tag, constants.limits.depth_max);
+        if (!descriptor.knows(T, tag.number)) try sink.raw(bytes[start..reader.position]);
+    }
+    unreachable;
 }
 
 /// A map entry writes its key and its value even at their defaults, as Go and C++ write them, so

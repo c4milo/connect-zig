@@ -53,7 +53,10 @@ pub fn merge_depth(comptime T: type, message: *T, bytes: []const u8, depth_left:
         const field_start = reader.position;
         const tag = try reader.tag();
         const known = try read_known(T, message, field_start, bytes, tag, &reader, depth_left, mode);
-        if (!known) try reader.skip(tag, depth_left);
+        if (!known) {
+            try reader.skip(tag, depth_left);
+            if (comptime descriptor.keeps_unknown(T)) try keep_unknown(&@field(message, descriptor.unknown_field), bytes, field_start, reader.position);
+        }
     }
     unreachable;
 }
@@ -140,6 +143,15 @@ fn view_within(view: []const u8, bytes: []const u8) bool {
     if (view.len == 0) return true;
     const start = @intFromPtr(view.ptr);
     return start >= @intFromPtr(bytes.ptr) and start + view.len <= @intFromPtr(bytes.ptr) + bytes.len;
+}
+
+/// Widens a message's span of unknown fields to end at `field_end`. A span of another input means
+/// the message came from a merge of two inputs, which one span cannot hold (decisions 6, 24).
+fn keep_unknown(unknown: *descriptor.Unknown, bytes: []const u8, field_start: usize, field_end: usize) Error!void {
+    assert(field_start < field_end and field_end <= bytes.len);
+    if (!view_within(unknown.bytes, bytes)) return error.MergeUnsupported;
+    const start = if (unknown.bytes.len == 0) field_start else @intFromPtr(unknown.bytes.ptr) - @intFromPtr(bytes.ptr);
+    unknown.bytes = bytes[start..field_end];
 }
 
 /// Makes a view hold the field's records from its first through the one that ends at

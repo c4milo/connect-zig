@@ -38,6 +38,8 @@ pub const EnumValue = files.descriptor.EnumValue;
 pub const EnumDescriptor = files.descriptor.EnumDescriptor;
 /// Where a decoded repeated field's elements lie.
 pub const View = files.descriptor.View;
+/// The fields a message does not know, which a generated message keeps (decision 24).
+pub const Unknown = files.descriptor.Unknown;
 pub const Repeated = files.repeated.Repeated;
 pub const Lazy = files.repeated.Lazy;
 /// What `decode` and `merge` refuse an input with.
@@ -132,11 +134,11 @@ pub const map_get = files.repeated.map_get;
 
 test "the root exports the names a program calls" {
     try @import("public_names").expect(@This(), &.{
-        "constants",   "Kind",             "Field",       "Descriptor",       "EnumValue",       "EnumDescriptor",
-        "View",        "Repeated",         "Lazy",        "Error",            "EncodeError",     "decode",
-        "merge",       "encoded_len",      "encode",      "map_get",          "JsonEncodeError", "JsonDecodeError",
-        "encode_json", "encode_json_with", "decode_json", "decode_json_with", "wkt",             "FieldOptions",
-        "field_of",
+        "constants",       "Kind",        "Field",            "Descriptor",  "EnumValue",        "EnumDescriptor",
+        "View",            "Unknown",     "Repeated",         "Lazy",        "Error",            "EncodeError",
+        "decode",          "merge",       "encoded_len",      "encode",      "map_get",          "JsonEncodeError",
+        "JsonDecodeError", "encode_json", "encode_json_with", "decode_json", "decode_json_with", "wkt",
+        "FieldOptions",    "field_of",
     });
 }
 
@@ -146,4 +148,5 @@ test {
     _ = @import("protobuf_json_test.zig");
     _ = @import("protobuf_json_wkt_test.zig");
     _ = @import("protobuf_group_test.zig");
+    _ = @import("protobuf_unknown_test.zig");
 }
