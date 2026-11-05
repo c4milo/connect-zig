@@ -25,7 +25,8 @@ fn generated_files(arena: std.mem.Allocator, request: *const pb.CodeGeneratorReq
         std.debug.print("{s}\n", .{message});
         return error.GenerationFailed;
     }
-    try testing.expectEqual(@as(?u64, 1), response.supported_features);
+    try testing.expectEqual(@as(?u64, pb.feature_proto3_optional | pb.feature_supports_editions), response.supported_features);
+    try testing.expectEqual(@as(?i32, pb.edition_2024), response.maximum_edition);
     var files = response.file.iterator();
     var list: std.ArrayList(pb.GeneratedFile) = .empty;
     while (try files.next()) |output| try list.append(arena, output);
@@ -193,4 +194,35 @@ test "a type of another file is named through that file's module" {
     try expect_contains(text, "//! The build gives this file the modules protobuf, shared_v1_shared.\n");
     try expect_contains(text, "const shared_v1_shared = @import(\"shared_v1_shared\");\n");
     try expect_contains(text, "    tag: ?shared_v1_shared.Tag = null,\n");
+}
+
+test "a file whose messages are delimited writes groups, but a map keeps its entries' lengths" {
+    var arena_state = std.heap.ArenaAllocator.init(testing.allocator);
+    defer arena_state.deinit();
+    const arena = arena_state.allocator();
+    var entry_key = field("key", 1, .string, .optional);
+    entry_key.label = .optional;
+    var entry_value = field("value", 2, .message, .optional);
+    entry_value.type_name = ".demo.v1.Note";
+    const entry: pb.DescriptorProto = .{ .name = "NotesEntry", .field = .of(&.{ entry_key, entry_value }), .options = .{ .map_entry = true } };
+    var note = field("note", 1, .message, .optional);
+    note.type_name = ".demo.v1.Note";
+    var notes = field("notes", 2, .message, .repeated);
+    notes.type_name = ".demo.v1.Book.NotesEntry";
+    const book: pb.DescriptorProto = .{ .name = "Book", .field = .of(&.{ note, notes }), .nested_type = .of(&.{entry}) };
+    const file: pb.FileDescriptorProto = .{
+        .name = "demo/v1/demo.proto",
+        .package = "demo.v1",
+        .message_type = .of(&.{ book, .{ .name = "Note" } }),
+        .syntax = "editions",
+        .edition = pb.edition_proto2 + 2,
+        .options = .{ .features = .{ .message_encoding = pb.message_delimited } },
+    };
+    const request: pb.CodeGeneratorRequest = .{ .file_to_generate = .of(&.{"demo/v1/demo.proto"}), .proto_file = .of(&.{file}) };
+    const content = try generated(arena, &request);
+    try expect_contains(content, ".name = \"note\", .number = @intFromEnum(@This().FieldNumber.note), .kind = .group");
+    try expect_contains(content, ".name = \"notes\", .number = @intFromEnum(@This().FieldNumber.notes), .kind = .message");
+    // The entry's value keeps its length too, and its key has no presence.
+    try expect_contains(content, ".name = \"value\", .number = @intFromEnum(@This().FieldNumber.value), .kind = .message");
+    try expect_contains(content, "key: []const u8 = \"\",\n");
 }

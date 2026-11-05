@@ -146,6 +146,16 @@ first. Cite an entry by number in code and commits ("decision 6").
     stream message takes 0.38 us against 3.3 us. Beaten: always encoding into scratch, one copy
     per message more.
 
+23. **The plugin reads editions 2023 and 2024, and the runtime writes groups.** The plugin
+    resolves three features for each field, from its file down through its messages: presence,
+    which makes a singular field a `?T`; repeated encoding, packed or expanded; and message
+    encoding, where DELIMITED makes a message field a `.group`, written between start and end
+    tags as a proto2 group is. A map entry's fields never have presence. LEGACY_REQUIRED reads
+    as explicit, since the runtime checks no required field. A closed enum keeps an unknown
+    number as a value of its non-exhaustive enum, and `utf8_validation = NONE` is still checked:
+    both are stricter than the spec asks, never looser. Beaten: refusing edition files, which
+    buf generates by default for new modules.
+
 ## Tooling
 
 15. **pepegrillo is lazy.** `build.zig` requests it only when `b.pkg_hash.len == 0`, so a project

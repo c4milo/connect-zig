@@ -38,8 +38,7 @@ pub fn file(arena: Allocator, index: *const Index, descriptor: pb.FileDescriptor
 }
 
 fn new_out(arena: Allocator, index: *const Index, descriptor: pb.FileDescriptorProto, mode: generate_out.Mode) Out {
-    const syntax = descriptor.syntax orelse "proto2";
-    return .{ .arena = arena, .index = index, .file = descriptor.name orelse "", .proto2 = std.mem.eql(u8, syntax, "proto2"), .mode = mode };
+    return .{ .arena = arena, .index = index, .file = descriptor.name orelse "", .features = .of_file(descriptor), .mode = mode };
 }
 
 fn render_single(arena: Allocator, index: *const Index, descriptor: pb.FileDescriptorProto) Error![]const u8 {
@@ -64,12 +63,12 @@ fn render_pieces(arena: Allocator, index: *const Index, descriptor: pb.FileDescr
     try root.print("\n", .{});
     var messages = descriptor.message_type.iterator();
     while (try messages.next()) |message| {
-        try pending.append(arena, .{ .scope = package, .path = message.name orelse "", .declaration = .{ .message = message } });
+        try pending.append(arena, .{ .scope = package, .path = message.name orelse "", .declaration = .{ .message = message }, .features = root.features });
         try write_reexport(&root, directory, message.name orelse "");
     }
     var enums = descriptor.enum_type.iterator();
     while (try enums.next()) |enumeration| {
-        try pending.append(arena, .{ .scope = package, .path = enumeration.name orelse "", .declaration = .{ .enumeration = enumeration } });
+        try pending.append(arena, .{ .scope = package, .path = enumeration.name orelse "", .declaration = .{ .enumeration = enumeration }, .features = root.features });
         try write_reexport(&root, directory, enumeration.name orelse "");
     }
     var services = descriptor.service.iterator();
@@ -99,6 +98,8 @@ fn merge_modules(root: *Out, piece: *const Out) Error!void {
 
 fn render_piece(arena: Allocator, index: *const Index, descriptor: pb.FileDescriptorProto, item: Pending, pending: *std.ArrayList(Pending), root: *Out) Error![]const u8 {
     var piece = new_out(arena, index, descriptor, .piece);
+    // A nested declaration's piece starts from its enclosing messages' features.
+    piece.features = item.features;
     const parent_end = std.mem.lastIndexOfScalar(u8, item.path, '.');
     const parent = if (parent_end) |end| item.path[0..end] else "";
     switch (item.declaration) {

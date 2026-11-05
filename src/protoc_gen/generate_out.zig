@@ -2,6 +2,7 @@
 //! in the same file, by `proto.wkt` for a well-known type, or through the module of another
 //! generated file. Each output records the names it uses, so its imports list exactly those.
 const std = @import("std");
+const Features = @import("features.zig").Features;
 const Allocator = std.mem.Allocator;
 const names = @import("names.zig");
 const index_file = @import("index.zig");
@@ -23,9 +24,8 @@ pub const Out = struct {
     index: *const Index,
     /// The .proto file whose declarations this output holds.
     file: []const u8,
-    /// Whether the file is proto2, where a singular scalar has presence and a repeated scalar is
-    /// unpacked unless it says otherwise.
-    proto2: bool,
+    /// The features of the fields being written: the file's, then each enclosing message's.
+    features: Features,
     mode: Mode,
     /// The first segment of each path in the same .proto file this output names, which a piece
     /// imports from its sibling.

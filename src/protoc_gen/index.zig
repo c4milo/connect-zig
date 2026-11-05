@@ -81,7 +81,7 @@ pub const Index = struct {
         const message = entry.message orelse return false;
         var fields = message.field.iterator();
         while (try fields.next()) |field| {
-            if (field.label == .repeated or field.type != .message) continue;
+            if (field.label == .repeated or (field.type != .message and field.type != .group)) continue;
             const type_name = strip_dot(field.type_name orelse continue);
             if (try index.reaches(arena, visited, type_name, target)) return true;
         }

@@ -44,10 +44,36 @@ pub const Type = enum(i32) {
     pub const protobuf: proto.EnumDescriptor = .{ .full_name = "google.protobuf.FieldDescriptorProto.Type", .values = &.{} };
 };
 
+/// The edition features the generator reads (descriptor.proto, FeatureSet). Each value names a
+/// choice, and 0 is unknown; a field with none set inherits its parent's.
+pub const FeatureSet = struct {
+    field_presence: ?i32 = null,
+    repeated_field_encoding: ?i32 = null,
+    message_encoding: ?i32 = null,
+    pub const FieldNumber = enum(u29) { field_presence = 1, repeated_field_encoding = 3, message_encoding = 5 };
+    pub const protobuf: Descriptor = .{ .full_name = "google.protobuf.FeatureSet", .fields = &.{
+        field_of(FieldNumber.field_presence, .int32, .{}), field_of(FieldNumber.repeated_field_encoding, .int32, .{}), field_of(FieldNumber.message_encoding, .int32, .{}),
+    } };
+};
+
+/// FeatureSet.FieldPresence's values.
+pub const presence_explicit = 1;
+pub const presence_implicit = 2;
+pub const presence_legacy_required = 3;
+/// FeatureSet.RepeatedFieldEncoding's values.
+pub const encoding_packed = 1;
+pub const encoding_expanded = 2;
+/// FeatureSet.MessageEncoding's values.
+pub const message_length_prefixed = 1;
+pub const message_delimited = 2;
+
 pub const FieldOptions = struct {
     @"packed": ?bool = null,
-    pub const FieldNumber = enum(u29) { @"packed" = 2 };
-    pub const protobuf: Descriptor = .{ .full_name = "google.protobuf.FieldOptions", .fields = &.{field_of(FieldNumber.@"packed", .bool, .{})} };
+    features: ?FeatureSet = null,
+    pub const FieldNumber = enum(u29) { @"packed" = 2, features = 21 };
+    pub const protobuf: Descriptor = .{ .full_name = "google.protobuf.FieldOptions", .fields = &.{
+        field_of(FieldNumber.@"packed", .bool, .{}), field_of(FieldNumber.features, .message, .{}),
+    } };
 };
 
 pub const FieldDescriptorProto = struct {
@@ -76,8 +102,17 @@ pub const OneofDescriptorProto = struct {
 
 pub const MessageOptions = struct {
     map_entry: ?bool = null,
-    pub const FieldNumber = enum(u29) { map_entry = 7 };
-    pub const protobuf: Descriptor = .{ .full_name = "google.protobuf.MessageOptions", .fields = &.{field_of(FieldNumber.map_entry, .bool, .{})} };
+    features: ?FeatureSet = null,
+    pub const FieldNumber = enum(u29) { map_entry = 7, features = 12 };
+    pub const protobuf: Descriptor = .{ .full_name = "google.protobuf.MessageOptions", .fields = &.{
+        field_of(FieldNumber.map_entry, .bool, .{}), field_of(FieldNumber.features, .message, .{}),
+    } };
+};
+
+pub const FileOptions = struct {
+    features: ?FeatureSet = null,
+    pub const FieldNumber = enum(u29) { features = 50 };
+    pub const protobuf: Descriptor = .{ .full_name = "google.protobuf.FileOptions", .fields = &.{field_of(FieldNumber.features, .message, .{})} };
 };
 
 pub const EnumValueDescriptorProto = struct {
@@ -157,12 +192,15 @@ pub const FileDescriptorProto = struct {
     message_type: Repeated(DescriptorProto, .message) = .{},
     enum_type: Repeated(EnumDescriptorProto, .message) = .{},
     service: Repeated(ServiceDescriptorProto, .message) = .{},
+    options: ?FileOptions = null,
     syntax: ?[]const u8 = null,
-    pub const FieldNumber = enum(u29) { name = 1, package = 2, dependency = 3, message_type = 4, enum_type = 5, service = 6, syntax = 12 };
+    /// The edition of a file whose syntax is "editions": an `Edition` number such as 1000.
+    edition: ?i32 = null,
+    pub const FieldNumber = enum(u29) { name = 1, package = 2, dependency = 3, message_type = 4, enum_type = 5, service = 6, options = 8, syntax = 12, edition = 14 };
     pub const protobuf: Descriptor = .{ .full_name = "google.protobuf.FileDescriptorProto", .fields = &.{
         field_of(FieldNumber.name, .string, .{}),          field_of(FieldNumber.package, .string, .{}),    field_of(FieldNumber.dependency, .string, .{}),
         field_of(FieldNumber.message_type, .message, .{}), field_of(FieldNumber.enum_type, .message, .{}), field_of(FieldNumber.service, .message, .{}),
-        field_of(FieldNumber.syntax, .string, .{}),
+        field_of(FieldNumber.options, .message, .{}),      field_of(FieldNumber.syntax, .string, .{}),     field_of(FieldNumber.edition, .int32, .{}),
     } };
 };
 
@@ -187,13 +225,22 @@ pub const GeneratedFile = struct {
 
 /// CodeGeneratorResponse.Feature: FEATURE_PROTO3_OPTIONAL is 1.
 pub const feature_proto3_optional: u64 = 1;
+/// CodeGeneratorResponse.Feature: the plugin reads edition files and resolves their features.
+pub const feature_supports_editions: u64 = 2;
+/// The editions the plugin supports, as `Edition` numbers: from proto2 to 2024.
+pub const edition_proto2: i32 = 998;
+pub const edition_2024: i32 = 1001;
 
 pub const CodeGeneratorResponse = struct {
     @"error": ?[]const u8 = null,
     supported_features: ?u64 = null,
+    minimum_edition: ?i32 = null,
+    maximum_edition: ?i32 = null,
     file: Repeated(GeneratedFile, .message) = .{},
-    pub const FieldNumber = enum(u29) { @"error" = 1, supported_features = 2, file = 15 };
+    pub const FieldNumber = enum(u29) { @"error" = 1, supported_features = 2, minimum_edition = 3, maximum_edition = 4, file = 15 };
     pub const protobuf: Descriptor = .{ .full_name = "google.protobuf.compiler.CodeGeneratorResponse", .fields = &.{
-        field_of(FieldNumber.@"error", .string, .{}), field_of(FieldNumber.supported_features, .uint64, .{}), field_of(FieldNumber.file, .message, .{}),
+        field_of(FieldNumber.@"error", .string, .{}),       field_of(FieldNumber.supported_features, .uint64, .{}),
+        field_of(FieldNumber.minimum_edition, .int32, .{}), field_of(FieldNumber.maximum_edition, .int32, .{}),
+        field_of(FieldNumber.file, .message, .{}),
     } };
 };

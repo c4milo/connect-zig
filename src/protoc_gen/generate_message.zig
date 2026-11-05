@@ -2,6 +2,7 @@
 //! nested messages and enums. Each field number is a member of `FieldNumber`, so the generated
 //! code names every number, as the magic-numbers rule asks of all code here.
 const std = @import("std");
+const Features = @import("features.zig").Features;
 const Allocator = std.mem.Allocator;
 const pb = @import("descriptor_pb.zig");
 const names = @import("names.zig");
@@ -18,6 +19,8 @@ pub const Pending = struct {
     /// Its piece's name, the Zig path joined by dots: "Tree.Leaf".
     path: []const u8,
     declaration: union(enum) { message: pb.DescriptorProto, enumeration: pb.EnumDescriptorProto },
+    /// The features in effect where it is declared.
+    features: Features,
 };
 
 /// Where nested declarations go: inline, or into pieces of their own.
@@ -38,6 +41,10 @@ pub fn write(out: *Out, scope: []const u8, message: pb.DescriptorProto, depth: u
     const full = try generate_out.full_name(out.arena, scope, name);
     const fields = try collect_fields(out, message);
     try check_names(message);
+    // The message's fields, and the messages nested in it, resolve features from its own.
+    const enclosing = out.features;
+    out.features = enclosing.of_message(message);
+    defer out.features = enclosing;
     try out.print("\n", .{});
     try out.indent(depth);
     try out.print("pub const {s} = struct {{\n", .{try names.identifier(out.arena, name)});
@@ -59,7 +66,7 @@ fn write_nested(out: *Out, full: []const u8, message: pb.DescriptorProto, depth:
         };
         const child_path = try std.fmt.allocPrint(out.arena, "{s}.{s}", .{ nesting.path, child.name orelse "" });
         try write_import(out, child.name orelse "", child_path, depth);
-        try pending.append(out.arena, .{ .scope = full, .path = child_path, .declaration = .{ .message = child } });
+        try pending.append(out.arena, .{ .scope = full, .path = child_path, .declaration = .{ .message = child }, .features = out.features });
     }
     var enums = message.enum_type.iterator();
     while (try enums.next()) |enumeration| {
@@ -69,7 +76,7 @@ fn write_nested(out: *Out, full: []const u8, message: pb.DescriptorProto, depth:
         };
         const child_path = try std.fmt.allocPrint(out.arena, "{s}.{s}", .{ nesting.path, enumeration.name orelse "" });
         try write_import(out, enumeration.name orelse "", child_path, depth);
-        try pending.append(out.arena, .{ .scope = full, .path = child_path, .declaration = .{ .enumeration = enumeration } });
+        try pending.append(out.arena, .{ .scope = full, .path = child_path, .declaration = .{ .enumeration = enumeration }, .features = out.features });
     }
 }
 
@@ -155,7 +162,7 @@ fn value_type(out: *Out, container: []const u8, field: pb.FieldDescriptorProto) 
         .bool => "bool",
         .string, .bytes => "[]const u8",
         .@"enum" => out.reference(index_file.strip_dot(field.type_name orelse "")),
-        .message => message_type(out, container, field),
+        .message, .group => message_type(out, container, field),
         else => error.UnknownType,
     };
 }
@@ -174,9 +181,9 @@ const Typed = struct { text: []const u8, default: []const u8 };
 fn zig_type(out: *Out, container: []const u8, field: pb.FieldDescriptorProto) Error!Typed {
     if (field.label == .repeated) {
         const value = try value_type(out, container, field);
-        return .{ .text = try std.fmt.allocPrint(out.arena, "proto.Repeated({s}, .{s})", .{ value, kind_name(field.type.?) }), .default = ".{}" };
+        return .{ .text = try std.fmt.allocPrint(out.arena, "proto.Repeated({s}, .{s})", .{ value, try field_kind(out, field) }), .default = ".{}" };
     }
-    if (field.type == .message) {
+    if (field.type == .message or field.type == .group) {
         const target = index_file.strip_dot(field.type_name orelse "");
         const reference = try out.reference(target);
         // A message that contains itself, at any depth, is held as `proto.Lazy`: a struct
@@ -198,7 +205,9 @@ fn zig_type(out: *Out, container: []const u8, field: pb.FieldDescriptorProto) Er
 /// outside a oneof (language guide, "Field Presence").
 fn has_presence(out: *const Out, field: pb.FieldDescriptorProto) bool {
     if (field.proto3_optional orelse false) return true;
-    return out.proto2 and field.label != .repeated and field.oneof_index == null;
+    if (field.label == .repeated or field.oneof_index != null) return false;
+    // proto2 and editions give a singular field presence; proto3 and IMPLICIT do not.
+    return out.features.of_field(field).explicit_presence;
 }
 
 /// Whether a repeated packable field is written unpacked: proto3 packs unless the field says
@@ -211,7 +220,24 @@ fn unpacked(out: *const Out, field: pb.FieldDescriptorProto) bool {
     }
     const stated: ?bool = if (field.options) |options| options.@"packed" else null;
     if (stated) |packed_flag| return !packed_flag;
-    return out.proto2;
+    return !out.features.of_field(field).@"packed";
+}
+
+/// The runtime's kind of a field: its type's name, but `group` for a proto2 group and for a
+/// message field whose `message_encoding` is DELIMITED. A map's entries are always written with
+/// a length (editions, "message_encoding").
+fn field_kind(out: *const Out, field: pb.FieldDescriptorProto) Error![]const u8 {
+    const kind = field.type orelse return error.UnknownType;
+    if (kind == .message and out.features.of_field(field).delimited and !try is_map(out, field)) return "group";
+    return kind_name(kind);
+}
+
+fn is_map(out: *const Out, field: pb.FieldDescriptorProto) Error!bool {
+    if (field.label != .repeated) return false;
+    const entry = try out.index.get(index_file.strip_dot(field.type_name orelse ""));
+    const message = entry.message orelse return false;
+    const options = message.options orelse return false;
+    return options.map_entry orelse false;
 }
 
 pub fn kind_name(kind: pb.Type) []const u8 {
@@ -275,7 +301,7 @@ fn write_field_entry(out: *Out, member: Member, depth: usize) Error!void {
         try names.string_literal(out.arena, name),
         field_number_enum,
         try names.field_identifier(out.arena, name),
-        kind_name(field.type orelse .int32),
+        try field_kind(out, field),
         try names.string_literal(out.arena, field.json_name orelse name),
         try names.string_literal(out.arena, name),
     });
