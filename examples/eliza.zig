@@ -27,16 +27,16 @@ const Service = eliza.ElizaService;
 
 const calls_count = 7;
 
-pub const Error = error{ExchangeWrong};
+pub const Error = error{CallWrong};
 
-// colibri reads and writes each exchange until the round ends, so they live outside the stack.
-var say_proto: rpc.Exchange(Service.say) align(@alignOf(rpc.Exchange(Service.say))) = undefined;
-var say_get: rpc.Exchange(Service.say) align(@alignOf(rpc.Exchange(Service.say))) = undefined;
-var introduce: rpc.Exchange(Service.introduce) align(@alignOf(rpc.Exchange(Service.introduce))) = undefined;
-var converse: rpc.Exchange(Service.converse) align(@alignOf(rpc.Exchange(Service.converse))) = undefined;
-var say_empty: rpc.Exchange(Service.say) align(@alignOf(rpc.Exchange(Service.say))) = undefined;
-var say_grpc: rpc.Exchange(Service.say) align(@alignOf(rpc.Exchange(Service.say))) = undefined;
-var introduce_grpc: rpc.Exchange(Service.introduce) align(@alignOf(rpc.Exchange(Service.introduce))) = undefined;
+// colibri reads and writes each call until the round ends, so they live outside the stack.
+var say_proto: rpc.ClientCall(Service.say) align(@alignOf(rpc.ClientCall(Service.say))) = undefined;
+var say_get: rpc.ClientCall(Service.say) align(@alignOf(rpc.ClientCall(Service.say))) = undefined;
+var introduce: rpc.ClientCall(Service.introduce) align(@alignOf(rpc.ClientCall(Service.introduce))) = undefined;
+var converse: rpc.ClientCall(Service.converse) align(@alignOf(rpc.ClientCall(Service.converse))) = undefined;
+var say_empty: rpc.ClientCall(Service.say) align(@alignOf(rpc.ClientCall(Service.say))) = undefined;
+var say_grpc: rpc.ClientCall(Service.say) align(@alignOf(rpc.ClientCall(Service.say))) = undefined;
+var introduce_grpc: rpc.ClientCall(Service.introduce) align(@alignOf(rpc.ClientCall(Service.introduce))) = undefined;
 var buffers: [calls_count]harness.CallBuffers align(@alignOf(harness.CallBuffers)) = undefined;
 
 pub fn main() !void {
@@ -72,10 +72,10 @@ fn round(protocols: client.Protocols, expected: client.Protocol) !void {
 /// Reads every message of a response and checks each sentence, then success.
 fn expect_sentences(response: *connect.client.Response, comptime T: type, sentences: []const []const u8) !void {
     for (sentences) |sentence| {
-        const message = try response.next(T) orelse return error.ExchangeWrong;
+        const message = try response.next(T) orelse return error.CallWrong;
         if (!std.mem.eql(u8, message.sentence, sentence)) {
             std.debug.print("eliza: got \"{s}\", wanted \"{s}\"\n", .{ message.sentence, sentence });
-            return error.ExchangeWrong;
+            return error.CallWrong;
         }
     }
     try harness.expect_end(response, T);
@@ -96,7 +96,7 @@ fn check() !void {
     var introduced_grpc = introduce_grpc.read(harness.storage());
     try expect_sentences(&introduced_grpc, eliza.IntroduceResponse, &service.introduce_answers);
     var empty = say_empty.read(harness.storage());
-    if (try empty.next(eliza.SayResponse) != null) return error.ExchangeWrong;
-    const failure = empty.failure orelse return error.ExchangeWrong;
-    if (failure.code != .invalid_argument or !std.mem.eql(u8, failure.message, "say something")) return error.ExchangeWrong;
+    if (try empty.next(eliza.SayResponse) != null) return error.CallWrong;
+    const failure = empty.failure orelse return error.CallWrong;
+    if (failure.code != .invalid_argument or !std.mem.eql(u8, failure.message, "say something")) return error.CallWrong;
 }

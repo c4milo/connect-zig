@@ -1,5 +1,5 @@
 //! connect_colibri's tests: a router table holding a route of each stream type compiles, and a
-//! client `Exchange` reads what colibri wrote into its response. `zig build examples` runs both
+//! client `ClientCall` reads what colibri wrote into its response. `zig build examples` runs both
 //! sides over colibri's h2 and h11 (design §8 step 5).
 const std = @import("std");
 const testing = std.testing;
@@ -81,8 +81,8 @@ test "a route table holds a route of each stream type, and a GET beside a POST" 
     try testing.expect(routes.match("GET", "/test.Svc/Count", &parameters) != .found);
 }
 
-test "an exchange writes its request for colibri and reads what colibri filled in" {
-    const Call = rpc.Exchange(say);
+test "a client call writes its request for colibri and reads what colibri filled in" {
+    const Call = rpc.ClientCall(say);
     var call: Call = undefined;
     var buffers: [7][512]u8 = undefined;
     try call.init(.{ .protocol = .grpc_web }, &.{.{ .text = "hi" }}, .{
@@ -93,7 +93,7 @@ test "an exchange writes its request for colibri and reads what colibri filled i
     });
     try testing.expectEqualStrings("POST", call.request.method);
     try testing.expectEqualStrings("/test.Svc/Say", call.request.path);
-    // What colibri writes into the response at the exchange's end: a grpc-web body.
+    // What colibri writes into the response at the call's end: a grpc-web body.
     const body = [_]u8{ 0, 0, 0, 0, 4, 0x0a, 2, 'h', 'i', 0x80, 0, 0, 0, 16 } ++ "grpc-status: 0\r\n".*;
     @memcpy(call.response.body[0..body.len], &body);
     call.response.body_len = body.len;
@@ -132,8 +132,8 @@ fn write_lines(section: anytype, lines: []const connect.Header) void {
     section.len = used;
 }
 
-test "a gRPC exchange reads its status from the response's trailers (PROTOCOL-HTTP2.md, Responses)" {
-    const Call = rpc.Exchange(say);
+test "a gRPC client call reads its status from the response's trailers (PROTOCOL-HTTP2.md, Responses)" {
+    const Call = rpc.ClientCall(say);
     var call: Call = undefined;
     var buffers: [7][512]u8 = undefined;
     try call.init(.{ .protocol = .grpc }, &.{.{ .text = "hi" }}, .{
@@ -177,7 +177,7 @@ test "a gRPC exchange reads its status from the response's trailers (PROTOCOL-HT
     try testing.expect(cut.failure != null);
 }
 
-test "an exchange that ends with no response maps to the code a client retries on" {
+test "a client call that ends with no response maps to the code a client retries on" {
     try testing.expectEqual(connect.Code.unavailable, rpc.failure_of(.refused).code);
     try testing.expectEqual(connect.Code.unavailable, rpc.failure_of(.closed).code);
     try testing.expectEqual(connect.Code.resource_exhausted, rpc.failure_of(.too_large).code);

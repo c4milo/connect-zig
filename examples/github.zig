@@ -34,7 +34,7 @@ const service = @import("services/github.zig");
 const Repositories = github.RepositoryService;
 const Issues = github.IssueService;
 
-pub const Error = error{ExchangeWrong};
+pub const Error = error{CallWrong};
 
 /// What each caller sends: octocat's token, hubot's, or none.
 const octocat = [_]connect.Header{.{ .name = "authorization", .value = "Bearer " ++ store_file.tokens[0] }};
@@ -55,16 +55,16 @@ const events_count = 11;
 /// router pool's 8 requests.
 const burst_len = 6;
 
-var create_repository: rpc.Exchange(Repositories.create_repository) align(@alignOf(rpc.Exchange(Repositories.create_repository))) = undefined;
-var get_repository: rpc.Exchange(Repositories.get_repository) align(@alignOf(rpc.Exchange(Repositories.get_repository))) = undefined;
-var list_repositories: rpc.Exchange(Repositories.list_repositories) align(@alignOf(rpc.Exchange(Repositories.list_repositories))) = undefined;
-var create_issue: rpc.Exchange(Issues.create_issue) align(@alignOf(rpc.Exchange(Issues.create_issue))) = undefined;
-var get_issue: rpc.Exchange(Issues.get_issue) align(@alignOf(rpc.Exchange(Issues.get_issue))) = undefined;
-var list_issues: rpc.Exchange(Issues.list_issues) align(@alignOf(rpc.Exchange(Issues.list_issues))) = undefined;
-var update_issue: rpc.Exchange(Issues.update_issue) align(@alignOf(rpc.Exchange(Issues.update_issue))) = undefined;
-var import_issues: rpc.Exchange(Issues.import_issues) align(@alignOf(rpc.Exchange(Issues.import_issues))) = undefined;
-var watch_events: rpc.Exchange(Issues.watch_events) align(@alignOf(rpc.Exchange(Issues.watch_events))) = undefined;
-var burst: [burst_len]rpc.Exchange(Repositories.get_repository) align(@alignOf(rpc.Exchange(Repositories.get_repository))) = undefined;
+var create_repository: rpc.ClientCall(Repositories.create_repository) align(@alignOf(rpc.ClientCall(Repositories.create_repository))) = undefined;
+var get_repository: rpc.ClientCall(Repositories.get_repository) align(@alignOf(rpc.ClientCall(Repositories.get_repository))) = undefined;
+var list_repositories: rpc.ClientCall(Repositories.list_repositories) align(@alignOf(rpc.ClientCall(Repositories.list_repositories))) = undefined;
+var create_issue: rpc.ClientCall(Issues.create_issue) align(@alignOf(rpc.ClientCall(Issues.create_issue))) = undefined;
+var get_issue: rpc.ClientCall(Issues.get_issue) align(@alignOf(rpc.ClientCall(Issues.get_issue))) = undefined;
+var list_issues: rpc.ClientCall(Issues.list_issues) align(@alignOf(rpc.ClientCall(Issues.list_issues))) = undefined;
+var update_issue: rpc.ClientCall(Issues.update_issue) align(@alignOf(rpc.ClientCall(Issues.update_issue))) = undefined;
+var import_issues: rpc.ClientCall(Issues.import_issues) align(@alignOf(rpc.ClientCall(Issues.import_issues))) = undefined;
+var watch_events: rpc.ClientCall(Issues.watch_events) align(@alignOf(rpc.ClientCall(Issues.watch_events))) = undefined;
+var burst: [burst_len]rpc.ClientCall(Repositories.get_repository) align(@alignOf(rpc.ClientCall(Repositories.get_repository))) = undefined;
 var buffers: [burst_len]harness.CallBuffers align(@alignOf(harness.CallBuffers)) = undefined;
 
 /// The token of the next page of a list, which the client sends back.
@@ -101,51 +101,51 @@ fn session(round_protocols: client.Protocols, round_protocol: client.Protocol) !
 }
 
 /// Runs one call alone, so each step sees what the steps before it changed.
-fn call(exchange: anytype, options: connect.client.Options, messages: MessagesOf(@TypeOf(exchange))) !void {
+fn call(client_call: anytype, options: connect.client.Options, messages: MessagesOf(@TypeOf(client_call))) !void {
     try harness.begin(protocols);
-    try exchange.init(options, messages, harness.buffers(&buffers[0]));
-    try harness.request(&exchange.request, &exchange.response);
+    try client_call.init(options, messages, harness.buffers(&buffers[0]));
+    try harness.request(&client_call.request, &client_call.response);
     try harness.finish(expected);
 }
 
-/// The request messages an exchange's `init` takes, so a call's literals take their type.
+/// The request messages a client call's `init` takes, so a call's literals take their type.
 fn MessagesOf(comptime Pointer: type) type {
-    const Exchange = @typeInfo(Pointer).pointer.child;
-    return @typeInfo(@TypeOf(Exchange.init)).@"fn".params[2].type.?;
+    const ClientCall = @typeInfo(Pointer).pointer.child;
+    return @typeInfo(@TypeOf(ClientCall.init)).@"fn".params[2].type.?;
 }
 
 /// The one message a call answered. Its strings stay valid until the next `read`.
-fn answer(comptime T: type, exchange: anytype) !T {
-    var response = exchange.read(harness.storage());
+fn answer(comptime T: type, client_call: anytype) !T {
+    var response = client_call.read(harness.storage());
     const message = try response.next(T) orelse {
         if (response.failure) |failure| std.debug.print("github: {s}: {s}\n", .{ failure.code.name(), failure.message });
-        return error.ExchangeWrong;
+        return error.CallWrong;
     };
     try harness.expect_end(&response, T);
     return message;
 }
 
 /// The error a call failed with, which must be `code`.
-fn failed_with(comptime T: type, exchange: anytype, code: connect.Code) !connect.RpcError {
-    var response = exchange.read(harness.storage());
-    if (try response.next(T) != null) return error.ExchangeWrong;
-    const failed = response.failure orelse return error.ExchangeWrong;
+fn failed_with(comptime T: type, client_call: anytype, code: connect.Code) !connect.RpcError {
+    var response = client_call.read(harness.storage());
+    if (try response.next(T) != null) return error.CallWrong;
+    const failed = response.failure orelse return error.CallWrong;
     if (failed.code != code) {
         std.debug.print("github: wanted {s}, got {s}: {s}\n", .{ code.name(), failed.code.name(), failed.message });
-        return error.ExchangeWrong;
+        return error.CallWrong;
     }
     return failed;
 }
 
 /// The one detail of an error, decoded as `Detail`.
 fn detail(comptime Detail: type, failed: connect.RpcError) !Detail {
-    if (failed.details.len != 1) return error.ExchangeWrong;
-    if (!std.mem.eql(u8, failed.details[0].type_name, Detail.protobuf.full_name)) return error.ExchangeWrong;
+    if (failed.details.len != 1) return error.CallWrong;
+    if (!std.mem.eql(u8, failed.details[0].type_name, Detail.protobuf.full_name)) return error.CallWrong;
     return proto.decode(Detail, failed.details[0].value);
 }
 
 fn expect(condition: bool) !void {
-    if (!condition) return error.ExchangeWrong;
+    if (!condition) return error.CallWrong;
 }
 
 /// Step 1: octocat creates a repository; a second create of its name, and one with no token, fail.
@@ -240,7 +240,7 @@ fn read_issues() !void {
         pages += 1;
         if (page.next_page_token.len == 0) break;
         // The token lives in the response's storage, which the next read reuses: keep a copy.
-        if (page.next_page_token.len > page_token.len) return error.ExchangeWrong;
+        if (page.next_page_token.len > page_token.len) return error.CallWrong;
         @memcpy(page_token[0..page.next_page_token.len], page.next_page_token);
         request.page_token = page_token[0..page.next_page_token.len];
     }
@@ -281,20 +281,20 @@ fn rate_limit() !void {
     const left = service.limit_anonymous - harness.app.github.store.calls[store_file.anonymous];
     try expect(left < burst_len);
     try harness.begin(protocols);
-    for (&burst, 0..) |*exchange, index| {
-        try exchange.init(.{}, &.{.{ .owner = "octocat", .name = "hello-world" }}, harness.buffers(&buffers[index]));
-        try harness.request(&exchange.request, &exchange.response);
+    for (&burst, 0..) |*client_call, index| {
+        try client_call.init(.{}, &.{.{ .owner = "octocat", .name = "hello-world" }}, harness.buffers(&buffers[index]));
+        try harness.request(&client_call.request, &client_call.response);
     }
     try harness.finish(expected);
     var answered: usize = 0;
     var limited: usize = 0;
-    for (&burst) |*exchange| {
-        var response = exchange.read(harness.storage());
+    for (&burst) |*client_call| {
+        var response = client_call.read(harness.storage());
         if (try response.next(github.Repository) != null) {
             answered += 1;
             continue;
         }
-        const limit = try detail(github.RateLimited, response.failure orelse return error.ExchangeWrong);
+        const limit = try detail(github.RateLimited, response.failure orelse return error.CallWrong);
         try expect(response.failure.?.code == .resource_exhausted and limit.limit == service.limit_anonymous);
         limited += 1;
     }

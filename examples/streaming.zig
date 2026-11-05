@@ -22,21 +22,21 @@ const Service = demo.DemoService;
 const calls_count = 8;
 const countdown_from = 3;
 
-pub const Error = error{ExchangeWrong};
+pub const Error = error{CallWrong};
 
 const lines = [_]demo.ChatMessage{ .{ .text = "hello" }, .{ .text = "how are you" }, .{ .text = "goodbye" } };
 const echoes = [_][]const u8{ "echo: hello", "echo: how are you", "echo: goodbye", "bye after 3" };
 const numbers = [_]demo.SumRequest{ .{ .number = 1 }, .{ .number = 2 }, .{ .number = 3 }, .{ .number = 4 } };
 const numbers_sum = 10;
 
-var chat: rpc.Exchange(Service.chat) align(@alignOf(rpc.Exchange(Service.chat))) = undefined;
-var chat_refused: rpc.Exchange(Service.chat) align(@alignOf(rpc.Exchange(Service.chat))) = undefined;
-var chat_cut: rpc.Exchange(Service.chat) align(@alignOf(rpc.Exchange(Service.chat))) = undefined;
-var chat_silent: rpc.Exchange(Service.chat) align(@alignOf(rpc.Exchange(Service.chat))) = undefined;
-var sum: rpc.Exchange(Service.sum) align(@alignOf(rpc.Exchange(Service.sum))) = undefined;
-var sum_web: rpc.Exchange(Service.sum) align(@alignOf(rpc.Exchange(Service.sum))) = undefined;
-var countdown: rpc.Exchange(Service.countdown) align(@alignOf(rpc.Exchange(Service.countdown))) = undefined;
-var countdown_far: rpc.Exchange(Service.countdown) align(@alignOf(rpc.Exchange(Service.countdown))) = undefined;
+var chat: rpc.ClientCall(Service.chat) align(@alignOf(rpc.ClientCall(Service.chat))) = undefined;
+var chat_refused: rpc.ClientCall(Service.chat) align(@alignOf(rpc.ClientCall(Service.chat))) = undefined;
+var chat_cut: rpc.ClientCall(Service.chat) align(@alignOf(rpc.ClientCall(Service.chat))) = undefined;
+var chat_silent: rpc.ClientCall(Service.chat) align(@alignOf(rpc.ClientCall(Service.chat))) = undefined;
+var sum: rpc.ClientCall(Service.sum) align(@alignOf(rpc.ClientCall(Service.sum))) = undefined;
+var sum_web: rpc.ClientCall(Service.sum) align(@alignOf(rpc.ClientCall(Service.sum))) = undefined;
+var countdown: rpc.ClientCall(Service.countdown) align(@alignOf(rpc.ClientCall(Service.countdown))) = undefined;
+var countdown_far: rpc.ClientCall(Service.countdown) align(@alignOf(rpc.ClientCall(Service.countdown))) = undefined;
 var buffers: [calls_count]harness.CallBuffers align(@alignOf(harness.CallBuffers)) = undefined;
 
 pub fn main() !void {
@@ -80,8 +80,8 @@ fn round(protocols: client.Protocols, expected: client.Protocol) !void {
 fn check_chat() !void {
     var chatted = chat.read(harness.storage());
     for (echoes) |echo| {
-        const message = try chatted.next(demo.ChatMessage) orelse return error.ExchangeWrong;
-        if (!std.mem.eql(u8, message.text, echo)) return error.ExchangeWrong;
+        const message = try chatted.next(demo.ChatMessage) orelse return error.CallWrong;
+        if (!std.mem.eql(u8, message.text, echo)) return error.CallWrong;
     }
     try harness.expect_end(&chatted, demo.ChatMessage);
     // Chat's `on_end` adds a trailer, and `Counting` two more, which the Connect end-stream
@@ -91,8 +91,8 @@ fn check_chat() !void {
     try harness.expect_trailer(chatted.metadata, service.sent_trailer, "4");
 
     var silent = chat_silent.read(harness.storage());
-    const bye = try silent.next(demo.ChatMessage) orelse return error.ExchangeWrong;
-    if (!std.mem.eql(u8, bye.text, "bye after 0")) return error.ExchangeWrong;
+    const bye = try silent.next(demo.ChatMessage) orelse return error.CallWrong;
+    if (!std.mem.eql(u8, bye.text, "bye after 0")) return error.CallWrong;
     try harness.expect_end(&silent, demo.ChatMessage);
     // gRPC-Web carries the call's trailers in its trailers frame.
     try harness.expect_trailer(silent.metadata, service.received_trailer, "0");
@@ -100,11 +100,11 @@ fn check_chat() !void {
 
     // The empty message fails the call: its answer to "x" arrived, and no message after.
     var refused = chat_refused.read(harness.storage());
-    const echo = try refused.next(demo.ChatMessage) orelse return error.ExchangeWrong;
-    if (!std.mem.eql(u8, echo.text, "echo: x")) return error.ExchangeWrong;
-    if (try refused.next(demo.ChatMessage) != null) return error.ExchangeWrong;
-    const failure = refused.failure orelse return error.ExchangeWrong;
-    if (failure.code != .invalid_argument) return error.ExchangeWrong;
+    const echo = try refused.next(demo.ChatMessage) orelse return error.CallWrong;
+    if (!std.mem.eql(u8, echo.text, "echo: x")) return error.CallWrong;
+    if (try refused.next(demo.ChatMessage) != null) return error.CallWrong;
+    const failure = refused.failure orelse return error.CallWrong;
+    if (failure.code != .invalid_argument) return error.CallWrong;
     try harness.expect_trailer(refused.metadata, service.received_trailer, "2");
     try harness.expect_trailer(refused.metadata, service.sent_trailer, "1");
 }
@@ -112,33 +112,33 @@ fn check_chat() !void {
 fn check_cut() !void {
     var cut = chat_cut.read(harness.storage());
     for (echoes[0 .. lines.len - 1]) |echo| {
-        const message = try cut.next(demo.ChatMessage) orelse return error.ExchangeWrong;
-        if (!std.mem.eql(u8, message.text, echo)) return error.ExchangeWrong;
+        const message = try cut.next(demo.ChatMessage) orelse return error.CallWrong;
+        if (!std.mem.eql(u8, message.text, echo)) return error.CallWrong;
     }
-    if (try cut.next(demo.ChatMessage) != null) return error.ExchangeWrong;
-    const failure = cut.failure orelse return error.ExchangeWrong;
-    if (failure.code != .invalid_argument) return error.ExchangeWrong;
+    if (try cut.next(demo.ChatMessage) != null) return error.CallWrong;
+    const failure = cut.failure orelse return error.CallWrong;
+    if (failure.code != .invalid_argument) return error.CallWrong;
     // The call ended through the interceptors, so `Counting` still reports it.
     try harness.expect_trailer(cut.metadata, service.received_trailer, "2");
 }
 
-fn check_sum(exchange: *const rpc.Exchange(Service.sum)) !void {
-    var summed = exchange.read(harness.storage());
-    const answer = try summed.next(demo.SumResponse) orelse return error.ExchangeWrong;
-    if (answer.sum != numbers_sum or answer.count != numbers.len) return error.ExchangeWrong;
+fn check_sum(client_call: *const rpc.ClientCall(Service.sum)) !void {
+    var summed = client_call.read(harness.storage());
+    const answer = try summed.next(demo.SumResponse) orelse return error.CallWrong;
+    if (answer.sum != numbers_sum or answer.count != numbers.len) return error.CallWrong;
     try harness.expect_end(&summed, demo.SumResponse);
 }
 
 fn check_countdown() !void {
     var counted = countdown.read(harness.storage());
     for (0..countdown_from) |index| {
-        const message = try counted.next(demo.CountdownResponse) orelse return error.ExchangeWrong;
-        if (message.number != countdown_from - index) return error.ExchangeWrong;
+        const message = try counted.next(demo.CountdownResponse) orelse return error.CallWrong;
+        if (message.number != countdown_from - index) return error.CallWrong;
     }
     try harness.expect_end(&counted, demo.CountdownResponse);
 
     var far = countdown_far.read(harness.storage());
-    if (try far.next(demo.CountdownResponse) != null) return error.ExchangeWrong;
-    const failure = far.failure orelse return error.ExchangeWrong;
-    if (failure.code != .out_of_range) return error.ExchangeWrong;
+    if (try far.next(demo.CountdownResponse) != null) return error.CallWrong;
+    const failure = far.failure orelse return error.CallWrong;
+    if (failure.code != .out_of_range) return error.CallWrong;
 }

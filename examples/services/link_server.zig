@@ -43,7 +43,7 @@ pub const cpu: tls.Cpu = .{
     .timing = .not_stated,
 };
 
-pub const Error = error{ ExchangeWrong, SendUnfinished };
+pub const Error = error{ CallWrong, SendUnfinished };
 
 /// One TCP connection and one QUIC connection at a time: each round opens one.
 const Endpoint = server.EndpointOf(.{ .tcp_connections = 1, .quic_connections = 1, .receive_pool_len = receive_pool_len });
@@ -96,7 +96,7 @@ pub fn deinit() void {
 
 /// Accepts the socket the client connected, in cleartext.
 pub fn accept() !void {
-    accepted = endpoint.accept(.{ .tls = false }, link.now_ns(.server)) orelse return error.ExchangeWrong;
+    accepted = endpoint.accept(.{ .tls = false }, link.now_ns(.server)) orelse return error.CallWrong;
 }
 
 /// One turn of the server: fire its deadlines, pass the endpoint what the socket read and each
@@ -156,11 +156,11 @@ fn serve(event: server.Event, now_ns: u64) !void {
             .send => |connection| try flush(connection, now_ns),
             .close => {},
             .ended => |over| {
-                if (over.failed) return error.ExchangeWrong;
+                if (over.failed) return error.CallWrong;
                 if (accepted == over.connection) accepted = null;
                 ended_count += 1;
             },
-            else => return error.ExchangeWrong,
+            else => return error.CallWrong,
         },
     }
 }

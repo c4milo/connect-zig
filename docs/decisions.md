@@ -125,7 +125,7 @@ first. Cite an entry by number in code and commits ("decision 6").
 19. **Interceptors are types, chosen at compile time.** A route lists its interceptors in its
     options. Each may define `on_call`, which runs in list order and may refuse the call, and
     `on_finish`, which runs in reverse and returns the outcome the client reads. A client's
-    `ExchangeWith` lists `on_request` and `on_response` interceptors the same way. A handler and
+    `ClientCallWith` lists `on_request` and `on_response` interceptors the same way. A handler and
     an interceptor read the call through `Call`: its protocol, codec, timeout and request
     headers, and the response headers and trailers they add. Beaten: a runtime list of function
     pointers, which costs an indirect call and loses the `app` type.

@@ -175,6 +175,10 @@ ran on Linux x86-64 with Zig 0.16.0.
   `connect_colibri` gains `Call.request_headers`, `Call.request_query` and a context's
   `message_receive_limit`. It also gains 16 KiB of trailer room, for details that echo headers.
 
+- **`ClientCall`.** `connect_colibri.Exchange`, `ExchangeWith` and `ExchangeBuffers` become
+  `ClientCall`, `ClientCallWith` and `ClientCallBuffers`, so the client's side of a call reads as
+  the pair of the server's `Call`. The records above keep the names of their day.
+
 - **The gRPC client.** connect-zig pins colibri `2cf693b1`, whose client holds a response's
   headers and trailers in buffers (colibri decision 152). `connect_colibri.Exchange` reads its
   headers through `Headers.get` and a gRPC status through `Trailers.get`, and

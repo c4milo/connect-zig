@@ -6,7 +6,7 @@
 //! - `Logging` counts every call and adds a response header, and sees each call's outcome;
 //! - `Auth` refuses a call with no bearer token as unauthenticated, before the handler runs.
 //!
-//! On the client, an `ExchangeWith` takes interceptors of its own:
+//! On the client, an `ClientCallWith` takes interceptors of its own:
 //!
 //! - `BearerToken` adds the authorization header to each request it builds;
 //! - `Tally` sees each response before the program reads it, and counts them.
@@ -25,7 +25,7 @@ const Service = demo.DemoService;
 const caller = "Ada";
 const calls_count = 3;
 
-pub const Error = error{ExchangeWrong};
+pub const Error = error{CallWrong};
 
 /// Adds "authorization: Bearer Ada" to each request, as a program adds its credentials.
 const BearerToken = struct {
@@ -49,8 +49,8 @@ const Tally = struct {
 
 const http_ok_status = 200;
 
-const Signed = rpc.ExchangeWith(Service.whoami, &.{ BearerToken, Tally });
-const Anonymous = rpc.ExchangeWith(Service.whoami, &.{Tally});
+const Signed = rpc.ClientCallWith(Service.whoami, &.{ BearerToken, Tally });
+const Anonymous = rpc.ClientCallWith(Service.whoami, &.{Tally});
 
 var signed_post: Signed align(@alignOf(Signed)) = undefined;
 var signed_get: Signed align(@alignOf(Signed)) = undefined;
@@ -85,32 +85,32 @@ fn round(protocols: client.Protocols, expected: client.Protocol) !void {
     const first = try expect_caller(&signed_post) - logged_before;
     const second = try expect_caller(&signed_get) - logged_before;
     // `Logging` counted the calls in the order they arrived, so each saw a different count.
-    if (first == second or first < 0 or second < 0) return error.ExchangeWrong;
-    if (first >= calls_count or second >= calls_count) return error.ExchangeWrong;
+    if (first == second or first < 0 or second < 0) return error.CallWrong;
+    if (first >= calls_count or second >= calls_count) return error.CallWrong;
     var refused = anonymous.read(harness.storage());
-    if (try refused.next(demo.WhoamiResponse) != null) return error.ExchangeWrong;
-    const failure = refused.failure orelse return error.ExchangeWrong;
-    if (failure.code != .unauthenticated) return error.ExchangeWrong;
+    if (try refused.next(demo.WhoamiResponse) != null) return error.CallWrong;
+    const failure = refused.failure orelse return error.CallWrong;
+    if (failure.code != .unauthenticated) return error.CallWrong;
     std.debug.print("interceptors: refused without a token: {s}: {s}\n", .{ failure.code.name(), failure.message });
 
     // The server's interceptors saw all three calls, and the one `Auth` refused.
     const logged = harness.app.logged - logged_before;
     const failed = harness.app.failed - failed_before;
-    if (logged != calls_count or failed != 1) return error.ExchangeWrong;
+    if (logged != calls_count or failed != 1) return error.CallWrong;
     // The one GET reached the interceptor with its query.
-    if (harness.app.queried - queried_before != 1) return error.ExchangeWrong;
-    if (Tally.read - read_before != calls_count or Tally.http_ok - http_ok_before != calls_count) return error.ExchangeWrong;
+    if (harness.app.queried - queried_before != 1) return error.CallWrong;
+    if (Tally.read - read_before != calls_count or Tally.http_ok - http_ok_before != calls_count) return error.CallWrong;
     std.debug.print("interceptors: over {s}, server logged {d} calls, {d} failed; client read {d}\n", .{ @tagName(expected), logged, failed, Tally.read - read_before });
 }
 
 /// Reads a Whoami answer, checks the name, and returns the calls the server logged before it.
-fn expect_caller(exchange: *const Signed) !i64 {
-    var response = exchange.read(harness.storage());
+fn expect_caller(client_call: *const Signed) !i64 {
+    var response = client_call.read(harness.storage());
     const answer = try response.next(demo.WhoamiResponse) orelse {
         if (response.failure) |failure| std.debug.print("interceptors: {s}: {s}\n", .{ failure.code.name(), failure.message });
-        return error.ExchangeWrong;
+        return error.CallWrong;
     };
-    if (!std.mem.eql(u8, answer.name, caller)) return error.ExchangeWrong;
+    if (!std.mem.eql(u8, answer.name, caller)) return error.CallWrong;
     std.debug.print("interceptors: whoami answered {s}, after {d} calls\n", .{ answer.name, answer.calls_before });
     return answer.calls_before;
 }

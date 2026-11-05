@@ -1,7 +1,7 @@
 //! A client call over colibri's `client.ConnectionPool`: a `connect.client.Request` written as a
 //! `client.Request`, and the `client.Response` colibri fills read as a `connect.client.Response`
 //! (design §7). colibri's client holds the response's headers and trailers apart (colibri decision
-//! 152), so an exchange speaks Connect, gRPC-Web and gRPC (decision 11). It sends each request
+//! 152), so a client call speaks Connect, gRPC-Web and gRPC (decision 11). It sends each request
 //! body whole, so a client stream is half-duplex.
 const std = @import("std");
 const assert = std.debug.assert;
@@ -23,11 +23,11 @@ pub const Buffers = struct {
 
 /// One call of `method`. The program keeps it in place from `init` until colibri's `finished`
 /// event for its request, since colibri reads `request` and writes `response` until then.
-pub fn Exchange(comptime method: connect.Method) type {
-    return ExchangeWith(method, &.{});
+pub fn ClientCall(comptime method: connect.Method) type {
+    return ClientCallWith(method, &.{});
 }
 
-/// An `Exchange` whose interceptors see each request before it goes and each response once it
+/// An `ClientCall` whose interceptors see each request before it goes and each response once it
 /// is read. A client interceptor is a type with any of:
 ///
 /// - `on_request(*connect.client.Request) !void`, which may add headers with `add_header`;
@@ -37,7 +37,7 @@ pub fn Exchange(comptime method: connect.Method) type {
 ///
 /// `on_request` runs in the order the list names the interceptors, and `on_response` in the
 /// reverse.
-pub fn ExchangeWith(comptime method: connect.Method, comptime interceptors: []const type) type {
+pub fn ClientCallWith(comptime method: connect.Method, comptime interceptors: []const type) type {
     return struct {
         const Self = @This();
 
@@ -67,7 +67,7 @@ pub fn ExchangeWith(comptime method: connect.Method, comptime interceptors: []co
             };
         }
 
-        /// Reads the response once colibri reported the exchange `finished`.
+        /// Reads the response once colibri reported the call `finished`.
         pub fn read(self: *const Self, storage: connect.client.Storage) connect.client.Response {
             var response = read_response(self, storage);
             run_on_response(interceptors, &response);
@@ -99,7 +99,7 @@ fn run_on_response(comptime interceptors: []const type, response: *connect.clien
     }
 }
 
-/// Reads the response of an exchange once colibri reported it `finished`.
+/// Reads the response of a client call once colibri reported it `finished`.
 fn read_response(self: anytype, storage: connect.client.Storage) connect.client.Response {
     const Self = @TypeOf(self.*);
     const speaks = self.call.speaks;
@@ -121,7 +121,7 @@ fn read_response(self: anytype, storage: connect.client.Storage) connect.client.
     return connect.client.read(speaks, incoming, storage, self.options.decoders);
 }
 
-/// The error a client gives an exchange that ended with no whole response.
+/// The error a client gives a call that ended with no whole response.
 pub fn failure_of(result: client.Result) connect.RpcError {
     assert(result != .response);
     return switch (result) {

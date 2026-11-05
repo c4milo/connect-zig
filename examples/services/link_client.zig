@@ -6,10 +6,10 @@
 //! A program calls `init` once, then for each round:
 //!
 //! 1. `begin` with the protocols the pool may speak: h3 alone, or h11 and h2 without h3;
-//! 2. `request` for each call, with the colibri request and response of an `Exchange`;
+//! 2. `request` for each call, with the colibri request and response of an `ClientCall`;
 //! 3. `finish` with the protocol the round must speak, which runs client and server until every
 //!    call finished and the connection closed;
-//! 4. `read` on each exchange, with `storage()`, to check what arrived.
+//! 4. `read` on each client call, with `storage()`, to check what arrived.
 const std = @import("std");
 const connect = @import("connect");
 const client = @import("client");
@@ -49,7 +49,7 @@ const server_addresses = [_]client.Address{.of(&loopback, 0)};
 const read_len = 4096;
 const entries_max = 8;
 
-pub const Error = error{ ExchangeUnfinished, ExchangeWrong };
+pub const Error = error{ CallUnfinished, CallWrong };
 
 /// Octets of each buffer one call writes its request into and reads its response into.
 pub const call_buffer_len = 4096;
@@ -57,8 +57,8 @@ pub const call_buffer_len = 4096;
 /// headers, trailers and body.
 pub const CallBuffers = [7][call_buffer_len]u8;
 
-/// The `Exchange` buffers that `set` holds.
-pub fn buffers(set: *CallBuffers) rpc.ExchangeBuffers {
+/// The `ClientCall` buffers that `set` holds.
+pub fn buffers(set: *CallBuffers) rpc.ClientCallBuffers {
     return .{
         .request = .{ .body = &set[0], .scratch = .{ .message = &set[1], .work = &set[2], .tokens = &.{} }, .values = &set[3] },
         .headers = &set[4],
@@ -151,12 +151,12 @@ pub fn finish(expected: client.Protocol) !void {
         // The round is over once the pool closed and the server's connection ended, so the next
         // round's connection takes the server's one slot.
         if (pool_closed and link_server.ended() > ended_before) {
-            if (spoken != expected) return error.ExchangeWrong;
+            if (spoken != expected) return error.CallWrong;
             return;
         }
         if (!link.pending() and !datagram_link.pending()) try link.wait(.client, sleep_ns());
     }
-    return error.ExchangeUnfinished;
+    return error.CallUnfinished;
 }
 
 /// Room for one response's strings, details and metadata. Each `read` reuses it, so a program
@@ -263,7 +263,7 @@ fn send_owed(connection: client.ConnectionHandle, now_ns: u64) !void {
         try link.send(.client, output[0..written]);
         if (written < output.len) return;
     }
-    return error.ExchangeWrong;
+    return error.CallWrong;
 }
 
 fn sleep_ns() u64 {
@@ -275,10 +275,10 @@ fn sleep_ns() u64 {
 
 /// Checks a response holds no message more, and ended in success.
 pub fn expect_end(response: *connect.client.Response, comptime T: type) !void {
-    if (try response.next(T) != null) return error.ExchangeWrong;
+    if (try response.next(T) != null) return error.CallWrong;
     if (response.failure) |failure| {
         std.debug.print("example: {s}: {s}\n", .{ failure.code.name(), failure.message });
-        return error.ExchangeWrong;
+        return error.CallWrong;
     }
 }
 
@@ -288,9 +288,9 @@ pub fn expect_trailer(trailers: []const connect.Header, name: []const u8, value:
         if (std.mem.eql(u8, entry.name, name)) {
             if (std.mem.eql(u8, entry.value, value)) return;
             std.debug.print("example: trailer {s} is {s}, wanted {s}\n", .{ name, entry.value, value });
-            return error.ExchangeWrong;
+            return error.CallWrong;
         }
     }
     std.debug.print("example: no trailer {s}\n", .{name});
-    return error.ExchangeWrong;
+    return error.CallWrong;
 }

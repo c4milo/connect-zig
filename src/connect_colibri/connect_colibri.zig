@@ -10,7 +10,7 @@ const files = struct {
     pub const route = @import("route.zig");
     pub const refusal = @import("refusal.zig");
     pub const call = @import("call.zig");
-    pub const exchange = @import("exchange.zig");
+    pub const client_call = @import("client_call.zig");
     pub const dispatch = @import("dispatch.zig");
 };
 
@@ -27,10 +27,10 @@ pub const Call = files.call.Call;
 pub const Sender = files.call.Sender;
 pub const Receiver = files.call.Receiver;
 /// A client call over colibri's pool.
-pub const Exchange = files.exchange.Exchange;
-pub const ExchangeWith = files.exchange.ExchangeWith;
-pub const ExchangeBuffers = files.exchange.Buffers;
-pub const failure_of = files.exchange.failure_of;
+pub const ClientCall = files.client_call.ClientCall;
+pub const ClientCallWith = files.client_call.ClientCallWith;
+pub const ClientCallBuffers = files.client_call.Buffers;
+pub const failure_of = files.client_call.failure_of;
 
 /// chapulin's one hook, which a program that links colibri's `tls` defines (colibri decision
 /// 94). The module's own test binary defines it here; a program defines its own.
@@ -44,9 +44,9 @@ comptime {
 
 test "the root exports the names a program calls" {
     try @import("public_names").expect(@This(), &.{
-        "constants",       "Route",      "RouteOptions", "Codings",  "post",     "get",
-        "Refusals",        "Call",       "Sender",       "Receiver", "Exchange", "ExchangeWith",
-        "ExchangeBuffers", "failure_of",
+        "constants",         "Route",      "RouteOptions", "Codings",  "post",       "get",
+        "Refusals",          "Call",       "Sender",       "Receiver", "ClientCall", "ClientCallWith",
+        "ClientCallBuffers", "failure_of",
     });
 }
 

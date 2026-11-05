@@ -150,7 +150,7 @@ handler reads its call through `rpc.Call`: the protocol, the timeout, the reques
 and the response headers and trailers it adds.
 
 Interceptors are types a route lists in its options: `on_call` runs before the handler and may
-refuse the call, and `on_finish` sees the outcome. A client's `rpc.ExchangeWith` takes
+refuse the call, and `on_finish` sees the outcome. A client's `rpc.ClientCallWith` takes
 interceptors with `on_request`, which may add headers, and `on_response`.
 
 ### 4. Route it
@@ -180,7 +180,7 @@ To give methods different options, such as their own interceptors, list routes b
 
 ### 5. Call it
 
-A client call is a `connect_colibri.Exchange`. It writes a request for colibri's
+A client call is a `connect_colibri.ClientCall`. It writes a request for colibri's
 `client.ConnectionPool` and reads the response the pool fills in:
 
 ```zig
