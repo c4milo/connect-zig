@@ -61,8 +61,9 @@ first. Cite an entry by number in code and commits ("decision 6").
 9. **JSON decode transcodes to binary.** `decode_json` reads the JSON text with stdx's
    `json.TextReader` and writes the binary encoding into a scratch buffer the caller owns, then
    decodes that with `decode`. Strings and bytes then point into the scratch buffer. A nested
-   message's length is written as a 5-byte padded varint and patched once the message ends,
-   because a parser accepts a varint longer than it needs. Beaten: a second decoder that writes
+   message's length is written into a 5-byte placeholder once the message ends, and the body
+   moves up to meet the octets the length needs, so the binary is canonical: an Any keeps its
+   message's bytes as they are, and Go writes them canonical. Beaten: a second decoder that writes
    struct fields from JSON, which doubles the merge and presence rules.
 
 ## Connect

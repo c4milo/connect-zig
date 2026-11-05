@@ -200,19 +200,12 @@ pub const Writer = struct {
         writer.len += len;
     }
 
-    /// A varint of exactly `constants.limits.padded_length_len` bytes, padded with continuation
-    /// bits. Decoders accept a varint longer than it needs ("Base 128 Varints"), so a length
-    /// written before it is known can be patched in place by `patch_padded`.
+    /// A placeholder of `constants.limits.padded_length_len` octets for a length written once it
+    /// is known, which the writer then shrinks to fit. It holds a padded zero, a valid varint.
     pub fn padded_varint(writer: *Writer) WriteError!usize {
         const at = writer.len;
         try writer.bytes(&padded_zero);
         return at;
-    }
-
-    pub fn patch_padded(writer: *Writer, at: usize, value: u64) void {
-        assert(at + constants.limits.padded_length_len <= writer.len);
-        assert(value < (1 << (group_bits * constants.limits.padded_length_len)));
-        write_groups(writer.buffer[at..][0..constants.limits.padded_length_len], value);
     }
 
     pub fn fixed32(writer: *Writer, value: u32) WriteError!void {
@@ -283,11 +276,8 @@ test "a varint of 11 bytes is refused, and a short one is truncated" {
 test "the spec's example: 150 is 96 01, and a padded varint reads the same value" {
     var reader: Reader = .{ .bytes = &.{ 0x96, 0x01 } };
     try testing.expectEqual(@as(u64, 150), try reader.varint());
-    var buffer: [8]u8 = undefined;
-    var writer: Writer = .{ .buffer = &buffer };
-    const at = try writer.padded_varint();
-    writer.patch_padded(at, 150);
-    var padded: Reader = .{ .bytes = writer.written() };
+    // "Base 128 Varints": a parser accepts a varint padded with continuation groups.
+    var padded: Reader = .{ .bytes = &.{ 0x96, 0x81, 0x80, 0x80, 0x00 } };
     try testing.expectEqual(@as(u64, 150), try padded.varint());
 }
 

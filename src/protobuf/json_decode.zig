@@ -2,8 +2,8 @@
 //! `decode` then reads (decision 9). Tokens come from stdx's `json.TextReader`, whose storage
 //! holds each token's octets until the next call, so each value is written before the next read.
 //!
-//! A nested message's length is written as a 5-byte padded varint and patched at its end. A
-//! parser accepts a varint longer than it needs ("Base 128 Varints"), so `decode` reads it.
+//! A nested message's length is written as a 5-byte placeholder, and once the body is written
+//! the length takes the octets it needs and the body moves up to meet it.
 const std = @import("std");
 const assert = std.debug.assert;
 const json = @import("json");
@@ -170,9 +170,18 @@ fn read_map(comptime field: Field, comptime Entry: type, transcoder: *Transcoder
     unreachable;
 }
 
+/// Writes a nested message's length at `at` in as few octets as it takes, and moves the body up
+/// to meet it, so the binary is what an encoder writes. A padded length is valid too, but an Any
+/// keeps its message's bytes as they are, and Go and C++ write them canonical.
 pub fn patch(writer: *wire.Writer, at: usize) void {
-    const body_len = writer.len - at - constants.limits.padded_length_len;
-    writer.patch_padded(at, body_len);
+    const body_start = at + constants.limits.padded_length_len;
+    const body_len = writer.len - body_start;
+    const prefix_len = wire.varint_len(body_len);
+    std.mem.copyForwards(u8, writer.buffer[at + prefix_len ..][0..body_len], writer.buffer[body_start..writer.len]);
+    writer.len = at;
+    // The length takes at most the octets of the placeholder it replaces.
+    writer.varint(body_len) catch unreachable;
+    writer.len += body_len;
 }
 
 fn write_key(comptime field: Field, comptime K: type, writer: *wire.Writer, key: []const u8) Error!void {
@@ -312,5 +321,6 @@ test "the transcoder itself refuses nesting past its bound, before decode reads 
     try testing.expectError(error.DepthExceeded, transcode(Chain, deep, &binary, &tokens, .{}));
     const fits = "{\"next\":" ** 3 ++ "{}" ++ "}" ** 3;
     const bytes = try transcode(Chain, fits, &binary, &tokens, .{});
-    try testing.expectEqual(@as(usize, 3 * (1 + constants.limits.padded_length_len)), bytes.len);
+    // Each level is a tag and a one-octet length: the placeholders shrank to fit.
+    try testing.expectEqual(@as(usize, 3 * 2), bytes.len);
 }

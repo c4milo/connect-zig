@@ -57,11 +57,28 @@ pub fn encode_into(comptime T: type, message: *const T, writer: *wire.Writer) Er
 
 fn encode_message(comptime T: type, message: *const T, sink: *Sink) Error!void {
     comptime descriptor.check(T);
+    if (comptime T.protobuf.map_entry) return encode_entry(T, message, sink);
     inline for (T.protobuf.fields) |field| {
         if (field.oneof) |oneof| {
             try encode_member(T, field, oneof, message, sink);
         } else {
             try encode_field(field, @field(message, field.name), sink);
+        }
+    }
+}
+
+/// A map entry writes its key and its value even at their defaults, as Go and C++ write them, so
+/// the bytes match theirs ("Maps": an entry is a message of key 1 and value 2).
+fn encode_entry(comptime T: type, entry: *const T, sink: *Sink) Error!void {
+    inline for (T.protobuf.fields) |field| {
+        const item = @field(entry, field.name);
+        const F = @TypeOf(item);
+        if (comptime repeated.is_lazy(F)) {
+            const child = try item.get() orelse F.Message{};
+            try encode_child(F.Message, field.number, &child, sink);
+        } else switch (@typeInfo(F)) {
+            .optional => |optional| try encode_present(field, optional.child, item orelse .{}, sink),
+            else => try encode_present(field, F, item, sink),
         }
     }
 }

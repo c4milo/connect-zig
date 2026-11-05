@@ -152,11 +152,12 @@ pub fn parse_float(comptime V: type, octets: []const u8, from_string: bool) Deco
         if (std.mem.eql(u8, octets, "Infinity")) return std.math.inf(V);
         if (std.mem.eql(u8, octets, "-Infinity")) return -std.math.inf(V);
     }
-    const value = std.fmt.parseFloat(f64, octets) catch return error.InvalidNumber;
+    // Parsing straight into `V` rounds the text once. Through f64 it would round twice, and a
+    // text such as float's maximum, 3.4028235e38, lies above floatMax(f32) as an f64.
+    const value = std.fmt.parseFloat(V, octets) catch return error.InvalidNumber;
     // "JSON Mapping": a value out of the type's range is refused, not rounded to infinity.
     if (std.math.isInf(value)) return error.NumberOutOfRange;
-    if (V == f32 and @abs(value) > std.math.floatMax(f32)) return error.NumberOutOfRange;
-    return @floatCast(value);
+    return value;
 }
 
 /// The octets base64 text decodes to, written into `writer` after their length, in standard or
@@ -211,6 +212,11 @@ test "integers parse from exponents when integral, and refuse fractions and over
     try testing.expectError(error.NumberOutOfRange, parse_integer(u64, "1.8446744073709551615e19"));
     try testing.expectEqual(@as(i64, std.math.minInt(i64)), try parse_integer(i64, "-9.223372036854775808e18"));
     try testing.expectError(error.NumberOutOfRange, parse_float(f32, "1e39", false));
+    // float's maximum as Go and Java write it rounds to floatMax(f32), so it is in range.
+    try testing.expectEqual(std.math.floatMax(f32), try parse_float(f32, "3.4028235e38", false));
+    // Just above the midpoint of 1 and the next float: one rounding goes up. Through f64 the
+    // text first rounds to the midpoint itself, which then rounds to even, down to 1.
+    try testing.expectEqual(@as(f32, 1.00000011920928955078125), try parse_float(f32, "1.0000000596046447753906251", false));
     try testing.expect(std.math.isNan(try parse_float(f64, "NaN", true)));
 }
 

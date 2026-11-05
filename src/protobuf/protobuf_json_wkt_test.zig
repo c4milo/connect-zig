@@ -57,7 +57,7 @@ test "a Value with no kind, or a number JSON cannot hold, is refused" {
 
 test "an Any holds a well-known type under value, and another type beside @type" {
     try round_trip(wkt.Any, "{\"@type\":\"type.googleapis.com/google.protobuf.Duration\",\"value\":\"1.500s\"}", .{});
-    try round_trip(wkt.Any, "{\"@type\":\"type.googleapis.com/google.protobuf.Empty\",\"value\":{}}", .{});
+    try round_trip(wkt.Any, "{\"@type\":\"type.googleapis.com/google.protobuf.Empty\"}", .{});
     try round_trip(wkt.Any, "{\"@type\":\"type.googleapis.com/test.Inner\",\"a\":7,\"tags\":[\"x\"]}", .{Inner});
     try round_trip(wkt.Any, "{}", .{});
     // An Any inside an Any.
@@ -66,6 +66,9 @@ test "an Any holds a well-known type under value, and another type beside @type"
 
 test "an Any's @type may follow its members" {
     var buffers: Buffers = .{};
+    // Empty is read with "value" or without it.
+    const empty = try proto.decode_json(wkt.Any, "{\"value\":{},\"@type\":\"type.googleapis.com/google.protobuf.Empty\"}", &buffers.binary, &buffers.tokens);
+    try testing.expectEqualStrings("type.googleapis.com/google.protobuf.Empty", empty.type_url);
     const late = "{\"a\":7,\"tags\":[\"x\"],\"@type\":\"type.googleapis.com/test.Inner\"}";
     const message = try proto.decode_json_with(wkt.Any, late, &buffers.binary, &buffers.tokens, .{Inner});
     const inner = try proto.decode(Inner, message.value);

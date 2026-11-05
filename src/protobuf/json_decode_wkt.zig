@@ -110,7 +110,7 @@ fn any_value_of(comptime A: type, transcoder: *Transcoder, depth_left: u32, comp
     const writer = &transcoder.writer;
     try writer.tag(any_value, .len);
     const at = try writer.padded_varint();
-    if (comptime any.nests_value(A)) {
+    if (comptime any.nests_value(A) or A == wkt.Empty) {
         try value_member(A, transcoder, depth_left, registry);
     } else {
         try json_decode.members(A, transcoder, depth_left - 1, .with_type, registry);
@@ -123,7 +123,8 @@ fn value_member(comptime A: type, transcoder: *Transcoder, depth_left: u32, comp
     var seen = false;
     for (0..transcoder.reader.input.len + 1) |_| {
         const name = switch (try transcoder.next()) {
-            .end_object => return if (seen) {} else error.UnexpectedToken,
+            // Empty may leave "value" out, as Go writes it.
+            .end_object => return if (seen or A == wkt.Empty) {} else error.UnexpectedToken,
             .name => |octets| octets,
             else => return error.UnexpectedToken,
         };

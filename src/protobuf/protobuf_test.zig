@@ -272,3 +272,11 @@ test "a deep chain encodes into a buffer of its exact length in time linear in i
     var exact: [1024]u8 = undefined;
     try testing.expectEqualSlices(u8, written, try proto.encode(Node, root, exact[0..written.len]));
 }
+
+test "a map entry writes its key and value even at their defaults, as Go and C++ do" {
+    const entries = [_]Entry{.{ .key = "", .value = 0 }};
+    const holder: All = .{ .counts = .of(&entries) };
+    var buffer: [16]u8 = undefined;
+    // Field 17 (8a 01), length 4: key "" (0a 00) and value 0 (10 00).
+    try testing.expectEqualSlices(u8, &.{ 0x8a, 0x01, 4, 0x0a, 0, 0x10, 0 }, try proto.encode(All, &holder, &buffer));
+}

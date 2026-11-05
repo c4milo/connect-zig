@@ -31,14 +31,17 @@ pub fn full_name_of(url: []const u8) []const u8 {
     return url[slash + 1 ..];
 }
 
-/// Whether a type's JSON inside an Any sits under "value": every well-known type, since each
-/// has a form of its own ("JSON Mapping", Any). Another message's fields sit beside "@type".
+/// Whether a type's JSON inside an Any sits under "value": a well-known type with a form of its
+/// own ("JSON Mapping", Any). Another message's fields sit beside "@type". Empty is written
+/// beside it, as Go writes it, and read in either place.
 pub fn nests_value(comptime T: type) bool {
+    if (T == wkt.Empty) return false;
     return comptime std.mem.startsWith(u8, T.protobuf.full_name, "google.protobuf.");
 }
 
 test "a type URL names the full name after its last slash" {
     try std.testing.expectEqualStrings("google.protobuf.Duration", full_name_of("type.googleapis.com/google.protobuf.Duration"));
     try std.testing.expectEqualStrings("a.B", full_name_of("a.B"));
-    try std.testing.expect(nests_value(wkt.Empty));
+    try std.testing.expect(!nests_value(wkt.Empty));
+    try std.testing.expect(nests_value(wkt.Duration));
 }
