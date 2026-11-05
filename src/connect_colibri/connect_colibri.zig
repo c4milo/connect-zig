@@ -30,7 +30,6 @@ pub const Receiver = files.call.Receiver;
 pub const Exchange = files.exchange.Exchange;
 pub const ExchangeWith = files.exchange.ExchangeWith;
 pub const ExchangeBuffers = files.exchange.Buffers;
-pub const wanted_names = files.exchange.wanted_names;
 pub const failure_of = files.exchange.failure_of;
 
 /// chapulin's one hook, which a program that links colibri's `tls` defines (colibri decision
@@ -45,9 +44,9 @@ comptime {
 
 test "the root exports the names a program calls" {
     try @import("public_names").expect(@This(), &.{
-        "constants",       "Route",        "RouteOptions", "Codings",  "post",     "get",
-        "Refusals",        "Call",         "Sender",       "Receiver", "Exchange", "ExchangeWith",
-        "ExchangeBuffers", "wanted_names", "failure_of",
+        "constants",       "Route",      "RouteOptions", "Codings",  "post",     "get",
+        "Refusals",        "Call",       "Sender",       "Receiver", "Exchange", "ExchangeWith",
+        "ExchangeBuffers", "failure_of",
     });
 }
 

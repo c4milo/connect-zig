@@ -86,7 +86,7 @@ Empty, FieldMask, Struct, Value, ListValue and Any. An Any names its type from a
 `client.Request` and `client.Response`. A function handler's route sets `.whole_body` and takes
 its stream whole (decision 12). A type handler's route reads the body as it arrives and answers
 each message at once, full-duplex over h2 (decision 18). Interceptors wrap a route's handler and
-a client's exchange (decision 19). The client speaks Connect and gRPC-Web (decision 11).
+a client's exchange (decision 19). The client speaks Connect, gRPC-Web and gRPC (decision 11).
 
 ## 8. Build plan
 
@@ -175,6 +175,13 @@ ran on Linux x86-64 with Zig 0.16.0.
   `connect_colibri` gains `Call.request_headers`, `Call.request_query` and a context's
   `message_receive_limit`. It also gains 16 KiB of trailer room, for details that echo headers.
 
+- **The gRPC client.** connect-zig pins colibri `2cf693b1`, whose client holds a response's
+  headers and trailers in buffers (colibri decision 152). `connect_colibri.Exchange` reads its
+  headers through `Headers.get` and a gRPC status through `Trailers.get`, and
+  `ExchangeBuffers` takes `headers` and `trailers` in place of `values`. `wanted_names` leaves
+  the root's list. `zig build example-eliza` reads a gRPC unary and server stream over h2, h11
+  and h3, and `example-github` reads gRPC errors that follow response headers.
+
 - **A GitHub-style example.** `zig build example-github` runs one session against
   `github.v1.RepositoryService` and `IssueService` over h2 and h3: tokens, a rate limit, pages,
   an update mask, a private repository, a client stream and a server stream.
@@ -195,6 +202,5 @@ ran on Linux x86-64 with Zig 0.16.0.
 
 - The connectrpc conformance suite against the client (step 7), once colibri's client exposes
   trailers and streams a request body.
-- A gRPC client over colibri, once colibri's client exposes response trailers (decision 11).
 - Long server streams written at `on_writable` (decision 12).
 - Client-side full-duplex, once colibri's client streams a request body.

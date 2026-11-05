@@ -9,9 +9,10 @@
 //! - Say over Connect with the JSON codec, as a GET, since Say has no side effects;
 //! - Introduce, a server stream, over gRPC-Web;
 //! - Converse, a bidirectional stream sent half-duplex, over Connect with JSON;
+//! - Say over gRPC, and Introduce over gRPC: their status comes in HTTP trailers, after the
+//!   messages, which colibri's client keeps apart from the headers (decision 11);
 //! - Say with an empty sentence over gRPC, which fails with invalid_argument. The server sends
-//!   that error Trailers-Only, which colibri's client reads; a gRPC success needs trailers it does
-//!   not expose yet (decision 11).
+//!   that error Trailers-Only, in the head.
 //!
 //! Anything other than the expected answers exits with an error, which is how `zig build
 //! examples` and CI know the example works. Run it with `zig build example-eliza`.
@@ -24,7 +25,7 @@ const service = @import("services/eliza.zig");
 const harness = @import("services/link_client.zig");
 const Service = eliza.ElizaService;
 
-const calls_count = 5;
+const calls_count = 7;
 
 pub const Error = error{ExchangeWrong};
 
@@ -34,6 +35,8 @@ var say_get: rpc.Exchange(Service.say) align(@alignOf(rpc.Exchange(Service.say))
 var introduce: rpc.Exchange(Service.introduce) align(@alignOf(rpc.Exchange(Service.introduce))) = undefined;
 var converse: rpc.Exchange(Service.converse) align(@alignOf(rpc.Exchange(Service.converse))) = undefined;
 var say_empty: rpc.Exchange(Service.say) align(@alignOf(rpc.Exchange(Service.say))) = undefined;
+var say_grpc: rpc.Exchange(Service.say) align(@alignOf(rpc.Exchange(Service.say))) = undefined;
+var introduce_grpc: rpc.Exchange(Service.introduce) align(@alignOf(rpc.Exchange(Service.introduce))) = undefined;
 var buffers: [calls_count]harness.CallBuffers align(@alignOf(harness.CallBuffers)) = undefined;
 
 pub fn main() !void {
@@ -57,6 +60,10 @@ fn round(protocols: client.Protocols, expected: client.Protocol) !void {
     try harness.request(&introduce.request, &introduce.response);
     try harness.request(&converse.request, &converse.response);
     try harness.request(&say_empty.request, &say_empty.response);
+    try say_grpc.init(.{ .protocol = .grpc }, &.{.{ .sentence = service.said }}, harness.buffers(&buffers[5]));
+    try introduce_grpc.init(.{ .protocol = .grpc }, &.{.{ .name = service.name }}, harness.buffers(&buffers[6]));
+    try harness.request(&say_grpc.request, &say_grpc.response);
+    try harness.request(&introduce_grpc.request, &introduce_grpc.response);
     try harness.finish(expected);
     try check();
     std.debug.print("eliza: round over {s} answered\n", .{@tagName(expected)});
@@ -84,6 +91,10 @@ fn check() !void {
     var conversed = converse.read(harness.storage());
     try expect_sentences(&conversed, eliza.ConverseResponse, &service.converse_answers);
     try harness.expect_trailer(conversed.metadata, "eliza-turns", "done");
+    var said_grpc = say_grpc.read(harness.storage());
+    try expect_sentences(&said_grpc, eliza.SayResponse, &.{service.say_answer});
+    var introduced_grpc = introduce_grpc.read(harness.storage());
+    try expect_sentences(&introduced_grpc, eliza.IntroduceResponse, &service.introduce_answers);
     var empty = say_empty.read(harness.storage());
     if (try empty.next(eliza.SayResponse) != null) return error.ExchangeWrong;
     const failure = empty.failure orelse return error.ExchangeWrong;

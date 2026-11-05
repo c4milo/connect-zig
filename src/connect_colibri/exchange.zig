@@ -1,29 +1,22 @@
 //! A client call over colibri's `client.ConnectionPool`: a `connect.client.Request` written as a
 //! `client.Request`, and the `client.Response` colibri fills read as a `connect.client.Response`
-//! (design §7). colibri's client sends whole bodies and exposes no trailers, so it speaks Connect
-//! and gRPC-Web, and plain gRPC only when the server answers Trailers-Only (decision 11).
+//! (design §7). colibri's client holds the response's headers and trailers apart (colibri decision
+//! 152), so an exchange speaks Connect, gRPC-Web and gRPC (decision 11). It sends each request
+//! body whole, so a client stream is half-duplex.
 const std = @import("std");
 const assert = std.debug.assert;
 const connect = @import("connect");
 const client = @import("client");
 const http = @import("http");
 
-/// The response headers a client reads.
-pub const wanted_names = [_][]const u8{
-    "content-type",
-    "content-encoding",
-    "connect-content-encoding",
-    "grpc-encoding",
-    "grpc-status",
-    "grpc-message",
-    "grpc-status-details-bin",
-};
-
 pub const Buffers = struct {
     /// The request: its body, the encoding work and the header values.
     request: connect.client.Buffers,
-    /// The values of the response headers in `wanted_names`.
-    values: []u8,
+    /// The response's header section and trailer section, each line's name and value and four
+    /// octets (colibri decision 152). A section longer than its buffer ends the call
+    /// resource_exhausted. gRPC sends its status in the trailers (PROTOCOL-HTTP2.md, "Responses").
+    headers: []u8,
+    trailers: []u8,
     /// The response body.
     body: []u8,
 };
@@ -52,7 +45,6 @@ pub fn ExchangeWith(comptime method: connect.Method, comptime interceptors: []co
         call: connect.client.Request,
         fields: [connect.client.request_headers_max]http.Field,
         request: client.Request,
-        wanted: [wanted_names.len]client.WantedHeader,
         response: client.Response,
 
         /// Builds the request of a call that sends `messages`.
@@ -68,8 +60,11 @@ pub fn ExchangeWith(comptime method: connect.Method, comptime interceptors: []co
                 .headers = self.fields[0..headers.len],
                 .body = self.call.body,
             };
-            for (&self.wanted, wanted_names) |*wanted, name| wanted.* = .{ .name = name };
-            self.response = .{ .wanted = &self.wanted, .values = buffers.values, .body = buffers.body };
+            self.response = .{
+                .headers = .{ .buffer = buffers.headers },
+                .trailers = .{ .buffer = buffers.trailers },
+                .body = buffers.body,
+            };
         }
 
         /// Reads the response once colibri reported the exchange `finished`.
@@ -81,7 +76,12 @@ pub fn ExchangeWith(comptime method: connect.Method, comptime interceptors: []co
 
         fn find(context: *const anyopaque, name: []const u8) ?[]const u8 {
             const self: *const Self = @ptrCast(@alignCast(context));
-            return find_wanted(&self.wanted, name);
+            return self.response.headers.get(name);
+        }
+
+        fn find_trailer(context: *const anyopaque, name: []const u8) ?[]const u8 {
+            const self: *const Self = @ptrCast(@alignCast(context));
+            return self.response.trailers.get(name);
         }
     };
 }
@@ -99,13 +99,6 @@ fn run_on_response(comptime interceptors: []const type, response: *connect.clien
     }
 }
 
-fn find_wanted(wanted: []const client.WantedHeader, name: []const u8) ?[]const u8 {
-    for (wanted) |entry| {
-        if (std.ascii.eqlIgnoreCase(entry.name, name)) return entry.value;
-    }
-    return null;
-}
-
 /// Reads the response of an exchange once colibri reported it `finished`.
 fn read_response(self: anytype, storage: connect.client.Storage) connect.client.Response {
     const Self = @TypeOf(self.*);
@@ -121,6 +114,9 @@ fn read_response(self: anytype, storage: connect.client.Storage) connect.client.
         .status = self.response.status,
         .headers = lookup,
         .body = self.response.body[0..self.response.body_len],
+        // gRPC's status and its call's trailers come in HTTP trailers after the last message
+        // (PROTOCOL-HTTP2.md, "Responses"). Connect and gRPC-Web carry theirs in the body.
+        .trailers = if (speaks.protocol == .grpc) .{ .context = self, .find_fn = Self.find_trailer } else null,
     };
     return connect.client.read(speaks, incoming, storage, self.options.decoders);
 }

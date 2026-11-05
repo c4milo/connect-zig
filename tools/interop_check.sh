@@ -1,7 +1,7 @@
 #!/bin/sh
 # Runs the example socket server and calls it with buf curl, whose client is connect-go's, in each
-# protocol, over h2 and h3, and with curl over h11 and h2. It requires each answer octet for octet: a gRPC
-# success, whose status rides in HTTP trailers, is checked here and nowhere else (decision 11).
+# protocol, over h2 and h3, and with curl over h11 and h2. It requires each answer octet for octet,
+# so connect-go checks the server as connect-zig's own client checks it in the examples.
 # It needs buf on the path, or BUF naming it, and curl.
 set -eu
 cd "$(dirname "$0")/.."

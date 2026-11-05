@@ -76,11 +76,6 @@ It reads proto2, proto3 and editions 2023 and 2024, groups and DELIMITED fields 
 message keeps the fields its schema does not know and writes them back, so an older service
 passes newer fields on.
 
-> [!NOTE]
-> A gRPC client needs HTTP trailers, which colibri's client does not expose yet. Until it does,
-> the client reads gRPC errors sent "Trailers-Only" and nothing else (decision 11 in
-> [docs/decisions.md](docs/decisions.md)).
-
 ## Use it in your project
 
 ### 1. Add the package
@@ -247,7 +242,7 @@ Still to come:
 - [x] HTTP/3 on the socket server, over a UDP socket
 - [x] zstd compression of messages, both ways
 - [ ] brotli compression of messages, once stdx ships its encoder
-- [ ] A gRPC client, once colibri's client exposes trailers
+- [x] A gRPC client, over h11, h2 and h3
 - [ ] Long server streams, and full-duplex on the client side
 - [x] HTTP/3 in the in-memory examples, with a test-only TLS identity
 - [x] Full-duplex streams on the server, interceptors and error details

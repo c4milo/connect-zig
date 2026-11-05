@@ -17,9 +17,9 @@
 //!    what the session's earlier anonymous reads left of it. The rest fail with a `RateLimited`
 //!    detail.
 //!
-//! The calls mix Connect in binary and JSON, Connect GET, and gRPC-Web. gRPC waits for colibri's
-//! client to read trailers (decision 11): `RateLimit` sets headers on every call, so even a gRPC
-//! error comes in trailers after them, never Trailers-Only.
+//! The calls mix Connect in binary and JSON, Connect GET, gRPC-Web and gRPC. `RateLimit` sets
+//! headers on every call, so a gRPC error comes in trailers after them, never Trailers-Only, and
+//! the client reads it there as it reads a success's status (decision 11).
 //!
 //! Run it with `zig build example-github`.
 const std = @import("std");
@@ -157,7 +157,7 @@ fn repositories() !void {
     try expect(try created.topics.count() == 2 and created.visibility == .visibility_public);
     try expect(created.created_at.?.seconds == store_file.epoch_seconds + 1);
 
-    try call(&create_repository, .{ .protocol = .grpc_web, .headers = &octocat }, &.{hello});
+    try call(&create_repository, .{ .protocol = .grpc, .headers = &octocat }, &.{hello});
     const exists = try detail(github.AlreadyExists, try failed_with(github.Repository, &create_repository, .already_exists));
     try expect(std.mem.eql(u8, exists.resource_name, "hello-world"));
 
@@ -208,7 +208,7 @@ fn update_issues() !void {
         .issue = .{ .state = .issue_state_closed, .title = "ignored: the mask does not name it" },
         .update_mask = .{ .paths = .of(&.{"state"}) },
     };
-    try call(&update_issue, .{ .protocol = .grpc_web, .headers = &hubot }, &.{close});
+    try call(&update_issue, .{ .protocol = .grpc, .headers = &hubot }, &.{close});
     _ = try failed_with(github.Issue, &update_issue, .permission_denied);
 
     try call(&update_issue, .{ .headers = &octocat }, &.{close});
@@ -251,7 +251,7 @@ fn read_issues() !void {
     var labeled = bugs.issues.iterator();
     try expect((try labeled.next()).?.number == 1 and (try labeled.next()).?.number == 3 and try labeled.next() == null);
 
-    try call(&get_issue, .{ .protocol = .grpc_web }, &.{.{ .owner = "octocat", .repository = "hello-world", .number = 42 }});
+    try call(&get_issue, .{ .protocol = .grpc }, &.{.{ .owner = "octocat", .repository = "hello-world", .number = 42 }});
     const missing = try detail(github.NotFound, try failed_with(github.Issue, &get_issue, .not_found));
     try expect(std.mem.eql(u8, missing.resource_name, "octocat/hello-world#42"));
     std.debug.print("github: read {d} open issues in {d} pages, and the bugs #1 and #3\n", .{ seen, pages });
@@ -270,7 +270,7 @@ fn read_events() !void {
     try harness.expect_end(&response, github.Event);
     try expect(count == events_count and last.payload.? == .closed and last.issue_number == 1);
 
-    try call(&watch_events, .{ .protocol = .grpc_web }, &.{.{ .owner = "octocat", .repository = "hello-world", .after_id = events_count - 1 }});
+    try call(&watch_events, .{ .protocol = .grpc }, &.{.{ .owner = "octocat", .repository = "hello-world", .after_id = events_count - 1 }});
     try expect((try answer(github.Event, &watch_events)).id == events_count);
     std.debug.print("github: streamed {d} events, then the one after the cursor\n", .{count});
 }

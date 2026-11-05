@@ -84,11 +84,12 @@ test "a route table holds a route of each stream type, and a GET beside a POST" 
 test "an exchange writes its request for colibri and reads what colibri filled in" {
     const Call = rpc.Exchange(say);
     var call: Call = undefined;
-    var buffers: [6][512]u8 = undefined;
+    var buffers: [7][512]u8 = undefined;
     try call.init(.{ .protocol = .grpc_web }, &.{.{ .text = "hi" }}, .{
         .request = .{ .body = &buffers[0], .scratch = .{ .message = &buffers[1], .work = &buffers[2], .tokens = &.{} }, .values = &buffers[3] },
-        .values = &buffers[4],
-        .body = &buffers[5],
+        .headers = &buffers[4],
+        .trailers = &buffers[5],
+        .body = &buffers[6],
     });
     try testing.expectEqualStrings("POST", call.request.method);
     try testing.expectEqualStrings("/test.Svc/Say", call.request.path);
@@ -98,7 +99,7 @@ test "an exchange writes its request for colibri and reads what colibri filled i
     call.response.body_len = body.len;
     call.response.status = 200;
     call.response.result = .response;
-    call.wanted[0].value = "application/grpc-web+proto";
+    write_lines(&call.response.headers, &.{.{ .name = "content-type", .value = "application/grpc-web+proto" }});
     var storage_buffers: [4][256]u8 = undefined;
     var details: [2]connect.Detail = undefined;
     var metadata: [4]connect.Header = undefined;
@@ -113,6 +114,67 @@ test "an exchange writes its request for colibri and reads what colibri filled i
     try testing.expectEqual(@as(?connect.RpcError, null), response.failure);
     call.response.result = .closed;
     try testing.expectEqual(connect.Code.unavailable, call.read(response.storage).failure.?.code);
+}
+
+/// Writes field lines into a section's buffer as colibri's client does: each name's and value's
+/// length in two octets, big-endian, then the name and the value (colibri decision 152).
+fn write_lines(section: anytype, lines: []const connect.Header) void {
+    const length_len = @sizeOf(u16);
+    var used: usize = 0;
+    for (lines) |line| {
+        std.mem.writeInt(u16, section.buffer[used..][0..length_len], @intCast(line.name.len), .big);
+        std.mem.writeInt(u16, section.buffer[used + length_len ..][0..length_len], @intCast(line.value.len), .big);
+        const start = used + length_len + length_len;
+        @memcpy(section.buffer[start..][0..line.name.len], line.name);
+        @memcpy(section.buffer[start + line.name.len ..][0..line.value.len], line.value);
+        used = start + line.name.len + line.value.len;
+    }
+    section.len = used;
+}
+
+test "a gRPC exchange reads its status from the response's trailers (PROTOCOL-HTTP2.md, Responses)" {
+    const Call = rpc.Exchange(say);
+    var call: Call = undefined;
+    var buffers: [7][512]u8 = undefined;
+    try call.init(.{ .protocol = .grpc }, &.{.{ .text = "hi" }}, .{
+        .request = .{ .body = &buffers[0], .scratch = .{ .message = &buffers[1], .work = &buffers[2], .tokens = &.{} }, .values = &buffers[3] },
+        .headers = &buffers[4],
+        .trailers = &buffers[5],
+        .body = &buffers[6],
+    });
+    const body = [_]u8{ 0, 0, 0, 0, 4, 0x0a, 2, 'h', 'i' };
+    @memcpy(call.response.body[0..body.len], &body);
+    call.response.body_len = body.len;
+    call.response.status = 200;
+    call.response.result = .response;
+    write_lines(&call.response.headers, &.{.{ .name = "content-type", .value = "application/grpc+proto" }});
+    // A grpc-status among the headers is not the call's status: only the trailers carry it.
+    write_lines(&call.response.trailers, &.{.{ .name = "grpc-status", .value = "0" }});
+    var storage_buffers: [4][256]u8 = undefined;
+    var details: [2]connect.Detail = undefined;
+    var metadata: [4]connect.Header = undefined;
+    const storage: connect.client.Storage = .{
+        .scratch = .{ .message = &storage_buffers[0], .work = &storage_buffers[1], .tokens = &storage_buffers[2] },
+        .octets = &storage_buffers[3],
+        .details = &details,
+        .metadata = &metadata,
+    };
+    var success = call.read(storage);
+    try testing.expectEqualStrings("hi", (try success.next(Note)).?.text);
+    try testing.expectEqual(@as(?Note, null), try success.next(Note));
+    try testing.expectEqual(@as(?connect.RpcError, null), success.failure);
+    write_lines(&call.response.trailers, &.{ .{ .name = "grpc-status", .value = "5" }, .{ .name = "grpc-message", .value = "gone" } });
+    var failed = call.read(storage);
+    _ = try failed.next(Note);
+    try testing.expectEqual(@as(?Note, null), try failed.next(Note));
+    try testing.expectEqual(connect.Code.not_found, failed.failure.?.code);
+    try testing.expectEqualStrings("gone", failed.failure.?.message);
+    // No trailers at all: the call ended without its status.
+    call.response.trailers.len = 0;
+    var cut = call.read(storage);
+    _ = try cut.next(Note);
+    try testing.expectEqual(@as(?Note, null), try cut.next(Note));
+    try testing.expect(cut.failure != null);
 }
 
 test "an exchange that ends with no response maps to the code a client retries on" {

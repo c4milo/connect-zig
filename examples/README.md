@@ -51,9 +51,9 @@ Each program over the links runs its calls in rounds, one `client.ConnectionPool
   of [testdata/tls](testdata/tls), and the client trusts its CA (decision 25). Both judge the
   certificates at the fixed instant 1_800_000_000, which a real program reads from its clock.
 
-Over h3 every protocol answers as it does over h2: Connect POST and GET, gRPC-Web, and gRPC's
-errors, which the server sends Trailers-Only. A gRPC success still needs response trailers that
-colibri's client does not expose (decision 11). colibri's client sends a request body whole, so
+Over h3 every protocol answers as it does over h2: Connect POST and GET, gRPC-Web, and gRPC,
+whose status the client reads from the response's trailers (decision 11). colibri's client
+sends a request body whole, so
 these programs show the server's type handlers answer each message, not that the client reads an
 answer while it still sends.
 

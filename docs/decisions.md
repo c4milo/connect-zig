@@ -80,7 +80,8 @@ first. Cite an entry by number in code and commits ("decision 6").
     trailers, so a client cannot read `grpc-status` over h2. The server speaks gRPC now. The
     client speaks Connect for every stream type, through the end-stream message, and gRPC-Web,
     whose trailers are a body frame. Beaten: reading trailers below colibri's API, which colibri's
-    rules forbid to a dependent.
+    rules forbid to a dependent. Lifted on 2026-11-05: colibri `2cf693b1` holds a response's
+    trailers apart (colibri decision 152), and the client reads gRPC's status from them.
 
 12. **Streams are whole bodies in v0.** colibri's router hands a route the whole request body,
     and a route writes its response into the response memory the router pool holds. A server
@@ -175,9 +176,8 @@ first. Cite an entry by number in code and commits ("decision 6").
     openssl, and the client trusts the CA. Both certificates are valid from 2020 to 2099, and the
     programs judge them at the fixed instant 1_800_000_000. The key is public and for tests
     alone: no module of `src/` reads it. The rounds over h2 and h11 stay in cleartext (decision
-    13), and gRPC success still waits on colibri's trailers over h3 (decision 11). Beaten:
-    colibri's test identity, which colibri does not package; and minting an identity at each
-    run, which needs openssl in every build.
+    13). Beaten: colibri's test identity, which colibri does not package; and minting an identity
+    at each run, which needs openssl in every build.
 
 26. **The conformance suite runs against a server of its own.** `conformance/` holds a program
     that serves connectrpc's ConformanceService on a socket the kernel picks, as the runner's

@@ -2,9 +2,8 @@
 //! spoke (Connect protocol, "Unary-Response", "Streaming-Response" and "HTTP to Error Code";
 //! PROTOCOL-HTTP2.md, "Responses"; PROTOCOL-WEB.md).
 //!
-//! gRPC carries its status in HTTP trailers, which colibri's client does not expose yet, so a gRPC
-//! response is readable here only when the caller passes its trailers, or when the server
-//! answered Trailers-Only (decision 11).
+//! gRPC carries its status in HTTP trailers, which the caller passes in `Incoming.trailers`. With
+//! none, a gRPC response is readable only when the server answered Trailers-Only (decision 11).
 const std = @import("std");
 const assert = std.debug.assert;
 const protocol = @import("protocol.zig");

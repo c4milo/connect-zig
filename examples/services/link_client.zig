@@ -54,15 +54,16 @@ pub const Error = error{ ExchangeUnfinished, ExchangeWrong };
 /// Octets of each buffer one call writes its request into and reads its response into.
 pub const call_buffer_len = 4096;
 /// The buffers of one call: its request's body, scratch and header values, and its response's
-/// header values and body.
-pub const CallBuffers = [6][call_buffer_len]u8;
+/// headers, trailers and body.
+pub const CallBuffers = [7][call_buffer_len]u8;
 
 /// The `Exchange` buffers that `set` holds.
 pub fn buffers(set: *CallBuffers) rpc.ExchangeBuffers {
     return .{
         .request = .{ .body = &set[0], .scratch = .{ .message = &set[1], .work = &set[2], .tokens = &.{} }, .values = &set[3] },
-        .values = &set[4],
-        .body = &set[5],
+        .headers = &set[4],
+        .trailers = &set[5],
+        .body = &set[6],
     };
 }
 
