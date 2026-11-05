@@ -50,28 +50,31 @@ pub fn merge_depth(comptime T: type, message: *T, bytes: []const u8, depth_left:
     // Each field takes at least one byte, so the input's length bounds the fields.
     for (0..bytes.len + 1) |_| {
         if (reader.at_end()) return;
+        const field_start = reader.position;
         const tag = try reader.tag();
-        const known = try read_known(T, message, bytes, tag, &reader, depth_left, mode);
+        const known = try read_known(T, message, field_start, bytes, tag, &reader, depth_left, mode);
         if (!known) try reader.skip(tag, depth_left);
     }
     unreachable;
 }
 
-fn read_known(comptime T: type, message: *T, bytes: []const u8, tag: wire.Tag, reader: *wire.Reader, depth_left: u32, comptime mode: Mode) Error!bool {
+/// `field_start` is where the field's tag starts in `bytes`, where a repeated field's view
+/// starts, so the view holds the field's records and not the whole message.
+fn read_known(comptime T: type, message: *T, field_start: usize, bytes: []const u8, tag: wire.Tag, reader: *wire.Reader, depth_left: u32, comptime mode: Mode) Error!bool {
     inline for (T.protobuf.fields) |field| {
         if (tag.number == field.number) {
-            try read_field(T, field, message, bytes, tag, reader, depth_left, mode);
+            try read_field(T, field, message, field_start, bytes, tag, reader, depth_left, mode);
             return true;
         }
     }
     return false;
 }
 
-fn read_field(comptime T: type, comptime field: Field, message: *T, bytes: []const u8, tag: wire.Tag, reader: *wire.Reader, depth_left: u32, comptime mode: Mode) Error!void {
+fn read_field(comptime T: type, comptime field: Field, message: *T, field_start: usize, bytes: []const u8, tag: wire.Tag, reader: *wire.Reader, depth_left: u32, comptime mode: Mode) Error!void {
     if (field.oneof) |oneof| return read_oneof(T, field, oneof, message, tag, reader, depth_left, mode);
     const F = @FieldType(T, field.name);
     const slot = &@field(message, field.name);
-    if (comptime repeated.is_repeated(F)) return read_repeated(F, slot, bytes, field.number, tag, reader, depth_left, mode);
+    if (comptime repeated.is_repeated(F)) return read_repeated(F, slot, field_start, bytes, field.number, tag, reader, depth_left, mode);
     if (comptime repeated.is_lazy(F)) return read_lazy(F, slot, tag, reader, depth_left, mode);
     if (comptime field.kind == .message) {
         const Child = @typeInfo(F).optional.child;
@@ -107,31 +110,45 @@ fn read_lazy(comptime F: type, slot: *F, tag: wire.Tag, reader: *wire.Reader, de
     slot.* = .{ .bytes = payload };
 }
 
-fn read_repeated(comptime F: type, slot: *F, bytes: []const u8, number: u32, tag: wire.Tag, reader: *wire.Reader, depth_left: u32, comptime mode: Mode) Error!void {
-    const view_elsewhere = slot.view.bytes.len != 0 and slot.view.bytes.ptr != bytes.ptr;
-    if (view_elsewhere or slot.items.len != 0) return error.MergeUnsupported;
+fn read_repeated(comptime F: type, slot: *F, field_start: usize, bytes: []const u8, number: u32, tag: wire.Tag, reader: *wire.Reader, depth_left: u32, comptime mode: Mode) Error!void {
+    if (!view_within(slot.view.bytes, bytes) or slot.items.len != 0) return error.MergeUnsupported;
     if (comptime F.kind.packable()) {
         // "Packed Repeated Fields": a parser accepts the packed form for any packable field.
-        if (tag.wire_type == .len) return check_packed(F, try reader.length_delimited(), bytes, number, slot);
+        if (tag.wire_type == .len) try check_packed(F, try reader.length_delimited());
     }
-    if (tag.wire_type != F.kind.wire_type()) return error.WireTypeMismatch;
-    if (comptime F.kind == .message) {
-        const payload = try reader.length_delimited();
-        if (mode == .checked) _ = try decode_depth(F.Element, payload, depth_left - 1);
-    } else {
-        _ = try scalar.read(F.kind, F.Element, reader);
+    if (tag.wire_type != .len or !comptime F.kind.packable()) {
+        if (tag.wire_type != F.kind.wire_type()) return error.WireTypeMismatch;
+        if (comptime F.kind == .message) {
+            const payload = try reader.length_delimited();
+            if (mode == .checked) _ = try decode_depth(F.Element, payload, depth_left - 1);
+        } else {
+            _ = try scalar.read(F.kind, F.Element, reader);
+        }
     }
-    slot.view = .{ .bytes = bytes, .number = number };
+    extend_view(&slot.view, bytes, field_start, reader.position, number);
 }
 
-fn check_packed(comptime F: type, payload: []const u8, bytes: []const u8, number: u32, slot: *F) Error!void {
+/// Whether a field's view lies in `bytes`, or is not set. A view of another message's bytes
+/// means the field already came from a merge, which a view cannot hold (decision 6).
+fn view_within(view: []const u8, bytes: []const u8) bool {
+    if (view.len == 0) return true;
+    const start = @intFromPtr(view.ptr);
+    return start >= @intFromPtr(bytes.ptr) and start + view.len <= @intFromPtr(bytes.ptr) + bytes.len;
+}
+
+/// Makes a view hold the field's records from its first through the one that ends at
+/// `field_end`. Other fields' records between them stay in it, and the iterator skips them.
+fn extend_view(view: *descriptor.View, bytes: []const u8, field_start: usize, field_end: usize, number: u32) void {
+    assert(field_start < field_end and field_end <= bytes.len);
+    const start = if (view.bytes.len == 0) field_start else @intFromPtr(view.bytes.ptr) - @intFromPtr(bytes.ptr);
+    view.* = .{ .bytes = bytes[start..field_end], .number = number };
+}
+
+fn check_packed(comptime F: type, payload: []const u8) Error!void {
     var packed_reader: wire.Reader = .{ .bytes = payload };
     // Each element takes at least one byte.
     for (0..payload.len + 1) |_| {
-        if (packed_reader.at_end()) {
-            slot.view = .{ .bytes = bytes, .number = number };
-            return;
-        }
+        if (packed_reader.at_end()) return;
         _ = try scalar.read(F.kind, F.Element, &packed_reader);
     }
     unreachable;

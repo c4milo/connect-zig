@@ -164,7 +164,7 @@ fn write_child_once(comptime M: type, child: *const M, sink: *Sink, writer: *wir
     const child_len = writer.len - start;
     assert(sink.len - sink_start == child_len);
     const prefix_len = wire.varint_len(child_len);
-    std.mem.copyForwards(u8, writer.buffer[at + prefix_len ..][0..child_len], writer.buffer[start..writer.len]);
+    @memmove(writer.buffer[at + prefix_len ..][0..child_len], writer.buffer[start..writer.len]);
     writer.len = at;
     try writer.varint(child_len);
     writer.len += child_len;

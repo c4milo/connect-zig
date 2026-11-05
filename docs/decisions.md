@@ -35,8 +35,8 @@ first. Cite an entry by number in code and commits ("decision 6").
 
 6. **Decoding copies nothing.** A string or bytes field is a slice of the input. A repeated field
    is a `Repeated(T, kind)`: either `items`, which a program sets to encode, or a view of the
-   enclosing message's bytes plus the field number, which an iterator reads (packed and
-   unpacked). A singular message that may contain its own type is a `Lazy(T)`: encoded bytes or a
+   enclosing message's bytes from the field's first record to its last, plus the field number,
+   which an iterator reads (packed and unpacked). A singular message that may contain its own type is a `Lazy(T)`: encoded bytes or a
    pointer. Beaten: decoding into caller arrays, which needs a size for every repeated field.
 
    Cost: a view names one span. When a singular message field occurs twice in one input, and the

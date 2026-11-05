@@ -177,7 +177,7 @@ pub fn patch(writer: *wire.Writer, at: usize) void {
     const body_start = at + constants.limits.padded_length_len;
     const body_len = writer.len - body_start;
     const prefix_len = wire.varint_len(body_len);
-    std.mem.copyForwards(u8, writer.buffer[at + prefix_len ..][0..body_len], writer.buffer[body_start..writer.len]);
+    @memmove(writer.buffer[at + prefix_len ..][0..body_len], writer.buffer[body_start..writer.len]);
     writer.len = at;
     // The length takes at most the octets of the placeholder it replaces.
     writer.varint(body_len) catch unreachable;

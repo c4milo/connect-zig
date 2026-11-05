@@ -280,3 +280,12 @@ test "a map entry writes its key and value even at their defaults, as Go and C++
     // Field 17 (8a 01), length 4: key "" (0a 00) and value 0 (10 00).
     try testing.expectEqualSlices(u8, &.{ 0x8a, 0x01, 4, 0x0a, 0, 0x10, 0 }, try proto.encode(All, &holder, &buffer));
 }
+
+test "a decoded repeated field's view holds its own records, not the whole message" {
+    const all: All = .{ .int32_field = 5, .numbers = .of(&.{ 1, 2 }), .choice = .{ .name = "x" } };
+    var buffer: [64]u8 = undefined;
+    const decoded = try proto.decode(All, try proto.encode(All, &all, &buffer));
+    // Field 14 packed (72), length 2, then 1 and 2: the int32 before it and the name after it
+    // are not in the view, so reading it scans its records alone.
+    try testing.expectEqualSlices(u8, &.{ 0x72, 2, 1, 2 }, decoded.numbers.view.bytes);
+}
