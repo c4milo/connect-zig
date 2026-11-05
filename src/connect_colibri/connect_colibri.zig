@@ -10,6 +10,7 @@ const files = struct {
     pub const route = @import("route.zig");
     pub const call = @import("call.zig");
     pub const exchange = @import("exchange.zig");
+    pub const dispatch = @import("dispatch.zig");
 };
 
 /// The struct route that serves a method, and its router entries.
@@ -24,6 +25,7 @@ pub const Sender = files.call.Sender;
 pub const Receiver = files.call.Receiver;
 /// A client call over colibri's pool.
 pub const Exchange = files.exchange.Exchange;
+pub const ExchangeWith = files.exchange.ExchangeWith;
 pub const ExchangeBuffers = files.exchange.Buffers;
 pub const wanted_names = files.exchange.wanted_names;
 pub const failure_of = files.exchange.failure_of;
@@ -40,9 +42,9 @@ comptime {
 
 test "the root exports the names a program calls" {
     try @import("public_names").expect(@This(), &.{
-        "constants",  "Route",  "RouteOptions", "Codings",  "post",            "get",
-        "Call",       "Sender", "Receiver",     "Exchange", "ExchangeBuffers", "wanted_names",
-        "failure_of",
+        "constants",    "Route",      "RouteOptions", "Codings",  "post",         "get",
+        "Call",         "Sender",     "Receiver",     "Exchange", "ExchangeWith", "ExchangeBuffers",
+        "wanted_names", "failure_of",
     });
 }
 

@@ -82,7 +82,7 @@ first. Cite an entry by number in code and commits ("decision 6").
     and a route writes its response into the response memory the router pool holds. A server
     stream is therefore bounded by `response_bytes`, and a bidirectional stream is half-duplex.
     Beaten: waiting for flow control in colibri before shipping any stream. A later step writes
-    long streams at `on_writable`.
+    long streams at `on_writable`. Decision 18 lifts the half-duplex part for type handlers.
 
 13. **Examples run in cleartext.** The ELIZA programs speak h2 with prior knowledge and h11, and
     hold no TLS identity, so they need no certificate to run. colibri's `tls` module still links
@@ -107,6 +107,27 @@ first. Cite an entry by number in code and commits ("decision 6").
       message of more than about 160 fields still makes one piece too long.
     Beaten: exempting `.pb.zig` from the rules, as colibri exempts its generated tables from
     magic-numbers, which would leave a project's own lint failing on the code it generates.
+
+18. **A type handler streams full-duplex.** A client or bidirectional stream's handler may be a
+    type with `on_message` and `on_end`. Its route sets no `.whole_body`, so colibri hands it the
+    body as it arrives, and it passes each whole envelope on and keeps a partial one for the
+    next read. Each message a `Sender` writes is flushed to the endpoint at once. Over h2 a
+    client reads answers while it still sends; `tools/interop_check.sh` checks it with buf curl.
+    A function handler still takes its stream whole. Beaten: a handler that blocks on a
+    `Receiver`, which needs a thread or a coroutine the library does not have.
+
+19. **Interceptors are types, chosen at compile time.** A route lists its interceptors in its
+    options. Each may define `on_call`, which runs in list order and may refuse the call, and
+    `on_finish`, which runs in reverse and returns the outcome the client reads. A client's
+    `ExchangeWith` lists `on_request` and `on_response` interceptors the same way. A handler and
+    an interceptor read the call through `Call`: its protocol, codec, timeout and request
+    headers, and the response headers and trailers they add. Beaten: a runtime list of function
+    pointers, which costs an indirect call and loses the `app` type.
+
+20. **Examples share their services.** The programs in `examples/` import the ELIZA and demo
+    services, the in-memory link and its client loop from `examples/services/`, so each program
+    holds only its calls and its checks. The socket server serves both services. Beaten: one
+    copy of the link loop per program.
 
 ## Tooling
 

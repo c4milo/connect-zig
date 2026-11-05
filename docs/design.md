@@ -80,9 +80,11 @@ Empty and FieldMask in the first step; Any, Struct, Value and ListValue later.
 
 ## 7. The colibri adapter
 
-`connect_colibri` maps a `connect.Method` onto a route of `server.router`, with `.whole_body`
-set, and onto `client.Request` and `client.Response`. Streams are whole bodies in v0 (decision
-12). The client speaks Connect and gRPC-Web (decision 11).
+`connect_colibri` maps a `connect.Method` onto a route of `server.router`, and onto
+`client.Request` and `client.Response`. A function handler's route sets `.whole_body` and takes
+its stream whole (decision 12). A type handler's route reads the body as it arrives and answers
+each message at once, full-duplex over h2 (decision 18). Interceptors wrap a route's handler and
+a client's exchange (decision 19). The client speaks Connect and gRPC-Web (decision 11).
 
 ## 8. Build plan
 
@@ -106,6 +108,12 @@ Each step names the check that proves it. A step is done when its check passes i
    `examples/`, and the output equals the committed code.
 7. **Conformance.** The connectrpc conformance suite against the client and the server. Check:
    the suite's report, pinned to a release.
+8. **Calls, interceptors and full-duplex streams.** `Call` exposes the protocol, codec,
+   timeout and request headers, and takes response headers and trailers. Interceptors run on
+   both sides, and type handlers stream (decisions 18 and 19). New public names:
+   `ExchangeWith`. Check: `zig build examples` runs `interceptors`, `streaming` and `errors`
+   over the in-memory link; `tools/interop_check.sh` calls the demo service with buf curl in
+   each protocol, and requires Chat's first answer before the client's second message.
 
 ### Step records
 
@@ -126,9 +134,14 @@ ran on Linux x86-64 with Zig 0.16.0.
   `large.proto`'s split pieces among it, and `zig build lint` reads it with every rule and reports
   no finding (decision 17).
 
+- **Step 8.** `zig build examples` printed every call answered over h2 and h11 for `eliza` and
+  `streaming`, and over h2 for `interceptors` and `errors`. `tools/interop_check.sh` with buf
+  1.74.0 printed 35 of 35 calls answered, Chat's full-duplex check among them.
+
 ### What a later step owes
 
 - The connectrpc conformance suite (step 7).
 - A gRPC client over colibri, once colibri's client exposes response trailers (decision 11).
-- Long streams written at `on_writable`, and full-duplex streams (decision 12).
+- Long server streams written at `on_writable` (decision 12).
+- Client-side full-duplex, once colibri's client streams a request body.
 - Unknown fields kept, Any, Struct, Value and ListValue in JSON, and editions in the plugin.

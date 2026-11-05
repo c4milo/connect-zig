@@ -31,6 +31,20 @@ pub const Buffers = struct {
 /// One call of `method`. The program keeps it in place from `init` until colibri's `finished`
 /// event for its request, since colibri reads `request` and writes `response` until then.
 pub fn Exchange(comptime method: connect.Method) type {
+    return ExchangeWith(method, &.{});
+}
+
+/// An `Exchange` whose interceptors see each request before it goes and each response once it
+/// is read. A client interceptor is a type with any of:
+///
+/// - `on_request(*connect.client.Request) !void`, which may add headers with `add_header`;
+/// - `on_response(*connect.client.Response) void`, which sees each response before the program
+///   reads its messages: its HTTP status and headers. A stream's outcome follows its messages,
+///   so `failure` is set here only when the head alone carries it.
+///
+/// `on_request` runs in the order the list names the interceptors, and `on_response` in the
+/// reverse.
+pub fn ExchangeWith(comptime method: connect.Method, comptime interceptors: []const type) type {
     return struct {
         const Self = @This();
 
@@ -45,6 +59,7 @@ pub fn Exchange(comptime method: connect.Method) type {
         pub fn init(self: *Self, options: connect.client.Options, messages: []const method.Request, buffers: Buffers) connect.client.RequestError!void {
             self.options = options;
             self.call = try connect.client.request(method, options, messages, buffers.request);
+            try run_on_request(interceptors, &self.call);
             const headers = self.call.headers();
             for (headers, 0..) |header, index| self.fields[index] = .{ .name = header.name, .value = header.value };
             self.request = .{
@@ -59,35 +74,60 @@ pub fn Exchange(comptime method: connect.Method) type {
 
         /// Reads the response once colibri reported the exchange `finished`.
         pub fn read(self: *const Self, storage: connect.client.Storage) connect.client.Response {
-            const speaks = speaks_of(self.options);
-            const lookup: connect.Lookup = .{ .context = self, .find_fn = find };
-            if (self.response.result != .response) {
-                var response = connect.client.read(speaks, .{ .status = connect.constants.protocol.status.ok, .headers = lookup, .body = "" }, storage, self.options.decoders);
-                response.done = true;
-                response.failure = failure_of(self.response.result);
-                return response;
-            }
-            const incoming: connect.client.Incoming = .{
-                .status = self.response.status,
-                .headers = lookup,
-                .body = self.response.body[0..self.response.body_len],
-            };
-            return connect.client.read(speaks, incoming, storage, self.options.decoders);
+            var response = read_response(method, self, storage);
+            run_on_response(interceptors, &response);
+            return response;
         }
 
         fn find(context: *const anyopaque, name: []const u8) ?[]const u8 {
             const self: *const Self = @ptrCast(@alignCast(context));
-            for (self.wanted) |wanted| {
-                if (std.ascii.eqlIgnoreCase(wanted.name, name)) return wanted.value;
-            }
-            return null;
-        }
-
-        fn speaks_of(options: connect.client.Options) connect.Speaks {
-            const enveloped = options.protocol != .connect or method.stream_type.enveloped();
-            return .{ .protocol = options.protocol, .codec = options.codec, .enveloped = enveloped };
+            return find_wanted(&self.wanted, name);
         }
     };
+}
+
+fn run_on_request(comptime interceptors: []const type, request: *connect.client.Request) !void {
+    inline for (interceptors) |Interceptor| {
+        if (comptime @hasDecl(Interceptor, "on_request")) try Interceptor.on_request(request);
+    }
+}
+
+fn run_on_response(comptime interceptors: []const type, response: *connect.client.Response) void {
+    inline for (0..interceptors.len) |index| {
+        const Interceptor = interceptors[interceptors.len - 1 - index];
+        if (comptime @hasDecl(Interceptor, "on_response")) Interceptor.on_response(response);
+    }
+}
+
+fn find_wanted(wanted: []const client.WantedHeader, name: []const u8) ?[]const u8 {
+    for (wanted) |entry| {
+        if (std.ascii.eqlIgnoreCase(entry.name, name)) return entry.value;
+    }
+    return null;
+}
+
+/// Reads the response of an exchange once colibri reported it `finished`.
+fn read_response(comptime method: connect.Method, self: anytype, storage: connect.client.Storage) connect.client.Response {
+    const Self = @TypeOf(self.*);
+    const speaks = speaks_of(method, self.options);
+    const lookup: connect.Lookup = .{ .context = self, .find_fn = Self.find };
+    if (self.response.result != .response) {
+        var response = connect.client.read(speaks, .{ .status = connect.constants.protocol.status.ok, .headers = lookup, .body = "" }, storage, self.options.decoders);
+        response.done = true;
+        response.failure = failure_of(self.response.result);
+        return response;
+    }
+    const incoming: connect.client.Incoming = .{
+        .status = self.response.status,
+        .headers = lookup,
+        .body = self.response.body[0..self.response.body_len],
+    };
+    return connect.client.read(speaks, incoming, storage, self.options.decoders);
+}
+
+fn speaks_of(comptime method: connect.Method, options: connect.client.Options) connect.Speaks {
+    const enveloped = options.protocol != .connect or method.stream_type.enveloped();
+    return .{ .protocol = options.protocol, .codec = options.codec, .enveloped = enveloped };
 }
 
 /// The error a client gives an exchange that ended with no whole response.

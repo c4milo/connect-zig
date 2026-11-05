@@ -28,6 +28,8 @@ pub const Options = struct {
     encoder: ?*compression.GzipEncoder = null,
     /// What the client decompresses, which it names in its accept header.
     decoders: compression.Decoders = .{},
+    /// Headers of the program's own, sent with the request: at most `extra_headers_max`.
+    headers: []const Header = &.{},
 };
 
 pub const Buffers = struct {
@@ -39,7 +41,11 @@ pub const Buffers = struct {
 };
 
 /// The most headers `request` writes.
-pub const request_headers_max = 6;
+pub const request_headers_max = protocol_headers_max + extra_headers_max;
+/// The headers the protocol needs: content type, version, codings, accept list and timeout.
+const protocol_headers_max = 6;
+/// The headers a program or its interceptors add to one request, at most.
+pub const extra_headers_max = 8;
 
 pub const Request = struct {
     http_method: []const u8,
@@ -53,6 +59,12 @@ pub const Request = struct {
         return request_value.storage[0..request_value.count];
     }
 
+    /// Adds a header of the program's own, such as a credential, which an interceptor adds too.
+    pub fn add_header(request_value: *Request, name: []const u8, value: []const u8) error{TooManyHeaders}!void {
+        if (request_value.count == request_headers_max) return error.TooManyHeaders;
+        request_value.add(name, value);
+    }
+
     fn add(request_value: *Request, name: []const u8, value: []const u8) void {
         assert(request_value.count < request_headers_max);
         request_value.storage[request_value.count] = .{ .name = name, .value = value };
@@ -60,7 +72,7 @@ pub const Request = struct {
     }
 };
 
-pub const Error = message_codec.EncodeError || error{NoSpaceLeft};
+pub const Error = message_codec.EncodeError || error{ NoSpaceLeft, TooManyHeaders };
 
 fn speaks_of(comptime method: method_file.Method, options: Options) protocol.Speaks {
     const enveloped = options.protocol != .connect or method.stream_type.enveloped();
@@ -87,7 +99,13 @@ pub fn request(comptime method: method_file.Method, options: Options, messages: 
     result.body = buffers.body[0..len];
     result.add("content-type", protocol.content_type(speaks));
     try add_protocol_headers(&result, speaks, options, compressed_any, buffers.values);
+    try add_extra_headers(&result, options.headers);
     return result;
+}
+
+fn add_extra_headers(result: *Request, headers: []const Header) error{TooManyHeaders}!void {
+    if (headers.len > extra_headers_max) return error.TooManyHeaders;
+    for (headers) |header| try result.add_header(header.name, header.value);
 }
 
 /// Writes one message into the body: bare for Connect unary, else in an envelope.
@@ -144,6 +162,7 @@ fn request_get(comptime method: method_file.Method, options: Options, message: *
     if (buffers.values.len < compression.accept_list_len_max) return error.NoSpaceLeft;
     const accept = options.decoders.accept_list(buffers.values[0..compression.accept_list_len_max]);
     if (accept.len != 0) result.add("accept-encoding", accept);
+    try add_extra_headers(&result, options.headers);
     return result;
 }
 
@@ -179,6 +198,12 @@ test "a Connect unary request is the bare message with the protocol's headers" {
     try testing.expectEqualSlices(u8, &.{ 0x0a, 2, 'h', 'i' }, call.body);
     try testing.expectEqualStrings("application/proto", find(call.headers(), "content-type").?);
     try testing.expectEqualStrings("2", find(call.headers(), "connect-timeout-ms").?);
+    const with_token = try request(say, .{ .headers = &.{.{ .name = "authorization", .value = "Bearer t" }} }, &.{.{}}, .{
+        .body = &buffers[0],
+        .scratch = .{ .message = &buffers[1], .work = &buffers[2], .tokens = &.{} },
+        .values = &buffers[3],
+    });
+    try testing.expectEqualStrings("Bearer t", find(with_token.headers(), "authorization").?);
 }
 
 test "a client stream over gRPC-Web is envelopes, and a GET carries its message in the query" {
