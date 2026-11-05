@@ -16,7 +16,8 @@ and serve the same handlers to Connect, gRPC and gRPC-Web clients, in binary pro
 - **Fast.** Binary and JSON encoding and decoding run 1.5 to 6 times faster than Go's protobuf
   runtime on most messages (see [Performance](#performance)).
 - **HTTP underneath from [colibri](https://github.com/c4milo/colibri).** Servers and clients run
-  over h11 and h2 today; h3 is next.
+  over h11, h2 and h3. The in-memory examples run over h3 as well as h11 and h2; the socket
+  server serves h11 and h2 for now.
 
 ## Try it in 30 seconds
 
@@ -208,7 +209,8 @@ Each cell is Go's time over connect-zig's: above 1 means connect-zig is faster.
 ## How it is checked
 
 - `zig build test` runs every module's tests and the examples, and each check in the library was
-  broken on purpose to prove a test catches it.
+  broken on purpose to prove a test catches it. The examples run a client against the server in
+  memory over h11 and h2 in cleartext, and over h3 under a test-only TLS identity.
 - `tools/coverage_check.sh` converts every protobuf type, and edition and proto2 files, with
   connect-zig and with Go's runtime through `buf convert`, in each direction between binary and
   JSON, and requires the same message.
@@ -232,10 +234,11 @@ Still to come:
 
 - [ ] The [connectrpc conformance suite](https://github.com/connectrpc/conformance) against the
   client and the server, in progress
-- [ ] HTTP/3, with a TLS identity for the examples
+- [ ] HTTP/3 on the socket server, over a UDP socket
 - [ ] zstd and brotli compression of messages, once colibri and stdx ship the encoders
 - [ ] A gRPC client, once colibri's client exposes trailers
 - [ ] Long server streams, and full-duplex on the client side
+- [x] HTTP/3 in the in-memory examples, with a test-only TLS identity
 - [x] Full-duplex streams on the server, interceptors and error details
 - [x] `Any`, `Struct`, `Value` and `ListValue` in JSON
 - [x] Editions 2023 and 2024, and proto2 groups

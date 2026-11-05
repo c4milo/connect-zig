@@ -88,7 +88,8 @@ first. Cite an entry by number in code and commits ("decision 6").
 13. **Examples run in cleartext.** The ELIZA programs speak h2 with prior knowledge and h11, and
     hold no TLS identity, so they need no certificate to run. colibri's `tls` module still links
     chapulin, so each program defines `ch_assert_fail`. Beaten: colibri's test identity, which
-    colibri does not package.
+    colibri does not package. Decision 25 adds a round over h3, under a test identity
+    of the examples' own; the cleartext rounds stay.
 
 14. **A handler returns its error as a value.** A handler fills its response and returns null, or
     returns the `connect.RpcError` the client reads. A Zig error from a handler is a fault, which
@@ -164,6 +165,16 @@ first. Cite an entry by number in code and commits ("decision 6").
     and a message merged from two inputs fails with `MergeUnsupported`, as a view does
     (decision 6). JSON writes no unknown field (proto3 JSON mapping). Beaten: dropping them, as
     v0 did (decision 5), which loses data a proxy forwards.
+
+25. **The examples run h3 too, under a test-only identity.** Each program over the in-memory link
+    adds a round over h3: QUIC over colibri's datagram link. The server presents a P-256 CA and a
+    leaf for `localhost` from `examples/testdata/tls`, which `tools/test_identity.sh` mints with
+    openssl, and the client trusts the CA. Both certificates are valid from 2020 to 2099, and the
+    programs judge them at the fixed instant 1_800_000_000. The key is public and for tests
+    alone: no module of `src/` reads it. The rounds over h2 and h11 stay in cleartext (decision
+    13), and gRPC success still waits on colibri's trailers over h3 (decision 11). Beaten:
+    colibri's test identity, which colibri does not package; and minting an identity at each
+    run, which needs openssl in every build.
 
 ## Tooling
 

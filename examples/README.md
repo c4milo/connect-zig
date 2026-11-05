@@ -9,10 +9,10 @@ Start at the top: each example adds one layer to the one before it.
 | --- | --- | --- |
 | [protobuf_messages.zig](protobuf_messages.zig) | Generated messages in binary and JSON, with no RPC | `zig build example-protobuf_messages` |
 | [sans_io_call.zig](sans_io_call.zig) | A whole call through `connect` alone: no socket, no HTTP library | `zig build example-sans_io_call` |
-| [eliza.zig](eliza.zig) | A client and a server over colibri's h2 and h11, in memory | `zig build example-eliza` |
-| [streaming.zig](streaming.zig) | Bidirectional, client and server streams, and a stream that fails | `zig build example-streaming` |
-| [interceptors.zig](interceptors.zig) | Server interceptors that log and authenticate, and client interceptors | `zig build example-interceptors` |
-| [errors.zig](errors.zig) | Errors with typed details in Connect, gRPC and gRPC-Web | `zig build example-errors` |
+| [eliza.zig](eliza.zig) | A client and a server over colibri's h2, h11 and h3, in memory | `zig build example-eliza` |
+| [streaming.zig](streaming.zig) | Bidirectional, client and server streams, and a stream that fails, over h2, h11 and h3 | `zig build example-streaming` |
+| [interceptors.zig](interceptors.zig) | Server interceptors that log and authenticate, and client interceptors, over h2 and h3 | `zig build example-interceptors` |
+| [errors.zig](errors.zig) | Errors with typed details in Connect, gRPC and gRPC-Web, over h2 and h3 | `zig build example-errors` |
 | [socket_server.zig](socket_server.zig) | Both services on a TCP socket, for curl and `buf curl` | `zig build run-eliza-server -- 8080` |
 
 ## The services
@@ -28,9 +28,26 @@ Start at the top: each example adds one layer to the one before it.
   `Countdown`, and `Divide`, which fails with a `DivisionByZero` detail.
 - [services/routes.zig](services/routes.zig) puts both under one `server.router`, which
   [services/app.zig](services/app.zig)'s `App` runs.
-- [services/link.zig](services/link.zig) is colibri's in-memory link, copied unchanged, which
-  stands where sockets would be. [services/link_server.zig](services/link_server.zig) and
-  [services/link_client.zig](services/link_client.zig) run the server and the client over it.
+- [services/link.zig](services/link.zig) and [services/link_datagram.zig](services/link_datagram.zig)
+  are colibri's in-memory links for octet streams and for datagrams, copied unchanged, which stand
+  where sockets would be. [services/link_server.zig](services/link_server.zig) and
+  [services/link_client.zig](services/link_client.zig) run the server and the client over them.
+
+### Rounds and protocols
+
+Each program over the links runs its calls in rounds, one `client.ConnectionPool` for each:
+
+- A round over h2 or h11 runs TCP in cleartext over the stream link: h2 with prior knowledge,
+  and h11 (decision 13).
+- A round over h3 runs QUIC over the datagram link. The server presents the test-only identity
+  of [testdata/tls](testdata/tls), and the client trusts its CA (decision 25). Both judge the
+  certificates at the fixed instant 1_800_000_000, which a real program reads from its clock.
+
+Over h3 every protocol answers as it does over h2: Connect POST and GET, gRPC-Web, and gRPC's
+errors, which the server sends Trailers-Only. A gRPC success still needs response trailers that
+colibri's client does not expose (decision 11). colibri's client sends a request body whole, so
+these programs show the server's type handlers answer each message, not that the client reads an
+answer while it still sends.
 
 ### A type handler
 

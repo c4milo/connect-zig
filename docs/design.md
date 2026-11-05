@@ -122,6 +122,10 @@ Each step names the check that proves it. A step is done when its check passes i
    `editions` and `legacy` with Zig and with Go, through buf convert, and requires the same
    message both ways. `editions` and `legacy` hold edition 2023's features and proto2's groups
    (decision 23).
+10. **h3 in memory.** A test-only TLS identity, and a round over h3 in each program over the
+    in-memory link, beside its cleartext rounds (decision 25). Check: `zig build examples` runs
+    `eliza`, `streaming`, `interceptors` and `errors` over h3, with the checks of their other
+    rounds.
 
 ### Step records
 
@@ -156,9 +160,16 @@ ran on Linux x86-64 with Zig 0.16.0.
   with no side effects as a GET too. Generated code still imports no HTTP library (decision 2).
   `examples/services/eliza.zig` routes ELIZA through it.
 
+- **Step 10.** `zig build examples` printed every call answered over h2, h11 and h3 for `eliza`
+  and `streaming`, and over h2 and h3 for `interceptors` and `errors`. Over h3 that is Connect
+  POST and GET, gRPC-Web, gRPC's Trailers-Only errors with their details, and the type handlers
+  of Chat and Sum. It found one fault, now fixed: a GET's route read its query from colibri's
+  head memory after the head's event, and h3 had reused those octets.
+
 ### What a later step owes
 
 - The connectrpc conformance suite (step 7).
 - A gRPC client over colibri, once colibri's client exposes response trailers (decision 11).
 - Long server streams written at `on_writable` (decision 12).
 - Client-side full-duplex, once colibri's client streams a request body.
+- h3 on the socket server, over a UDP socket, and `tools/interop_check.sh` over h3.
