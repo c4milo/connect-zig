@@ -71,7 +71,9 @@ buf curl --http2-prior-knowledge --protocol grpc --schema examples/proto \
 The protobuf runtime covers every scalar type, `optional`, packed and unpacked repeated fields,
 maps with every key type, oneofs, enums, recursive messages and every well-known type with its
 JSON form: Timestamp, Duration, FieldMask, the wrappers, Empty, Struct, Value, ListValue and Any.
-It reads proto2, proto3 and editions 2023 and 2024, groups and DELIMITED fields included.
+It reads proto2, proto3 and editions 2023 and 2024, groups and DELIMITED fields included. A
+message keeps the fields its schema does not know and writes them back, so an older service
+passes newer fields on.
 
 > [!NOTE]
 > A gRPC client needs HTTP trailers, which colibri's client does not expose yet. Until it does,
@@ -237,7 +239,7 @@ Still to come:
 - [x] Full-duplex streams on the server, interceptors and error details
 - [x] `Any`, `Struct`, `Value` and `ListValue` in JSON
 - [x] Editions 2023 and 2024, and proto2 groups
-- [ ] Unknown fields kept
+- [x] Unknown fields kept and written back
 
 ## Contributing
 

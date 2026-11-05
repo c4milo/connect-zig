@@ -8,7 +8,11 @@
 //! coverage coverage json-to-binary < case.json > case.binpb
 //! coverage editions binary-to-json < case.binpb > case.json
 //! coverage legacy binary-to-binary < case.binpb > again.binpb
+//! coverage coverage through-partial < case.binpb > again.binpb
 //! ```
+//!
+//! `through-partial` reads an `Everything` as `coverage.v1.Partial`, which knows only its scalars,
+//! and writes it back: every other field passes through as an unknown field (decision 24).
 //!
 //! An Any in the cases names coverage types, so the root file declares them (decision 21).
 const std = @import("std");
@@ -27,7 +31,7 @@ const message_len_max = 1 << 20;
 const token_len_max = 1 << 16;
 const io_buffer_len = 1 << 12;
 
-const Direction = enum { @"json-to-binary", @"binary-to-json", @"binary-to-binary" };
+const Direction = enum { @"json-to-binary", @"binary-to-json", @"binary-to-binary", @"through-partial" };
 const Message = enum { coverage, editions, legacy };
 
 var input: [message_len_max]u8 = undefined;
@@ -67,6 +71,10 @@ fn convert(comptime T: type, direction: Direction, bytes: []const u8) ![]const u
         .@"binary-to-binary" => {
             const message = try proto.decode(T, bytes);
             return proto.encode(T, &message, &output);
+        },
+        .@"through-partial" => {
+            const message = try proto.decode(coverage.Partial, bytes);
+            return proto.encode(coverage.Partial, &message, &output);
         },
     }
 }

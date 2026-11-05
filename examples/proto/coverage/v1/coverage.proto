@@ -158,3 +158,9 @@ message Everything {
   Everything child = 7;
   repeated Everything children = 8;
 }
+
+// An older schema of Everything, which knows only its scalars. Read with it, every other field of
+// Everything is unknown and must be written back as it came (decision 24).
+message Partial {
+  Scalars scalars = 1;
+}

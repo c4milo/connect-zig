@@ -45,7 +45,8 @@ the Zig name, the number, the kind, the JSON name, the .proto name, and the oneo
   messages. An iterator over a decoded view therefore reads only checked bytes.
 - Merge follows "Last One Wins": scalars keep the last value, messages merge, a oneof keeps the
   member read last. A merge that a view cannot hold fails closed (decision 6).
-- Unknown fields and groups are skipped, with groups nested at most `depth_max` deep (decision 5).
+- Unknown fields are kept in a generated message's `_unknown` and written back (decision 24);
+  groups nest at most `depth_max` deep.
 - `encode` writes fields in number order. Implicit scalars at their default are left off, and
   packable repeated fields are packed unless the field says otherwise.
 
@@ -161,4 +162,3 @@ ran on Linux x86-64 with Zig 0.16.0.
 - A gRPC client over colibri, once colibri's client exposes response trailers (decision 11).
 - Long server streams written at `on_writable` (decision 12).
 - Client-side full-duplex, once colibri's client streams a request body.
-- Unknown fields kept.

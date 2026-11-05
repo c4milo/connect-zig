@@ -10,7 +10,9 @@
 # 3. Zig reads Go's binary and writes it back as binary that Go reads as the same message;
 # 4. Zig reads the JSON Go writes;
 # 5. Zig's binary equals Go's byte for byte, but where Go sorts a map's keys, which Zig keeps in
-#    the order they came, and where Go's NaN carries a payload bit Zig's does not.
+#    the order they came, and where Go's NaN carries a payload bit Zig's does not;
+# 6. for coverage, Zig reads Go's binary with an older schema, coverage.v1.Partial, and writes
+#    back the same message: each field Partial does not know passes through.
 #
 # JSON texts are compared after jq sorts their keys, since a map's members have no order. It
 # needs buf on the path, or BUF naming it, and jq.
@@ -53,6 +55,12 @@ for case in examples/testdata/coverage/*.json examples/testdata/editions/*.json 
     "${converter}" "${set}" json-to-binary <"${work}/${name}.go.json" >"${work}/${name}.from-go.binpb"
     go_convert "${work}/${name}.from-go.binpb#format=binpb" "${work}/${name}.from-go.json#format=json"
     same "${name}: Zig reads Go's JSON" "${work}/${name}.go.json" "${work}/${name}.from-go.json"
+    if [ "${set}" = coverage ]; then
+        # 6. Read with a schema that knows only the scalars, Go's binary keeps every other field.
+        "${converter}" "${set}" through-partial <"${work}/${name}.go.binpb" >"${work}/${name}.partial.binpb"
+        go_convert "${work}/${name}.partial.binpb#format=binpb" "${work}/${name}.partial.json#format=json"
+        same "${name}: unknown fields pass through" "${work}/${name}.go.json" "${work}/${name}.partial.json"
+    fi
     if cmp -s "${work}/${name}.go.binpb" "${work}/${name}.zig.binpb"; then
         echo "ok: ${name}: the same bytes as Go"
     else
