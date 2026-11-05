@@ -46,7 +46,7 @@ pub fn CallState(comptime options: Options, comptime handler: anytype) type {
 /// context with no such field reads and writes uncompressed messages alone.
 pub const Codings = struct {
     decoders: connect.Decoders = .{},
-    encoder: ?*connect.GzipEncoder = null,
+    encoders: connect.Encoders = .{},
 };
 
 fn codings_of(app: anytype) Codings {
@@ -113,7 +113,7 @@ fn begin(comptime spec: RouteSpec, comptime handler: anytype, app: anytype, stat
         .stream_type = spec.method.stream_type,
         .idempotency = spec.method.idempotency,
         .decoders = codings.decoders,
-        .can_compress = codings.encoder != null,
+        .encoders = codings.encoders,
     });
     const accepted = switch (decision) {
         .accepted => |accepted| accepted,
@@ -123,7 +123,7 @@ fn begin(comptime spec: RouteSpec, comptime handler: anytype, app: anytype, stat
         },
     };
     state.call = .{
-        .reply = .{ .accepted = accepted, .scratch = scratch_of(spec.options, handler, state, .reply), .encoder = codings.encoder },
+        .reply = .{ .accepted = accepted, .scratch = scratch_of(spec.options, handler, state, .reply), .encoders = codings.encoders },
         .response = response,
         .room = &state.room,
         .headers = &state.headers,

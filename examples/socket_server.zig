@@ -76,6 +76,9 @@ var app: App align(@alignOf(App)) = .{};
 /// The server reads gzip messages and writes them when a client accepts gzip.
 var gzip_decoder: connect.GzipDecoder align(@alignOf(connect.GzipDecoder)) = undefined;
 var gzip_encoder: connect.GzipEncoder align(@alignOf(connect.GzipEncoder)) = undefined;
+/// The same for zstd, which the server answers in when a client lists it before gzip.
+var zstd_decoder: connect.ZstdDecoder align(@alignOf(connect.ZstdDecoder)) = undefined;
+var zstd_encoder: connect.ZstdEncoder align(@alignOf(connect.ZstdEncoder)) = undefined;
 /// A cleartext endpoint draws no secret, so a seeded generator stands in for entropy.
 var prng: std.Random.DefaultPrng align(@alignOf(std.Random.DefaultPrng)) = .init(0x656c697a61);
 
@@ -87,7 +90,10 @@ pub fn main(init: std.process.Init) !void {
     try loop.init(&loop_memory, loop_options);
     defer loop.deinit();
     try endpoint.init(&config, prng.random(), now_seconds, loop.now_ns());
-    app.codings = .{ .decoders = .{ .gzip = &gzip_decoder }, .encoder = &gzip_encoder };
+    app.codings = .{
+        .decoders = .{ .gzip = &gzip_decoder, .zstd = &zstd_decoder },
+        .encoders = .{ .gzip = &gzip_encoder, .zstd = &zstd_encoder },
+    };
     std.debug.print("listening on port {d}\n", .{bound.port});
     for (0..turns_max) |_| try turn();
 }

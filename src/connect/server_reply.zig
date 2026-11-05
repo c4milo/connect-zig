@@ -53,14 +53,15 @@ pub const Prepared = message_codec.Prepared;
 pub const Reply = struct {
     accepted: server_head.Accepted,
     scratch: message_codec.Scratch,
-    encoder: ?*compression.GzipEncoder = null,
+    /// The encoders the reply compresses with, in the coding `accept` chose.
+    encoders: compression.Encoders = .{},
     /// Whether a message went out, which rules out gRPC's Trailers-Only form.
     sent: bool = false,
 
     /// Encodes a message into the scratch storage, compressing it when the response coding is
     /// gzip and the message is long enough.
     pub fn prepare(reply: *Reply, comptime T: type, message: *const T) Error!Prepared {
-        return message_codec.prepare(T, reply.accepted.speaks.codec, reply.accepted.response_coding, reply.encoder, message, reply.scratch);
+        return message_codec.prepare(T, reply.accepted.speaks.codec, reply.accepted.response_coding, reply.encoders, message, reply.scratch);
     }
 
     /// The head of a response that carries messages. `compressed` says whether a unary
@@ -113,7 +114,7 @@ pub const Reply = struct {
     fn shrink(reply: *const Reply, encoded: []const u8) Prepared {
         // An enveloped message is compressed one by one; a unary body only through `prepare`.
         if (!reply.accepted.speaks.enveloped) return .{ .octets = encoded, .compressed = false };
-        return message_codec.compress(reply.accepted.response_coding, reply.encoder, encoded, reply.scratch.work);
+        return message_codec.compress(reply.accepted.response_coding, reply.encoders, encoded, reply.scratch.work);
     }
 
     /// Writes one message: the whole body of a Connect unary response, or one envelope.
@@ -322,7 +323,7 @@ test "a long message is gzipped in its envelope, and a unary gzip reply is not w
     var reply: Reply = .{
         .accepted = .{ .speaks = .{ .protocol = .grpc, .codec = .proto, .enveloped = true }, .request_coding = .identity, .response_coding = .gzip, .timeout_ns = null },
         .scratch = .{ .message = &buffers[0], .work = &buffers[1], .tokens = &buffers[2] },
-        .encoder = &encoder,
+        .encoders = .{ .gzip = &encoder },
     };
     const text = [_]u8{'a'} ** message_codec.compress_len_min;
     var out: [message_codec.compress_len_min * 2]u8 = undefined;

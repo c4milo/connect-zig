@@ -68,10 +68,13 @@ first. Cite an entry by number in code and commits ("decision 6").
 
 ## Connect
 
-10. **Compression comes from stdx.** gzip encodes and decodes. At the stdx commit pinned,
-    `5fd03aa`, zstd and brotli decode only. connect-zig accepts `gzip`, `zstd` and `br`, and
-    compresses with `gzip` alone until stdx ships a zstd encoder. Beaten: a C codec, which stdx
-    exists to replace.
+10. **Compression comes from stdx.** gzip and zstd encode and decode; brotli decodes only, since
+    stdx has no brotli encoder yet. connect-zig accepts `gzip`, `zstd` and `br`. A program places
+    the encoders it compresses with in `connect.Encoders`, and a server answers in the first
+    coding the peer lists that it holds an encoder for. The zstd encoder runs at level 1 with a
+    128 KiB window, which an RPC message rarely outgrows. connect-zig pins the stdx colibri
+    pins, since two stdx in one binary repeat its exported symbols. Beaten: a C codec, which
+    stdx exists to replace.
 
 11. **Plain gRPC waits on colibri for the client.** colibri's `client.Response` holds no
     trailers, so a client cannot read `grpc-status` over h2. The server speaks gRPC now. The

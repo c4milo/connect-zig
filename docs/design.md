@@ -166,6 +166,11 @@ ran on Linux x86-64 with Zig 0.16.0.
   of Chat and Sum. It found one fault, now fixed: a GET's route read its query from colibri's
   head memory after the head's event, and h3 had reused those octets.
 
+- **Compression, later.** `connect` gains `ZstdEncoder`, `ZstdDecoder` and `Encoders`; the gzip
+  `encoder` of `Reply`, `client.Options` and `connect_colibri.Codings` becomes `encoders`,
+  `accept`'s `can_compress` becomes `encoders`, and `compression.compress_gzip` becomes
+  `compression.compress` (decision 10). `tools/interop_check.sh` reads a zstd answer with curl.
+
 ### What a later step owes
 
 - The connectrpc conformance suite (step 7).

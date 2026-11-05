@@ -57,8 +57,8 @@ pub const Options = struct {
     idempotency: method.Idempotency = .unknown,
     /// What the server decompresses.
     decoders: compression.Decoders = .{},
-    /// Whether the server compresses responses with gzip.
-    can_compress: bool = false,
+    /// The encoders the server compresses responses with, which name the codings it can choose.
+    encoders: compression.Encoders = .{},
 };
 
 /// Reads the head of a request for a method of `options.stream_type`.
@@ -102,7 +102,7 @@ fn accept_post(speaks: Speaks, headers: Lookup, options: Options) Decision {
     const request_coding = coding_of(headers.find(names.encoding)) orelse return refuse(speaks, .unimplemented, "unknown request compression");
     if (!options.decoders.accepts(request_coding)) return refuse(speaks, .unimplemented, "unsupported request compression");
     const timeout_ns = read_timeout(speaks, headers.find(names.timeout)) catch return refuse(speaks, .invalid_argument, "malformed timeout");
-    const response_coding = compression.choose(headers.find(names.accept) orelse "", options.can_compress);
+    const response_coding = compression.choose(headers.find(names.accept) orelse "", options.encoders);
     return .{ .accepted = .{ .speaks = speaks, .request_coding = request_coding, .response_coding = response_coding, .timeout_ns = timeout_ns } };
 }
 
@@ -113,7 +113,7 @@ fn accept_get(query: []const u8, headers: Lookup, options: Options) Decision {
     const speaks: Speaks = .{ .protocol = .connect, .codec = read.codec, .enveloped = false };
     if (!options.decoders.accepts(read.coding)) return refuse(speaks, .unimplemented, "unsupported request compression");
     const timeout_ns = read_timeout(speaks, headers.find("connect-timeout-ms")) catch return refuse(speaks, .invalid_argument, "malformed timeout");
-    const response_coding = compression.choose(headers.find("accept-encoding") orelse "", options.can_compress);
+    const response_coding = compression.choose(headers.find("accept-encoding") orelse "", options.encoders);
     return .{ .accepted = .{ .speaks = speaks, .request_coding = read.coding, .response_coding = response_coding, .timeout_ns = timeout_ns, .query = read } };
 }
 
@@ -156,7 +156,8 @@ test "a Connect unary POST is accepted with its codings and timeout" {
         .{ .name = "Accept-Encoding", .value = "gzip" },
         .{ .name = "Connect-Timeout-Ms", .value = "250" },
     } };
-    const decision = accept("POST", null, headers.lookup(), .{ .stream_type = .unary, .can_compress = true });
+    var encoder: compression.GzipEncoder = undefined;
+    const decision = accept("POST", null, headers.lookup(), .{ .stream_type = .unary, .encoders = .{ .gzip = &encoder } });
     const accepted = decision.accepted;
     try testing.expectEqual(protocol.Codec.json, accepted.speaks.codec);
     try testing.expectEqual(Coding.gzip, accepted.response_coding);

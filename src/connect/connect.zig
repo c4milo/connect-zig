@@ -41,8 +41,12 @@ pub const Status = files.rpc_error.Status;
 pub const Coding = files.compression.Coding;
 pub const Decoders = files.compression.Decoders;
 pub const GzipEncoder = files.compression.GzipEncoder;
+/// The zstd encoder a caller places, and the encoders a server or a client compresses with.
+pub const ZstdEncoder = files.compression.ZstdEncoder;
+pub const Encoders = files.compression.Encoders;
 /// The gzip decoder a caller places for `Decoders.gzip`.
 pub const GzipDecoder = files.compression.GzipDecoder;
+pub const ZstdDecoder = files.compression.ZstdDecoder;
 pub const Envelope = files.envelope.Envelope;
 pub const EnvelopeFlags = files.envelope.Flags;
 pub const EnvelopeReader = files.envelope.Reader;
@@ -107,7 +111,7 @@ pub const timeout = struct {
 
 pub const compression = struct {
     pub const decompress = files.compression.decompress;
-    pub const compress_gzip = files.compression.compress_gzip;
+    pub const compress = files.compression.compress;
     pub const choose = files.compression.choose;
     pub const accept_list_len_max = files.compression.accept_list_len_max;
     pub const Error = files.compression.Error;
@@ -156,12 +160,12 @@ pub const status = struct {
 
 test "the root exports the names a program calls" {
     try @import("public_names").expect(@This(), &.{
-        "constants",      "Code",        "Protocol",    "Codec",       "Speaks",   "Method",
-        "StreamType",     "Idempotency", "Header",      "Detail",      "RpcError", "Status",
-        "Coding",         "Decoders",    "GzipEncoder", "GzipDecoder", "Envelope", "EnvelopeFlags",
-        "EnvelopeReader", "EndStream",   "envelope",    "protocol",    "timeout",  "compression",
-        "error_json",     "end_stream",  "trailers",    "get",         "status",   "Scratch",
-        "Lookup",         "server",      "client",
+        "constants",   "Code",        "Protocol",      "Codec",          "Speaks",     "Method",
+        "StreamType",  "Idempotency", "Header",        "Detail",         "RpcError",   "Status",
+        "Coding",      "Decoders",    "GzipEncoder",   "ZstdEncoder",    "Encoders",   "GzipDecoder",
+        "ZstdDecoder", "Envelope",    "EnvelopeFlags", "EnvelopeReader", "EndStream",  "envelope",
+        "protocol",    "timeout",     "compression",   "error_json",     "end_stream", "trailers",
+        "get",         "status",      "Scratch",       "Lookup",         "server",     "client",
     });
 }
 

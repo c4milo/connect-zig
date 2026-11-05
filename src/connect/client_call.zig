@@ -25,7 +25,7 @@ pub const Options = struct {
     use_get: bool = false,
     /// gzip compresses requests when `encoder` is set; identity sends them as they are.
     request_coding: Coding = .identity,
-    encoder: ?*compression.GzipEncoder = null,
+    encoders: compression.Encoders = .{},
     /// What the client decompresses, which it names in its accept header.
     decoders: compression.Decoders = .{},
     /// Headers of the program's own, sent with the request: at most `extra_headers_max`.
@@ -116,7 +116,7 @@ fn place(comptime T: type, speaks: protocol.Speaks, options: Options, message: *
     const prefix_len: usize = if (speaks.enveloped) flag_prefix_len else 0;
     if (room.len < prefix_len) return error.NoSpaceLeft;
     const encoded = try message_codec.encode(T, options.codec, message, room[prefix_len..]);
-    const result = message_codec.compress(options.request_coding, options.encoder, encoded, work);
+    const result = message_codec.compress(options.request_coding, options.encoders, encoded, work);
     if (result.compressed) @memcpy(room[prefix_len..][0..result.octets.len], result.octets);
     if (speaks.enveloped) envelope.write_prefix(.{ .compressed = result.compressed }, result.octets.len, room[0..flag_prefix_len]);
     return .{ .len = prefix_len + result.octets.len, .compressed = result.compressed };
@@ -157,12 +157,12 @@ fn add_grpc_headers(result: *Request, speaks: protocol.Speaks, options: Options,
 }
 
 fn request_get(comptime method: method_file.Method, options: Options, message: *const method.Request, buffers: Buffers) Error!Request {
-    const packed_message = try message_codec.prepare(method.Request, options.codec, options.request_coding, options.encoder, message, buffers.scratch);
+    const packed_message = try message_codec.prepare(method.Request, options.codec, options.request_coding, options.encoders, message, buffers.scratch);
     const path = comptime method.path();
     if (buffers.body.len < path.len + 1) return error.NoSpaceLeft;
     @memcpy(buffers.body[0..path.len], path);
     buffers.body[path.len] = '?';
-    const coding: Coding = if (packed_message.compressed) .gzip else .identity;
+    const coding: Coding = if (packed_message.compressed) options.request_coding else .identity;
     const query = try get.write_query(options.codec, coding, packed_message.octets, buffers.body[path.len + 1 ..]);
     var result: Request = .{ .speaks = speaks_of(method, options), .http_method = "GET", .target = buffers.body[0 .. path.len + 1 + query.len], .body = "" };
     if (buffers.values.len < compression.accept_list_len_max) return error.NoSpaceLeft;

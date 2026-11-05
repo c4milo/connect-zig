@@ -63,7 +63,7 @@ buf curl --http2-prior-knowledge --protocol grpc --schema examples/proto \
 | Server: unary, all streams | ✅ | ✅ | ✅ |
 | Client: unary, all streams | ✅ | errors only | ✅ |
 | Proto and JSON codecs | ✅ | ✅ | ✅ |
-| gzip both ways | ✅ | ✅ | ✅ |
+| gzip and zstd both ways, brotli read | ✅ | ✅ | ✅ |
 | Unary GET for `NO_SIDE_EFFECTS` | ✅ | | |
 | Full-duplex bidirectional streams (server) | ✅ | ✅ | ✅ |
 | Interceptors, server and client | ✅ | ✅ | ✅ |
@@ -223,9 +223,8 @@ Each cell is Go's time over connect-zig's: above 1 means connect-zig is faster.
 > [!IMPORTANT]
 > A server stream is written into the router's response memory, so a long one is bounded by it
 > (decision 12). A type handler streams full-duplex (decision 18); colibri's client sends its
-> request body whole, so the client side of a stream is half-duplex. zstd and brotli are read
-> but not written yet: stdx has a zstd encoder, which needs colibri to pin that stdx, and its
-> brotli encoder is not written (decision 10).
+> request body whole, so the client side of a stream is half-duplex. brotli is read but not
+> written yet, since stdx has no brotli encoder (decision 10).
 
 The library is stricter than the spec in three places: it does not report a missing required
 field, a closed enum keeps an unknown value, and every string must be valid UTF-8 (decision 23).
@@ -235,7 +234,8 @@ Still to come:
 - [ ] The [connectrpc conformance suite](https://github.com/connectrpc/conformance) against the
   client and the server, in progress
 - [ ] HTTP/3 on the socket server, over a UDP socket
-- [ ] zstd and brotli compression of messages, once colibri and stdx ship the encoders
+- [x] zstd compression of messages, both ways
+- [ ] brotli compression of messages, once stdx ships its encoder
 - [ ] A gRPC client, once colibri's client exposes trailers
 - [ ] Long server streams, and full-duplex on the client side
 - [x] HTTP/3 in the in-memory examples, with a test-only TLS identity

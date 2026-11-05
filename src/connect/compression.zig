@@ -2,8 +2,8 @@
 //! compressed: Connect's Content-Encoding and Connect-Content-Encoding, and gRPC's grpc-encoding
 //! (Connect protocol, "Compression"; PROTOCOL-HTTP2.md, "Message-Encoding").
 //!
-//! gzip compresses and decompresses. zstd and br decompress only, at the stdx commit pinned, so a
-//! server answers in gzip or identity alone.
+//! gzip and zstd compress and decompress; br decompresses only, since stdx has no brotli encoder
+//! yet. A server answers in the first coding the peer lists that it holds an encoder for.
 const std = @import("std");
 const assert = std.debug.assert;
 const codec = @import("codec");
@@ -35,8 +35,32 @@ pub const Coding = enum {
 /// The gzip encoder a caller places, at stdx's default level.
 pub const GzipEncoder = gzip.Encoder(.{});
 
+/// The zstd encoder a caller places: level 1, and a window of one block, 128 KiB, which an RPC
+/// message rarely outgrows and which keeps the encoder small (stdx decisions 12 and 13).
+pub const ZstdEncoder = zstd.Encoder(.{ .level = zstd_level, .window_log = zstd_window_log });
+const zstd_level = 1;
+const zstd_window_log = 17;
+
+/// The encoders a caller placed. A coding whose encoder is null is not written.
+pub const Encoders = struct {
+    gzip: ?*GzipEncoder = null,
+    zstd: ?*ZstdEncoder = null,
+
+    pub fn writes(encoders: Encoders, coding: Coding) bool {
+        return switch (coding) {
+            .identity => true,
+            .gzip => encoders.gzip != null,
+            .zstd => encoders.zstd != null,
+            .br => false,
+        };
+    }
+};
+
 /// The gzip decoder a caller places.
 pub const GzipDecoder = gzip.Decoder;
+
+/// The zstd decoder a caller places, with HTTP's window limit (RFC 9659 §3).
+pub const ZstdDecoder = zstd.HttpDecoder;
 
 /// The decoders a caller placed. A coding whose decoder is null is not accepted.
 pub const Decoders = struct {
@@ -103,24 +127,34 @@ pub fn decompress(coding: Coding, decoders: Decoders, input: []const u8, output:
     return output[0..whole.written];
 }
 
-/// Compresses `input` with gzip into `output`.
-pub fn compress_gzip(encoder: *GzipEncoder, input: []const u8, output: []u8) error{NoSpaceLeft}![]const u8 {
-    encoder.init(codec.Features.target());
-    const len = try encoder.encode_all(input, output);
-    assert(len <= GzipEncoder.encoded_len_max(input.len));
+/// Compresses `input` with `coding`, which `encoders` writes, into `output`.
+pub fn compress(coding: Coding, encoders: Encoders, input: []const u8, output: []u8) error{NoSpaceLeft}![]const u8 {
+    assert(coding != .identity and encoders.writes(coding));
+    const features = codec.Features.target();
+    const len = switch (coding) {
+        .gzip => len: {
+            encoders.gzip.?.init(features);
+            break :len try encoders.gzip.?.encode_all(input, output);
+        },
+        .zstd => len: {
+            encoders.zstd.?.init(features);
+            break :len try encoders.zstd.?.encode_all(input, output);
+        },
+        .identity, .br => unreachable,
+    };
     return output[0..len];
 }
 
-/// The coding a server answers in: the first one the peer's list names that the server
-/// compresses with, which is gzip alone, or identity (Connect protocol, "Compression").
-pub fn choose(accepted: []const u8, can_compress: bool) Coding {
-    if (!can_compress) return .identity;
+/// The coding a server answers in: the first one the peer's list names that `encoders` writes,
+/// or identity (Connect protocol, "Compression").
+pub fn choose(accepted: []const u8, encoders: Encoders) Coding {
     var entries = std.mem.splitScalar(u8, accepted, ',');
     for (0..constants.limits.codings_max) |_| {
         const entry = entries.next() orelse return .identity;
         // RFC 9110 §12.4.2: a weight follows ";", and "q=0" means not acceptable.
         const end = std.mem.indexOfScalar(u8, entry, ';') orelse entry.len;
-        if (weight(entry[end..]) > 0 and Coding.from_name(entry[0..end]) == .gzip) return .gzip;
+        const coding = Coding.from_name(entry[0..end]) orelse continue;
+        if (coding != .identity and weight(entry[end..]) > 0 and encoders.writes(coding)) return coding;
     }
     return .identity;
 }
@@ -142,21 +176,27 @@ test "coding names are case-insensitive, and an unknown one is null" {
     try testing.expectEqual(@as(?Coding, null), Coding.from_name("snappy"));
 }
 
-test "a server picks gzip when the peer lists it, and identity otherwise" {
-    try testing.expectEqual(Coding.gzip, choose("br, gzip", true));
-    try testing.expectEqual(Coding.identity, choose("br, zstd", true));
-    try testing.expectEqual(Coding.identity, choose("gzip;q=0", true));
-    try testing.expectEqual(Coding.gzip, choose("gzip;q=0.5", true));
-    try testing.expectEqual(Coding.identity, choose("gzip; q=0.0", true));
-    try testing.expectEqual(Coding.identity, choose("gzip", false));
+/// The encoders the tests place: too large for a test's stack.
+threadlocal var test_gzip: GzipEncoder align(@alignOf(GzipEncoder)) = undefined;
+threadlocal var test_zstd: ZstdEncoder align(@alignOf(ZstdEncoder)) = undefined;
+
+test "a server answers in the first coding the peer lists that it writes" {
+    const both: Encoders = .{ .gzip = &test_gzip, .zstd = &test_zstd };
+    try testing.expectEqual(Coding.gzip, choose("br, gzip", both));
+    try testing.expectEqual(Coding.zstd, choose("br, zstd, gzip", both));
+    try testing.expectEqual(Coding.gzip, choose("zstd, gzip", .{ .gzip = &test_gzip }));
+    try testing.expectEqual(Coding.identity, choose("br", both));
+    try testing.expectEqual(Coding.identity, choose("gzip;q=0", both));
+    try testing.expectEqual(Coding.gzip, choose("gzip;q=0.5", both));
+    try testing.expectEqual(Coding.identity, choose("gzip; q=0.0", both));
+    try testing.expectEqual(Coding.identity, choose("gzip, zstd", .{}));
 }
 
 test "gzip round-trips, and a coding with no decoder or a small buffer is refused" {
-    var encoder: GzipEncoder = undefined;
     var decoder: gzip.Decoder = undefined;
     const message = "hello hello hello hello";
     var compressed: [128]u8 = undefined;
-    const packed_octets = try compress_gzip(&encoder, message, &compressed);
+    const packed_octets = try compress(.gzip, .{ .gzip = &test_gzip }, message, &compressed);
     var output: [64]u8 = undefined;
     const decoders: Decoders = .{ .gzip = &decoder };
     try testing.expectEqualStrings(message, try decompress(.gzip, decoders, packed_octets, &output));
@@ -165,4 +205,17 @@ test "gzip round-trips, and a coding with no decoder or a small buffer is refuse
     try testing.expectError(error.CorruptMessage, decompress(.gzip, decoders, "not gzip at all", &output));
     var list: [accept_list_len_max]u8 = undefined;
     try testing.expectEqualStrings("gzip", decoders.accept_list(&list));
+}
+
+/// The zstd decoder the round trip places: too large for a test's stack.
+threadlocal var test_zstd_decoder: zstd.HttpDecoder align(@alignOf(zstd.HttpDecoder)) = undefined;
+
+test "zstd round-trips through stdx's encoder and decoder" {
+    const message = "zstd zstd zstd zstd zstd zstd zstd zstd";
+    var compressed: [128]u8 = undefined;
+    const packed_octets = try compress(.zstd, .{ .zstd = &test_zstd }, message, &compressed);
+    // RFC 8878 §3.1.1: a Zstandard frame starts with its magic number, 0xFD2FB528, little-endian.
+    try testing.expectEqualSlices(u8, &.{ 0x28, 0xb5, 0x2f, 0xfd }, packed_octets[0..4]);
+    var output: [64]u8 = undefined;
+    try testing.expectEqualStrings(message, try decompress(.zstd, .{ .zstd = &test_zstd_decoder }, packed_octets, &output));
 }

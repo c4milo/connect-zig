@@ -5,6 +5,7 @@ const rpc_error = @import("rpc_error.zig");
 const testing = std.testing;
 const proto = @import("protobuf");
 const gzip = @import("gzip");
+const zstd = @import("zstd");
 const connect = @import("connect.zig");
 const client_call = @import("client_call.zig");
 const client_response = @import("client_response.zig");
@@ -62,6 +63,8 @@ const Server = struct {
     trailer_out: [connect.trailers.trailers_max]Header = undefined,
     encoder: connect.GzipEncoder = undefined,
     decoder: gzip.Decoder = undefined,
+    zstd_encoder: connect.ZstdEncoder = undefined,
+    zstd_decoder: zstd.HttpDecoder = undefined,
 
     fn scratch(server: *Server) message_codec.Scratch {
         return .{ .message = &server.message, .work = &server.work, .tokens = &server.tokens };
@@ -74,12 +77,13 @@ const Server = struct {
         const target = request.target;
         const question = std.mem.indexOfScalar(u8, target, '?');
         const query = if (question) |at| target[at + 1 ..] else null;
-        const decoders: connect.Decoders = .{ .gzip = &server.decoder };
+        const decoders: connect.Decoders = .{ .gzip = &server.decoder, .zstd = &server.zstd_decoder };
+        const encoders: connect.Encoders = .{ .gzip = &server.encoder, .zstd = &server.zstd_encoder };
         const decision = server_head.accept(request.http_method, query, list.lookup(), .{
             .stream_type = method.stream_type,
             .idempotency = method.idempotency,
             .decoders = decoders,
-            .can_compress = true,
+            .encoders = encoders,
         });
         var body: std.Io.Writer = .fixed(&server.body);
         defer server.body_len = body.end;
@@ -93,7 +97,7 @@ const Server = struct {
                 return server.fail(&reply, refused.failure.?, &body);
             },
         };
-        var reply: server_reply.Reply = .{ .accepted = accepted, .scratch = server.scratch(), .encoder = &server.encoder };
+        var reply: server_reply.Reply = .{ .accepted = accepted, .scratch = server.scratch(), .encoders = encoders };
         if (failure) |rpc_failure| return server.fail(&reply, rpc_failure, &body);
         var messages = server_request.Messages.init(accepted, request.body, .{ .message = &server.request_message, .work = &server.work, .tokens = &server.tokens }, decoders);
         server.head = reply.head(false);
@@ -131,6 +135,8 @@ const Client = struct {
     metadata: [metadata_max]Header = undefined,
     decoder: gzip.Decoder = undefined,
     encoder: connect.GzipEncoder = undefined,
+    zstd_decoder: zstd.HttpDecoder = undefined,
+    zstd_encoder: connect.ZstdEncoder = undefined,
     head_list: List = .{ .entries = &.{} },
     trailer_list: List = .{ .entries = &.{} },
 
@@ -152,7 +158,7 @@ const Client = struct {
             .headers = client.head_list.lookup(),
             .body = server.body[0..server.body_len],
             .trailers = client.trailer_list.lookup(),
-        }, storage, .{ .gzip = &client.decoder });
+        }, storage, .{ .gzip = &client.decoder, .zstd = &client.zstd_decoder });
     }
 };
 
@@ -166,8 +172,10 @@ threadlocal var client_state: Client align(@alignOf(Client)) = .{};
 
 fn round_trip(comptime method: connect.Method, options: client_call.Options, messages: []const Note, failure: ?connect.RpcError) !client_response.Response {
     var with_codings = options;
-    with_codings.decoders = .{ .gzip = &client_state.decoder };
-    with_codings.encoder = &client_state.encoder;
+    // A case that names its decoders keeps them: its accept list is what the server chooses from.
+    const named = options.decoders.gzip != null or options.decoders.zstd != null;
+    if (!named) with_codings.decoders = .{ .gzip = &client_state.decoder, .zstd = &client_state.zstd_decoder };
+    with_codings.encoders = .{ .gzip = &client_state.encoder, .zstd = &client_state.zstd_encoder };
     const request = try client_call.request(method, with_codings, messages, client_state.call_buffers());
     try server_state.serve(method, &request, failure);
     return client_state.response(speaks_of(method, options), &server_state);
@@ -225,6 +233,21 @@ test "a GET, gzip both ways, and a timeout pass through" {
     try testing.expectEqualStrings(long, (try compressed.next(Note)).?.text);
     var unary_gzip = try round_trip(say, .{ .request_coding = .gzip }, &.{.{ .text = long }}, null);
     try testing.expectEqualStrings(long, (try unary_gzip.next(Note)).?.text);
+}
+
+test "zstd both ways: the client sends it, and a server answers in it to a client that takes it alone" {
+    const long = "zstd " ** 300;
+    const zstd_only: connect.Decoders = .{ .zstd = &client_state.zstd_decoder };
+    var compressed = try round_trip(say, .{ .protocol = .grpc, .request_coding = .zstd, .decoders = zstd_only }, &.{.{ .text = long }}, null);
+    try testing.expectEqualStrings("zstd", server_state.head.headers()[1].value);
+    // The reply's envelope is flagged compressed, so the server wrote it in zstd.
+    try testing.expectEqual(@as(u8, 1), server_state.body[0]);
+    try testing.expectEqualStrings(long, (try compressed.next(Note)).?.text);
+    var unary = try round_trip(say, .{ .request_coding = .zstd, .decoders = zstd_only }, &.{.{ .text = long }}, null);
+    try testing.expectEqualStrings(long, (try unary.next(Note)).?.text);
+    // A GET names its message's coding in its query (Connect protocol, "Unary-Get-Request").
+    var get = try round_trip(say, .{ .use_get = true, .request_coding = .zstd, .decoders = zstd_only }, &.{.{ .text = long }}, null);
+    try testing.expectEqualStrings(long, (try get.next(Note)).?.text);
 }
 
 test "a Connect stream with no end-stream message fails, and a short message is not compressed" {
