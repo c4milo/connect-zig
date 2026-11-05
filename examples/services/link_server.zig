@@ -39,7 +39,7 @@ const client_address: server.Address = .of(&loopback, client_port);
 /// What a program probes once and passes every TLS configuration: here no CPU feature is known
 /// and the thread's timing mode is not stated, so each session runs ChaCha20 alone.
 pub const cpu: tls.Cpu = .{
-    .probe = .{ .aes_clmul = .not_known, .dit = .not_known, .sha256 = .not_known, .sha512 = .not_known, .sha3 = .not_known, .ssse3 = .not_known, .sse4_1 = .not_known },
+    .probe = .{ .aes_clmul = .not_known, .dit = .not_known, .sha256 = .not_known, .sha512 = .not_known, .sha3 = .not_known, .ssse3 = .not_known, .sse4_1 = .not_known, .avx2 = .not_known, .vaes = .not_known },
     .timing = .not_stated,
 };
 
@@ -55,7 +55,8 @@ var output: [output_len]u8 = undefined;
 var datagram_output: [datagram_module.datagram_len_max]u8 = undefined;
 var chain_der: [chain_der_len]u8 = undefined;
 var chain_room: [tls.constants.limits.certificate_chain_len_max][]const u8 = undefined;
-var key: tls.P256Key align(@alignOf(tls.P256Key)) = .{};
+var key: tls.Key align(@alignOf(tls.Key)) = .{};
+var identities: [1]tls.Identity align(@alignOf(tls.Identity)) = undefined;
 var cookie_key: [tls.constants.protocol.server_key_len]u8 = undefined;
 var ticket_key: [tls.constants.protocol.server_key_len]u8 = undefined;
 var config: server.Config align(@alignOf(server.Config)) = .{};
@@ -75,11 +76,12 @@ pub fn init(stream: *Link, datagrams: *DatagramLink) !void {
     prng.random().bytes(&ticket_key);
     // The chain, the end-entity first, and the P-256 key the end-entity certificate carries.
     const chain = try tls.pem.chain(identity.chain_pem, &chain_der, &chain_room);
-    try tls.pem.p256_key(cpu, identity.key_pem, chain[0], &key);
+    try tls.pem.key(cpu, identity.key_pem, chain[0], &key);
+    identities[0] = .{ .chain = chain, .key = &key };
     // The identity serves QUIC, which names h3. A TCP socket the program accepts with `.tls =
     // false` stays in cleartext.
     config = .{ .tls = .{
-        .ecdsa_p256 = .{ .chain = chain, .public_key = &key.public_key, .private_key = &key.private_key },
+        .identities = &identities,
         .cookie_key = &cookie_key,
         .ticket_key = &ticket_key,
         .cpu = cpu,
