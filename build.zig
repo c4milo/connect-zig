@@ -46,7 +46,7 @@ pub fn build(b: *std.Build) void {
     b.installArtifact(plugin);
 
     // Everything below is connect-zig's own build. A project that depends on it stops here,
-    // before the tooling requests pepegrillo (docs/decisions.md entry 13).
+    // before the tooling requests pepegrillo (docs/decisions.md entry 15).
     if (b.pkg_hash.len != 0) return;
 
     const test_step = b.step("test", "Run the lint, then every module's unit tests and the examples");

@@ -4,17 +4,28 @@
     .fingerprint = 0x25c0784958afdaae,
     .minimum_zig_version = "0.16.0",
     .dependencies = .{
+        // The HTTP transport of `connect_colibri`, and through its `tls` module, chapulin.
         .colibri = .{
             .url = "git+https://github.com/c4milo/colibri?ref=v0.11.0#83c922b13f6f49623d085c36cf4e6a244de166db",
             .hash = "colibri-0.10.0-Wo-AvtswnASeMGAf75MDVdGAz7oGtHKg1iK_uV2rioDy",
         },
+        // JSON for proto3 JSON and the Connect error bodies, and the compression codecs.
         .stdx = .{
             .url = "git+https://github.com/c4milo/stdx#5fd03aa712b86d371927f65149a42756a9091ac6",
             .hash = "stdx-0.0.0-BD60tmIaMADl0M2qj5DcS0aUq1aOuZkMwnVViPPHVKhZ",
         },
+        // Developer tooling only, never linked into the library (decision 15). Lazy, and requested
+        // only when connect-zig is the root build.
         .pepegrillo = .{
             .url = "git+https://github.com/c4milo/pepegrillo#151eedd90b46fe57726a242c3ff904d5033584a5",
             .hash = "pepegrillo-0.0.0-axiFUPL3CgAtzvvowVH_JkuQqmQ8Lx8ZYsih1AE4hRI2",
+            .lazy = true,
+        },
+        // The event loop of the examples, at the commit colibri v0.11.0 pins. Lazy, and requested
+        // only when connect-zig is the root build, like pepegrillo.
+        .rotor = .{
+            .url = "git+https://github.com/c4milo/rotor#4f818b7fec7fc0015467c0fc2b9990402360faa6",
+            .hash = "rotor-0.7.0-YZkxRNWsFABSDEyZC7xAC0DCzwhUANFdPg_yrBh8uhEj",
             .lazy = true,
         },
     },
