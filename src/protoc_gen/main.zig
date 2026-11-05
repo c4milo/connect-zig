@@ -16,14 +16,14 @@ const io_buffer_len = constants.io_buffer_len;
 
 pub fn main(init: std.process.Init) !void {
     const arena = init.arena.allocator();
-    var input_buffer: [io_buffer_len]u8 = undefined;
-    var stdin = std.Io.File.stdin().reader(init.io, &input_buffer);
+    const input_buffer = try arena.alloc(u8, io_buffer_len);
+    var stdin = std.Io.File.stdin().reader(init.io, input_buffer);
     const request_bytes = try stdin.interface.allocRemaining(arena, .limited(request_len_max));
     const response = try respond(arena, request_bytes);
     const len = try proto.encoded_len(pb.CodeGeneratorResponse, &response);
     const encoded = try proto.encode(pb.CodeGeneratorResponse, &response, try arena.alloc(u8, len));
-    var output_buffer: [io_buffer_len]u8 = undefined;
-    var stdout = std.Io.File.stdout().writer(init.io, &output_buffer);
+    const output_buffer = try arena.alloc(u8, io_buffer_len);
+    var stdout = std.Io.File.stdout().writer(init.io, output_buffer);
     try stdout.interface.writeAll(encoded);
     try stdout.interface.flush();
 }

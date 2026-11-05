@@ -28,7 +28,7 @@ pub fn CallState(comptime options: Options) type {
         tokens: [options.token_bytes]u8 = undefined,
         reply_message: [options.message_bytes]u8 = undefined,
         reply_work: [options.message_bytes]u8 = undefined,
-        trailers: [constants.trailer_bytes]u8 = undefined,
+        room: call_file.Room = .{},
     };
 }
 
@@ -73,7 +73,7 @@ pub fn Route(comptime App: type, comptime method: connect.Method, comptime handl
                 },
                 .refused => |refused| {
                     state.done = true;
-                    return call_file.answer_refusal(refused, scratch_of(options, state, .reply), &state.trailers, response);
+                    return call_file.answer_refusal(refused, scratch_of(options, state, .reply), &state.room, response);
                 },
             }
         }
@@ -91,7 +91,7 @@ pub fn Route(comptime App: type, comptime method: connect.Method, comptime handl
             var call: call_file.Call = .{
                 .reply = .{ .accepted = accepted, .scratch = scratch_of(options, state, .reply), .encoder = codings.encoder },
                 .response = response,
-                .trailer_storage = &state.trailers,
+                .room = &state.room,
             };
             var messages = connect.server.Messages.init(accepted, body, scratch_of(options, state, .request), codings.decoders);
             return call_file.dispatch(App, method, handler, app, &call, &messages);

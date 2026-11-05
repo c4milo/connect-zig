@@ -92,11 +92,13 @@ pub const Tokens = struct {
 
 const base64_chars = 4;
 const base64_octets = 3;
+/// The base64 octets one string piece writes, under one cache line, so the staging buffer
+/// costs a few stores a call.
+const piece_len = 60;
 
 /// Writes `octets` as one string of unpadded standard base64, in pieces.
 pub fn write_base64(octets: []const u8, text: *json.TextWriter) (json.EncodeError || error{NoSpaceLeft})!void {
     const encoder = std.base64.standard_no_pad.Encoder;
-    const piece_len = constants.limits.base64_piece_len;
     // Base64 writes 4 characters for each 3 octets.
     const chunk_len = piece_len / base64_chars * base64_octets;
     var buffer: [piece_len]u8 = undefined;

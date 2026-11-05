@@ -72,8 +72,6 @@ pub const limits = struct {
     pub const query_pairs_max = 32;
     /// The deepest JSON nesting an error body or end-stream message holds.
     pub const json_depth_max = 16;
-    /// The octets of base64 one string piece writes.
-    pub const base64_piece_len = 64;
 };
 
 /// The halves a writer splits one storage into, when it writes two values at once: a Status and

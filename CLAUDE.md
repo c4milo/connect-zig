@@ -76,11 +76,17 @@ confirm a test fails. Report `CAUGHT` or `NOT CAUGHT` per mutation in the commit
   generated code. `zig build test-<module>` runs one module's tests alone.
 - Lint: `zig build lint`: the cognitive-complexity score, then the rules of `tools/lint/main.zig`:
   heap, io, determinism, unbounded-loop, file-length, markdown, relative-import, magic-numbers,
-  global-state and static-alignment. They read `examples/gen` as they read hand-written code
+  global-state, static-alignment, defer-order, undefined-fill, unreleased-acquire and
+  denied-words, all from pepegrillo. `zig build test` also requires `.githooks/pre-push` to equal
+  pepegrillo's hook (`zig build hook-check`).
+- Hooks: `zig build hooks` once after cloning points `core.hooksPath` at `.githooks`, whose
+  pre-push hook runs the commit linter that `zig build install-commit-lint` installs. They read `examples/gen` as they read hand-written code
   (decision 17).
 - Commit messages: `zig build lint-commits` checks `origin/main..HEAD`.
-- Examples: `zig build examples` runs every program in `examples/` that checks itself: the ELIZA
-  client against the ELIZA server over colibri's h2 and h11, in memory. `zig build
+- Examples: `zig build examples` runs every program in `examples/` that checks itself:
+  `protobuf_messages`, `sans_io_call`, and the ELIZA client against the ELIZA server over
+  colibri's h2 and h11, in memory. `zig build example-<name>` runs one; `examples/README.md`
+  lists them. `zig build
   run-eliza-server -- [port]` serves ELIZA on a TCP socket; port 0 lets the kernel choose, and the
   server prints `listening on port <port>`.
 - Generated code: `zig build test-generated` compiles `examples/gen` and runs its round trips.

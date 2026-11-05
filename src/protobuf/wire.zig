@@ -194,16 +194,16 @@ pub const Writer = struct {
     }
 
     pub fn varint(writer: *Writer, value: u64) WriteError!void {
-        var rest = value;
-        var octets: [constants.protocol.varint_len_max]u8 = undefined;
         const len = varint_len(value);
-        for (octets[0..len], 0..) |*octet, index| {
+        if (len > writer.buffer.len - writer.len) return error.NoSpaceLeft;
+        var rest = value;
+        for (writer.buffer[writer.len..][0..len], 0..) |*octet, index| {
             const more: u8 = if (index + 1 < len) continuation else 0;
             octet.* = @as(u8, @truncate(rest & payload_mask)) | more;
             rest >>= group_bits;
         }
         assert(rest == 0);
-        try writer.bytes(octets[0..len]);
+        writer.len += len;
     }
 
     /// A varint of exactly `constants.limits.padded_length_len` bytes, padded with continuation
@@ -227,15 +227,21 @@ pub const Writer = struct {
     }
 
     pub fn fixed32(writer: *Writer, value: u32) WriteError!void {
-        var octets: [constants.protocol.fixed32_len]u8 = undefined;
-        std.mem.writeInt(u32, &octets, value, .little);
-        try writer.bytes(&octets);
+        const room = try writer.take(constants.protocol.fixed32_len);
+        std.mem.writeInt(u32, room, value, .little);
     }
 
     pub fn fixed64(writer: *Writer, value: u64) WriteError!void {
-        var octets: [constants.protocol.fixed64_len]u8 = undefined;
-        std.mem.writeInt(u64, &octets, value, .little);
-        try writer.bytes(&octets);
+        const room = try writer.take(constants.protocol.fixed64_len);
+        std.mem.writeInt(u64, room, value, .little);
+    }
+
+    /// The next `len` bytes of the buffer, which the caller fills, or an error when they do not fit.
+    fn take(writer: *Writer, comptime len: usize) WriteError!*[len]u8 {
+        if (len > writer.buffer.len - writer.len) return error.NoSpaceLeft;
+        const room = writer.buffer[writer.len..][0..len];
+        writer.len += len;
+        return room;
     }
 
     pub fn tag(writer: *Writer, number: u32, wire_type: WireType) WriteError!void {

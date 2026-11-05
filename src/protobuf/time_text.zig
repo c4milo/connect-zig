@@ -115,13 +115,14 @@ fn civil_from_days(days: i64) Civil {
     return .{ .year = year, .month = month, .day = day };
 }
 
-/// The fraction digits the mapping writes: none, or 3, 6 or 9, the fewest that hold `nanos`.
-fn write_fraction(nanos: u32, buffer: *[fraction_text_len_max]u8) []const u8 {
-    if (nanos == 0) return buffer[0..0];
-    const digits = std.fmt.bufPrint(buffer, ".{d:0>9}", .{nanos}) catch unreachable;
-    if (nanos % nanos_per_milli == 0) return digits[0 .. 1 + milli_digits];
-    if (nanos % nanos_per_micro == 0) return digits[0 .. 1 + micro_digits];
-    return digits;
+/// Writes the fraction digits the mapping writes into `buffer`: none, or 3, 6 or 9, the fewest
+/// that hold `nanos`. Returns the octets written.
+fn write_fraction(nanos: u32, buffer: []u8) Error!usize {
+    if (nanos == 0) return 0;
+    const digits = std.fmt.bufPrint(buffer, ".{d:0>9}", .{nanos}) catch return error.NoSpaceLeft;
+    if (nanos % nanos_per_milli == 0) return 1 + milli_digits;
+    if (nanos % nanos_per_micro == 0) return 1 + micro_digits;
+    return digits.len;
 }
 
 pub fn format_timestamp(instant: Instant, buffer: []u8) Error![]const u8 {
@@ -130,24 +131,28 @@ pub fn format_timestamp(instant: Instant, buffer: []u8) Error![]const u8 {
     const days = @divFloor(instant.seconds, seconds_per_day);
     const second_of_day: u64 = @intCast(instant.seconds - days * seconds_per_day);
     const civil = civil_from_days(days);
-    var fraction: [fraction_text_len_max]u8 = undefined;
-    return std.fmt.bufPrint(buffer, "{d:0>4}-{d:0>2}-{d:0>2}T{d:0>2}:{d:0>2}:{d:0>2}{s}Z", .{
+    const whole = std.fmt.bufPrint(buffer, "{d:0>4}-{d:0>2}-{d:0>2}T{d:0>2}:{d:0>2}:{d:0>2}", .{
         @as(u64, @intCast(civil.year)),                        civil.month,
         civil.day,                                             second_of_day / seconds_per_hour,
         second_of_day / seconds_per_minute % minutes_per_hour, second_of_day % seconds_per_minute,
-        write_fraction(@intCast(instant.nanos), &fraction),
-    }) catch error.NoSpaceLeft;
+    }) catch return error.NoSpaceLeft;
+    return finish_text(buffer, whole.len, @intCast(instant.nanos), "Z");
 }
 
 pub fn format_duration(instant: Instant, buffer: []u8) Error![]const u8 {
     try check_duration(instant);
     const negative = instant.seconds < 0 or instant.nanos < 0;
-    var fraction: [fraction_text_len_max]u8 = undefined;
-    return std.fmt.bufPrint(buffer, "{s}{d}{s}s", .{
-        if (negative) "-" else "",
-        @abs(instant.seconds),
-        write_fraction(@abs(instant.nanos), &fraction),
-    }) catch error.NoSpaceLeft;
+    const whole = std.fmt.bufPrint(buffer, "{s}{d}", .{ if (negative) "-" else "", @abs(instant.seconds) }) catch return error.NoSpaceLeft;
+    return finish_text(buffer, whole.len, @abs(instant.nanos), "s");
+}
+
+/// Writes the fraction and the suffix after the `len` octets already in `buffer`.
+fn finish_text(buffer: []u8, len: usize, nanos: u32, suffix: []const u8) Error![]const u8 {
+    var end = len + try write_fraction(nanos, buffer[len..]);
+    if (end + suffix.len > buffer.len) return error.NoSpaceLeft;
+    @memcpy(buffer[end..][0..suffix.len], suffix);
+    end += suffix.len;
+    return buffer[0..end];
 }
 
 fn check_duration(instant: Instant) Error!void {

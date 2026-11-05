@@ -13,6 +13,11 @@ const root_documents = [_][]const u8{ "README.md", "CLAUDE.md" };
 
 const commit_lint_range = "origin/main..HEAD";
 
+/// The directory `zig build hooks` points a clone's core.hooksPath at, and the pre-push hook: a
+/// copy of pepegrillo's, which `zig build test` compares byte for byte, as colibri does.
+const hooks_directory = ".githooks";
+const pre_push_hook = hooks_directory ++ "/pre-push";
+
 /// Adds the lint steps and returns `lint`, or null while pepegrillo is not fetched yet.
 pub fn add(b: *std.Build) ?*std.Build.Step {
     const dependency = b.lazyDependency("pepegrillo", .{}) orelse return null;
@@ -40,6 +45,17 @@ pub fn add(b: *std.Build) ?*std.Build.Step {
     step.dependOn(&tool_tests.step);
 
     const commits = b.addExecutable(.{ .name = "commit_lint", .root_module = tool(b, pepegrillo, "tools/commit_lint.zig") });
+    // The pre-push hook runs zig-out/bin/commit_lint, which this step installs alone.
+    const install_commits = b.addInstallArtifact(commits, .{});
+    b.step("install-commit-lint", "Install the commit-message linter the pre-push hook runs").dependOn(&install_commits.step);
+    const hooks = b.addSystemCommand(&.{ "git", "config", "core.hooksPath", hooks_directory });
+    b.step("hooks", "Point this clone's core.hooksPath at " ++ hooks_directory).dependOn(&hooks.step);
+    const compare = b.addSystemCommand(&.{"cmp"});
+    compare.addFileArg(dependency.path("hooks/pre-push"));
+    compare.addFileArg(b.path(pre_push_hook));
+    const hook_check = b.step("hook-check", "Require " ++ pre_push_hook ++ " to equal pepegrillo's hooks/pre-push");
+    hook_check.dependOn(&compare.step);
+    step.dependOn(hook_check);
     const commits_run = b.addRunArtifact(commits);
     commits_run.addArgs(&.{ "--range", commit_lint_range });
     commits_run.setCwd(b.path("."));

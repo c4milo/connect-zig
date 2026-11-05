@@ -22,7 +22,9 @@ pub const trailers_max = 3;
 pub const Error = error{ NoSpaceLeft, TooManyDetails } || @import("protobuf").EncodeError;
 
 /// Writes the status trailers of `failure`, or of success when null, into `buffer`.
-pub fn write(failure: ?RpcError, buffer: []u8, out: *[trailers_max]Header) Error![]const Header {
+/// `out` holds at least `trailers_max` headers.
+pub fn write(failure: ?RpcError, buffer: []u8, out: []Header) Error![]const Header {
+    assert(out.len >= trailers_max);
     const status = failure orelse {
         out[0] = .{ .name = "grpc-status", .value = "0" };
         return out[0..1];
@@ -47,7 +49,7 @@ pub fn write(failure: ?RpcError, buffer: []u8, out: *[trailers_max]Header) Error
     return out[0..count];
 }
 
-fn add(out: *[trailers_max]Header, count: usize, name: []const u8, value: []const u8) usize {
+fn add(out: []Header, count: usize, name: []const u8, value: []const u8) usize {
     assert(count < trailers_max);
     out[count] = .{ .name = name, .value = value };
     return count + 1;

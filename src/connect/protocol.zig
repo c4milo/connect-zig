@@ -15,8 +15,12 @@ pub const Codec = enum {
         return @tagName(codec);
     }
 
+    /// The codec a media type names, in any case (RFC 9110 §8.3.1).
     pub fn from_name(text: []const u8) ?Codec {
-        return std.meta.stringToEnum(Codec, text);
+        inline for (comptime std.enums.values(Codec)) |codec| {
+            if (std.ascii.eqlIgnoreCase(text, @tagName(codec))) return codec;
+        }
+        return null;
     }
 };
 
@@ -39,21 +43,15 @@ pub const Error = error{
 pub fn of_content_type(value: []const u8) Error!Speaks {
     const end = std.mem.indexOfScalar(u8, value, ';') orelse value.len;
     const media = std.mem.trim(u8, value[0..end], " \t");
-    var lower: [media_len_max]u8 = undefined;
-    if (media.len > lower.len) return error.UnsupportedMediaType;
-    const folded = std.ascii.lowerString(&lower, media);
     const application = "application/";
-    if (!std.mem.startsWith(u8, folded, application)) return error.UnsupportedMediaType;
-    return of_subtype(folded[application.len..]);
+    if (!std.ascii.startsWithIgnoreCase(media, application)) return error.UnsupportedMediaType;
+    return of_subtype(media[application.len..]);
 }
-
-/// The longest media type `of_content_type` reads.
-const media_len_max = 64;
 
 fn of_subtype(subtype: []const u8) Error!Speaks {
     // gRPC: "application/grpc" alone means proto (PROTOCOL-HTTP2.md, "Content-Type").
-    if (std.mem.eql(u8, subtype, "grpc")) return .{ .protocol = .grpc, .codec = .proto, .enveloped = true };
-    if (std.mem.eql(u8, subtype, "grpc-web")) return .{ .protocol = .grpc_web, .codec = .proto, .enveloped = true };
+    if (std.ascii.eqlIgnoreCase(subtype, "grpc")) return .{ .protocol = .grpc, .codec = .proto, .enveloped = true };
+    if (std.ascii.eqlIgnoreCase(subtype, "grpc-web")) return .{ .protocol = .grpc_web, .codec = .proto, .enveloped = true };
     if (suffixed(subtype, "grpc-web+")) |codec| return .{ .protocol = .grpc_web, .codec = codec, .enveloped = true };
     if (suffixed(subtype, "grpc+")) |codec| return .{ .protocol = .grpc, .codec = codec, .enveloped = true };
     if (suffixed(subtype, "connect+")) |codec| return .{ .protocol = .connect, .codec = codec, .enveloped = true };
@@ -62,7 +60,7 @@ fn of_subtype(subtype: []const u8) Error!Speaks {
 }
 
 fn suffixed(subtype: []const u8, prefix: []const u8) ?Codec {
-    if (!std.mem.startsWith(u8, subtype, prefix)) return null;
+    if (!std.ascii.startsWithIgnoreCase(subtype, prefix)) return null;
     return Codec.from_name(subtype[prefix.len..]);
 }
 

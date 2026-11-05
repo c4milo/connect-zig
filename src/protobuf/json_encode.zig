@@ -17,6 +17,13 @@ const Field = descriptor.Field;
 
 pub const Error = json_scalar.EncodeError;
 
+/// The longest Timestamp or Duration text, which `time_text` pins: under one cache line.
+const time_text_len = 32;
+
+comptime {
+    std.debug.assert(time_text_len == time_text.text_len_max);
+}
+
 pub fn write_message(comptime T: type, message: *const T, text: *json.TextWriter) Error!void {
     comptime descriptor.check(T);
     switch (comptime wkt.form(T)) {
@@ -39,7 +46,7 @@ pub fn write_message(comptime T: type, message: *const T, text: *json.TextWriter
 }
 
 fn write_time(message: anytype, comptime format: anytype, text: *json.TextWriter) Error!void {
-    var buffer: [time_text.text_len_max]u8 = undefined;
+    var buffer: [time_text_len]u8 = undefined;
     const written = format(.{ .seconds = message.seconds, .nanos = message.nanos }, &buffer) catch |failure| switch (failure) {
         error.NoSpaceLeft => unreachable,
         else => |refusal| return refusal,

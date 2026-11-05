@@ -141,13 +141,9 @@ fn request_get(comptime method: method_file.Method, options: Options, message: *
     const coding: Coding = if (packed_message.compressed) .gzip else .identity;
     const query = try get.write_query(options.codec, coding, packed_message.octets, buffers.body[path.len + 1 ..]);
     var result: Request = .{ .http_method = "GET", .target = buffers.body[0 .. path.len + 1 + query.len], .body = "" };
-    var accept_room: [compression.accept_list_len_max]u8 = undefined;
-    const accept = options.decoders.accept_list(&accept_room);
-    if (accept.len != 0) {
-        if (buffers.values.len < accept.len) return error.NoSpaceLeft;
-        @memcpy(buffers.values[0..accept.len], accept);
-        result.add("accept-encoding", buffers.values[0..accept.len]);
-    }
+    if (buffers.values.len < compression.accept_list_len_max) return error.NoSpaceLeft;
+    const accept = options.decoders.accept_list(buffers.values[0..compression.accept_list_len_max]);
+    if (accept.len != 0) result.add("accept-encoding", accept);
     return result;
 }
 

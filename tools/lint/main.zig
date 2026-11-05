@@ -101,9 +101,42 @@ pub const markdown = rules.markdown.Rule(.{
     .trailing_whitespace = true,
 });
 
+/// The Zig code this tree writes by hand or generates, which the remaining rules read.
+const zig_tree: lint.scope.Scope = .{ .extensions = &.{lint.paths.zig_extension}, .include_directories = &.{ "src", "examples", "tools", "build" } };
+
+/// A `defer` goes above any statement that can fail, so what the block acquired is released.
+pub const defer_order = rules.defer_order.Rule(.{ .scope = zig_tree });
+
+/// A function's local array is not set to `undefined`, which Debug and ReleaseSafe fill on each
+/// call: the library and the examples take that memory from their caller instead.
+pub const undefined_fill = rules.undefined_fill.Rule(.{
+    .scope = .{ .extensions = &.{lint.paths.zig_extension}, .include_directories = &.{ "src", "examples" } },
+    .stop_at_testing_import = true,
+    // A copy of colibri's examples/link.zig, kept as colibri wrote it.
+    .allowed = &.{
+        .{ .path = "examples/eliza/link.zig", .variable = "events" },
+    },
+});
+
+/// A socket, a file or a loop opened with `try` is closed before a later statement can fail.
+pub const unreleased_acquire = rules.unreleased_acquire.Rule(.{
+    .scope = zig_tree,
+    .acquire_prefixes = &.{ "open", "listen", "init" },
+    .read_assignments = true,
+});
+
+/// No unresolved marker ships: open work is a GitHub issue (CLAUDE.md, Conventions).
+pub const denied_words = rules.denied_words.Rule(.{
+    // This file names the words to deny them.
+    .scope = .{ .extensions = &.{ lint.paths.zig_extension, ".md", ".sh", ".yml", ".proto" }, .exclude_paths = &.{"tools/lint/main.zig"} },
+    .words = &.{ "TODO", "FIXME", "XXX", "HACK" },
+    .word_label = "unresolved marker",
+});
+
 const Linter = lint.Linter(.{
     heap,            io,                      determinism,   unbounded_loop, file_length,      markdown,
-    relative_import, relative_import_outside, magic_numbers, global_state,   static_alignment,
+    relative_import, relative_import_outside, magic_numbers, global_state,   static_alignment, defer_order,
+    undefined_fill,  unreleased_acquire,      denied_words,
 });
 
 pub fn main(init: std.process.Init) !void {
@@ -130,4 +163,27 @@ test "the determinism rule refuses a clock read" {
     const source: [:0]const u8 = "const std = @import(\"std\");\nconst t = std.time.nanoTimestamp;\n";
     const findings = try harness.run(arena_state.allocator(), determinism, "src/connect/timeout.zig", source);
     try testing.expect(findings.len == 1);
+}
+
+test "undefined-fill reports a large local array and passes the copy of colibri's link" {
+    var arena_state = std.heap.ArenaAllocator.init(testing.allocator);
+    defer arena_state.deinit();
+    const arena = arena_state.allocator();
+    const source: [:0]const u8 = "const T = struct { a: u64 };\nfn f() void {\n    var events: [16]T = undefined;\n    _ = &events;\n}\n";
+    try testing.expect((try harness.run(arena, undefined_fill, "src/connect/reply.zig", source)).len == 1);
+    try testing.expect((try harness.run(arena, undefined_fill, "examples/eliza/link.zig", source)).len == 0);
+}
+
+test "denied-words refuses an unresolved marker in prose" {
+    var arena_state = std.heap.ArenaAllocator.init(testing.allocator);
+    defer arena_state.deinit();
+    const findings = try harness.run(arena_state.allocator(), denied_words, "docs/design.md", "Fix this later. todo: split it\n");
+    try testing.expect(findings.len == 1);
+}
+
+test "defer-order refuses a defer under a statement that can fail" {
+    var arena_state = std.heap.ArenaAllocator.init(testing.allocator);
+    defer arena_state.deinit();
+    const source: [:0]const u8 = "fn f() !void {\n    const a = try open();\n    try flush();\n    defer close(a);\n}\n";
+    try testing.expect((try harness.run(arena_state.allocator(), defer_order, "src/connect/x.zig", source)).len == 1);
 }

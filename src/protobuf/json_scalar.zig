@@ -38,8 +38,9 @@ pub const DecodeError = json.DecodeError || error{ Truncated, NoSpaceLeft } || w
 const integer_text_len_max = 20;
 /// The longest text `{d}` or `{e}` writes for a double.
 const float_text_len_max = 32;
-/// The base64 octets one piece of a bytes field writes: 4 for each 3 input octets.
-const base64_piece_len = 64;
+/// The base64 octets one piece of a bytes field writes: 4 for each 3 input octets, and under one
+/// cache line, so the staging buffer costs a few stores a call.
+const base64_piece_len = 60;
 /// Base64 writes 4 characters for each 3 octets (RFC 4648 §4).
 const base64_chars = 4;
 const base64_octets = 3;

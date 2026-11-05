@@ -25,6 +25,11 @@ const RpcError = rpc_error.RpcError;
 /// The most headers `head` and `error_head` return.
 pub const head_headers_max = 4;
 
+comptime {
+    // A Trailers-Only head holds the content type and every status trailer.
+    assert(head_headers_max >= 1 + trailers.trailers_max);
+}
+
 pub const Head = struct {
     status: u16,
     storage: [head_headers_max]Header = undefined,
@@ -84,9 +89,8 @@ pub const Reply = struct {
     pub fn write_message(reply: *Reply, prepared: Prepared, body: *std.Io.Writer) Error!void {
         reply.sent = true;
         if (!reply.accepted.speaks.enveloped) return body.writeAll(prepared.octets);
-        var prefix: [constants.protocol.envelope_prefix_len]u8 = undefined;
-        envelope.write_prefix(.{ .compressed = prepared.compressed }, prepared.octets.len, &prefix);
-        try body.writeAll(&prefix);
+        // The prefix is written in place, in the body writer's own buffer.
+        envelope.write_prefix(.{ .compressed = prepared.compressed }, prepared.octets.len, try body.writableArray(constants.protocol.envelope_prefix_len));
         try body.writeAll(prepared.octets);
     }
 
@@ -110,8 +114,9 @@ pub const Reply = struct {
         }
         var result: Head = .{ .status = constants.protocol.status.ok };
         result.add("content-type", protocol.content_type(speaks));
-        var status_trailers: [trailers.trailers_max]Header = undefined;
-        for (try trailers.write(failure, storage, &status_trailers)) |trailer| result.add(trailer.name, trailer.value);
+        // The status trailers go in the head's own storage, after the content type.
+        const written = try trailers.write(failure, storage, result.storage[result.count..]);
+        result.count += written.len;
         return result;
     }
 
@@ -123,15 +128,13 @@ pub const Reply = struct {
 
     /// Ends a response that carried messages. A Connect stream and gRPC-Web write their end into
     /// the body; gRPC returns the trailers the HTTP library sends, with values in `storage`.
-    pub fn finish(reply: *const Reply, failure: ?RpcError, metadata: []const Header, body: *std.Io.Writer, storage: []u8, out: *[trailers.trailers_max]Header) Error![]const Header {
+    pub fn finish(reply: *const Reply, failure: ?RpcError, metadata: []const Header, body: *std.Io.Writer, storage: []u8, out: []Header) Error![]const Header {
         const speaks = reply.accepted.speaks;
         assert(speaks.enveloped);
         switch (speaks.protocol) {
             .connect => {
                 const text = end_stream.encode(.{ .failure = failure, .metadata = metadata }, storage) catch return error.NoSpaceLeft;
-                var prefix: [constants.protocol.envelope_prefix_len]u8 = undefined;
-                envelope.write_prefix(.{ .end_stream = true }, text.len, &prefix);
-                try body.writeAll(&prefix);
+                envelope.write_prefix(.{ .end_stream = true }, text.len, try body.writableArray(constants.protocol.envelope_prefix_len));
                 try body.writeAll(text);
                 return out[0..0];
             },

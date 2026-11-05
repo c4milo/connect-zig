@@ -7,10 +7,18 @@ const server = @import("server");
 const http = @import("http");
 const constants = @import("constants.zig");
 
+/// What the end of a call writes its trailers into: their octets, and the lists of them that
+/// connect and colibri each take. A route keeps one in each request's entry of the router pool.
+pub const Room = struct {
+    storage: [constants.trailer_bytes]u8 = undefined,
+    headers: [connect.trailers.trailers_max]connect.Header = undefined,
+    fields: [connect.trailers.trailers_max + constants.fields_max]http.Field = undefined,
+};
+
 pub const Call = struct {
     reply: connect.server.Reply,
     response: *server.ResponseWriter,
-    trailer_storage: []u8,
+    room: *Room,
     head_written: bool = false,
     metadata: [constants.fields_max]connect.Header = undefined,
     metadata_count: usize = 0,
@@ -80,7 +88,7 @@ fn write_head_once(call: *Call, compressed: bool) !void {
 pub fn finish(call: *Call, failure: ?connect.RpcError) !void {
     if (failure) |rpc_failure| {
         if (call.reply.error_only() and !call.head_written) {
-            const head = try call.reply.error_head(rpc_failure, call.trailer_storage);
+            const head = try call.reply.error_head(rpc_failure, &call.room.storage);
             try apply_head(&head, call.response);
             try call.reply.write_error_body(rpc_failure, call.response.body());
             return call.response.end();
@@ -88,11 +96,10 @@ pub fn finish(call: *Call, failure: ?connect.RpcError) !void {
     }
     try write_head_once(call, false);
     if (!call.reply.accepted.speaks.enveloped) return call.response.end();
-    var out: [connect.trailers.trailers_max]connect.Header = undefined;
     const metadata = call.metadata[0..call.metadata_count];
-    const trailers = try call.reply.finish(failure, metadata, call.response.body(), call.trailer_storage, &out);
+    const trailers = try call.reply.finish(failure, metadata, call.response.body(), &call.room.storage, &call.room.headers);
     if (trailers.len == 0) return call.response.end();
-    var fields: [connect.trailers.trailers_max + constants.fields_max]http.Field = undefined;
+    const fields = &call.room.fields;
     for (trailers, 0..) |trailer, index| fields[index] = .{ .name = trailer.name, .value = trailer.value };
     for (metadata, trailers.len..) |trailer, index| fields[index] = .{ .name = trailer.name, .value = trailer.value };
     return call.response.trailers(fields[0 .. trailers.len + metadata.len]);
@@ -153,11 +160,11 @@ pub fn dispatch(comptime App: type, comptime method: connect.Method, comptime ha
 }
 
 /// Answers a request the route refused before it read the body.
-pub fn answer_refusal(refused: connect.server.Refused, scratch: connect.Scratch, storage: []u8, response: *server.ResponseWriter) !void {
+pub fn answer_refusal(refused: connect.server.Refused, scratch: connect.Scratch, room: *Room, response: *server.ResponseWriter) !void {
     const reply = connect.server.refusal_reply(refused, scratch) orelse {
         response.status = refused.http_status;
         return response.end();
     };
-    var call: Call = .{ .reply = reply, .response = response, .trailer_storage = storage };
+    var call: Call = .{ .reply = reply, .response = response, .room = room };
     return finish(&call, refused.failure.?);
 }

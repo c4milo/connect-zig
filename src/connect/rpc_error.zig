@@ -46,23 +46,21 @@ pub const Status = struct {
 /// URL while the encoding runs.
 pub fn encode_status(failure: RpcError, buffer: []u8, type_urls: []u8) (proto.EncodeError || error{TooManyDetails})![]u8 {
     if (failure.details.len > constants.limits.details_max) return error.TooManyDetails;
-    var anys: [constants.limits.details_max]proto.wkt.Any = undefined;
-    var used: usize = 0;
-    for (failure.details, 0..) |detail, index| {
-        const len = type_url_prefix.len + detail.type_name.len;
-        if (used + len > type_urls.len) return error.NoSpaceLeft;
-        const url = type_urls[used..][0..len];
+    const head: Status = .{ .code = @intFromEnum(failure.code), .message = failure.message };
+    var len = (try proto.encode(Status, &head, buffer)).len;
+    // Two encodings of one message, one after the other, decode as their merge ("Last One
+    // Wins", encoding guide), so each detail is appended as a Status holding it alone.
+    for (failure.details) |detail| {
+        const url_len = type_url_prefix.len + detail.type_name.len;
+        if (url_len > type_urls.len) return error.NoSpaceLeft;
+        const url = type_urls[0..url_len];
         @memcpy(url[0..type_url_prefix.len], type_url_prefix);
         @memcpy(url[type_url_prefix.len..], detail.type_name);
-        used += len;
-        anys[index] = .{ .type_url = url, .value = detail.value };
+        const any: [1]proto.wkt.Any = .{.{ .type_url = url, .value = detail.value }};
+        const record: Status = .{ .details = .of(&any) };
+        len += (try proto.encode(Status, &record, buffer[len..])).len;
     }
-    const status: Status = .{
-        .code = @intFromEnum(failure.code),
-        .message = failure.message,
-        .details = .of(anys[0..failure.details.len]),
-    };
-    return proto.encode(Status, &status, buffer);
+    return buffer[0..len];
 }
 
 /// Reads a google.rpc.Status into an error whose details go into `details`. Slices point into
