@@ -57,7 +57,8 @@ pub const RequestHeaders = struct {
 /// each request's entry of the router pool.
 pub const Room = struct {
     storage: [constants.trailer_bytes]u8 = undefined,
-    headers: [connect.trailers.trailers_max]connect.Header = undefined,
+    /// The status trailers, then the call's own, which gRPC-Web's trailers frame holds together.
+    headers: [connect.trailers.trailers_max + constants.fields_max]connect.Header = undefined,
     fields: [connect.trailers.trailers_max + constants.fields_max]http.Field = undefined,
     response_headers: [constants.fields_max]connect.Header = undefined,
     response_header_count: usize = 0,
@@ -193,7 +194,13 @@ pub fn finish(call: *Call, failure: ?connect.RpcError) !void {
             const head = try call.reply.error_head(rpc_failure, &call.room.storage);
             try apply_head(call, &head);
             call.head_written = true;
-            if (call.reply.accepted.speaks.protocol == .connect) try write_prefixed_trailers(call);
+            switch (call.reply.accepted.speaks.protocol) {
+                .connect => try write_prefixed_trailers(call),
+                // A Trailers-Only reply is one header section, which holds the trailers too
+                // (gRPC PROTOCOL-HTTP2.md, "Responses").
+                .grpc => for (call.room.metadata[0..call.room.metadata_count]) |trailer| try call.response.header(trailer.name, trailer.value),
+                .grpc_web => {},
+            }
             try call.reply.write_error_body(rpc_failure, call.response.body());
             return call.response.end();
         }

@@ -61,59 +61,55 @@ pub fn whole(comptime method: connect.Method, comptime handler: anytype, comptim
     comptime assert(!is_streaming(handler));
     if (I.on_call(app, call)) |refusal| return call_file.finish(call, I.on_finish(app, call, refusal));
     switch (comptime method.stream_type) {
-        .unary => return single(method, handler, I, app, call, messages),
-        .server_stream => {
-            var request: method.Request = .{};
-            const failure = switch (call_file.read_one(method.Request, call, messages, &request)) {
-                .failure => |failure| failure,
-                .message => message: {
-                    var sender: Sender(method.Response) = .{ .call = call };
-                    break :message handler(app, call, &request, &sender);
-                },
-            };
-            return call_file.finish(call, I.on_finish(app, call, failure));
+        .unary, .client_stream => {
+            var response: method.Response = .{};
+            const failure = invoke(method, handler, app, call, messages, &response);
+            return respond_one(method.Response, I, app, call, failure, &response);
         },
-        .client_stream => return single(method, handler, I, app, call, messages),
-        .bidi_stream => {
-            var receiver: Receiver(method.Request) = .{ .messages = messages, .call = call };
+        .server_stream, .bidi_stream => {
             var sender: Sender(method.Response) = .{ .call = call };
-            const failure = handler(app, call, &receiver, &sender) orelse receiver.failure;
+            const failure = invoke(method, handler, app, call, messages, &sender);
             return call_file.finish(call, I.on_finish(app, call, failure));
         },
     }
 }
 
-/// A call answered with one message: unary, or a client stream taken whole. The interceptors see
-/// the outcome before the message goes out, so `on_finish` may still turn it into an error.
-fn single(comptime method: connect.Method, comptime handler: anytype, comptime I: type, app: anytype, call: *Call, messages: *connect.server.Messages) !void {
-    var response: method.Response = .{};
-    const failure = if (comptime method.stream_type == .unary) unary: {
+/// Calls a function handler with the request as its stream type takes it: one message, or a
+/// `Receiver`. `reply` is the `*Response` or the `*Sender` the handler writes to.
+fn invoke(comptime method: connect.Method, comptime handler: anytype, app: anytype, call: *Call, messages: *connect.server.Messages, reply: anytype) ?connect.RpcError {
+    if (comptime method.stream_type == .unary or method.stream_type == .server_stream) {
         var request: method.Request = .{};
-        break :unary switch (call_file.read_one(method.Request, call, messages, &request)) {
+        return switch (call_file.read_one(method.Request, call, messages, &request)) {
             .failure => |failure| failure,
-            .message => handler(app, call, &request, &response),
+            .message => handler(app, call, &request, reply),
         };
-    } else stream: {
-        var receiver: Receiver(method.Request) = .{ .messages = messages, .call = call };
-        break :stream handler(app, call, &receiver, &response) orelse receiver.failure;
-    };
+    }
+    var receiver: Receiver(method.Request) = .{ .messages = messages, .call = call };
+    return handler(app, call, &receiver, reply) orelse receiver.failure;
+}
+
+/// Ends a call answered with one message. The interceptors see the outcome before the message
+/// goes out, so `on_finish` may still turn it into an error.
+fn respond_one(comptime T: type, comptime I: type, app: anytype, call: *Call, failure: ?connect.RpcError, response: *const T) !void {
     const outcome = I.on_finish(app, call, failure);
-    if (outcome == null) try call_file.send_one(method.Response, call, &response);
+    if (outcome == null) try call_file.send_one(T, call, response);
     return call_file.finish(call, outcome);
 }
 
-/// The octets of `bytes` that hold whole envelopes, from its start.
-pub fn whole_envelopes_len(bytes: []const u8) usize {
-    const prefix_len = connect.constants.protocol.envelope_prefix_len;
-    var at: usize = 0;
+/// The octets of `bytes` that hold whole envelopes, from its start. A partial envelope at the end
+/// waits for more octets; an envelope over `payload_len_max` or with reserved flags set fails the
+/// call at once, before its payload arrives.
+pub fn whole_envelopes_len(bytes: []const u8, payload_len_max: usize) connect.envelope.Error!usize {
+    var reader: connect.EnvelopeReader = .{ .body = bytes, .payload_len_max = payload_len_max };
     // Each envelope takes at least its prefix.
-    for (0..bytes.len / prefix_len + 1) |_| {
-        if (bytes.len - at < prefix_len) return at;
-        const payload_len = std.mem.readInt(u32, bytes[at + 1 ..][0 .. prefix_len - 1], .big);
-        if (payload_len > bytes.len - at - prefix_len) return at;
-        at += prefix_len + payload_len;
+    for (0..bytes.len / connect.constants.protocol.envelope_prefix_len + 1) |_| {
+        const envelope = reader.next() catch |failure| switch (failure) {
+            error.Truncated => return reader.position,
+            else => |other| return other,
+        };
+        if (envelope == null) return reader.position;
     }
-    return at;
+    unreachable;
 }
 
 /// Passes each whole message of `bytes` to a type handler's `on_message`, and returns the error
@@ -140,13 +136,17 @@ pub fn end_stream(comptime method: connect.Method, comptime handler: type, compt
         return call_file.finish(call, I.on_finish(app, call, failure));
     }
     var response: method.Response = .{};
-    const outcome = I.on_finish(app, call, handler.on_end(app, call, state, &response));
-    if (outcome == null) try call_file.send_one(method.Response, call, &response);
-    return call_file.finish(call, outcome);
+    return respond_one(method.Response, I, app, call, handler.on_end(app, call, state, &response), &response);
 }
 
-test "whole envelopes stop before a partial one" {
+test "whole envelopes stop before a partial one, and refuse one too long or with reserved flags" {
+    const payload_len_max = 4;
     const bytes = [_]u8{ 0, 0, 0, 0, 1, 'a', 0, 0, 0, 0, 3, 'b' };
-    try std.testing.expectEqual(@as(usize, 6), whole_envelopes_len(&bytes));
-    try std.testing.expectEqual(@as(usize, 0), whole_envelopes_len(bytes[0..4]));
+    try std.testing.expectEqual(@as(usize, 6), try whole_envelopes_len(&bytes, payload_len_max));
+    try std.testing.expectEqual(@as(usize, 0), try whole_envelopes_len(bytes[0..4], payload_len_max));
+    // The prefix alone announces a payload over the limit, so the call fails before it arrives.
+    const long = [_]u8{ 0, 0, 0, 0, payload_len_max + 1 };
+    try std.testing.expectError(error.MessageTooLarge, whole_envelopes_len(&long, payload_len_max));
+    const reserved = [_]u8{ 0x40, 0, 0, 0, 0 };
+    try std.testing.expectError(error.InvalidFlags, whole_envelopes_len(&reserved, payload_len_max));
 }

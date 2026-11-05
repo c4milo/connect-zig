@@ -74,7 +74,7 @@ pub fn ExchangeWith(comptime method: connect.Method, comptime interceptors: []co
 
         /// Reads the response once colibri reported the exchange `finished`.
         pub fn read(self: *const Self, storage: connect.client.Storage) connect.client.Response {
-            var response = read_response(method, self, storage);
+            var response = read_response(self, storage);
             run_on_response(interceptors, &response);
             return response;
         }
@@ -107,9 +107,9 @@ fn find_wanted(wanted: []const client.WantedHeader, name: []const u8) ?[]const u
 }
 
 /// Reads the response of an exchange once colibri reported it `finished`.
-fn read_response(comptime method: connect.Method, self: anytype, storage: connect.client.Storage) connect.client.Response {
+fn read_response(self: anytype, storage: connect.client.Storage) connect.client.Response {
     const Self = @TypeOf(self.*);
-    const speaks = speaks_of(method, self.options);
+    const speaks = self.call.speaks;
     const lookup: connect.Lookup = .{ .context = self, .find_fn = Self.find };
     if (self.response.result != .response) {
         var response = connect.client.read(speaks, .{ .status = connect.constants.protocol.status.ok, .headers = lookup, .body = "" }, storage, self.options.decoders);
@@ -123,11 +123,6 @@ fn read_response(comptime method: connect.Method, self: anytype, storage: connec
         .body = self.response.body[0..self.response.body_len],
     };
     return connect.client.read(speaks, incoming, storage, self.options.decoders);
-}
-
-fn speaks_of(comptime method: connect.Method, options: connect.client.Options) connect.Speaks {
-    const enveloped = options.protocol != .connect or method.stream_type.enveloped();
-    return .{ .protocol = options.protocol, .codec = options.codec, .enveloped = enveloped };
 }
 
 /// The error a client gives an exchange that ended with no whole response.

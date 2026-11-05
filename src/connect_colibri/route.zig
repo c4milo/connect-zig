@@ -27,7 +27,6 @@ pub const Options = struct {
 /// have their own areas, so a response may point into its request.
 pub fn CallState(comptime options: Options, comptime handler: anytype) type {
     return struct {
-        accepted: ?connect.server.Accepted = null,
         done: bool = false,
         started: bool = false,
         call: call_file.Call = undefined,
@@ -114,7 +113,6 @@ fn begin(comptime spec: RouteSpec, comptime handler: anytype, app: anytype, stat
             return call_file.answer_refusal(refused, scratch_of(spec.options, handler, state, .reply), &state.room, &state.headers, response);
         },
     };
-    state.accepted = accepted;
     state.call = .{
         .reply = .{ .accepted = accepted, .scratch = scratch_of(spec.options, handler, state, .reply), .encoder = codings.encoder },
         .response = response,
@@ -127,7 +125,7 @@ fn begin(comptime spec: RouteSpec, comptime handler: anytype, app: anytype, stat
 fn serve_whole(comptime spec: RouteSpec, comptime handler: anytype, app: anytype, state: *CallState(spec.options, handler), body: []const u8) !void {
     assert(!state.done);
     state.done = true;
-    var messages = connect.server.Messages.init(state.accepted.?, body, scratch_of(spec.options, handler, state, .request), codings_of(app).decoders);
+    var messages = connect.server.Messages.init(state.call.reply.accepted, body, scratch_of(spec.options, handler, state, .request), codings_of(app).decoders);
     return dispatch.whole(spec.method, handler, dispatch.Interceptors(spec.options.interceptors), app, &state.call, &messages);
 }
 
@@ -140,8 +138,9 @@ fn serve_streaming(comptime spec: RouteSpec, comptime handler: anytype, app: any
         if (I.on_call(app, call)) |refusal| return stop(I, app, state, refusal);
     }
     const buffered = body.buffered();
-    const whole_len = dispatch.whole_envelopes_len(buffered);
-    var messages = connect.server.Messages.init(state.accepted.?, buffered[0..whole_len], scratch_of(spec.options, handler, state, .request), codings_of(app).decoders);
+    const whole_len = dispatch.whole_envelopes_len(buffered, spec.options.message_bytes) catch |failure|
+        return stop(I, app, state, connect.server.failure_of(failure));
+    var messages = connect.server.Messages.init(state.call.reply.accepted, buffered[0..whole_len], scratch_of(spec.options, handler, state, .request), codings_of(app).decoders);
     if (dispatch.each_message(spec.method, handler, app, call, &state.handler_state, &messages)) |failure| return stop(I, app, state, failure);
     body.toss(whole_len);
     // A read past the bytes that arrived says whether the body ended or more will come.

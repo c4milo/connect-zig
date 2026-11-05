@@ -25,13 +25,12 @@ const count = method("Count", .server_stream, .unknown);
 const gather = method("Gather", .client_stream, .unknown);
 const chat = method("Chat", .bidi_stream, .unknown);
 
-const App = struct { calls: u32 = 0 };
+const App = struct {};
 
 /// The messages a chat answers, at most.
 const chat_turns_max = 4;
 
-fn on_say(app: *App, _: *adapter.Call, request: *const Note, response: *Note) ?connect.RpcError {
-    app.calls += 1;
+fn on_say(_: *App, _: *adapter.Call, request: *const Note, response: *Note) ?connect.RpcError {
     response.text = request.text;
     return null;
 }
