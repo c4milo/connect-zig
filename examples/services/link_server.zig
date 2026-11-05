@@ -32,7 +32,6 @@ pub var app: App align(@alignOf(App)) = .{};
 var accepted: ?server.ConnectionHandle align(@alignOf(server.ConnectionHandle)) = null;
 /// A cleartext endpoint draws no secret, so a seeded generator stands in for entropy.
 var prng: std.Random.DefaultPrng align(@alignOf(std.Random.DefaultPrng)) = .init(0x656c697a61);
-pub var ended: u32 = 0;
 
 pub fn init(stream: *Link) !void {
     link = stream;
@@ -71,7 +70,6 @@ fn serve(event: server.Event, now_ns: u64) !void {
             .close => {},
             .ended => |over| {
                 if (over.failed) return error.ExchangeWrong;
-                ended += 1;
                 accepted = null;
             },
             else => return error.ExchangeWrong,

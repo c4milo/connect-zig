@@ -76,17 +76,20 @@ fn check_chat() !void {
         const message = try chatted.next(demo.ChatMessage) orelse return error.ExchangeWrong;
         if (!std.mem.eql(u8, message.text, echo)) return error.ExchangeWrong;
     }
-    try expect_end(&chatted, demo.ChatMessage);
+    try harness.expect_end(&chatted, demo.ChatMessage);
     // Chat's `on_end` adds a trailer, and `Counting` two more, which the Connect end-stream
     // message carries.
-    try expect_trailer(chatted.metadata, service.turns_trailer, "some");
-    try expect_trailer(chatted.metadata, service.received_trailer, "3");
-    try expect_trailer(chatted.metadata, service.sent_trailer, "4");
+    try harness.expect_trailer(chatted.metadata, service.turns_trailer, "some");
+    try harness.expect_trailer(chatted.metadata, service.received_trailer, "3");
+    try harness.expect_trailer(chatted.metadata, service.sent_trailer, "4");
 
     var silent = chat_silent.read(harness.storage());
     const bye = try silent.next(demo.ChatMessage) orelse return error.ExchangeWrong;
     if (!std.mem.eql(u8, bye.text, "bye after 0")) return error.ExchangeWrong;
-    try expect_end(&silent, demo.ChatMessage);
+    try harness.expect_end(&silent, demo.ChatMessage);
+    // gRPC-Web carries the call's trailers in its trailers frame.
+    try harness.expect_trailer(silent.metadata, service.received_trailer, "0");
+    try harness.expect_trailer(silent.metadata, service.sent_trailer, "1");
 
     // The empty message fails the call: its answer to "x" arrived, and no message after.
     var refused = chat_refused.read(harness.storage());
@@ -95,27 +98,15 @@ fn check_chat() !void {
     if (try refused.next(demo.ChatMessage) != null) return error.ExchangeWrong;
     const failure = refused.failure orelse return error.ExchangeWrong;
     if (failure.code != .invalid_argument) return error.ExchangeWrong;
-    try expect_trailer(refused.metadata, service.received_trailer, "2");
-    try expect_trailer(refused.metadata, service.sent_trailer, "1");
-}
-
-fn expect_trailer(metadata: []const connect.Header, name: []const u8, value: []const u8) !void {
-    for (metadata) |entry| {
-        if (std.mem.eql(u8, entry.name, name)) {
-            if (std.mem.eql(u8, entry.value, value)) return;
-            std.debug.print("streaming: trailer {s} is {s}, wanted {s}\n", .{ name, entry.value, value });
-            return error.ExchangeWrong;
-        }
-    }
-    std.debug.print("streaming: no trailer {s}\n", .{name});
-    return error.ExchangeWrong;
+    try harness.expect_trailer(refused.metadata, service.received_trailer, "2");
+    try harness.expect_trailer(refused.metadata, service.sent_trailer, "1");
 }
 
 fn check_sum(exchange: *const adapter.Exchange(Service.sum)) !void {
     var summed = exchange.read(harness.storage());
     const answer = try summed.next(demo.SumResponse) orelse return error.ExchangeWrong;
     if (answer.sum != numbers_sum or answer.count != numbers.len) return error.ExchangeWrong;
-    try expect_end(&summed, demo.SumResponse);
+    try harness.expect_end(&summed, demo.SumResponse);
 }
 
 fn check_countdown() !void {
@@ -124,19 +115,10 @@ fn check_countdown() !void {
         const message = try counted.next(demo.CountdownResponse) orelse return error.ExchangeWrong;
         if (message.number != countdown_from - index) return error.ExchangeWrong;
     }
-    try expect_end(&counted, demo.CountdownResponse);
+    try harness.expect_end(&counted, demo.CountdownResponse);
 
     var far = countdown_far.read(harness.storage());
     if (try far.next(demo.CountdownResponse) != null) return error.ExchangeWrong;
     const failure = far.failure orelse return error.ExchangeWrong;
     if (failure.code != .out_of_range) return error.ExchangeWrong;
-}
-
-/// Checks a response holds no message more, and ended in success.
-fn expect_end(response: *connect.client.Response, comptime T: type) !void {
-    if (try response.next(T) != null) return error.ExchangeWrong;
-    if (response.failure) |failure| {
-        std.debug.print("streaming: {s}: {s}\n", .{ failure.code.name(), failure.message });
-        return error.ExchangeWrong;
-    }
 }

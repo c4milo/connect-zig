@@ -9,15 +9,12 @@ const Service = eliza.ElizaService;
 /// The sentences Converse answers in one call, at most.
 const conversation_turns_max = 16;
 
-const App = @import("app.zig").App;
-
-fn reply(app: *App, comptime format: []const u8, args: anytype) []const u8 {
-    return std.fmt.bufPrint(&app.text, format, args) catch "I have nothing to say to that.";
-}
+const app_file = @import("app.zig");
+const App = app_file.App;
+const reply = app_file.text_of;
 
 /// Say answers one sentence.
 fn say(app: *App, _: *adapter.Call, request: *const eliza.SayRequest, response: *eliza.SayResponse) ?connect.RpcError {
-    app.calls += 1;
     if (request.sentence.len == 0) return .{ .code = .invalid_argument, .message = "say something" };
     response.sentence = reply(app, "You said \"{s}\". How does that make you feel?", .{request.sentence});
     return null;
@@ -25,7 +22,6 @@ fn say(app: *App, _: *adapter.Call, request: *const eliza.SayRequest, response: 
 
 /// Introduce answers a name with three sentences.
 fn introduce(app: *App, _: *adapter.Call, request: *const eliza.IntroduceRequest, sender: *adapter.Sender(eliza.IntroduceResponse)) ?connect.RpcError {
-    app.calls += 1;
     const who = if (request.name.len == 0) "friend" else request.name;
     const lines = [_][]const u8{ "Hi {s}, I am Eliza.", "Before we begin, {s}, tell me how you came here.", "How are you feeling today, {s}?" };
     inline for (lines) |line| {
@@ -36,7 +32,6 @@ fn introduce(app: *App, _: *adapter.Call, request: *const eliza.IntroduceRequest
 
 /// Converse answers each sentence it reads, in order.
 fn converse(app: *App, call: *adapter.Call, receiver: *adapter.Receiver(eliza.ConverseRequest), sender: *adapter.Sender(eliza.ConverseResponse)) ?connect.RpcError {
-    app.calls += 1;
     for (0..conversation_turns_max) |_| {
         const sentence = receiver.next() orelse break;
         sender.send(&.{ .sentence = reply(app, "Why do you say \"{s}\"?", .{sentence.sentence}) }) catch return .{ .code = .resource_exhausted };
@@ -45,7 +40,7 @@ fn converse(app: *App, call: *adapter.Call, receiver: *adapter.Receiver(eliza.Co
     return null;
 }
 
-const route_options: adapter.RouteOptions = .{ .message_bytes = 4096, .token_bytes = 4096 };
+const route_options = app_file.route_options;
 
 /// ELIZA's entries in the route table. Say is served as a POST and, since it has no side
 /// effects, as a GET.

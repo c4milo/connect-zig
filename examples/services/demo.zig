@@ -12,7 +12,9 @@ const connect = @import("connect");
 const proto = @import("protobuf");
 const adapter = @import("connect_colibri");
 const demo = @import("demo");
-const App = @import("app.zig").App;
+const app_file = @import("app.zig");
+const App = app_file.App;
+const text_of = app_file.text_of;
 const Service = demo.DemoService;
 
 /// The prefix of the authorization header `Auth` reads (RFC 6750 §2.1).
@@ -87,10 +89,6 @@ fn whoami(app: *App, call: *adapter.Call, _: *const demo.WhoamiRequest, response
     return null;
 }
 
-fn text_of(app: *App, comptime format: []const u8, args: anytype) []const u8 {
-    return std.fmt.bufPrint(&app.text, format, args) catch "too long";
-}
-
 /// Chat answers each message the moment it arrives, and says goodbye when the client ends.
 const Chat = struct {
     pub const State = struct { turns: u32 = 0 };
@@ -152,9 +150,15 @@ fn divide(app: *App, _: *adapter.Call, request: *const demo.DivideRequest, respo
     return null;
 }
 
-const plain: adapter.RouteOptions = .{ .message_bytes = 4096, .token_bytes = 4096 };
-const counted: adapter.RouteOptions = .{ .message_bytes = 4096, .token_bytes = 4096, .interceptors = &.{Counting} };
-const guarded: adapter.RouteOptions = .{ .message_bytes = 4096, .token_bytes = 4096, .interceptors = &.{ Logging, Auth } };
+const plain = app_file.route_options;
+const counted = with_interceptors(&.{Counting});
+const guarded = with_interceptors(&.{ Logging, Auth });
+
+fn with_interceptors(comptime interceptors: []const type) adapter.RouteOptions {
+    var options = app_file.route_options;
+    options.interceptors = interceptors;
+    return options;
+}
 
 /// The demo's entries in the route table. Whoami runs behind its interceptors, as a POST and as
 /// a GET.
@@ -164,5 +168,5 @@ pub const routes = .{
     adapter.post(App, Service.chat, Chat, counted),
     adapter.post(App, Service.sum, Sum, plain),
     adapter.post(App, Service.countdown, countdown, plain),
-    adapter.post(App, Service.divide, divide, plain),
+    adapter.post(App, Service.divide, divide, counted),
 };

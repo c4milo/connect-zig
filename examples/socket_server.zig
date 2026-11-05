@@ -57,13 +57,8 @@ const Socket = struct {
     output_sent: usize = 0,
 };
 
-/// chapulin's one hook, which a program that links colibri's `tls` defines (colibri decision 94).
-fn assert_fail(condition: [*:0]const u8, file: [*:0]const u8, line: c_int) callconv(.c) noreturn {
-    std.debug.panic("chapulin assertion failed: {s} ({s}:{d})", .{ condition, file, line });
-}
-
 comptime {
-    @export(&assert_fail, .{ .name = "ch_assert_fail", .linkage = .strong });
+    _ = @import("services/hooks.zig");
 }
 
 const Endpoint = server.EndpointOf(.{ .tcp_connections = sockets_max, .quic_connections = 0 });

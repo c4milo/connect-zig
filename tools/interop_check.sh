@@ -82,6 +82,12 @@ for protocol in connect grpc grpcweb; do
         '{"code":"invalid_argument","message":"divisionbyzero","details":[{"type":"demo.v1.DivisionByZero","value":"CAc"}]}' \
         "$(demo "${protocol}" -d '{"dividend":7}' "${base}/Divide")"
 done
+# A gRPC error before any message is Trailers-Only: one header section holds the status and the
+# call's own trailers, here Counting's.
+expect "grpc Trailers-Only carries trailers" 'call-received: 1|call-sent: 0|' \
+    "$(timeout "${call_seconds}" "${buf}" curl --http2-prior-knowledge --schema examples/proto --protocol grpc -v \
+        -d '{"dividend":7}' "${base}/Divide" 2>&1 | sed -n 's/^buf: < (#1) //p' | tr -d '\r' |
+        grep -i -e '^call-received:' -e '^call-sent:' | tr 'A-Z' 'a-z' | tr '\n' '|')"
 # Logging's response header, and Whoami's trailer, which a Connect unary reply sends as a header.
 expect "Connect unary headers" 'demo-logged: yes|trailer-whoami-caller: Ada|' \
     "$(curl -sS -m 5 -m 5 -H 'authorization: Bearer Ada' --json '{}' -D - -o /dev/null "${base}/Whoami" |

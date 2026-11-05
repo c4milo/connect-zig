@@ -70,11 +70,7 @@ fn expect_sentences(response: *connect.client.Response, comptime T: type, senten
             return error.ExchangeWrong;
         }
     }
-    if (try response.next(T) != null) return error.ExchangeWrong;
-    if (response.failure) |failure| {
-        std.debug.print("eliza: {s}: {s}\n", .{ failure.code.name(), failure.message });
-        return error.ExchangeWrong;
-    }
+    try harness.expect_end(response, T);
 }
 
 fn check() !void {
@@ -86,7 +82,7 @@ fn check() !void {
     try expect_sentences(&introduced, eliza.IntroduceResponse, &service.introduce_answers);
     var conversed = converse.read(harness.storage());
     try expect_sentences(&conversed, eliza.ConverseResponse, &service.converse_answers);
-    if (conversed.metadata.len != 1 or !std.mem.eql(u8, conversed.metadata[0].value, "done")) return error.ExchangeWrong;
+    try harness.expect_trailer(conversed.metadata, "eliza-turns", "done");
     var empty = say_empty.read(harness.storage());
     if (try empty.next(eliza.SayResponse) != null) return error.ExchangeWrong;
     const failure = empty.failure orelse return error.ExchangeWrong;

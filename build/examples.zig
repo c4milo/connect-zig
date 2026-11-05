@@ -9,15 +9,7 @@ pub fn add(b: *std.Build, graph: Graph) *std.Build.Step {
     const step = b.step("examples", "Build and run every example");
     const rotor_dependency = b.lazyDependency("rotor", .{ .target = graph.target, .release = graph.optimize == .ReleaseSafe }) orelse return step;
     const rotor = rotor_dependency.module("rotor");
-    const eliza = b.createModule(.{
-        .root_source_file = b.path("examples/gen/connectrpc/eliza/v1/eliza.pb.zig"),
-        .target = graph.target,
-        .optimize = graph.optimize,
-        .imports = &.{
-            .{ .name = "protobuf", .module = graph.protobuf },
-            .{ .name = "connect", .module = graph.connect },
-        },
-    });
+    const eliza = generated(b, graph, "examples/gen/connectrpc/eliza/v1/eliza.pb.zig", &.{});
     // The kitchen-sink messages, which reach shared.proto's through its module (decision 17).
     const shared = generated(b, graph, "examples/gen/kitchen/v1/shared.pb.zig", &.{});
     const kitchen = generated(b, graph, "examples/gen/kitchen/v1/kitchen.pb.zig", &.{.{ .name = "kitchen_v1_shared", .module = shared }});

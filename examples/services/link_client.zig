@@ -44,13 +44,8 @@ pub fn buffers(set: *CallBuffers) adapter.ExchangeBuffers {
     };
 }
 
-/// chapulin's one hook, which a program that links colibri's `tls` defines (colibri decision 94).
-fn assert_fail(condition: [*:0]const u8, file: [*:0]const u8, line: c_int) callconv(.c) noreturn {
-    std.debug.panic("chapulin assertion failed: {s} ({s}:{d})", .{ condition, file, line });
-}
-
 comptime {
-    @export(&assert_fail, .{ .name = "ch_assert_fail", .linkage = .strong });
+    _ = @import("hooks.zig");
 }
 
 var link: Link align(@alignOf(Link)) = undefined;
@@ -182,4 +177,26 @@ fn sleep_ns() u64 {
     if (pool.deadline_ns()) |deadline_ns| wait_ns = @min(wait_ns, deadline_ns -| link.now_ns(.client));
     if (link_server.deadline_ns()) |deadline_ns| wait_ns = @min(wait_ns, deadline_ns -| link.now_ns(.server));
     return @max(wait_ns, 1);
+}
+
+/// Checks a response holds no message more, and ended in success.
+pub fn expect_end(response: *connect.client.Response, comptime T: type) !void {
+    if (try response.next(T) != null) return error.ExchangeWrong;
+    if (response.failure) |failure| {
+        std.debug.print("example: {s}: {s}\n", .{ failure.code.name(), failure.message });
+        return error.ExchangeWrong;
+    }
+}
+
+/// Checks `trailers` holds a trailer `name` with `value`.
+pub fn expect_trailer(trailers: []const connect.Header, name: []const u8, value: []const u8) !void {
+    for (trailers) |entry| {
+        if (std.mem.eql(u8, entry.name, name)) {
+            if (std.mem.eql(u8, entry.value, value)) return;
+            std.debug.print("example: trailer {s} is {s}, wanted {s}\n", .{ name, entry.value, value });
+            return error.ExchangeWrong;
+        }
+    }
+    std.debug.print("example: no trailer {s}\n", .{name});
+    return error.ExchangeWrong;
 }

@@ -1,5 +1,6 @@
 //! The state the example server keeps across calls, which every handler and interceptor of the
 //! ELIZA and demo services reads as its `app`.
+const std = @import("std");
 const connect = @import("connect");
 const adapter = @import("connect_colibri");
 
@@ -11,8 +12,6 @@ pub const count_digits_max = 20;
 /// A reply is written into the response before its handler returns, so one room serves every
 /// call, even while several calls run at once.
 pub const App = struct {
-    /// The calls ELIZA answered.
-    calls: u32 = 0,
     /// The demo calls the logging interceptor saw start, and those it saw fail.
     logged: u32 = 0,
     failed: u32 = 0,
@@ -25,3 +24,12 @@ pub const App = struct {
     /// The digits of the counts `Counting` reports.
     counts: [count_digits_max]u8 = undefined,
 };
+
+/// Writes a reply into `app.text`, which stays valid until the next call writes there.
+pub fn text_of(app: *App, comptime format: []const u8, args: anytype) []const u8 {
+    return std.fmt.bufPrint(&app.text, format, args) catch "too long";
+}
+
+/// The route options both services start from: room for a message and a JSON token of
+/// `text_len_max` octets.
+pub const route_options: adapter.RouteOptions = .{ .message_bytes = text_len_max, .token_bytes = text_len_max };

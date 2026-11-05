@@ -85,5 +85,5 @@ fn expect_quotient() !void {
     var response = by_two.read(harness.storage());
     const answer = try response.next(demo.DivideResponse) orelse return error.ExchangeWrong;
     if (answer.quotient != dividend / divisor or answer.remainder != dividend % divisor) return error.ExchangeWrong;
-    if (response.failure != null) return error.ExchangeWrong;
+    try harness.expect_end(&response, demo.DivideResponse);
 }
