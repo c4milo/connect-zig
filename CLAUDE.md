@@ -95,6 +95,9 @@ confirm a test fails. Report `CAUGHT` or `NOT CAUGHT` per mutation in the commit
 - Interop: `tools/interop_check.sh` calls the socket server with `buf curl` in Connect, gRPC and
   gRPC-Web, and with curl over h11 and h2, and checks that Chat answers full-duplex. It needs buf
   and curl.
+- Benchmark: `zig build bench` times binary and JSON encode and decode, ReleaseFast;
+  `tools/bench_check.sh` runs the Go benchmark in `bench/go` beside it and checks both write the
+  same bytes. `tools/ci.sh` runs `zig build bench -- --quick`.
 - Coverage: `tools/coverage_check.sh` compares every protobuf type with Go's runtime through
   `buf convert`, over the cases in `examples/testdata/coverage`. It needs buf and jq.
 - CI: `tools/ci.sh` runs every check, and `.github/workflows/main.yml` runs it on each push. A new
