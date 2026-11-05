@@ -1,0 +1,9 @@
+# `tools/generate_check.sh` runs `buf generate --template conformance/buf.gen.yaml` from the root:
+# the Zig code of the conformance suite's messages and service, with the plugin this repository
+# builds (design §8 step 7).
+version: v2
+inputs:
+  - directory: conformance/proto
+plugins:
+  - local: zig-out/bin/protoc-gen-connect-zig
+    out: conformance/gen

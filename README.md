@@ -217,6 +217,10 @@ Each cell is Go's time over connect-zig's: above 1 means connect-zig is faster.
 - `tools/interop_check.sh` calls the example server with `buf curl`, connect-go's client, in all
   three protocols, and with curl over h11 and h2. It requires a bidirectional stream to answer
   before the client finishes sending.
+- `tools/conformance_check.sh` runs the [connectrpc conformance
+  suite](https://github.com/connectrpc/conformance) v1.0.4 against a conformance server: 2714
+  cases in Connect, gRPC and gRPC-Web, over h11 and h2, in proto and JSON, with gzip and zstd.
+  2712 pass. The two left are listed, with the reason, in `conformance/known_failing.txt`.
 
 ## Good to know
 
@@ -231,8 +235,10 @@ field, a closed enum keeps an unknown value, and every string must be valid UTF-
 
 Still to come:
 
-- [ ] The [connectrpc conformance suite](https://github.com/connectrpc/conformance) against the
-  client and the server, in progress
+- [x] The [connectrpc conformance suite](https://github.com/connectrpc/conformance) against the
+  server
+- [ ] The conformance suite against the client, once colibri's client exposes trailers and
+  streams a request body
 - [ ] HTTP/3 on the socket server, over a UDP socket
 - [x] zstd compression of messages, both ways
 - [ ] brotli compression of messages, once stdx ships its encoder
@@ -256,6 +262,7 @@ zig build test            # the lint, every module's tests and the examples
 tools/generate_check.sh   # buf generate still writes examples/gen and bench/gen
 tools/interop_check.sh    # buf curl and curl against the example server
 tools/coverage_check.sh   # every protobuf type against Go's runtime
+tools/conformance_check.sh  # the connectrpc conformance suite against the server
 tools/bench_check.sh      # the benchmark beside Go's
 ```
 

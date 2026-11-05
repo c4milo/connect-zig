@@ -1,0 +1,36 @@
+# The features of connect-zig's server that the connectrpc conformance runner tests (design §8
+# step 7). tools/conformance_check.sh passes this file with --conf. Each feature states what the
+# server supports, and nothing more.
+features:
+  # colibri's server speaks h11 and h2. Its h3 needs TLS, which the conformance server does not
+  # serve.
+  versions:
+    - HTTP_VERSION_1
+    - HTTP_VERSION_2
+  protocols:
+    - PROTOCOL_CONNECT
+    - PROTOCOL_GRPC
+    - PROTOCOL_GRPC_WEB
+  codecs:
+    - CODEC_PROTO
+    - CODEC_JSON
+  # The server reads br too, but writes identity, gzip and zstd alone (decision 10).
+  compressions:
+    - COMPRESSION_IDENTITY
+    - COMPRESSION_GZIP
+    - COMPRESSION_ZSTD
+  stream_types:
+    - STREAM_TYPE_UNARY
+    - STREAM_TYPE_CLIENT_STREAM
+    - STREAM_TYPE_SERVER_STREAM
+    - STREAM_TYPE_HALF_DUPLEX_BIDI_STREAM
+    - STREAM_TYPE_FULL_DUPLEX_BIDI_STREAM
+  # h2 with prior knowledge, in cleartext.
+  supports_h2c: true
+  supports_tls: false
+  supports_tls_client_certs: false
+  supports_trailers: true
+  # A type handler reads a stream as it arrives over h11 too, and answers once it ends.
+  supports_half_duplex_bidi_over_http1: true
+  supports_connect_get: true
+  supports_message_receive_limit: true

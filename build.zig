@@ -9,6 +9,7 @@ const lint = @import("build/lint.zig");
 const examples = @import("build/examples.zig");
 const generate = @import("build/generate.zig");
 const bench = @import("build/bench.zig");
+const conformance = @import("build/conformance.zig");
 
 const Graph = @import("build/graph.zig").Graph;
 
@@ -45,6 +46,9 @@ pub fn build(b: *std.Build) void {
     const test_step = b.step("test", "Run the lint, then every module's unit tests and the examples");
     add_unit_tests(b, graph, plugin, test_step);
     test_step.dependOn(examples.add(b, graph));
+    if (b.lazyDependency("rotor", .{ .target = target, .release = release })) |rotor| {
+        test_step.dependOn(conformance.add(b, graph, rotor.module("rotor")));
+    }
     test_step.dependOn(generate.add(b, graph.protobuf, graph.connect, target, optimize));
     if (lint.add(b)) |lint_step| test_step.dependOn(lint_step);
     bench.add(b, graph.public_names, target);

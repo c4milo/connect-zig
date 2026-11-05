@@ -69,6 +69,7 @@ pub fn add(b: *std.Build, graph: Graph) *std.Build.Step {
     }
 
     const socket_server = program(b, graph, "eliza-server", "examples/socket_server.zig", services);
+    socket_server.root_module.addImport("socket_loop", socket_loop(b, graph, rotor));
     b.installArtifact(socket_server);
     const serve = b.addRunArtifact(socket_server);
     if (b.args) |args| serve.addArgs(args);
@@ -85,6 +86,19 @@ fn generated(b: *std.Build, graph: Graph, path: []const u8, extra: []const std.B
     module.addImport("connect", graph.connect);
     for (extra) |import| module.addImport(import.name, import.module);
     return module;
+}
+
+/// The socket loop the example socket server and the conformance server share (decision 22).
+pub fn socket_loop(b: *std.Build, graph: Graph, rotor: *std.Build.Module) *std.Build.Module {
+    return b.createModule(.{
+        .root_source_file = b.path("examples/services/socket_loop.zig"),
+        .target = graph.target,
+        .optimize = graph.optimize,
+        .imports = &.{
+            .{ .name = "server", .module = graph.colibri.module("server") },
+            .{ .name = "rotor", .module = rotor },
+        },
+    });
 }
 
 /// The modules a program over colibri imports beyond the library's own.

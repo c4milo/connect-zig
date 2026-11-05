@@ -101,5 +101,9 @@ confirm a test fails. Report `CAUGHT` or `NOT CAUGHT` per mutation in the commit
   same bytes. `tools/ci.sh` runs `zig build bench -- --quick`.
 - Coverage: `tools/coverage_check.sh` compares every protobuf type with Go's runtime through
   `buf convert`, over the cases in `examples/testdata/coverage`. It needs buf and jq.
+- Conformance: `tools/conformance_check.sh` runs connectrpc's conformance runner v1.0.4 against
+  `zig build conformance-server`, with the features of `conformance/config.yaml`. It downloads
+  the runner pinned by SHA-256, unless `CONNECTCONFORMANCE` names one. A case that fails on
+  purpose goes in `conformance/known_failing.txt`, with its reason.
 - CI: `tools/ci.sh` runs every check, and `.github/workflows/main.yml` runs it on each push. A new
   check joins `tools/ci.sh`, never the workflow file.

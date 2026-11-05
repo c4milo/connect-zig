@@ -166,6 +166,14 @@ ran on Linux x86-64 with Zig 0.16.0.
   of Chat and Sum. It found one fault, now fixed: a GET's route read its query from colibri's
   head memory after the head's event, and h3 had reused those octets.
 
+- **Step 7, the server half.** `tools/conformance_check.sh` with runner v1.0.4 printed 2712
+  of 2714 cases passed, and the two known failures (decision 26). The suite found three faults,
+  now fixed. A unary request with no message now fails `unimplemented`, as connect-go answers.
+  A compressed message with no coding named now fails `internal`, as gRPC's Message-Encoding
+  and Connect's Streaming-Request ask. A gRPC error after response headers keeps its own head.
+  `connect_colibri` gains `Call.request_headers`, `Call.request_query` and a context's
+  `message_receive_limit`. It also gains 16 KiB of trailer room, for details that echo headers.
+
 - **Compression, later.** `connect` gains `ZstdEncoder`, `ZstdDecoder` and `Encoders`; the gzip
   `encoder` of `Reply`, `client.Options` and `connect_colibri.Codings` becomes `encoders`,
   `accept`'s `can_compress` becomes `encoders`, and `compression.compress_gzip` becomes
@@ -173,7 +181,8 @@ ran on Linux x86-64 with Zig 0.16.0.
 
 ### What a later step owes
 
-- The connectrpc conformance suite (step 7).
+- The connectrpc conformance suite against the client (step 7), once colibri's client exposes
+  trailers and streams a request body.
 - A gRPC client over colibri, once colibri's client exposes response trailers (decision 11).
 - Long server streams written at `on_writable` (decision 12).
 - Client-side full-duplex, once colibri's client streams a request body.

@@ -25,3 +25,4 @@ run bench zig build bench -- --quick
 run generated tools/generate_check.sh
 run interop tools/interop_check.sh
 run coverage tools/coverage_check.sh
+run conformance tools/conformance_check.sh

@@ -1,0 +1,3 @@
+# The .proto files of the connectrpc conformance suite that a server under test reads, one buf
+# module. See README.md beside this file for where they come from.
+version: v2

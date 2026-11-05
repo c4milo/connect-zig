@@ -179,6 +179,15 @@ first. Cite an entry by number in code and commits ("decision 6").
     colibri's test identity, which colibri does not package; and minting an identity at each
     run, which needs openssl in every build.
 
+26. **The conformance suite runs against a server of its own.** `conformance/` holds a program
+    that serves connectrpc's ConformanceService on a socket the kernel picks, as the runner's
+    server mode asks. It shares the socket loop of `examples/services/socket_loop.zig` with the
+    example socket server. `tools/conformance_check.sh` downloads runner v1.0.4, pinned by
+    SHA-256, and `conformance/known_failing.txt` names each case that fails on purpose, with the
+    reason; the runner fails when a listed case passes. The client half waits on colibri's
+    client (decision 11). Beaten: the runner's reference server against our client alone, which
+    leaves the server untested; and a copy of the loop in each program.
+
 ## Tooling
 
 15. **pepegrillo is lazy.** `build.zig` requests it only when `b.pkg_hash.len == 0`, so a project
