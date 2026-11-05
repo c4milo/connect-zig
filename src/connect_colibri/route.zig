@@ -29,6 +29,8 @@ pub fn CallState(comptime options: Options, comptime handler: anytype) type {
     return struct {
         done: bool = false,
         started: bool = false,
+        /// The longest request message the call reads (`receive_limit_of`).
+        limit: usize = options.message_bytes,
         call: call_file.Call = undefined,
         request_message: [options.message_bytes]u8 = undefined,
         request_work: [options.message_bytes]u8 = undefined,
@@ -55,6 +57,17 @@ fn codings_of(app: anytype) Codings {
     return .{};
 }
 
+/// The longest request message a route reads: the context's field `message_receive_limit` when
+/// it has one and it is not 0, else `message_bytes`. The limit counts a message's octets once
+/// decompressed.
+fn receive_limit_of(app: anytype, comptime message_bytes: usize) usize {
+    const App = @TypeOf(app.*);
+    if (comptime !@hasField(App, "message_receive_limit")) return message_bytes;
+    const limit: usize = app.message_receive_limit;
+    if (limit == 0) return message_bytes;
+    return @min(limit, message_bytes);
+}
+
 /// The struct route of `method`, which calls `handler`. A function handler's signature follows
 /// the stream type:
 ///
@@ -70,6 +83,9 @@ fn codings_of(app: anytype) Codings {
 /// - `on_end(*App, *Call, *State, *Sender(Response))`, or `on_end(..., *Response)`.
 ///
 /// Each returns null to go on, or the error that ends the call.
+///
+/// A context may hold a field `message_receive_limit`, a count of octets: a request message
+/// longer than it, once decompressed, fails the call with `resource_exhausted`.
 pub fn Route(comptime App: type, comptime method: connect.Method, comptime handler: anytype, comptime options: Options) type {
     if (dispatch.is_streaming(handler)) assert(method.stream_type == .client_stream or method.stream_type == .bidi_stream);
     return struct {
@@ -96,6 +112,7 @@ const RouteSpec = struct { method: connect.Method, options: Options };
 /// the call.
 fn begin(comptime spec: RouteSpec, comptime handler: anytype, app: anytype, state: *CallState(spec.options, handler), request: *const server.Request, response: *server.ResponseWriter) !void {
     const codings = codings_of(app);
+    state.limit = receive_limit_of(app, spec.options.message_bytes);
     state.headers.copy(request.headers) catch {
         state.done = true;
         // RFC 6585 §5: headers larger than the server keeps get 431.
@@ -128,12 +145,18 @@ fn begin(comptime spec: RouteSpec, comptime handler: anytype, app: anytype, stat
         .room = &state.room,
         .headers = &state.headers,
         .path = comptime spec.method.path(),
+        .query = query orelse "",
     };
 }
 
 fn serve_whole(comptime spec: RouteSpec, comptime handler: anytype, app: anytype, state: *CallState(spec.options, handler), body: []const u8) !void {
     assert(!state.done);
     state.done = true;
+    // A Connect unary body is the message itself, and an uncompressed one is read in place, so
+    // its length is checked here; every other message is read into storage of `limit` octets.
+    if (read_in_place(state.call.reply.accepted) and body.len > state.limit) {
+        return stop(dispatch.Interceptors(spec.options.interceptors), app, state, too_large);
+    }
     var messages = connect.server.Messages.init(state.call.reply.accepted, body, scratch_of(spec.options, handler, state, .request), codings_of(app).decoders);
     return dispatch.whole(spec.method, handler, dispatch.Interceptors(spec.options.interceptors), app, &state.call, &messages);
 }
@@ -147,7 +170,7 @@ fn serve_streaming(comptime spec: RouteSpec, comptime handler: anytype, app: any
         if (I.on_call(app, call)) |refusal| return stop(I, app, state, refusal);
     }
     const buffered = body.buffered();
-    const whole_len = dispatch.whole_envelopes_len(buffered, spec.options.message_bytes) catch |failure|
+    const whole_len = dispatch.whole_envelopes_len(buffered, state.limit) catch |failure|
         return stop(I, app, state, connect.server.failure_of(failure));
     var messages = connect.server.Messages.init(state.call.reply.accepted, buffered[0..whole_len], scratch_of(spec.options, handler, state, .request), codings_of(app).decoders);
     if (dispatch.each_message(spec.method, handler, app, call, &state.handler_state, &messages)) |failure| return stop(I, app, state, failure);
@@ -171,11 +194,21 @@ fn stop(comptime I: type, app: anytype, state: anytype, failure: connect.RpcErro
     return call_file.finish(&state.call, I.on_finish(app, &state.call, failure));
 }
 
+/// Whether the request's one message is its body as it arrived: a Connect unary POST with no
+/// coding. `Messages` reads it in place, with no copy that `limit` bounds.
+fn read_in_place(accepted: connect.server.Accepted) bool {
+    return !accepted.speaks.enveloped and accepted.query == null and accepted.request_coding == .identity;
+}
+
+/// statuscodes.md, RESOURCE_EXHAUSTED: a message over the server's limit.
+const too_large: connect.RpcError = .{ .code = .resource_exhausted, .message = "message larger than the server reads" };
+
 const Side = enum { request, reply };
 
 fn scratch_of(comptime options: Options, comptime handler: anytype, state: *CallState(options, handler), side: Side) connect.Scratch {
+    assert(state.limit <= options.message_bytes);
     return switch (side) {
-        .request => .{ .message = &state.request_message, .work = &state.request_work, .tokens = &state.tokens },
+        .request => .{ .message = state.request_message[0..state.limit], .work = &state.request_work, .tokens = &state.tokens },
         .reply => .{ .message = &state.reply_message, .work = &state.reply_work, .tokens = &state.tokens },
     };
 }
@@ -191,4 +224,34 @@ pub fn post(comptime App: type, comptime method: connect.Method, comptime handle
 pub fn get(comptime App: type, comptime method: connect.Method, comptime handler: anytype, comptime options: Options) @TypeOf(.{ .get, method.path(), Route(App, method, handler, options), .{ .whole_body = true } }) {
     comptime assert(method.stream_type == .unary and method.idempotency == .no_side_effects);
     return .{ .get, comptime method.path(), Route(App, method, handler, options), .{ .whole_body = true } };
+}
+
+const testing = std.testing;
+
+test "the receive limit is the context's when it is set and smaller, else message_bytes" {
+    const message_bytes = 100;
+    const Limited = struct { message_receive_limit: u32 = 0 };
+    var limited: Limited = .{ .message_receive_limit = 40 };
+    try testing.expectEqual(@as(usize, 40), receive_limit_of(&limited, message_bytes));
+    limited.message_receive_limit = 0;
+    try testing.expectEqual(@as(usize, message_bytes), receive_limit_of(&limited, message_bytes));
+    limited.message_receive_limit = message_bytes + 1;
+    try testing.expectEqual(@as(usize, message_bytes), receive_limit_of(&limited, message_bytes));
+    const Plain = struct {};
+    var plain: Plain = .{};
+    try testing.expectEqual(@as(usize, message_bytes), receive_limit_of(&plain, message_bytes));
+}
+
+test "only an uncompressed Connect unary POST is read in place" {
+    const unary: connect.server.Accepted = .{ .speaks = .{ .protocol = .connect, .codec = .proto, .enveloped = false }, .request_coding = .identity, .response_coding = .identity, .timeout_ns = null };
+    try testing.expect(read_in_place(unary));
+    var gzipped = unary;
+    gzipped.request_coding = .gzip;
+    try testing.expect(!read_in_place(gzipped));
+    var get_request = unary;
+    get_request.query = .{ .codec = .proto, .message = "" };
+    try testing.expect(!read_in_place(get_request));
+    var stream = unary;
+    stream.speaks.enveloped = true;
+    try testing.expect(!read_in_place(stream));
 }

@@ -15,6 +15,8 @@ pub const App = struct {
     /// The demo calls the logging interceptor saw start, and those it saw fail.
     logged: u32 = 0,
     failed: u32 = 0,
+    /// The logged calls that arrived as a Connect GET, with their message in the query.
+    queried: u32 = 0,
     /// The codings connect_colibri reads and writes messages in: none unless a program sets them.
     codings: rpc.Codings = .{},
     text: [text_len_max]u8 = undefined,

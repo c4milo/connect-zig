@@ -92,6 +92,8 @@ pub const Call = struct {
     headers: *const RequestHeaders,
     /// The path that names the method: "/connectrpc.eliza.v1.ElizaService/Say".
     path: []const u8,
+    /// The request's query, after the path's "?", copied at the head, or empty.
+    query: []const u8 = "",
     head_written: bool = false,
     /// Messages the call read and wrote, which an interceptor may report.
     received: u32 = 0,
@@ -113,6 +115,17 @@ pub const Call = struct {
         return call.reply.accepted.timeout_ns;
     }
 
+    /// The request's headers, every line in the order it arrived. A name may repeat.
+    pub fn request_headers(call: *const Call) []const connect.Header {
+        return call.headers.entries[0..call.headers.count];
+    }
+
+    /// The request's query, after the path's "?", or empty: a unary GET's parameters (Connect
+    /// protocol, "Unary-Get-Request").
+    pub fn request_query(call: *const Call) []const u8 {
+        return call.query;
+    }
+
     /// A request header's value, by a name in any case, or null.
     pub fn request_header(call: *const Call, name: []const u8) ?[]const u8 {
         return call.headers.find(name);
@@ -127,6 +140,13 @@ pub const Call = struct {
         if (call.room.response_header_count == constants.fields_max) return error.TooManyHeaders;
         call.room.response_headers[call.room.response_header_count] = .{ .name = name, .value = value };
         call.room.response_header_count += 1;
+    }
+
+    /// Whether a gRPC error keeps its head apart from its trailers. A Trailers-Only reply is one
+    /// header section, which a client reads as trailers alone (gRPC PROTOCOL-HTTP2.md,
+    /// "Responses"), so a call that set response headers sends them in a head of their own.
+    fn headers_kept(call: *const Call) bool {
+        return call.reply.accepted.speaks.protocol == .grpc and call.room.response_header_count != 0;
     }
 
     /// Adds a trailer the reply carries: in the end-stream message, gRPC's trailers or
@@ -210,7 +230,7 @@ fn write_prefixed_trailers(call: *Call) !void {
 /// Ends the call: with the error when it is set, else with success.
 pub fn finish(call: *Call, failure: ?connect.RpcError) !void {
     if (failure) |rpc_failure| {
-        if (call.reply.error_only() and !call.head_written) {
+        if (call.reply.error_only() and !call.head_written and !call.headers_kept()) {
             const head = try call.reply.error_head(rpc_failure, &call.room.storage);
             try apply_head(call, &head);
             call.head_written = true;
@@ -274,7 +294,10 @@ pub const One = union(enum) { message: void, failure: connect.RpcError };
 /// Reads the one message of a unary or server-stream request into `out`.
 pub fn read_one(comptime T: type, call: *Call, messages: *connect.server.Messages, out: *T) One {
     const message = messages.next(T) catch |failure| return .{ .failure = connect.server.failure_of(failure) };
-    out.* = message orelse return .{ .failure = .{ .code = .invalid_argument, .message = "missing request message" } };
+    // A unary request with no message breaks the method's cardinality, as one with two does:
+    // connect-go and grpc-go answer both `unimplemented`, and the conformance suite asks it
+    // (connect_server_unexpected.yaml and grpc_server_unexpected.yaml, "no-request").
+    out.* = message orelse return .{ .failure = .{ .code = .unimplemented, .message = "unary request with no message" } };
     call.received += 1;
     // Connect protocol and PROTOCOL-HTTP2.md: a unary request holds exactly one message.
     const extra = messages.next(T) catch return .{ .failure = .{ .code = .invalid_argument, .message = "malformed request" } };
@@ -307,6 +330,18 @@ test "request headers copy every line, and find them by a name in any case (RFC 
     try testing.expectEqualStrings("Bearer Ada", headers.find("Authorization").?);
     try testing.expectEqualStrings("7", headers.lookup().find("X-TRACE").?);
     try testing.expectEqual(@as(?[]const u8, null), headers.find("cookie"));
+}
+
+test "a call lists its request headers in order, repeats included, and its query" {
+    test_section.init();
+    try test_section.append("x-a", "1");
+    try test_section.append("x-a", "2");
+    var headers: RequestHeaders = .{};
+    try headers.copy(.of(&test_section));
+    const call: Call = .{ .reply = undefined, .response = undefined, .room = undefined, .headers = &headers, .path = "", .query = "encoding=proto&connect=v1" };
+    try testing.expectEqualStrings("encoding=proto&connect=v1", call.request_query());
+    try testing.expectEqual(@as(usize, 2), call.request_headers().len);
+    try testing.expectEqualStrings("2", call.request_headers()[1].value);
 }
 
 test "request headers refuse one line more than they hold" {

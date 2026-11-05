@@ -5,8 +5,9 @@ pub const message_bytes_default = 64 * 1024;
 /// The longest JSON token a route reads by default.
 pub const token_bytes_default = 16 * 1024;
 /// The octets of a route's status trailers: grpc-status, grpc-message and the details, twice
-/// over for gRPC-Web's frame, and an end-stream message.
-pub const trailer_bytes = 4096;
+/// over for gRPC-Web's frame, and an end-stream message. Details in base64 take most of it: an
+/// error that echoes a request's headers as a detail needs a few KiB.
+pub const trailer_bytes = 16 * 1024;
 /// The headers and trailers connect_colibri copies into colibri's field lists at once, at most.
 pub const fields_max = 8;
 /// The octets of a request's headers a route copies at its head, names and values together.

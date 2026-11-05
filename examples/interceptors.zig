@@ -70,6 +70,7 @@ pub fn main() !void {
 fn round(protocols: client.Protocols, expected: client.Protocol) !void {
     const logged_before = harness.app.logged;
     const failed_before = harness.app.failed;
+    const queried_before = harness.app.queried;
     const read_before = Tally.read;
     const http_ok_before = Tally.http_ok;
     try harness.begin(protocols);
@@ -96,6 +97,8 @@ fn round(protocols: client.Protocols, expected: client.Protocol) !void {
     const logged = harness.app.logged - logged_before;
     const failed = harness.app.failed - failed_before;
     if (logged != calls_count or failed != 1) return error.ExchangeWrong;
+    // The one GET reached the interceptor with its query.
+    if (harness.app.queried - queried_before != 1) return error.ExchangeWrong;
     if (Tally.read - read_before != calls_count or Tally.http_ok - http_ok_before != calls_count) return error.ExchangeWrong;
     std.debug.print("interceptors: over {s}, server logged {d} calls, {d} failed; client read {d}\n", .{ @tagName(expected), logged, failed, Tally.read - read_before });
 }

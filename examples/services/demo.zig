@@ -33,11 +33,12 @@ pub const sent_trailer = "call-sent";
 /// "trailer-whoami-caller".
 pub const caller_trailer = "whoami-caller";
 
-/// Counts each call and marks its reply. It wraps `Auth`, so it also sees the calls `Auth`
-/// refuses, and counts them as failed.
+/// Counts each call, and each GET among them, and marks its reply. It wraps `Auth`, so it also
+/// sees the calls `Auth` refuses, and counts them as failed.
 pub const Logging = struct {
     pub fn on_call(app: *App, call: *rpc.Call) ?connect.RpcError {
         app.logged += 1;
+        if (call.request_query().len != 0) app.queried += 1;
         call.set_header(logged_header, logged_value) catch return .{ .code = .internal, .message = "no room for a header" };
         return null;
     }
