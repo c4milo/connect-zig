@@ -1,0 +1,75 @@
+// The messages the benchmarks encode and decode, in Zig and in Go, from the same fixed values.
+// Each stands for a shape a service sends: a small request, a record of about 1 KB, a large batch
+// with bytes, and a message that nests its own type.
+syntax = "proto3";
+
+package bench.v1;
+
+enum Status {
+  STATUS_UNSPECIFIED = 0;
+  STATUS_ACTIVE = 1;
+  STATUS_SUSPENDED = 2;
+  STATUS_CLOSED = 3;
+}
+
+// A typical RPC request: a few scalars and a short string.
+message Small {
+  int32 id = 1;
+  int64 created = 2;
+  bool active = 3;
+  string name = 4;
+  double score = 5;
+}
+
+message Address {
+  string street = 1;
+  string city = 2;
+  string country = 3;
+  uint32 postal_code = 4;
+}
+
+// About 1 KB: nested messages, packed integers, strings, a map, an enum and a oneof.
+message Medium {
+  uint64 id = 1;
+  string name = 2;
+  Status status = 3;
+  Address home = 4;
+  repeated int64 samples = 5;
+  repeated string tags = 6;
+  map<string, int64> counters = 7;
+  repeated Address previous = 8;
+  fixed64 checksum = 9;
+  float ratio = 10;
+  sint32 delta = 11;
+  // The oneof takes the highest numbers. This library writes fields in number order ("Field
+  // Order", encoding guide); Go writes a oneof's member after every other field. With the oneof
+  // last, the two write the same bytes.
+  oneof contact {
+    string email = 12;
+    string phone = 13;
+    Address office = 14;
+  }
+}
+
+// One element of `Large`: scalars, packed signed integers and a bytes payload.
+message Record {
+  uint64 id = 1;
+  string key = 2;
+  bytes payload = 3;
+  repeated sint32 values = 4;
+  double weight = 5;
+  Status status = 6;
+}
+
+// A batch of records, a few hundred kilobytes in all.
+message Large {
+  string name = 1;
+  repeated Record records = 2;
+}
+
+// A message that holds its own type, nested as deep as the benchmark builds it.
+message Deep {
+  int32 level = 1;
+  string label = 2;
+  Deep child = 3;
+}

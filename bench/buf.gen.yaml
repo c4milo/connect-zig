@@ -1,0 +1,8 @@
+# `tools/generate_check.sh` runs `buf generate --template bench/buf.gen.yaml` from the root: the
+# Zig code of the benchmark messages, with the plugin this repository builds.
+version: v2
+inputs:
+  - directory: bench/proto
+plugins:
+  - local: zig-out/bin/protoc-gen-connect-zig
+    out: bench/gen

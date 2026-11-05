@@ -8,6 +8,7 @@ const assert = std.debug.assert;
 const lint = @import("build/lint.zig");
 const examples = @import("build/examples.zig");
 const generate = @import("build/generate.zig");
+const bench = @import("build/bench.zig");
 
 const Graph = @import("build/graph.zig").Graph;
 
@@ -46,6 +47,7 @@ pub fn build(b: *std.Build) void {
     test_step.dependOn(examples.add(b, graph));
     test_step.dependOn(generate.add(b, graph.protobuf, graph.connect, target, optimize));
     if (lint.add(b)) |lint_step| test_step.dependOn(lint_step);
+    bench.add(b, graph.public_names, target);
 }
 
 fn modules(b: *std.Build, stdx: *std.Build.Dependency, colibri: *std.Build.Dependency, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode) Graph {

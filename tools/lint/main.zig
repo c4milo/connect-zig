@@ -41,7 +41,7 @@ pub const determinism = rules.forbidden_references.Rule(.{
 
 /// CLAUDE.md, Conventions: every loop is bounded.
 pub const unbounded_loop = rules.unbounded_loop.Rule(.{
-    .scope = .{ .extensions = &.{lint.paths.zig_extension}, .include_directories = &.{ "src", "examples" } },
+    .scope = .{ .extensions = &.{lint.paths.zig_extension}, .include_directories = &.{ "src", "examples", "bench" } },
     .forever = .unless_bounded_break,
     .length_read = true,
     .bound = .{ .segments = &.{"constants"}, .last_segment_suffixes = &.{"_max"} },
@@ -67,7 +67,7 @@ pub const relative_import = rules.relative_import.Rule(.{
 });
 pub const relative_import_outside = rules.relative_import.Rule(.{
     .name = "relative-import-outside",
-    .scope = .{ .extensions = &.{lint.paths.zig_extension}, .include_directories = &.{ "examples", "tools", "build" } },
+    .scope = .{ .extensions = &.{lint.paths.zig_extension}, .include_directories = &.{ "examples", "tools", "build", "bench" } },
     .mode = .parent_or_absolute,
 });
 
@@ -76,19 +76,19 @@ pub const relative_import_outside = rules.relative_import.Rule(.{
 pub const magic_numbers = rules.magic_numbers.Rule(.{
     .scope = .{
         .extensions = &.{lint.paths.zig_extension},
-        .include_directories = &.{ "src", "examples/gen" },
+        .include_directories = &.{ "src", "examples/gen", "bench/gen" },
         .exclude_basenames = &.{"constants.zig"},
     },
 });
 
 /// The library keeps no state every thread shares.
 pub const global_state = rules.global_state.Rule(.{
-    .scope = .{ .extensions = &.{lint.paths.zig_extension}, .include_directories = &.{ "src", "examples/gen" } },
+    .scope = .{ .extensions = &.{lint.paths.zig_extension}, .include_directories = &.{ "src", "examples/gen", "bench/gen" } },
 });
 
 /// A container-level `var` states its alignment, which Zig 0.16's x86_64 backend needs.
 pub const static_alignment = rules.static_alignment.Rule(.{
-    .scope = .{ .extensions = &.{lint.paths.zig_extension}, .include_directories = &.{ "src", "examples" } },
+    .scope = .{ .extensions = &.{lint.paths.zig_extension}, .include_directories = &.{ "src", "examples", "bench" } },
 });
 
 /// CLAUDE.md, Conventions: every Markdown file renders on GitHub as written.
@@ -102,15 +102,15 @@ pub const markdown = rules.markdown.Rule(.{
 });
 
 /// The Zig code this tree writes by hand or generates, which the remaining rules read.
-const zig_tree: lint.scope.Scope = .{ .extensions = &.{lint.paths.zig_extension}, .include_directories = &.{ "src", "examples", "tools", "build" } };
+const zig_tree: lint.scope.Scope = .{ .extensions = &.{lint.paths.zig_extension}, .include_directories = &.{ "src", "examples", "tools", "build", "bench" } };
 
 /// A `defer` goes above any statement that can fail, so what the block acquired is released.
 pub const defer_order = rules.defer_order.Rule(.{ .scope = zig_tree });
 
 /// A function's local array is not set to `undefined`, which Debug and ReleaseSafe fill on each
-/// call: the library and the examples take that memory from their caller instead.
+/// call: the library, the examples and the benchmark take that memory from their caller instead.
 pub const undefined_fill = rules.undefined_fill.Rule(.{
-    .scope = .{ .extensions = &.{lint.paths.zig_extension}, .include_directories = &.{ "src", "examples" } },
+    .scope = .{ .extensions = &.{lint.paths.zig_extension}, .include_directories = &.{ "src", "examples", "bench" } },
     .stop_at_testing_import = true,
     // A copy of colibri's examples/link.zig, kept as colibri wrote it.
     .allowed = &.{
