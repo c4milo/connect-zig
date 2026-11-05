@@ -121,8 +121,3 @@ test "the well-known types take their own forms both ways" {
     try testing.expectEqualStrings("user.display_name", (try paths.next()).?);
     try testing.expectEqualStrings("hi", back.label.?.value);
 }
-
-test "Any has no JSON form in this version" {
-    var buffers: Buffers = .{};
-    try testing.expectError(error.Unsupported, proto.encode_json(wkt.Any, &.{}, &buffers.text));
-}

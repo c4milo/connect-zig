@@ -21,6 +21,8 @@ const files = struct {
     pub const json_scalar = @import("json_scalar.zig");
     pub const json_encode = @import("json_encode.zig");
     pub const json_decode = @import("json_decode.zig");
+    pub const json_decode_wkt = @import("json_decode_wkt.zig");
+    pub const any = @import("any.zig");
     pub const time_text = @import("time_text.zig");
     pub const wkt = @import("wkt.zig");
 };
@@ -74,10 +76,20 @@ pub const JsonEncodeError = files.json_scalar.EncodeError;
 /// What `decode_json` refuses a text with, or fails with for want of room.
 pub const JsonDecodeError = files.json_scalar.DecodeError;
 
-/// Writes `message` as one proto3 JSON text into `buffer`, and returns the text.
+/// Writes `message` as one proto3 JSON text into `buffer`, and returns the text. An Any names
+/// its type from the well-known types and the root file's `protobuf_any_types` (decision 21).
 pub fn encode_json(comptime T: type, message: *const T, buffer: []u8) JsonEncodeError![]const u8 {
+    return encode_json_registry(T, message, buffer, files.any.types);
+}
+
+/// `encode_json`, with an Any naming its type from the well-known types and `any_types`.
+pub fn encode_json_with(comptime T: type, message: *const T, buffer: []u8, comptime any_types: anytype) JsonEncodeError![]const u8 {
+    return encode_json_registry(T, message, buffer, files.any.with(any_types));
+}
+
+fn encode_json_registry(comptime T: type, message: *const T, buffer: []u8, comptime registry: anytype) JsonEncodeError![]const u8 {
     var text = json.TextWriter.init(buffer, .text, codec.Features.target());
-    try files.json_encode.write_message(T, message, &text);
+    try files.json_encode.write_message(T, message, &text, registry);
     return text.written();
 }
 
@@ -85,8 +97,12 @@ pub fn encode_json(comptime T: type, message: *const T, buffer: []u8) JsonEncode
 /// `binary`, and the message's strings and bytes point into it. `tokens` holds one token's octets
 /// at a time, so a string as long as the longest one in the text fits.
 pub fn decode_json(comptime T: type, text: []const u8, binary: []u8, tokens: []u8) JsonDecodeError!T {
-    const bytes = try files.json_decode.transcode(T, text, binary, tokens);
-    return decode(T, bytes);
+    return decode(T, try files.json_decode.transcode(T, text, binary, tokens, files.any.types));
+}
+
+/// `decode_json`, with an Any naming its type from the well-known types and `any_types`.
+pub fn decode_json_with(comptime T: type, text: []const u8, binary: []u8, tokens: []u8, comptime any_types: anytype) JsonDecodeError!T {
+    return decode(T, try files.json_decode.transcode(T, text, binary, tokens, files.any.with(any_types)));
 }
 
 /// The well-known types with their own JSON form (design §5).
@@ -105,6 +121,10 @@ pub const wkt = struct {
     pub const BoolValue = files.wkt.BoolValue;
     pub const StringValue = files.wkt.StringValue;
     pub const BytesValue = files.wkt.BytesValue;
+    pub const NullValue = files.wkt.NullValue;
+    pub const Struct = files.wkt.Struct;
+    pub const Value = files.wkt.Value;
+    pub const ListValue = files.wkt.ListValue;
 };
 
 /// The value of the last entry of a map field whose key is `key` ("Maps": the last key wins).
@@ -112,10 +132,11 @@ pub const map_get = files.repeated.map_get;
 
 test "the root exports the names a program calls" {
     try @import("public_names").expect(@This(), &.{
-        "constants",   "Kind",        "Field",  "Descriptor",   "EnumValue",       "EnumDescriptor",
-        "View",        "Repeated",    "Lazy",   "Error",        "EncodeError",     "decode",
-        "merge",       "encoded_len", "encode", "map_get",      "JsonEncodeError", "JsonDecodeError",
-        "encode_json", "decode_json", "wkt",    "FieldOptions", "field_of",
+        "constants",   "Kind",             "Field",       "Descriptor",       "EnumValue",       "EnumDescriptor",
+        "View",        "Repeated",         "Lazy",        "Error",            "EncodeError",     "decode",
+        "merge",       "encoded_len",      "encode",      "map_get",          "JsonEncodeError", "JsonDecodeError",
+        "encode_json", "encode_json_with", "decode_json", "decode_json_with", "wkt",             "FieldOptions",
+        "field_of",
     });
 }
 
@@ -123,4 +144,5 @@ test {
     std.testing.refAllDecls(files);
     _ = @import("protobuf_test.zig");
     _ = @import("protobuf_json_test.zig");
+    _ = @import("protobuf_json_wkt_test.zig");
 }

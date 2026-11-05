@@ -14,7 +14,16 @@ const descriptor = @import("descriptor.zig");
 const Kind = descriptor.Kind;
 
 /// What writing JSON fails with.
-pub const EncodeError = json.EncodeError || wire.Error || error{ NoSpaceLeft, Unsupported, InvalidTimestamp, InvalidDuration, InvalidFieldMask };
+pub const EncodeError = json.EncodeError || wire.Error || error{
+    NoSpaceLeft,
+    InvalidTimestamp,
+    InvalidDuration,
+    InvalidFieldMask,
+    /// A Value with no kind set, or a number JSON cannot hold: NaN or an infinity.
+    InvalidValue,
+    /// An Any whose type URL names a type the program did not declare (decision 21).
+    UnknownAnyType,
+};
 
 /// What reading JSON refuses a text with, or fails with for want of room.
 pub const DecodeError = json.DecodeError || error{ Truncated, NoSpaceLeft } || wire.Error || error{
@@ -30,8 +39,8 @@ pub const DecodeError = json.DecodeError || error{ Truncated, NoSpaceLeft } || w
     InvalidTimestamp,
     InvalidDuration,
     InvalidFieldMask,
-    /// A JSON form this version does not read: Any, Struct, Value and ListValue (design §5).
-    Unsupported,
+    /// An Any whose "@type" names a type the program did not declare (decision 21).
+    UnknownAnyType,
 };
 
 /// The longest text a 64-bit integer takes in decimal, with its sign.

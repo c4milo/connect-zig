@@ -54,7 +54,8 @@ the Zig name, the number, the kind, the JSON name, the .proto name, and the oneo
 `encode_json` writes a message with stdx's `json.TextWriter`. `decode_json` transcodes JSON into
 the binary encoding in a caller scratch buffer and then calls `decode` (decision 9). Well-known
 types live in `proto.wkt` and have their own JSON forms: Timestamp, Duration, the wrappers,
-Empty and FieldMask in the first step; Any, Struct, Value and ListValue later.
+Empty, FieldMask, Struct, Value, ListValue and Any. An Any names its type from a comptime list
+(decision 21).
 
 ## 6. The protocol core
 
@@ -144,4 +145,4 @@ ran on Linux x86-64 with Zig 0.16.0.
 - A gRPC client over colibri, once colibri's client exposes response trailers (decision 11).
 - Long server streams written at `on_writable` (decision 12).
 - Client-side full-duplex, once colibri's client streams a request body.
-- Unknown fields kept, Any, Struct, Value and ListValue in JSON, and editions in the plugin.
+- Unknown fields kept, and editions in the plugin.

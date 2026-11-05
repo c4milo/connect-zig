@@ -22,6 +22,7 @@ pub const Entry = struct {
 const wkt_names = [_][]const u8{
     "Timestamp",  "Duration",    "Empty",      "FieldMask",   "Any",       "DoubleValue", "FloatValue",
     "Int64Value", "UInt64Value", "Int32Value", "UInt32Value", "BoolValue", "StringValue", "BytesValue",
+    "NullValue",  "Struct",      "Value",      "ListValue",
 };
 
 pub const Index = struct {

@@ -129,6 +129,13 @@ first. Cite an entry by number in code and commits ("decision 6").
     holds only its calls and its checks. The socket server serves both services. Beaten: one
     copy of the link loop per program.
 
+21. **An Any's JSON names its type from a comptime list.** Writing or reading an Any in JSON
+    needs the type its URL names. The well-known types are always in the list. A program adds
+    its own with `pub const protobuf_any_types = .{ ... };` in its root file, or passes them to
+    `encode_json_with` and `decode_json_with`, which a test needs since a test's root is the
+    test runner. A type outside the list fails with `UnknownAnyType`. Beaten: a runtime registry,
+    which needs an allocator or a fixed table of function pointers, and loses comptime decoding.
+
 ## Tooling
 
 15. **pepegrillo is lazy.** `build.zig` requests it only when `b.pkg_hash.len == 0`, so a project

@@ -191,7 +191,8 @@ Still to come:
 - [ ] A gRPC client, once colibri's client exposes trailers
 - [ ] Long server streams, and full-duplex on the client side
 - [x] Full-duplex streams on the server, interceptors and error details
-- [ ] `Any`, `Struct`, `Value` and `ListValue` in JSON, and unknown fields kept
+- [x] `Any`, `Struct`, `Value` and `ListValue` in JSON
+- [ ] Unknown fields kept
 
 ## Contributing
 
