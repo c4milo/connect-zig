@@ -1,0 +1,15 @@
+# The Go code of the benchmark messages. Run from the repository root, with protoc-gen-go at the
+# version go.mod pins on the path:
+#   buf generate --template bench/go/buf.gen.yaml
+version: v2
+managed:
+  enabled: true
+  override:
+    - file_option: go_package_prefix
+      value: github.com/c4milo/connect-zig/bench/go/gen
+inputs:
+  - directory: bench/proto
+plugins:
+  - local: protoc-gen-go
+    out: bench/go/gen
+    opt: paths=source_relative

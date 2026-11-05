@@ -202,9 +202,13 @@ The rules of the tree are in [CLAUDE.md](CLAUDE.md), the design and its build pl
 
 ```sh
 zig build test            # the lint, every module's tests and the examples
-tools/generate_check.sh   # buf generate still writes examples/gen
+tools/generate_check.sh   # buf generate still writes examples/gen and bench/gen
 tools/interop_check.sh    # buf curl and curl against the example server
 ```
+
+To measure the protobuf runtime, run `zig build bench`, or `tools/bench_check.sh`, which also runs
+the Go benchmark in `bench/go`, checks that both encode the same bytes, and prints the two side by
+side.
 
 ## License
 
