@@ -1,5 +1,32 @@
+//! connect_colibri: Connect, gRPC and gRPC-Web servers and clients over colibri's h11, h2 and h3
+//! (design §7). A server serves each `connect.Method` as a route of `server.router`; a client
+//! writes each call as a `client.Request` for its `client.ConnectionPool`.
 const std = @import("std");
 const builtin = @import("builtin");
+
+pub const constants = @import("constants.zig");
+
+const files = struct {
+    pub const route = @import("route.zig");
+    pub const call = @import("call.zig");
+    pub const exchange = @import("exchange.zig");
+};
+
+/// The struct route that serves a method, and its router entries.
+pub const Route = files.route.Route;
+pub const RouteOptions = files.route.Options;
+pub const Codings = files.route.Codings;
+pub const post = files.route.post;
+pub const get = files.route.get;
+/// What a handler reads about its call, and the streams it reads and writes.
+pub const Call = files.call.Call;
+pub const Sender = files.call.Sender;
+pub const Receiver = files.call.Receiver;
+/// A client call over colibri's pool.
+pub const Exchange = files.exchange.Exchange;
+pub const ExchangeBuffers = files.exchange.Buffers;
+pub const wanted_names = files.exchange.wanted_names;
+pub const failure_of = files.exchange.failure_of;
 
 /// chapulin's one hook, which a program that links colibri's `tls` defines (colibri decision
 /// 94). The module's own test binary defines it here; a program defines its own.
@@ -11,4 +38,15 @@ comptime {
     if (builtin.is_test) @export(&test_assert_fail, .{ .name = "ch_assert_fail", .linkage = .strong });
 }
 
-test {}
+test "the root exports the names a program calls" {
+    try @import("public_names").expect(@This(), &.{
+        "constants",  "Route",  "RouteOptions", "Codings",  "post",            "get",
+        "Call",       "Sender", "Receiver",     "Exchange", "ExchangeBuffers", "wanted_names",
+        "failure_of",
+    });
+}
+
+test {
+    std.testing.refAllDecls(files);
+    _ = @import("connect_colibri_test.zig");
+}

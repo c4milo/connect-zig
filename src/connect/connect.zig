@@ -41,6 +41,8 @@ pub const Status = files.rpc_error.Status;
 pub const Coding = files.compression.Coding;
 pub const Decoders = files.compression.Decoders;
 pub const GzipEncoder = files.compression.GzipEncoder;
+/// The gzip decoder a caller places for `Decoders.gzip`.
+pub const GzipDecoder = files.compression.GzipDecoder;
 pub const Envelope = files.envelope.Envelope;
 pub const EnvelopeFlags = files.envelope.Flags;
 pub const EnvelopeReader = files.envelope.Reader;
@@ -74,6 +76,7 @@ pub const client = struct {
     pub const Buffers = files.client_call.Buffers;
     pub const Request = files.client_call.Request;
     pub const RequestError = files.client_call.Error;
+    pub const request_headers_max = files.client_call.request_headers_max;
     pub const read = files.client_response.read;
     pub const Incoming = files.client_response.Incoming;
     pub const Storage = files.client_response.Storage;
@@ -152,12 +155,12 @@ pub const status = struct {
 
 test "the root exports the names a program calls" {
     try @import("public_names").expect(@This(), &.{
-        "constants",  "Code",        "Protocol",    "Codec",    "Speaks",        "Method",
-        "StreamType", "Idempotency", "Header",      "Detail",   "RpcError",      "Status",
-        "Coding",     "Decoders",    "GzipEncoder", "Envelope", "EnvelopeFlags", "EnvelopeReader",
-        "EndStream",  "envelope",    "protocol",    "timeout",  "compression",   "error_json",
-        "end_stream", "trailers",    "get",         "status",   "Scratch",       "Lookup",
-        "server",     "client",
+        "constants",      "Code",        "Protocol",    "Codec",       "Speaks",   "Method",
+        "StreamType",     "Idempotency", "Header",      "Detail",      "RpcError", "Status",
+        "Coding",         "Decoders",    "GzipEncoder", "GzipDecoder", "Envelope", "EnvelopeFlags",
+        "EnvelopeReader", "EndStream",   "envelope",    "protocol",    "timeout",  "compression",
+        "error_json",     "end_stream",  "trailers",    "get",         "status",   "Scratch",
+        "Lookup",         "server",      "client",
     });
 }
 

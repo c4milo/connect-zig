@@ -35,6 +35,9 @@ pub const Coding = enum {
 /// The gzip encoder a caller places, at stdx's default level.
 pub const GzipEncoder = gzip.Encoder(.{});
 
+/// The gzip decoder a caller places.
+pub const GzipDecoder = gzip.Decoder;
+
 /// The decoders a caller placed. A coding whose decoder is null is not accepted.
 pub const Decoders = struct {
     gzip: ?*gzip.Decoder = null,

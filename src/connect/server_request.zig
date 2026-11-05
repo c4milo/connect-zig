@@ -73,7 +73,9 @@ pub const Messages = struct {
 /// The error a server answers a request whose body it could not read with.
 pub fn failure_of(failure: Error) RpcError {
     return switch (failure) {
-        error.MessageTooLarge => .{ .code = .resource_exhausted, .message = "message larger than the server reads" },
+        // A message, or one of its JSON tokens, larger than the server's buffers is a limit the
+        // server set, not a fault of the message (statuscodes.md, RESOURCE_EXHAUSTED).
+        error.MessageTooLarge, error.NoSpaceLeft => .{ .code = .resource_exhausted, .message = "message larger than the server reads" },
         error.UnsupportedCoding => .{ .code = .internal, .message = "unsupported compression" },
         error.InvalidEnvelope, error.InvalidFlags, error.Truncated => .{ .code = .invalid_argument, .message = "malformed envelope" },
         else => .{ .code = .invalid_argument, .message = "malformed message" },
@@ -105,6 +107,17 @@ test "a unary body is one message, and envelopes are read in order" {
     try testing.expectEqualStrings("b", (try stream.next(Note)).?.text);
     try testing.expectEqualStrings("", (try stream.next(Note)).?.text);
     try testing.expectEqual(@as(?Note, null), try stream.next(Note));
+}
+
+test "a JSON token larger than the server's token buffer is resource_exhausted, not malformed" {
+    var buffers: [2][64]u8 = undefined;
+    var tokens: [4]u8 = undefined;
+    const scratch: message_codec.Scratch = .{ .message = &buffers[0], .work = &buffers[1], .tokens = &tokens };
+    const accepted: server_head.Accepted = .{ .speaks = .{ .protocol = .connect, .codec = .json, .enveloped = false }, .request_coding = .identity, .response_coding = .identity, .timeout_ns = null };
+    var messages = Messages.init(accepted, "{\"text\":\"a long sentence\"}", scratch, .{});
+    if (messages.next(Note)) |_| return error.TestExpectedError else |failure| {
+        try testing.expectEqual(Code.resource_exhausted, failure_of(failure).code);
+    }
 }
 
 test "a request envelope flagged end-stream, or compressed with no coding, is refused" {
