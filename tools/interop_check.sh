@@ -11,7 +11,7 @@ buf="${BUF:-buf}"
 call_seconds=10
 zig build
 log="$(mktemp)"
-trap 'kill "${server}" 2>/dev/null || true; rm -f "${log}"' EXIT
+trap 'kill "${server}" 2>/dev/null || true; rm -f "${log}" "${log}.body" "${log}.fifo" "${log}.chat"' EXIT
 # Port 0: the kernel picks a free port, which the server prints, so two runs never collide.
 zig-out/bin/eliza-server 0 >"${log}" 2>&1 &
 server=$!

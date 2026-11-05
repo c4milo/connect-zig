@@ -103,8 +103,10 @@ pub const Call = struct {
 
     /// Adds a response header. It goes out with the reply's head, so a handler adds it before it
     /// sends its first message.
-    pub fn set_header(call: *Call, name: []const u8, value: []const u8) error{ TooManyHeaders, HeadSent }!void {
+    pub fn set_header(call: *Call, name: []const u8, value: []const u8) error{ TooManyHeaders, HeadSent, InvalidField }!void {
         if (call.head_written) return error.HeadSent;
+        // A name that is not a token, or a value with CR, LF or NUL, would forge header lines.
+        if (!connect.trailers.valid_field(.{ .name = name, .value = value })) return error.InvalidField;
         if (call.room.response_header_count == constants.fields_max) return error.TooManyHeaders;
         call.room.response_headers[call.room.response_header_count] = .{ .name = name, .value = value };
         call.room.response_header_count += 1;
@@ -113,7 +115,9 @@ pub const Call = struct {
     /// Adds a trailer the reply carries: in the end-stream message, gRPC's trailers or
     /// gRPC-Web's trailers frame, and for a Connect unary reply in a header "trailer-<name>"
     /// (Connect protocol, "Unary-Response").
-    pub fn add_trailer(call: *Call, name: []const u8, value: []const u8) error{TooManyTrailers}!void {
+    pub fn add_trailer(call: *Call, name: []const u8, value: []const u8) error{ TooManyTrailers, InvalidField }!void {
+        // gRPC-Web writes trailers into the body, where no HTTP layer checks them (RFC 9110 §5.5).
+        if (!connect.trailers.valid_field(.{ .name = name, .value = value })) return error.InvalidField;
         if (call.room.metadata_count == constants.fields_max) return error.TooManyTrailers;
         call.room.metadata[call.room.metadata_count] = .{ .name = name, .value = value };
         call.room.metadata_count += 1;
@@ -298,6 +302,10 @@ test "a response header is refused once the head went out, or once the room is f
     try testing.expectError(error.TooManyHeaders, call.set_header("a", "b"));
     call.head_written = true;
     try testing.expectError(error.HeadSent, call.set_header("a", "b"));
+    call.head_written = false;
+    call.room.response_header_count = 0;
+    try testing.expectError(error.InvalidField, call.set_header("a", "b\r\nset-cookie: x"));
+    try testing.expectError(error.InvalidField, call.add_trailer("a:b", "c"));
     for (0..constants.fields_max) |_| try call.add_trailer("t", "v");
     try testing.expectError(error.TooManyTrailers, call.add_trailer("t", "v"));
 }

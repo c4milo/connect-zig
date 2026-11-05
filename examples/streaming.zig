@@ -19,7 +19,7 @@ const service = @import("services/demo.zig");
 const harness = @import("services/link_client.zig");
 const Service = demo.DemoService;
 
-const calls_count = 7;
+const calls_count = 8;
 const countdown_from = 3;
 
 pub const Error = error{ExchangeWrong};
@@ -31,6 +31,7 @@ const numbers_sum = 10;
 
 var chat: adapter.Exchange(Service.chat) align(@alignOf(adapter.Exchange(Service.chat))) = undefined;
 var chat_refused: adapter.Exchange(Service.chat) align(@alignOf(adapter.Exchange(Service.chat))) = undefined;
+var chat_cut: adapter.Exchange(Service.chat) align(@alignOf(adapter.Exchange(Service.chat))) = undefined;
 var chat_silent: adapter.Exchange(Service.chat) align(@alignOf(adapter.Exchange(Service.chat))) = undefined;
 var sum: adapter.Exchange(Service.sum) align(@alignOf(adapter.Exchange(Service.sum))) = undefined;
 var sum_web: adapter.Exchange(Service.sum) align(@alignOf(adapter.Exchange(Service.sum))) = undefined;
@@ -58,12 +59,17 @@ fn round(protocols: client.Protocols, expected: client.Protocol) !void {
     try harness.request(&chat.request, &chat.response);
     try harness.request(&chat_silent.request, &chat_silent.response);
     try harness.request(&chat_refused.request, &chat_refused.response);
+    // A body that stops inside an envelope fails the call, after the answers already sent.
+    try chat_cut.init(.{}, &lines, harness.buffers(&buffers[7]));
+    chat_cut.request.body = chat_cut.request.body[0 .. chat_cut.request.body.len - 1];
+    try harness.request(&chat_cut.request, &chat_cut.response);
     try harness.request(&sum.request, &sum.response);
     try harness.request(&sum_web.request, &sum_web.response);
     try harness.request(&countdown.request, &countdown.response);
     try harness.request(&countdown_far.request, &countdown_far.response);
     try harness.finish(expected);
     try check_chat();
+    try check_cut();
     try check_sum(&sum);
     try check_sum(&sum_web);
     try check_countdown();
@@ -100,6 +106,19 @@ fn check_chat() !void {
     if (failure.code != .invalid_argument) return error.ExchangeWrong;
     try harness.expect_trailer(refused.metadata, service.received_trailer, "2");
     try harness.expect_trailer(refused.metadata, service.sent_trailer, "1");
+}
+
+fn check_cut() !void {
+    var cut = chat_cut.read(harness.storage());
+    for (echoes[0 .. lines.len - 1]) |echo| {
+        const message = try cut.next(demo.ChatMessage) orelse return error.ExchangeWrong;
+        if (!std.mem.eql(u8, message.text, echo)) return error.ExchangeWrong;
+    }
+    if (try cut.next(demo.ChatMessage) != null) return error.ExchangeWrong;
+    const failure = cut.failure orelse return error.ExchangeWrong;
+    if (failure.code != .invalid_argument) return error.ExchangeWrong;
+    // The call ended through the interceptors, so `Counting` still reports it.
+    try harness.expect_trailer(cut.metadata, service.received_trailer, "2");
 }
 
 fn check_sum(exchange: *const adapter.Exchange(Service.sum)) !void {

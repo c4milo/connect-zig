@@ -143,9 +143,12 @@ fn serve_streaming(comptime spec: RouteSpec, comptime handler: anytype, app: any
     var messages = connect.server.Messages.init(state.call.reply.accepted, buffered[0..whole_len], scratch_of(spec.options, handler, state, .request), codings_of(app).decoders);
     if (dispatch.each_message(spec.method, handler, app, call, &state.handler_state, &messages)) |failure| return stop(I, app, state, failure);
     body.toss(whole_len);
-    // A read past the bytes that arrived says whether the body ended or more will come.
-    _ = body.peekByte() catch |failure| switch (failure) {
+    // A read past the octets that arrived says whether the body ended or more will come.
+    _ = body.peek(body.bufferedLen() + 1) catch |failure| switch (failure) {
         error.EndOfStream => {
+            // Connect protocol, "Streaming-Request", and gRPC's "Length-Prefixed-Message": a body
+            // ends between envelopes. One that stops inside an envelope fails the call.
+            if (body.bufferedLen() != 0) return stop(I, app, state, .{ .code = .invalid_argument, .message = "truncated message" });
             state.done = true;
             return dispatch.end_stream(spec.method, handler, I, app, call, &state.handler_state);
         },
