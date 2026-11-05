@@ -61,10 +61,12 @@ message Record {
   Status status = 6;
 }
 
-// A batch of records, a few hundred kilobytes in all.
+// A batch of records, a few hundred kilobytes in all, and a description of about 6 KB of text
+// in several scripts, which a parser checks as UTF-8 at its vector path.
 message Large {
   string name = 1;
   repeated Record records = 2;
+  string description = 3;
 }
 
 // A message that holds its own type, nested as deep as the benchmark builds it.

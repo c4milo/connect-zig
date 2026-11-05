@@ -79,7 +79,7 @@ func walkRecord(m *benchv1.Record) uint64 {
 }
 
 func walkLarge(m *benchv1.Large) uint64 {
-	sum := uint64(len(m.Name))
+	sum := uint64(len(m.Name)) + uint64(len(m.Description))
 	for _, record := range m.Records {
 		sum += walkRecord(record)
 	}

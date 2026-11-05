@@ -166,11 +166,13 @@ pub const Record = struct {
 pub const Large = struct {
     name: []const u8 = "",
     records: proto.Repeated(Record, .message) = .{},
+    description: []const u8 = "",
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
         name = 1,
         records = 2,
+        description = 3,
     };
 
     pub const protobuf: proto.Descriptor = .{
@@ -178,6 +180,7 @@ pub const Large = struct {
         .fields = &.{
             .{ .name = "name", .number = @intFromEnum(@This().FieldNumber.name), .kind = .string, .json_name = "name", .proto_name = "name" },
             .{ .name = "records", .number = @intFromEnum(@This().FieldNumber.records), .kind = .message, .json_name = "records", .proto_name = "records" },
+            .{ .name = "description", .number = @intFromEnum(@This().FieldNumber.description), .kind = .string, .json_name = "description", .proto_name = "description" },
         },
     };
 };

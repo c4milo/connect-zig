@@ -498,11 +498,13 @@ func (x *Record) GetStatus() Status {
 	return Status_STATUS_UNSPECIFIED
 }
 
-// A batch of records, a few hundred kilobytes in all.
+// A batch of records, a few hundred kilobytes in all, and a description of about 6 KB of text
+// in several scripts, which a parser checks as UTF-8 at its vector path.
 type Large struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
 	Records       []*Record              `protobuf:"bytes,2,rep,name=records,proto3" json:"records,omitempty"`
+	Description   string                 `protobuf:"bytes,3,opt,name=description,proto3" json:"description,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -549,6 +551,13 @@ func (x *Large) GetRecords() []*Record {
 		return x.Records
 	}
 	return nil
+}
+
+func (x *Large) GetDescription() string {
+	if x != nil {
+		return x.Description
+	}
+	return ""
 }
 
 // A message that holds its own type, nested as deep as the benchmark builds it.
@@ -655,10 +664,11 @@ const file_bench_v1_bench_proto_rawDesc = "" +
 	"\apayload\x18\x03 \x01(\fR\apayload\x12\x16\n" +
 	"\x06values\x18\x04 \x03(\x11R\x06values\x12\x16\n" +
 	"\x06weight\x18\x05 \x01(\x01R\x06weight\x12(\n" +
-	"\x06status\x18\x06 \x01(\x0e2\x10.bench.v1.StatusR\x06status\"G\n" +
+	"\x06status\x18\x06 \x01(\x0e2\x10.bench.v1.StatusR\x06status\"i\n" +
 	"\x05Large\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12*\n" +
-	"\arecords\x18\x02 \x03(\v2\x10.bench.v1.RecordR\arecords\"X\n" +
+	"\arecords\x18\x02 \x03(\v2\x10.bench.v1.RecordR\arecords\x12 \n" +
+	"\vdescription\x18\x03 \x01(\tR\vdescription\"X\n" +
 	"\x04Deep\x12\x14\n" +
 	"\x05level\x18\x01 \x01(\x05R\x05level\x12\x14\n" +
 	"\x05label\x18\x02 \x01(\tR\x05label\x12$\n" +

@@ -76,7 +76,7 @@ fn record(message: bench.Record) Error!u64 {
 }
 
 pub fn large(message: *const bench.Large) Error!u64 {
-    return message.name.len +% try each(@TypeOf(message.records), &message.records, record);
+    return message.name.len +% message.description.len +% try each(@TypeOf(message.records), &message.records, record);
 }
 
 /// Follows the chain of children one level at a time, as deep as the benchmark builds it.

@@ -7,8 +7,8 @@ const proto = @import("protobuf");
 /// Room for the largest message in each form: the large message takes about 180 KB in binary
 /// and about 300 KB in JSON.
 const buffer_len = 1 << 20;
-/// Room for the longest JSON token: a record's payload in base64.
-const token_len = 4096;
+/// Room for the longest JSON token: the large message's description, about 6 KB.
+const token_len = 16 * 1024;
 
 pub const Operation = enum {
     binary_encode,

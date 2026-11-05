@@ -131,6 +131,12 @@ fn build_medium() void {
     };
 }
 
+/// The phrase the large message's description repeats: ASCII, Latin, CJK and a dash, so a
+/// parser's UTF-8 check takes every length of character. bench/go/inputs.go repeats the same.
+const description_phrase = "A batch of records: données, 日本語のテキスト, ünïcode — end. ";
+const description_repeats = 100;
+const description = description_phrase ** description_repeats;
+
 fn build_large() void {
     for (&records, 0..) |*record, i| {
         for (&record_payloads[i], 0..) |*octet, j| octet.* = @truncate(i * payload_record_step + j * payload_byte_step);
@@ -148,7 +154,7 @@ fn build_large() void {
             .status = @enumFromInt(i % status_count),
         };
     }
-    large = .{ .name = "Large benchmark batch", .records = .of(&records) };
+    large = .{ .name = "Large benchmark batch", .records = .of(&records), .description = description };
 }
 
 fn build_deep() void {

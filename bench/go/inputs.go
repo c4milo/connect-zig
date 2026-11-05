@@ -5,6 +5,7 @@ package main
 
 import (
 	"fmt"
+	"strings"
 
 	benchv1 "github.com/c4milo/connect-zig/bench/go/gen/bench/v1"
 )
@@ -31,6 +32,9 @@ const (
 	weightStep              = 0.5
 	statusCount             = 4
 	deepLevelsCount         = 50
+	// The phrase the large message's description repeats, as bench/inputs.zig repeats it.
+	descriptionPhrase  = "A batch of records: données, 日本語のテキスト, ünïcode — end. "
+	descriptionRepeats = 100
 )
 
 func newSmall() *benchv1.Small {
@@ -104,7 +108,7 @@ func newLarge() *benchv1.Large {
 			Status:  benchv1.Status(i % statusCount),
 		}
 	}
-	return &benchv1.Large{Name: "Large benchmark batch", Records: records}
+	return &benchv1.Large{Name: "Large benchmark batch", Records: records, Description: strings.Repeat(descriptionPhrase, descriptionRepeats)}
 }
 
 func newDeep() *benchv1.Deep {
