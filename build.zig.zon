@@ -1,0 +1,22 @@
+.{
+    .name = .connect_zig,
+    .version = "0.0.0",
+    .fingerprint = 0x25c0784958afdaae,
+    .minimum_zig_version = "0.16.0",
+    .dependencies = .{
+        .colibri = .{
+            .url = "git+https://github.com/c4milo/colibri?ref=v0.11.0#83c922b13f6f49623d085c36cf4e6a244de166db",
+            .hash = "colibri-0.10.0-Wo-AvtswnASeMGAf75MDVdGAz7oGtHKg1iK_uV2rioDy",
+        },
+        .stdx = .{
+            .url = "git+https://github.com/c4milo/stdx#5fd03aa712b86d371927f65149a42756a9091ac6",
+            .hash = "stdx-0.0.0-BD60tmIaMADl0M2qj5DcS0aUq1aOuZkMwnVViPPHVKhZ",
+        },
+        .pepegrillo = .{
+            .url = "git+https://github.com/c4milo/pepegrillo#151eedd90b46fe57726a242c3ff904d5033584a5",
+            .hash = "pepegrillo-0.0.0-axiFUPL3CgAtzvvowVH_JkuQqmQ8Lx8ZYsih1AE4hRI2",
+            .lazy = true,
+        },
+    },
+    .paths = .{ "build.zig", "build.zig.zon", "src", "LICENSE", "README.md" },
+}
