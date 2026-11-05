@@ -1,0 +1,80 @@
+{
+ "record": {
+  "count": 7,
+  "label": "seven",
+  "shade": "SHADE_DARK",
+  "total": "-9000000000",
+  "title": "t",
+  "expanded": [
+   1,
+   -2,
+   300
+  ],
+  "packed": [
+   "-1",
+   "2",
+   "-300"
+  ],
+  "note": {
+   "a": 1,
+   "b": "n"
+  },
+  "delimitedNote": {
+   "a": 2,
+   "b": "d"
+  },
+  "delimitedNotes": [
+   {
+    "a": 3
+   },
+   {},
+   {
+    "b": "x"
+   }
+  ],
+  "notes": {
+   "k": {
+    "a": 4
+   },
+   "": {}
+  },
+  "pickNote": {
+   "a": 5
+  },
+  "child": {
+   "count": 0,
+   "child": {
+    "label": "deep",
+    "delimitedNote": {}
+   }
+  }
+ },
+ "delimited": {
+  "first": {
+   "a": 6
+  },
+  "rest": [
+   {
+    "a": 7
+   },
+   {
+    "b": "r"
+   }
+  ],
+  "byNumber": {
+   "-1": {
+    "a": 8
+   },
+   "2": {}
+  }
+ },
+ "records": [
+  {
+   "pickNumber": 0
+  },
+  {
+   "pickNumber": -3
+  },
+  {}
+ ]
+}

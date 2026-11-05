@@ -192,6 +192,7 @@ Still to come:
 - [ ] Long server streams, and full-duplex on the client side
 - [x] Full-duplex streams on the server, interceptors and error details
 - [x] `Any`, `Struct`, `Value` and `ListValue` in JSON
+- [x] Editions 2023 and 2024, and proto2 groups
 - [ ] Unknown fields kept
 
 ## Contributing

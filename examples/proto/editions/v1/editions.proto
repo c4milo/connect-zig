@@ -1,0 +1,52 @@
+// Edition 2023, which tools/coverage_check.sh compares with Go: each feature the generator reads,
+// at file, message and field level.
+edition = "2023";
+
+package editions.v1;
+
+option features.repeated_field_encoding = EXPANDED;
+
+enum Shade {
+  SHADE_UNSPECIFIED = 0;
+  SHADE_LIGHT = 1;
+  SHADE_DARK = 2;
+}
+
+message Note {
+  int32 a = 1;
+  string b = 2;
+}
+
+message Record {
+  // Explicit presence is the default: a zero that is set is written.
+  int32 count = 1;
+  string label = 2;
+  Shade shade = 3;
+  int64 total = 4 [features.field_presence = IMPLICIT];
+  string title = 5 [features.field_presence = IMPLICIT];
+  // The file makes repeated scalars expanded; this one packs again.
+  repeated int32 expanded = 6;
+  repeated sint64 packed = 7 [features.repeated_field_encoding = PACKED];
+  Note note = 8;
+  Note delimited_note = 9 [features.message_encoding = DELIMITED];
+  repeated Note delimited_notes = 10 [features.message_encoding = DELIMITED];
+  map<string, Note> notes = 11;
+  oneof choice {
+    int32 pick_number = 12;
+    Note pick_note = 13 [features.message_encoding = DELIMITED];
+  }
+  Record child = 14 [features.message_encoding = DELIMITED];
+}
+
+// A message's fields delimited one by one, beside a map, whose entries keep their lengths.
+message Delimited {
+  Note first = 1 [features.message_encoding = DELIMITED];
+  repeated Note rest = 2 [features.message_encoding = DELIMITED];
+  map<int32, Note> by_number = 3;
+}
+
+message Everything {
+  Record record = 1;
+  Delimited delimited = 2;
+  repeated Record records = 3;
+}

@@ -117,8 +117,10 @@ Each step names the check that proves it. A step is done when its check passes i
    each protocol, and requires Chat's first answer before the client's second message.
 9. **Every protobuf type against a reference.** `examples/proto/coverage` holds each scalar in
    each cardinality, every map key type, oneofs, enums, recursion and each well-known type.
-   Check: `tools/coverage_check.sh` converts each case in `examples/testdata/coverage` with Zig
-   and with Go, through buf convert, and requires the same message both ways.
+   Check: `tools/coverage_check.sh` converts each case in `examples/testdata/coverage`,
+   `editions` and `legacy` with Zig and with Go, through buf convert, and requires the same
+   message both ways. `editions` and `legacy` hold edition 2023's features and proto2's groups
+   (decision 23).
 
 ### Step records
 
@@ -154,4 +156,4 @@ ran on Linux x86-64 with Zig 0.16.0.
 - A gRPC client over colibri, once colibri's client exposes response trailers (decision 11).
 - Long server streams written at `on_writable` (decision 12).
 - Client-side full-duplex, once colibri's client streams a request body.
-- Unknown fields kept, and editions in the plugin.
+- Unknown fields kept.

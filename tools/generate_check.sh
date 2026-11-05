@@ -8,18 +8,17 @@ buf="${BUF:-buf}"
 zig build
 # Each output directory, and the template that writes it.
 targets="examples/gen:buf.gen.yaml bench/gen:bench/buf.gen.yaml"
-if [ "${1:-}" = "--write" ]; then
-    for target in ${targets}; do
-        rm -rf "${target%%:*}"
-        "${buf}" generate --template "${target#*:}"
-    done
-    exit 0
-fi
 scratch="$(mktemp -d)"
 trap 'rm -rf "${scratch}"' EXIT
 for target in ${targets}; do
     directory="${target%%:*}"
     "${buf}" generate --template "${target#*:}" --output "${scratch}"
+    # --write replaces a directory only once buf wrote its new one, so a failure keeps the old.
+    if [ "${1:-}" = "--write" ]; then
+        rm -rf "${directory}"
+        cp -R "${scratch}/${directory}" "${directory}"
+        continue
+    fi
     if ! diff -r "${directory}" "${scratch}/${directory}"; then
         echo "${directory} differs from what buf generate writes; run tools/generate_check.sh --write" >&2
         exit 1

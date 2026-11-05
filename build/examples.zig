@@ -16,6 +16,8 @@ pub fn add(b: *std.Build, graph: Graph) *std.Build.Step {
         .imports = &.{
             .{ .name = "protobuf", .module = graph.protobuf },
             .{ .name = "coverage", .module = coverage_module },
+            .{ .name = "editions", .module = generated(b, graph, "examples/gen/editions/v1/editions.pb.zig", &.{}) },
+            .{ .name = "legacy", .module = generated(b, graph, "examples/gen/legacy/v1/legacy.pb.zig", &.{}) },
         },
     }) });
     b.installArtifact(coverage);

@@ -1,0 +1,22 @@
+// proto2, which tools/coverage_check.sh compares with Go: groups, presence on every singular
+// field, unpacked repeated scalars, and the packed option.
+syntax = "proto2";
+
+package legacy.v1;
+
+message Everything {
+  optional int32 count = 1;
+  optional string label = 2;
+  required int64 id = 3;
+  repeated int32 unpacked = 4;
+  repeated int32 packed = 5 [packed = true];
+  optional group Inner = 6 {
+    optional int32 a = 7;
+    optional string b = 8;
+  }
+  repeated group Item = 9 {
+    optional int32 x = 10;
+  }
+  optional Everything child = 11;
+  map<string, int32> counts = 12;
+}
