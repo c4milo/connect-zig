@@ -1,7 +1,8 @@
-# Every check of this repository, on each push to main and each pull request: tools/ci.sh on
-# Linux x86-64 (docs/decisions.md entry 16). Each job's work
-# is one script or one zig build step, which a person runs by hand for the same answer. Each
-# download is pinned by checksum.
+# Every check of this repository, on each push to main and each pull request (docs/decisions.md
+# entry 16). `plan` asks tools/ci.sh for its checks, and `check` runs each in a job of its own, so
+# each shows apart in GitHub's checks with its own summary: a new check joins tools/ci.sh alone.
+# Each job's work is `tools/ci.sh --only <check>`, which a person runs by hand for the same
+# answer. Each download is pinned by checksum.
 name: main
 on:
   push:
@@ -17,12 +18,31 @@ env:
   # examples/gen (design §8 step 6).
   BUF_VERSION: 1.74.0
   BUF_SHA256: 92326d957d613712669fb55f9e4340946a8142a92120e09008459118778273d2
+  # go.mod files name their Go; the runner's Go fetches it.
+  GOTOOLCHAIN: auto
 jobs:
-  checks:
+  plan:
     runs-on: ubuntu-24.04
-    timeout-minutes: 45
+    outputs:
+      checks: ${{ steps.list.outputs.checks }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - id: list
+        run: echo "checks=$(tools/ci.sh --list)" >>"${GITHUB_OUTPUT}"
+  check:
+    needs: plan
+    name: ${{ matrix.check }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        check: ${{ fromJSON(needs.plan.outputs.checks) }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          # The commit linter reads the pushed range, which needs the history.
+          fetch-depth: 0
       - name: Restore Zig and buf
         id: zig
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
@@ -45,6 +65,9 @@ jobs:
           echo "${BUF_SHA256}  buf" | sha256sum -c -
           mkdir -p "${HOME}/bin" && install -m 0755 buf "${HOME}/bin/buf"
           rm buf
+      - name: Install valgrind
+        if: matrix.check == 'perf'
+        run: sudo apt-get update -q && sudo apt-get install -y -q valgrind
       - name: Put the tools on the path
         run: |
           echo "${HOME}/zig" >>"${GITHUB_PATH}"
@@ -57,11 +80,26 @@ jobs:
           path: |
             ~/.cache/zig
             .zig-cache
-          key: zig-cache-${{ runner.os }}-${{ hashFiles('build.zig.zon') }}-${{ github.sha }}
+          key: zig-cache-${{ matrix.check }}-${{ runner.os }}-${{ hashFiles('build.zig.zon') }}-${{ github.sha }}
           restore-keys: |
-            zig-cache-${{ runner.os }}-${{ hashFiles('build.zig.zon') }}-
-      - name: Run every check
-        run: tools/ci.sh ci-report.md
+            zig-cache-${{ matrix.check }}-${{ runner.os }}-${{ hashFiles('build.zig.zon') }}-
+      # What each check installs for itself, pinned by its lock files: Go modules, npm packages,
+      # the Python virtual environments, Cargo's builds and the conformance runner.
+      - name: Restore the checks' caches
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: |
+            ~/.cache/connect-zig
+            ~/go/pkg/mod
+            ~/.cargo/registry
+            interop/typescript/node_modules
+          key: deps-${{ matrix.check }}-${{ hashFiles('interop/*/go.sum', 'interop/*/package-lock.json', 'interop/*/Cargo.lock', 'interop/*/requirements.txt', 'tools/*.txt', 'bench/go/go.sum') }}
+          restore-keys: |
+            deps-${{ matrix.check }}-
+      - name: Run the check
+        env:
+          COMMIT_RANGE: ${{ github.event_name == 'pull_request' && format('{0}..{1}', github.event.pull_request.base.sha, github.event.pull_request.head.sha) || (github.event.before && github.event.before != '0000000000000000000000000000000000000000' && format('{0}..{1}', github.event.before, github.sha)) || format('{0}~1..{0}', github.sha) }}
+        run: tools/ci.sh --only "${{ matrix.check }}" ci-report.md
       - name: Publish the report
         if: always()
-        run: cat ci-report.md >>"${GITHUB_STEP_SUMMARY}"
+        run: '[ -f ci-report.md ] && cat ci-report.md >>"${GITHUB_STEP_SUMMARY}" || true'

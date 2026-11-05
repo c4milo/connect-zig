@@ -108,5 +108,12 @@ confirm a test fails. Report `CAUGHT` or `NOT CAUGHT` per mutation in the commit
   `zig build conformance-server`, with the features of `conformance/config.yaml`. It downloads
   the runner pinned by SHA-256, unless `CONNECTCONFORMANCE` names one. A case that fails on
   purpose goes in `conformance/known_failing.txt`, with its reason.
-- CI: `tools/ci.sh` runs every check, and `.github/workflows/main.yml` runs it on each push. A new
-  check joins `tools/ci.sh`, never the workflow file.
+- Interop across languages: `tools/interop_languages_check.sh [client...]` runs the clients of
+  `interop/` (Go, TypeScript, Python, Rust) against the socket server; `interop/README.md` holds
+  their contract. It needs buf, go, node with npm, python3 with venv, and cargo.
+- Performance: `tools/perf_check.sh` counts each benchmark operation's instructions under
+  callgrind against `bench/instructions.txt` and fails past 2%; `--write` records a new baseline,
+  which the commit that pays for it explains. It needs valgrind.
+- CI: `tools/ci.sh` runs every check and writes a report; `--only <check>` runs one and `--list`
+  names them. `.github/workflows/main.yml` runs each check of `--list` as a job of its own on each
+  push and pull request. A new check joins `tools/ci.sh`, never the workflow file.

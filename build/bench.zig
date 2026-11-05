@@ -27,17 +27,25 @@ pub fn add(b: *std.Build, public_names: *std.Build.Module, target: std.Build.Res
         .optimize = optimize,
         .imports = &.{.{ .name = "protobuf", .module = protobuf }},
     });
-    const exe = b.addExecutable(.{ .name = "bench", .root_module = b.createModule(.{
-        .root_source_file = b.path("bench/main.zig"),
-        .target = target,
-        .optimize = optimize,
-        .imports = &.{
-            .{ .name = "protobuf", .module = protobuf },
-            .{ .name = "bench_v1", .module = messages },
-        },
-    }) });
+    const exe = b.addExecutable(.{
+        .name = "bench",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("bench/main.zig"),
+            .target = target,
+            .optimize = optimize,
+            // `--instructions` talks to callgrind through client requests, which ReleaseFast drops
+            // unless the module asks for them. Natively each is a few instructions outside the loops.
+            .valgrind = true,
+            .imports = &.{
+                .{ .name = "protobuf", .module = protobuf },
+                .{ .name = "bench_v1", .module = messages },
+            },
+        }),
+    });
     const run = b.addRunArtifact(exe);
     if (b.args) |args| run.addArgs(args);
     run.has_side_effects = true;
+    // tools/perf_check.sh runs the program under valgrind, so it needs the binary itself.
+    b.step("install-bench", "Install the benchmark program into zig-out/bin").dependOn(&b.addInstallArtifact(exe, .{}).step);
     b.step("bench", "Benchmark the protobuf runtime, ReleaseFast: zig build bench -- [--quick] [--write <dir>]").dependOn(&run.step);
 }

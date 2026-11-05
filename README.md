@@ -229,6 +229,17 @@ Each cell is Go's time over connect-zig's: above 1 means connect-zig is faster.
   suite](https://github.com/connectrpc/conformance) v1.0.4 against a conformance server: 2714
   cases in Connect, gRPC and gRPC-Web, over h11 and h2, in proto and JSON, with gzip and zstd.
   All 2714 pass.
+- `tools/interop_languages_check.sh` calls the server from [clients in other
+  languages](interop): connect-go and grpc-go, connect-es on Node, Python's grpcio and Rust's
+  tonic. Each echoes every coverage case, in every protocol, codec and compression its library
+  speaks, and runs every stream shape, a typed error, a timeout, headers and trailers: 507 calls.
+- `tools/perf_check.sh` counts the instructions of each benchmark operation under callgrind and
+  fails when one takes more than 2% above `bench/instructions.txt`. Counts do not move with a
+  shared runner's load, so CI catches a regression that wall time would hide.
+
+CI runs each check as a job of its own, so each shows apart among a change's checks, and writes
+its results to the job's summary: the interop matrix, the instruction table, the conformance
+totals. A failure also shows as an annotation on the change.
 
 ## Good to know
 
@@ -274,6 +285,8 @@ tools/generate_check.sh   # buf generate still writes examples/gen and bench/gen
 tools/interop_check.sh    # buf curl and curl against the example server
 tools/coverage_check.sh   # every protobuf type against Go's runtime
 tools/conformance_check.sh  # the connectrpc conformance suite against the server
+tools/interop_languages_check.sh  # Go, TypeScript, Python and Rust clients against the server
+tools/perf_check.sh       # instructions of each benchmark operation against the baseline
 tools/bench_check.sh      # the benchmark beside Go's
 ```
 

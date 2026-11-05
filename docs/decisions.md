@@ -211,6 +211,22 @@ first. Cite an entry by number in code and commits ("decision 6").
     server stays in cleartext. Beaten: a second loop for UDP, which splits one clock in two; and
     waiting for colibri's `colibri.Server` (colibri decision 150), which colibri had not built.
 
+29. **Clients in other languages call the server, across the protocol and every type.**
+    `interop.v1.InteropService` has each RPC shape once, and each message is a
+    `coverage.v1.Everything`. `interop/` holds clients on connect-go and grpc-go, connect-es,
+    grpcio and tonic, each pinned by its lock file, which echo every coverage case in each
+    protocol, codec and compression their library speaks, and run every stream shape, a typed
+    error, a timeout, headers and trailers. Two messages are the same when a runtime writes the
+    same octets for both. The client side waits for `colibri.Client` (colibri decision 153).
+    Beaten: buf curl alone, which is one client; and the conformance runner alone, whose
+    reference client is connect-go.
+
+30. **CI gates performance on instruction counts.** `tools/perf_check.sh` counts each benchmark
+    operation under callgrind, on an x86-64-v3 build, and fails past 2% above
+    `bench/instructions.txt`. Counts repeat exactly on one build, so a shared runner judges them as
+    a quiet machine would. Beaten: wall time on shared runners, which moved 2x between runs here;
+    and a dedicated machine, which this project does not have.
+
 ## Tooling
 
 15. **pepegrillo is lazy.** `build.zig` requests it only when `b.pkg_hash.len == 0`, so a project

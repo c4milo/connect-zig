@@ -175,6 +175,12 @@ ran on Linux x86-64 with Zig 0.16.0.
   `connect_colibri` gains `Call.request_headers`, `Call.request_query` and a context's
   `message_receive_limit`. It also gains 16 KiB of trailer room, for details that echo headers.
 
+- **CI across languages and against a baseline.** `tools/interop_languages_check.sh` printed 507
+  calls passed: Go's connect-go in five modes and grpc-go, connect-es in five, grpcio and tonic
+  (decision 29). It found the example server hanging a connection past its eight sockets, which
+  it now accepts and closes, and which `tools/interop_check.sh` checks. `tools/perf_check.sh`
+  counts 24 operations (decision 30). CI runs each check of `tools/ci.sh --list` as its own job.
+
 - **Closed enums and unchecked strings.** The plugin resolves `enum_type` and
   `utf8_validation` (decision 23). `proto.EnumDescriptor` gains `closed` and `names`, and
   `proto.Kind` gains `unvalidated_string`. `tools/coverage_check.sh` printed 117 checks passed,

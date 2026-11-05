@@ -1,0 +1,25 @@
+# Instructions of one run of each benchmark operation, x86-64-v3, from tools/perf_check.sh.
+deep JSON decode+walk|155455
+deep JSON decode|132585
+deep JSON encode|120360
+deep binary decode+walk|44530
+deep binary decode|21663
+deep binary encode|21511
+large JSON decode+walk|15609350
+large JSON decode|12780632
+large JSON encode|11378806
+large binary decode+walk|3087350
+large binary decode|1128632
+large binary encode|2160689
+medium JSON decode+walk|129367
+medium JSON decode|105843
+medium JSON encode|90375
+medium binary decode+walk|40502
+medium binary decode|20334
+medium binary encode|24959
+small JSON decode+walk|5147
+small JSON decode|5142
+small JSON encode|5457
+small binary decode+walk|743
+small binary decode|738
+small binary encode|423

@@ -23,5 +23,19 @@ if [ -z "${runner}" ]; then
     fi
 fi
 zig build conformance-server
+log="$(mktemp)"
+trap 'rm -f "${log}"' EXIT
+status=0
 "${runner}" --mode server --conf conformance/config.yaml \
-    --known-failing @conformance/known_failing.txt -- zig-out/bin/conformance-server
+    --known-failing @conformance/known_failing.txt -- zig-out/bin/conformance-server >"${log}" 2>&1 || status=$?
+cat "${log}"
+# With CONFORMANCE_REPORT naming a file, the runner's totals and each failure go there too.
+if [ -n "${CONFORMANCE_REPORT:-}" ]; then
+    {
+        echo "## Conformance: connectrpc's runner v${version} against the server"
+        echo
+        grep -e '^Total cases' -e 'passed,' -e '^(Another' "${log}" | sed 's/^/- /'
+        grep '^FAILED: ' "${log}" | sed 's/^/- /' || true
+    } >>"${CONFORMANCE_REPORT}"
+fi
+exit "${status}"
