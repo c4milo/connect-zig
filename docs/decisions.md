@@ -204,7 +204,7 @@ first. Cite an entry by number in code and commits ("decision 6").
     `src/testing/udp.zig` does. The example server presents the test identity of decision 25,
     and draws its keys and each TLS session's secrets from `std.Io`'s entropy. The conformance
     server stays in cleartext. Beaten: a second loop for UDP, which splits one clock in two; and
-    waiting for colibri's `serve` (colibri decision 150), which waits on Rotor's `std.Io`.
+    waiting for colibri's `colibri.Server` (colibri decision 150), which colibri had not built.
 
 ## Tooling
 
