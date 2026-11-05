@@ -258,4 +258,24 @@ pub const KitchenService = struct {
         .stream_type = .bidi_stream,
         .idempotency = .unknown,
     };
+
+    /// Every method as a route of `transport`, such as `connect_colibri`. Each handler is the
+    /// declaration of `Handlers` the method names, so one a service lacks fails to compile.
+    pub fn routes(comptime transport: type, comptime App: type, comptime Handlers: type, comptime options: transport.RouteOptions) @TypeOf(.{
+        transport.post(App, get, Handlers.get, options),
+        transport.get(App, get, Handlers.get, options),
+        transport.post(App, put, Handlers.put, options),
+        transport.post(App, upload, Handlers.upload, options),
+        transport.post(App, watch, Handlers.watch, options),
+        transport.post(App, chat, Handlers.chat, options),
+    }) {
+        return .{
+            transport.post(App, get, Handlers.get, options),
+            transport.get(App, get, Handlers.get, options),
+            transport.post(App, put, Handlers.put, options),
+            transport.post(App, upload, Handlers.upload, options),
+            transport.post(App, watch, Handlers.watch, options),
+            transport.post(App, chat, Handlers.chat, options),
+        };
+    }
 };
