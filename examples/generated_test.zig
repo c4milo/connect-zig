@@ -5,10 +5,12 @@ const testing = std.testing;
 const proto = @import("protobuf");
 const kitchen = @import("gen/kitchen/v1/kitchen.pb.zig");
 const eliza = @import("gen/connectrpc/eliza/v1/eliza.pb.zig");
+const large = @import("gen/large/v1/large.pb.zig");
 
 test "every generated declaration compiles" {
     testing.refAllDecls(kitchen);
     testing.refAllDecls(eliza);
+    testing.refAllDecls(large);
     try testing.expectEqualStrings("/connectrpc.eliza.v1.ElizaService/Say", comptime eliza.ElizaService.say.path());
     try testing.expectEqual(.bidi_stream, eliza.ElizaService.converse.stream_type);
 }
@@ -41,4 +43,17 @@ test "a generated message with every shape round-trips through binary and JSON" 
     var leaves = from_json.leaves.iterator();
     try testing.expectEqualStrings("t", (try leaves.next()).?.tag.?.value);
     try testing.expectEqualStrings("kind", from_json.type);
+}
+
+test "a split file's pieces name each other, and round-trip as one file would" {
+    const owner: large.Account = .{ .field_80 = 80, .profile = .{ .display_name = "Ada", .visibility = .visibility_public }, .tag = .{ .value = "t" } };
+    const ledger: large.Ledger = .{ .field_1 = -1, .owner = owner, .visibility = .visibility_public, .children = .of(&.{.{ .field_2 = 2 }}) };
+    var binary: [1024]u8 = undefined;
+    const back = try proto.decode(large.Ledger, try proto.encode(large.Ledger, &ledger, &binary));
+    try testing.expectEqualStrings("Ada", back.owner.?.profile.?.display_name);
+    try testing.expectEqual(large.Account.Profile.Visibility.visibility_public, back.visibility);
+    try testing.expectEqualStrings("t", back.owner.?.tag.?.value);
+    try testing.expectEqual(@as(i64, 80), back.owner.?.field_80);
+    try testing.expectEqual(.unary, large.LedgerService.get_ledger.stream_type);
+    try testing.expectEqual(@as(u32, 81), large.Ledger.protobuf.fields[80].number);
 }

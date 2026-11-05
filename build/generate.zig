@@ -4,6 +4,14 @@
 const std = @import("std");
 
 pub fn add(b: *std.Build, protobuf: *std.Build.Module, connect: *std.Build.Module, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode) *std.Build.Step {
+    // A generated file reaches another by the module name its header states (design §8 step 6):
+    // kitchen.proto and large.proto import shared.proto as `kitchen_v1_shared`.
+    const shared = b.createModule(.{
+        .root_source_file = b.path("examples/gen/kitchen/v1/shared.pb.zig"),
+        .target = target,
+        .optimize = optimize,
+        .imports = &.{.{ .name = "protobuf", .module = protobuf }},
+    });
     const module = b.createModule(.{
         .root_source_file = b.path("examples/generated_test.zig"),
         .target = target,
@@ -11,6 +19,7 @@ pub fn add(b: *std.Build, protobuf: *std.Build.Module, connect: *std.Build.Modul
         .imports = &.{
             .{ .name = "protobuf", .module = protobuf },
             .{ .name = "connect", .module = connect },
+            .{ .name = "kitchen_v1_shared", .module = shared },
         },
     });
     const run = b.addRunArtifact(b.addTest(.{ .name = "generated", .root_module = module }));

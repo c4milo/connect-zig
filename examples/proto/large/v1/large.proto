@@ -1,0 +1,197 @@
+// A file long enough that the plugin splits its output into a piece for each declaration, so
+// CI generates, compiles and lints split code. Each message holds many fields, as an API's
+// resource messages do.
+syntax = "proto3";
+
+package large.v1;
+
+import "kitchen/v1/shared.proto";
+
+message Account {
+  int64 field_1 = 1;
+  int64 field_2 = 2;
+  int64 field_3 = 3;
+  int64 field_4 = 4;
+  int64 field_5 = 5;
+  int64 field_6 = 6;
+  int64 field_7 = 7;
+  int64 field_8 = 8;
+  int64 field_9 = 9;
+  int64 field_10 = 10;
+  int64 field_11 = 11;
+  int64 field_12 = 12;
+  int64 field_13 = 13;
+  int64 field_14 = 14;
+  int64 field_15 = 15;
+  int64 field_16 = 16;
+  int64 field_17 = 17;
+  int64 field_18 = 18;
+  int64 field_19 = 19;
+  int64 field_20 = 20;
+  int64 field_21 = 21;
+  int64 field_22 = 22;
+  int64 field_23 = 23;
+  int64 field_24 = 24;
+  int64 field_25 = 25;
+  int64 field_26 = 26;
+  int64 field_27 = 27;
+  int64 field_28 = 28;
+  int64 field_29 = 29;
+  int64 field_30 = 30;
+  int64 field_31 = 31;
+  int64 field_32 = 32;
+  int64 field_33 = 33;
+  int64 field_34 = 34;
+  int64 field_35 = 35;
+  int64 field_36 = 36;
+  int64 field_37 = 37;
+  int64 field_38 = 38;
+  int64 field_39 = 39;
+  int64 field_40 = 40;
+  int64 field_41 = 41;
+  int64 field_42 = 42;
+  int64 field_43 = 43;
+  int64 field_44 = 44;
+  int64 field_45 = 45;
+  int64 field_46 = 46;
+  int64 field_47 = 47;
+  int64 field_48 = 48;
+  int64 field_49 = 49;
+  int64 field_50 = 50;
+  int64 field_51 = 51;
+  int64 field_52 = 52;
+  int64 field_53 = 53;
+  int64 field_54 = 54;
+  int64 field_55 = 55;
+  int64 field_56 = 56;
+  int64 field_57 = 57;
+  int64 field_58 = 58;
+  int64 field_59 = 59;
+  int64 field_60 = 60;
+  int64 field_61 = 61;
+  int64 field_62 = 62;
+  int64 field_63 = 63;
+  int64 field_64 = 64;
+  int64 field_65 = 65;
+  int64 field_66 = 66;
+  int64 field_67 = 67;
+  int64 field_68 = 68;
+  int64 field_69 = 69;
+  int64 field_70 = 70;
+  int64 field_71 = 71;
+  int64 field_72 = 72;
+  int64 field_73 = 73;
+  int64 field_74 = 74;
+  int64 field_75 = 75;
+  int64 field_76 = 76;
+  int64 field_77 = 77;
+  int64 field_78 = 78;
+  int64 field_79 = 79;
+  int64 field_80 = 80;
+  Profile profile = 81;
+  shared.v1.Tag tag = 82;
+  message Profile {
+    string display_name = 1;
+    Visibility visibility = 2;
+    enum Visibility {
+      VISIBILITY_UNSPECIFIED = 0;
+      VISIBILITY_PUBLIC = 1;
+    }
+  }
+}
+
+message Ledger {
+  int64 field_1 = 1;
+  int64 field_2 = 2;
+  int64 field_3 = 3;
+  int64 field_4 = 4;
+  int64 field_5 = 5;
+  int64 field_6 = 6;
+  int64 field_7 = 7;
+  int64 field_8 = 8;
+  int64 field_9 = 9;
+  int64 field_10 = 10;
+  int64 field_11 = 11;
+  int64 field_12 = 12;
+  int64 field_13 = 13;
+  int64 field_14 = 14;
+  int64 field_15 = 15;
+  int64 field_16 = 16;
+  int64 field_17 = 17;
+  int64 field_18 = 18;
+  int64 field_19 = 19;
+  int64 field_20 = 20;
+  int64 field_21 = 21;
+  int64 field_22 = 22;
+  int64 field_23 = 23;
+  int64 field_24 = 24;
+  int64 field_25 = 25;
+  int64 field_26 = 26;
+  int64 field_27 = 27;
+  int64 field_28 = 28;
+  int64 field_29 = 29;
+  int64 field_30 = 30;
+  int64 field_31 = 31;
+  int64 field_32 = 32;
+  int64 field_33 = 33;
+  int64 field_34 = 34;
+  int64 field_35 = 35;
+  int64 field_36 = 36;
+  int64 field_37 = 37;
+  int64 field_38 = 38;
+  int64 field_39 = 39;
+  int64 field_40 = 40;
+  int64 field_41 = 41;
+  int64 field_42 = 42;
+  int64 field_43 = 43;
+  int64 field_44 = 44;
+  int64 field_45 = 45;
+  int64 field_46 = 46;
+  int64 field_47 = 47;
+  int64 field_48 = 48;
+  int64 field_49 = 49;
+  int64 field_50 = 50;
+  int64 field_51 = 51;
+  int64 field_52 = 52;
+  int64 field_53 = 53;
+  int64 field_54 = 54;
+  int64 field_55 = 55;
+  int64 field_56 = 56;
+  int64 field_57 = 57;
+  int64 field_58 = 58;
+  int64 field_59 = 59;
+  int64 field_60 = 60;
+  int64 field_61 = 61;
+  int64 field_62 = 62;
+  int64 field_63 = 63;
+  int64 field_64 = 64;
+  int64 field_65 = 65;
+  int64 field_66 = 66;
+  int64 field_67 = 67;
+  int64 field_68 = 68;
+  int64 field_69 = 69;
+  int64 field_70 = 70;
+  int64 field_71 = 71;
+  int64 field_72 = 72;
+  int64 field_73 = 73;
+  int64 field_74 = 74;
+  int64 field_75 = 75;
+  int64 field_76 = 76;
+  int64 field_77 = 77;
+  int64 field_78 = 78;
+  int64 field_79 = 79;
+  int64 field_80 = 80;
+  Account owner = 81;
+  Account.Profile.Visibility visibility = 82;
+  repeated Ledger children = 83;
+}
+
+enum Region {
+  REGION_UNSPECIFIED = 0;
+  REGION_NORTH = 1;
+  REGION_SOUTH = 2;
+}
+
+service LedgerService {
+  rpc GetLedger(Account) returns (Ledger) {}
+}

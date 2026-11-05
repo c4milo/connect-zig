@@ -41,8 +41,8 @@ pub fn string_literal(arena: Allocator, text: []const u8) Allocator.Error![]cons
     return std.fmt.allocPrint(arena, "\"{f}\"", .{std.zig.fmtString(text)});
 }
 
-/// The name of an import of another generated file: "google/type/date.proto" becomes
-/// "google_type_date".
+/// The module name a generated file imports another generated file by: "google/type/date.proto"
+/// becomes "google_type_date". The build gives each generated file's module this name.
 pub fn import_name(arena: Allocator, proto_path: []const u8) Allocator.Error![]const u8 {
     const stem = if (std.mem.endsWith(u8, proto_path, ".proto")) proto_path[0 .. proto_path.len - ".proto".len] else proto_path;
     const out = try arena.dupe(u8, stem);
@@ -50,18 +50,6 @@ pub fn import_name(arena: Allocator, proto_path: []const u8) Allocator.Error![]c
         if (!std.ascii.isAlphanumeric(octet.*)) octet.* = '_';
     }
     return out;
-}
-
-/// The path from the directory of `from` to `to`, both relative to the output root, which a
-/// generated file's `@import` names.
-pub fn relative_import(arena: Allocator, from: []const u8, to: []const u8) Allocator.Error![]const u8 {
-    const from_dir = std.fs.path.dirnamePosix(from) orelse "";
-    var depth: usize = 0;
-    if (from_dir.len != 0) depth = std.mem.count(u8, from_dir, "/") + 1;
-    var out: std.ArrayList(u8) = .empty;
-    for (0..depth) |_| try out.appendSlice(arena, "../");
-    try out.appendSlice(arena, to);
-    return out.items;
 }
 
 const testing = std.testing;
@@ -79,5 +67,5 @@ test "names follow Zig's conventions" {
     try testing.expectEqualStrings("@\"error\"", try field_identifier(arena, "error"));
     try testing.expectEqualStrings("name", try identifier(arena, "name"));
     try testing.expectEqualStrings("a/b.pb.zig", try output_path(arena, "a/b.proto"));
-    try testing.expectEqualStrings("../../c/d.pb.zig", try relative_import(arena, "a/b/x.pb.zig", "c/d.pb.zig"));
+    try testing.expectEqualStrings("google_type_date", try import_name(arena, "google/type/date.proto"));
 }

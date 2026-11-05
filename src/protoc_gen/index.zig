@@ -68,15 +68,6 @@ pub const Index = struct {
         return index.entries.get(full_name) orelse error.UnknownType;
     }
 
-    /// The Zig expression `from_file` names the type `full_name` with: its path in the same file,
-    /// `proto.wkt.Name` for a well-known type, or the path behind the import of its file.
-    pub fn reference(index: *const Index, arena: Allocator, from_file: []const u8, full_name: []const u8) Error![]const u8 {
-        if (wkt_reference(full_name)) |short| return std.fmt.allocPrint(arena, "proto.wkt.{s}", .{short});
-        const entry = try index.get(full_name);
-        if (std.mem.eql(u8, entry.file, from_file)) return entry.zig_path;
-        return std.fmt.allocPrint(arena, "{s}.{s}", .{ try names.import_name(arena, entry.file), entry.zig_path });
-    }
-
     /// Whether a singular field of message type `field_type` inside `container` closes a cycle of
     /// singular message fields, so the field must be a `proto.Lazy` to keep the struct finite.
     pub fn is_recursive(index: *const Index, arena: Allocator, container: []const u8, field_type: []const u8) Error!bool {
@@ -111,7 +102,8 @@ fn package_prefix(arena: Allocator, package: ?[]const u8) Allocator.Error![]cons
     return std.fmt.allocPrint(arena, "{s}.", .{name});
 }
 
-fn wkt_reference(full_name: []const u8) ?[]const u8 {
+/// The short name of a well-known type `proto.wkt` holds, or null.
+pub fn wkt_reference(full_name: []const u8) ?[]const u8 {
     const prefix = "google.protobuf.";
     if (!std.mem.startsWith(u8, full_name, prefix)) return null;
     const short = full_name[prefix.len..];

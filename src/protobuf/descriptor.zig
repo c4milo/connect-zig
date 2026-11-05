@@ -60,6 +60,30 @@ pub const Field = struct {
     @"packed": bool = true,
 };
 
+/// What `field_of` takes beside a field's number and kind.
+pub const FieldOptions = struct {
+    /// The JSON name, when it is not the .proto name: "typeUrl" for "type_url".
+    json_name: ?[]const u8 = null,
+    oneof: ?[]const u8 = null,
+    @"packed": bool = true,
+};
+
+/// A field of a hand-written message, named and numbered by `tag`, a member of the message's
+/// `FieldNumber` enum, as generated messages number their fields: `field_of(FieldNumber.code,
+/// .int32, .{})`. The Zig name and the .proto name are the tag's name.
+pub fn field_of(comptime tag: anytype, comptime kind: Kind, comptime options: FieldOptions) Field {
+    const name = @tagName(tag);
+    return .{
+        .name = name,
+        .number = @intFromEnum(tag),
+        .kind = kind,
+        .json_name = options.json_name orelse name,
+        .proto_name = name,
+        .oneof = options.oneof,
+        .@"packed" = options.@"packed",
+    };
+}
+
 /// A message's table: its full name and its fields, ordered by number.
 pub const Descriptor = struct {
     full_name: []const u8,
@@ -130,6 +154,14 @@ pub fn check(comptime T: type) void {
             previous = field.number;
         }
     }
+}
+
+test "field_of names and numbers a field by its tag" {
+    const FieldNumber = enum(u29) { type_url = 1, value = 2 };
+    const entry = field_of(FieldNumber.type_url, .string, .{ .json_name = "typeUrl" });
+    try std.testing.expectEqualStrings("type_url", entry.name);
+    try std.testing.expectEqualStrings("typeUrl", entry.json_name);
+    try std.testing.expectEqual(@as(u32, 2), field_of(FieldNumber.value, .bytes, .{}).number);
 }
 
 test "wire types and packing follow the encoding's table" {

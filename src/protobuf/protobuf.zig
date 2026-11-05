@@ -28,6 +28,9 @@ const files = struct {
 /// A field's type in the .proto file.
 pub const Kind = files.descriptor.Kind;
 pub const Field = files.descriptor.Field;
+pub const FieldOptions = files.descriptor.FieldOptions;
+/// A hand-written message's field, numbered by a member of its `FieldNumber` enum.
+pub const field_of = files.descriptor.field_of;
 pub const Descriptor = files.descriptor.Descriptor;
 pub const EnumValue = files.descriptor.EnumValue;
 pub const EnumDescriptor = files.descriptor.EnumDescriptor;
@@ -109,10 +112,10 @@ pub const map_get = files.repeated.map_get;
 
 test "the root exports the names a program calls" {
     try @import("public_names").expect(@This(), &.{
-        "constants",   "Kind",        "Field",  "Descriptor", "EnumValue",       "EnumDescriptor",
-        "View",        "Repeated",    "Lazy",   "Error",      "EncodeError",     "decode",
-        "merge",       "encoded_len", "encode", "map_get",    "JsonEncodeError", "JsonDecodeError",
-        "encode_json", "decode_json", "wkt",
+        "constants",   "Kind",        "Field",  "Descriptor",   "EnumValue",       "EnumDescriptor",
+        "View",        "Repeated",    "Lazy",   "Error",        "EncodeError",     "decode",
+        "merge",       "encoded_len", "encode", "map_get",      "JsonEncodeError", "JsonDecodeError",
+        "encode_json", "decode_json", "wkt",    "FieldOptions", "field_of",
     });
 }
 

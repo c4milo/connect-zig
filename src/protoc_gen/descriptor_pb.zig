@@ -5,11 +5,7 @@
 const proto = @import("protobuf");
 const Repeated = proto.Repeated;
 const Descriptor = proto.Descriptor;
-const Field = proto.Field;
-
-fn field(comptime name: []const u8, comptime number: u32, comptime kind: proto.Kind) Field {
-    return .{ .name = name, .number = number, .kind = kind, .json_name = name, .proto_name = name };
-}
+const field_of = proto.field_of;
 
 /// FieldDescriptorProto.Label.
 pub const Label = enum(i32) {
@@ -18,7 +14,9 @@ pub const Label = enum(i32) {
     repeated = 3,
     _,
     pub const protobuf: proto.EnumDescriptor = .{ .full_name = "google.protobuf.FieldDescriptorProto.Label", .values = &.{
-        .{ .name = "LABEL_OPTIONAL", .number = 1 }, .{ .name = "LABEL_REQUIRED", .number = 2 }, .{ .name = "LABEL_REPEATED", .number = 3 },
+        .{ .name = "LABEL_OPTIONAL", .number = @intFromEnum(@This().optional) },
+        .{ .name = "LABEL_REQUIRED", .number = @intFromEnum(@This().required) },
+        .{ .name = "LABEL_REPEATED", .number = @intFromEnum(@This().repeated) },
     } };
 };
 
@@ -48,7 +46,8 @@ pub const Type = enum(i32) {
 
 pub const FieldOptions = struct {
     @"packed": ?bool = null,
-    pub const protobuf: Descriptor = .{ .full_name = "google.protobuf.FieldOptions", .fields = &.{field("packed", 2, .bool)} };
+    pub const FieldNumber = enum(u29) { @"packed" = 2 };
+    pub const protobuf: Descriptor = .{ .full_name = "google.protobuf.FieldOptions", .fields = &.{field_of(FieldNumber.@"packed", .bool, .{})} };
 };
 
 pub const FieldDescriptorProto = struct {
@@ -61,36 +60,41 @@ pub const FieldDescriptorProto = struct {
     oneof_index: ?i32 = null,
     json_name: ?[]const u8 = null,
     proto3_optional: ?bool = null,
+    pub const FieldNumber = enum(u29) { name = 1, number = 3, label = 4, type = 5, type_name = 6, options = 8, oneof_index = 9, json_name = 10, proto3_optional = 17 };
     pub const protobuf: Descriptor = .{ .full_name = "google.protobuf.FieldDescriptorProto", .fields = &.{
-        field("name", 1, .string),       field("number", 3, .int32),      field("label", 4, .@"enum"),
-        field("type", 5, .@"enum"),      field("type_name", 6, .string),  field("options", 8, .message),
-        field("oneof_index", 9, .int32), field("json_name", 10, .string), field("proto3_optional", 17, .bool),
+        field_of(FieldNumber.name, .string, .{}),       field_of(FieldNumber.number, .int32, .{}),     field_of(FieldNumber.label, .@"enum", .{}),
+        field_of(FieldNumber.type, .@"enum", .{}),      field_of(FieldNumber.type_name, .string, .{}), field_of(FieldNumber.options, .message, .{}),
+        field_of(FieldNumber.oneof_index, .int32, .{}), field_of(FieldNumber.json_name, .string, .{}), field_of(FieldNumber.proto3_optional, .bool, .{}),
     } };
 };
 
 pub const OneofDescriptorProto = struct {
     name: ?[]const u8 = null,
-    pub const protobuf: Descriptor = .{ .full_name = "google.protobuf.OneofDescriptorProto", .fields = &.{field("name", 1, .string)} };
+    pub const FieldNumber = enum(u29) { name = 1 };
+    pub const protobuf: Descriptor = .{ .full_name = "google.protobuf.OneofDescriptorProto", .fields = &.{field_of(FieldNumber.name, .string, .{})} };
 };
 
 pub const MessageOptions = struct {
     map_entry: ?bool = null,
-    pub const protobuf: Descriptor = .{ .full_name = "google.protobuf.MessageOptions", .fields = &.{field("map_entry", 7, .bool)} };
+    pub const FieldNumber = enum(u29) { map_entry = 7 };
+    pub const protobuf: Descriptor = .{ .full_name = "google.protobuf.MessageOptions", .fields = &.{field_of(FieldNumber.map_entry, .bool, .{})} };
 };
 
 pub const EnumValueDescriptorProto = struct {
     name: ?[]const u8 = null,
     number: ?i32 = null,
+    pub const FieldNumber = enum(u29) { name = 1, number = 2 };
     pub const protobuf: Descriptor = .{ .full_name = "google.protobuf.EnumValueDescriptorProto", .fields = &.{
-        field("name", 1, .string), field("number", 2, .int32),
+        field_of(FieldNumber.name, .string, .{}), field_of(FieldNumber.number, .int32, .{}),
     } };
 };
 
 pub const EnumDescriptorProto = struct {
     name: ?[]const u8 = null,
     value: Repeated(EnumValueDescriptorProto, .message) = .{},
+    pub const FieldNumber = enum(u29) { name = 1, value = 2 };
     pub const protobuf: Descriptor = .{ .full_name = "google.protobuf.EnumDescriptorProto", .fields = &.{
-        field("name", 1, .string), field("value", 2, .message),
+        field_of(FieldNumber.name, .string, .{}), field_of(FieldNumber.value, .message, .{}),
     } };
 };
 
@@ -101,9 +105,10 @@ pub const DescriptorProto = struct {
     enum_type: Repeated(EnumDescriptorProto, .message) = .{},
     options: ?MessageOptions = null,
     oneof_decl: Repeated(OneofDescriptorProto, .message) = .{},
+    pub const FieldNumber = enum(u29) { name = 1, field = 2, nested_type = 3, enum_type = 4, options = 7, oneof_decl = 8 };
     pub const protobuf: Descriptor = .{ .full_name = "google.protobuf.DescriptorProto", .fields = &.{
-        field("name", 1, .string),       field("field", 2, .message),   field("nested_type", 3, .message),
-        field("enum_type", 4, .message), field("options", 7, .message), field("oneof_decl", 8, .message),
+        field_of(FieldNumber.name, .string, .{}),       field_of(FieldNumber.field, .message, .{}),   field_of(FieldNumber.nested_type, .message, .{}),
+        field_of(FieldNumber.enum_type, .message, .{}), field_of(FieldNumber.options, .message, .{}), field_of(FieldNumber.oneof_decl, .message, .{}),
     } };
 };
 
@@ -118,7 +123,8 @@ pub const IdempotencyLevel = enum(i32) {
 
 pub const MethodOptions = struct {
     idempotency_level: ?IdempotencyLevel = null,
-    pub const protobuf: Descriptor = .{ .full_name = "google.protobuf.MethodOptions", .fields = &.{field("idempotency_level", 34, .@"enum")} };
+    pub const FieldNumber = enum(u29) { idempotency_level = 34 };
+    pub const protobuf: Descriptor = .{ .full_name = "google.protobuf.MethodOptions", .fields = &.{field_of(FieldNumber.idempotency_level, .@"enum", .{})} };
 };
 
 pub const MethodDescriptorProto = struct {
@@ -128,17 +134,19 @@ pub const MethodDescriptorProto = struct {
     options: ?MethodOptions = null,
     client_streaming: ?bool = null,
     server_streaming: ?bool = null,
+    pub const FieldNumber = enum(u29) { name = 1, input_type = 2, output_type = 3, options = 4, client_streaming = 5, server_streaming = 6 };
     pub const protobuf: Descriptor = .{ .full_name = "google.protobuf.MethodDescriptorProto", .fields = &.{
-        field("name", 1, .string),     field("input_type", 2, .string),     field("output_type", 3, .string),
-        field("options", 4, .message), field("client_streaming", 5, .bool), field("server_streaming", 6, .bool),
+        field_of(FieldNumber.name, .string, .{}),     field_of(FieldNumber.input_type, .string, .{}),     field_of(FieldNumber.output_type, .string, .{}),
+        field_of(FieldNumber.options, .message, .{}), field_of(FieldNumber.client_streaming, .bool, .{}), field_of(FieldNumber.server_streaming, .bool, .{}),
     } };
 };
 
 pub const ServiceDescriptorProto = struct {
     name: ?[]const u8 = null,
     method: Repeated(MethodDescriptorProto, .message) = .{},
+    pub const FieldNumber = enum(u29) { name = 1, method = 2 };
     pub const protobuf: Descriptor = .{ .full_name = "google.protobuf.ServiceDescriptorProto", .fields = &.{
-        field("name", 1, .string), field("method", 2, .message),
+        field_of(FieldNumber.name, .string, .{}), field_of(FieldNumber.method, .message, .{}),
     } };
 };
 
@@ -150,10 +158,11 @@ pub const FileDescriptorProto = struct {
     enum_type: Repeated(EnumDescriptorProto, .message) = .{},
     service: Repeated(ServiceDescriptorProto, .message) = .{},
     syntax: ?[]const u8 = null,
+    pub const FieldNumber = enum(u29) { name = 1, package = 2, dependency = 3, message_type = 4, enum_type = 5, service = 6, syntax = 12 };
     pub const protobuf: Descriptor = .{ .full_name = "google.protobuf.FileDescriptorProto", .fields = &.{
-        field("name", 1, .string),          field("package", 2, .string),    field("dependency", 3, .string),
-        field("message_type", 4, .message), field("enum_type", 5, .message), field("service", 6, .message),
-        field("syntax", 12, .string),
+        field_of(FieldNumber.name, .string, .{}),          field_of(FieldNumber.package, .string, .{}),    field_of(FieldNumber.dependency, .string, .{}),
+        field_of(FieldNumber.message_type, .message, .{}), field_of(FieldNumber.enum_type, .message, .{}), field_of(FieldNumber.service, .message, .{}),
+        field_of(FieldNumber.syntax, .string, .{}),
     } };
 };
 
@@ -161,16 +170,18 @@ pub const CodeGeneratorRequest = struct {
     file_to_generate: Repeated([]const u8, .string) = .{},
     parameter: ?[]const u8 = null,
     proto_file: Repeated(FileDescriptorProto, .message) = .{},
+    pub const FieldNumber = enum(u29) { file_to_generate = 1, parameter = 2, proto_file = 15 };
     pub const protobuf: Descriptor = .{ .full_name = "google.protobuf.compiler.CodeGeneratorRequest", .fields = &.{
-        field("file_to_generate", 1, .string), field("parameter", 2, .string), field("proto_file", 15, .message),
+        field_of(FieldNumber.file_to_generate, .string, .{}), field_of(FieldNumber.parameter, .string, .{}), field_of(FieldNumber.proto_file, .message, .{}),
     } };
 };
 
 pub const GeneratedFile = struct {
     name: ?[]const u8 = null,
     content: ?[]const u8 = null,
+    pub const FieldNumber = enum(u29) { name = 1, content = 15 };
     pub const protobuf: Descriptor = .{ .full_name = "google.protobuf.compiler.CodeGeneratorResponse.File", .fields = &.{
-        field("name", 1, .string), field("content", 15, .string),
+        field_of(FieldNumber.name, .string, .{}), field_of(FieldNumber.content, .string, .{}),
     } };
 };
 
@@ -181,7 +192,8 @@ pub const CodeGeneratorResponse = struct {
     @"error": ?[]const u8 = null,
     supported_features: ?u64 = null,
     file: Repeated(GeneratedFile, .message) = .{},
+    pub const FieldNumber = enum(u29) { @"error" = 1, supported_features = 2, file = 15 };
     pub const protobuf: Descriptor = .{ .full_name = "google.protobuf.compiler.CodeGeneratorResponse", .fields = &.{
-        field("error", 1, .string), field("supported_features", 2, .uint64), field("file", 15, .message),
+        field_of(FieldNumber.@"error", .string, .{}), field_of(FieldNumber.supported_features, .uint64, .{}), field_of(FieldNumber.file, .message, .{}),
     } };
 };

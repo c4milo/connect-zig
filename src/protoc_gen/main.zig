@@ -10,9 +10,9 @@ const names = @import("names.zig");
 const index_file = @import("index.zig");
 const generate = @import("generate.zig");
 
-/// The most bytes of request the plugin reads: protoc's requests for large trees stay far below.
-const request_len_max = 256 * 1024 * 1024;
-const io_buffer_len = 64 * 1024;
+const constants = @import("constants.zig");
+const request_len_max = constants.request_len_max;
+const io_buffer_len = constants.io_buffer_len;
 
 pub fn main(init: std.process.Init) !void {
     const arena = init.arena.allocator();
@@ -41,7 +41,7 @@ pub fn respond(arena: Allocator, request_bytes: []const u8) Allocator.Error!pb.C
     return .{ .supported_features = pb.feature_proto3_optional, .file = .of(files) };
 }
 
-fn generate_all(arena: Allocator, request_bytes: []const u8) (index_file.Error || error{MissingFile})![]const pb.GeneratedFile {
+fn generate_all(arena: Allocator, request_bytes: []const u8) (generate.Error || error{MissingFile})![]const pb.GeneratedFile {
     const request = try proto.decode(pb.CodeGeneratorRequest, request_bytes);
     var descriptors: std.ArrayList(pb.FileDescriptorProto) = .empty;
     var proto_files = request.proto_file.iterator();
@@ -51,8 +51,9 @@ fn generate_all(arena: Allocator, request_bytes: []const u8) (index_file.Error |
     var wanted = request.file_to_generate.iterator();
     while (try wanted.next()) |path| {
         const descriptor = find(descriptors.items, path) orelse return error.MissingFile;
-        const content = try generate.file(arena, &index, descriptor);
-        try outputs.append(arena, .{ .name = try names.output_path(arena, path), .content = content });
+        for (try generate.file(arena, &index, descriptor)) |output| {
+            try outputs.append(arena, .{ .name = output.name, .content = output.content });
+        }
     }
     return outputs.items;
 }
