@@ -61,11 +61,12 @@ buf curl --http2-prior-knowledge --protocol grpc --schema examples/proto \
 | | Connect | gRPC | gRPC-Web |
 | --- | :---: | :---: | :---: |
 | Server: unary, all streams | ✅ | ✅ | ✅ |
-| Client: unary, all streams | ✅ | errors only | ✅ |
+| Client: unary, all streams | ✅ | ✅ | ✅ |
 | Proto and JSON codecs | ✅ | ✅ | ✅ |
 | gzip and zstd both ways, brotli read | ✅ | ✅ | ✅ |
 | Unary GET for `NO_SIDE_EFFECTS` | ✅ | | |
 | Full-duplex bidirectional streams (server) | ✅ | ✅ | ✅ |
+| Full-duplex bidirectional streams (client) | | | |
 | Interceptors, server and client | ✅ | ✅ | ✅ |
 | Error details | ✅ | ✅ | ✅ |
 
@@ -184,9 +185,16 @@ A client call is a `connect_colibri.ClientCall`. It writes a request for colibri
 `client.ConnectionPool` and reads the response the pool fills in:
 
 ```zig
-try say_proto.init(.{}, &.{.{ .sentence = "I feel tired" }}, buffers);
-_ = try pool.request(&say_proto.request, &say_proto.response);
+try say.init(.{ .protocol = .grpc }, &.{.{ .sentence = "I feel tired" }}, buffers);
+_ = try pool.request(&say.request, &say.response);
+// Once the pool reports the call finished:
+var response = say.read(storage);
+const answer = try response.next(eliza.SayResponse);
+if (response.failure) |failure| std.debug.print("{s}\n", .{failure.message});
 ```
+
+`.protocol` picks Connect, the default, gRPC or gRPC-Web, and the rest of the call stays the same.
+A gRPC call reads its status from the response's trailers.
 
 [examples/](examples) holds eight programs, from generated messages alone to streaming,
 interceptors, error details, a GitHub-style API with tokens, rate limits, pages and field masks,
@@ -237,13 +245,13 @@ Still to come:
 
 - [x] The [connectrpc conformance suite](https://github.com/connectrpc/conformance) against the
   server
-- [ ] The conformance suite against the client, once colibri's client exposes trailers and
-  streams a request body
+- [ ] The conformance suite against the client, once colibri's client streams a request body
+  (colibri step 39)
 - [x] HTTP/3 on the socket server, over a UDP socket
 - [x] zstd compression of messages, both ways
 - [ ] brotli compression of messages, once stdx ships its encoder
 - [x] A gRPC client, over h11, h2 and h3
-- [ ] Long server streams, and full-duplex on the client side
+- [ ] Long server streams, and full-duplex on the client side (colibri step 39)
 - [x] HTTP/3 in the in-memory examples, with a test-only TLS identity
 - [x] Full-duplex streams on the server, interceptors and error details
 - [x] `Any`, `Struct`, `Value` and `ListValue` in JSON
