@@ -1,6 +1,6 @@
 #!/bin/sh
 # Runs the example socket server and calls it with buf curl, whose client is connect-go's, in each
-# protocol, and with curl over h11 and h2. It requires each answer octet for octet: a gRPC
+# protocol, over h2 and h3, and with curl over h11 and h2. It requires each answer octet for octet: a gRPC
 # success, whose status rides in HTTP trailers, is checked here and nowhere else (decision 11).
 # It needs buf on the path, or BUF naming it, and curl.
 set -eu
@@ -77,6 +77,13 @@ expect "two messages for a unary call" '1' \
     "$(curl -sS -m 5 --http2-prior-knowledge -H 'content-type: application/grpc-web+proto' --data-binary "@${log}.body" "${base}/Say" |
         grep -ac 'grpc-status: 12')"
 rm -f "${log}.body"
+# h3 on the UDP socket of the same port, under the test identity: buf curl over quic-go.
+h3_base="https://127.0.0.1:${port}/connectrpc.eliza.v1.ElizaService"
+for protocol in connect grpc grpcweb; do
+    expect "${protocol} Introduce over h3" "${introduced}" \
+        "$(timeout "${call_seconds}" "${buf}" curl --http3 --cacert examples/testdata/tls/ca.pem --schema examples/proto \
+            --protocol "${protocol}" -d '{"name":"Ada"}' "${h3_base}/Introduce" 2>&1 | tr -d ' \n')"
+done
 
 # The demo service: interceptors, every kind of stream, and error details.
 base="http://127.0.0.1:${port}/demo.v1.DemoService"

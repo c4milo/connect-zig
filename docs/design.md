@@ -175,6 +175,10 @@ ran on Linux x86-64 with Zig 0.16.0.
   `connect_colibri` gains `Call.request_headers`, `Call.request_query` and a context's
   `message_receive_limit`. It also gains 16 KiB of trailer room, for details that echo headers.
 
+- **h3 on the socket server.** `tools/interop_check.sh` calls Introduce with `buf curl --http3`
+  in Connect, gRPC and gRPC-Web, under the test identity, beside the h2 and h11 calls (decision
+  28).
+
 - **Compression, later.** `connect` gains `ZstdEncoder`, `ZstdDecoder` and `Encoders`; the gzip
   `encoder` of `Reply`, `client.Options` and `connect_colibri.Codings` becomes `encoders`,
   `accept`'s `can_compress` becomes `encoders`, and `compression.compress_gzip` becomes
@@ -187,4 +191,3 @@ ran on Linux x86-64 with Zig 0.16.0.
 - A gRPC client over colibri, once colibri's client exposes response trailers (decision 11).
 - Long server streams written at `on_writable` (decision 12).
 - Client-side full-duplex, once colibri's client streams a request body.
-- h3 on the socket server, over a UDP socket, and `tools/interop_check.sh` over h3.

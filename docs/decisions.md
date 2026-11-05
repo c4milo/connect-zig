@@ -198,6 +198,14 @@ first. Cite an entry by number in code and commits ("decision 6").
     `Routes`, which a table of several services would then name twice; and a change to
     colibri's router, which is colibri's ruling.
 
+28. **The socket server speaks h3 on the UDP port of its TCP port.** `socket_loop.zig` opens a
+    datagram socket on the same Rotor loop when `quic_connections` is set, with one multishot
+    receive into buffers the loop owns and a slot for each datagram in flight, as colibri's
+    `src/testing/udp.zig` does. The example server presents the test identity of decision 25,
+    and draws its keys and each TLS session's secrets from `std.Io`'s entropy. The conformance
+    server stays in cleartext. Beaten: a second loop for UDP, which splits one clock in two; and
+    waiting for colibri's `serve` (colibri decision 150), which waits on Rotor's `std.Io`.
+
 ## Tooling
 
 15. **pepegrillo is lazy.** `build.zig` requests it only when `b.pkg_hash.len == 0`, so a project

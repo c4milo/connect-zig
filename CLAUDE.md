@@ -88,14 +88,15 @@ confirm a test fails. Report `CAUGHT` or `NOT CAUGHT` per mutation in the commit
   which run a client against the server of `examples/services/` over colibri's h11, h2 and h3,
   in memory; the h3 rounds use the test-only identity of `examples/testdata/tls` (decision 25).
   `zig build example-<name>` runs one; `examples/README.md` lists them. `zig build
-  run-eliza-server -- [port]` serves the ELIZA and demo services on a TCP socket; port 0 lets the
-  kernel choose, and the server prints `listening on port <port>`.
+  run-eliza-server -- [port]` serves the ELIZA and demo services on a TCP socket, and over h3 on
+  the UDP socket of the same port under the test identity; port 0 lets the kernel choose, and the
+  server prints `listening on port <port>`.
 - Generated code: `zig build test-generated` compiles `examples/gen` and runs its round trips.
   `tools/generate_check.sh` regenerates it with `buf generate` and fails on a difference;
   `--write` rewrites it. It needs buf, or `BUF` naming it.
 - Interop: `tools/interop_check.sh` calls the socket server with `buf curl` in Connect, gRPC and
-  gRPC-Web, and with curl over h11 and h2, and checks that Chat answers full-duplex. It needs buf
-  and curl.
+  gRPC-Web, over h2 and h3, and with curl over h11 and h2, and checks that Chat answers
+  full-duplex. It needs buf and curl.
 - Benchmark: `zig build bench` times binary and JSON encode and decode, ReleaseFast;
   `tools/bench_check.sh` runs the Go benchmark in `bench/go` beside it and checks both write the
   same bytes. `tools/ci.sh` runs `zig build bench -- --quick`.

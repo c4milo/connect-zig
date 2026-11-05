@@ -1,5 +1,7 @@
-//! A cleartext HTTP server on Rotor's loop, which the example socket server and the conformance
-//! server share (decision 26). It speaks h11 and h2 with prior knowledge on one port.
+//! An HTTP server on Rotor's loop, which the example socket server and the conformance server
+//! share (decision 26). It speaks h11 and h2 with prior knowledge on a TCP port, in cleartext.
+//! With `quic_connections` set it also speaks h3 on the UDP port of the same number, under the
+//! TLS identity the program puts in `config.tls` (decision 28).
 //!
 //! colibri does no I/O, so the program owns the sockets: it accepts, reads and writes through
 //! Rotor, passes what each socket read to one `server.Endpoint`, and hands each event to the
@@ -12,6 +14,8 @@ const std = @import("std");
 const assert = std.debug.assert;
 const rotor = @import("rotor");
 const server = @import("server");
+const Datagrams = @import("socket_datagram.zig").Datagrams;
+const datagram_operations = @import("socket_datagram.zig").operations;
 
 comptime {
     // chapulin's hook, which every program over colibri's `tls` defines (decision 13).
@@ -27,6 +31,8 @@ pub const Options = struct {
     log_requests: bool = true,
     /// colibri's deadlines for each connection: how long one may wait idle, among others.
     timeouts: server.Timeouts = .{},
+    /// The QUIC connections the server holds at once: 0 serves no h3, and opens no UDP socket.
+    quic_connections: u32 = 0,
 };
 
 /// The turns the server runs before it stops: as many as a `usize` counts.
@@ -55,8 +61,10 @@ const accept_user_data: u64 = std.math.maxInt(u64);
 
 pub fn SocketServer(comptime App: type, comptime Router: type, comptime options: Options) type {
     comptime assert(options.sockets_max > 0 and options.sockets_max <= 1 << index_bits);
-    const loop_options: rotor.Loop.Options = .{ .operations = options.sockets_max * operations_per_socket + 1 };
-    const Endpoint = server.EndpointOf(.{ .tcp_connections = options.sockets_max, .quic_connections = 0 });
+    const quic = options.quic_connections > 0;
+    const udp_operations = if (quic) datagram_operations else 0;
+    const loop_options: rotor.Loop.Options = .{ .operations = options.sockets_max * operations_per_socket + 1 + udp_operations };
+    const Endpoint = server.EndpointOf(.{ .tcp_connections = options.sockets_max, .quic_connections = options.quic_connections });
 
     const Socket = struct {
         live: bool = false,
@@ -86,6 +94,8 @@ pub fn SocketServer(comptime App: type, comptime Router: type, comptime options:
         const Self = @This();
         /// Whether each request's method and target go to stderr.
         pub const log_requests = options.log_requests;
+        /// Whether the server speaks h3 on a UDP socket.
+        pub const speaks_h3 = quic;
 
         loop_memory: [rotor.Loop.memory_bytes(loop_options)]u8 align(rotor.memory_alignment) = undefined,
         loop: rotor.Loop = undefined,
@@ -97,6 +107,13 @@ pub fn SocketServer(comptime App: type, comptime Router: type, comptime options:
         endpoint: Endpoint = undefined,
         router: Router = .{},
         prng: std.Random.DefaultPrng = .init(prng_seed),
+        /// The source of the endpoint's connection IDs and of each TLS session's secrets. A
+        /// cleartext server may leave it null: the seeded `prng` stands in, since it draws no
+        /// secret. A server with `config.tls` set gives it the operating system's entropy.
+        random: ?std.Random = null,
+        /// The instant the endpoint starts at, in Unix seconds, which TLS tickets count from.
+        now_seconds: u64 = now_seconds,
+        datagrams: if (quic) Datagrams else void = if (quic) .{} else {},
         app: *App = undefined,
 
         /// Listens on 127.0.0.1 at `port`, 0 for one the kernel chooses, tells `listening` the
@@ -108,7 +125,9 @@ pub fn SocketServer(comptime App: type, comptime Router: type, comptime options:
             const bound = try rotor.sync.local_address(self.listener);
             try self.loop.init(&self.loop_memory, loop_options);
             defer self.loop.deinit();
-            try self.endpoint.init(&self.config, self.prng.random(), now_seconds, self.loop.now_ns());
+            // RFC 9114 §3.1 finds an h3 endpoint on the UDP port of the TCP one.
+            if (quic) try self.datagrams.open(&self.loop, rotor.Address.ipv4(.{ 127, 0, 0, 1 }, bound.port));
+            try self.endpoint.init(&self.config, self.random orelse self.prng.random(), self.now_seconds, self.loop.now_ns());
             try listening.on_listening(bound.port);
             for (0..turns_max) |_| try turn(self);
         }
@@ -120,7 +139,7 @@ fn turn(self: anytype) !void {
     const wait = wait_ns(self, self.loop.now_ns());
     const count = try self.loop.tick(&self.events, wait);
     const now_ns = self.loop.now_ns();
-    for (self.events[0..count]) |event| on_event(self, event, now_ns);
+    for (self.events[0..count]) |event| try take_event(self, event, now_ns);
     self.endpoint.on_instant(now_ns);
     for (&self.sockets) |*socket| {
         if (socket.live and !socket.closing and !socket.close_wanted) try serve_input(self, socket, now_ns);
@@ -131,6 +150,17 @@ fn turn(self: anytype) !void {
     for (&self.sockets) |*socket| {
         if (socket.live and !socket.closing and !socket.close_wanted) flush(self, socket, now_ns);
     }
+    if (comptime @TypeOf(self.*).speaks_h3) self.datagrams.send_owed(&self.loop, &self.endpoint, now_ns);
+}
+
+/// Passes a datagram the UDP socket read to the endpoint, in Rotor's own buffer, which QUIC
+/// opens in place; every other event goes to `on_event`.
+fn take_event(self: anytype, event: rotor.Event, now_ns: u64) !void {
+    if (comptime !@TypeOf(self.*).speaks_h3) return on_event(self, event, now_ns);
+    if (!Datagrams.owns(event.user_data)) return on_event(self, event, now_ns);
+    defer self.datagrams.finish(&self.loop, event);
+    const datagram = self.datagrams.arrived(&self.loop, event) orelse return;
+    try serve_events(self, .{ .datagram = datagram }, now_ns);
 }
 
 /// How long the loop may wait: until the endpoint's next deadline or a lingering

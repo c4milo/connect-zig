@@ -16,8 +16,8 @@ and serve the same handlers to Connect, gRPC and gRPC-Web clients, in binary pro
 - **Fast.** Binary and JSON encoding and decoding run 1.5 to 6 times faster than Go's protobuf
   runtime on most messages (see [Performance](#performance)).
 - **HTTP underneath from [colibri](https://github.com/c4milo/colibri).** Servers and clients run
-  over h11, h2 and h3. The in-memory examples run over h3 as well as h11 and h2; the socket
-  server serves h11 and h2 for now.
+  over h11, h2 and h3. The in-memory examples and the socket server run over all three;
+  the socket server serves h3 on the UDP socket of its port, under a test-only identity.
 
 ## Try it in 30 seconds
 
@@ -243,7 +243,7 @@ Still to come:
   server
 - [ ] The conformance suite against the client, once colibri's client exposes trailers and
   streams a request body
-- [ ] HTTP/3 on the socket server, over a UDP socket
+- [x] HTTP/3 on the socket server, over a UDP socket
 - [x] zstd compression of messages, both ways
 - [ ] brotli compression of messages, once stdx ships its encoder
 - [ ] A gRPC client, once colibri's client exposes trailers
