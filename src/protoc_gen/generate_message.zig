@@ -237,7 +237,8 @@ fn write_descriptor(out: *Out, full: []const u8, message: pb.DescriptorProto, fi
     const sorted = try out.arena.dupe(Member, fields);
     std.mem.sort(Member, sorted, {}, by_number);
     const map_entry = if (message.options) |options| options.map_entry orelse false else false;
-    try out.print("\n", .{});
+    // zig fmt keeps no blank line at the top of a struct, so a message with no fields has none.
+    if (fields.len != 0) try out.print("\n", .{});
     try out.indent(depth);
     try out.print("pub const protobuf: proto.Descriptor = .{{\n", .{});
     try out.indent(depth + 1);
