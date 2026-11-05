@@ -33,8 +33,8 @@ pub fn introduce(app: *App, _: *rpc.Call, request: *const eliza.IntroduceRequest
 /// Converse answers each sentence it reads, in order.
 pub fn converse(app: *App, call: *rpc.Call, receiver: *rpc.Receiver(eliza.ConverseRequest), sender: *rpc.Sender(eliza.ConverseResponse)) ?connect.RpcError {
     for (0..conversation_turns_max) |_| {
-        const sentence = receiver.next() orelse break;
-        sender.send(&.{ .sentence = reply(app, "Why do you say \"{s}\"?", .{sentence.sentence}) }) catch return .{ .code = .resource_exhausted };
+        const request = receiver.next() orelse break;
+        sender.send(&.{ .sentence = reply(app, "Why do you say \"{s}\"?", .{request.sentence}) }) catch return .{ .code = .resource_exhausted };
     }
     call.add_trailer("eliza-turns", "done") catch {};
     return null;
