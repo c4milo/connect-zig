@@ -9,11 +9,14 @@ and serve the same handlers to Connect, gRPC and gRPC-Web clients, in binary pro
 
 - **No allocator in the library.** Every buffer is yours, and every size is a constant you can
   read.
-- **No copies when decoding.** Strings, bytes and repeated fields point into the input.
+- **No copies.** Decoding leaves strings, bytes and repeated fields pointing into the input, and
+  each RPC message is encoded straight into the HTTP body it goes out in.
 - **No hidden I/O.** The protocol core reads bytes you give it and writes bytes you send. It
   reads no clock, so every test is deterministic.
-- **Fast HTTP underneath.** Servers and clients run on
-  [colibri](https://github.com/c4milo/colibri)'s h11, h2 and h3.
+- **Fast.** Binary and JSON encoding and decoding run 1.5 to 6 times faster than Go's protobuf
+  runtime on most messages (see [Performance](#performance)).
+- **HTTP underneath from [colibri](https://github.com/c4milo/colibri).** Servers and clients run
+  over h11 and h2 today; h3 is next.
 
 ## Try it in 30 seconds
 
@@ -49,7 +52,7 @@ buf curl --http2-prior-knowledge --protocol grpc --schema examples/proto \
 | --- | --- |
 | `protobuf` | The binary encoding and the proto3 JSON mapping, over generated structs. |
 | `connect` | The Connect, gRPC and gRPC-Web rules, as functions over headers and bytes. |
-| `connect_colibri` | Routes for colibri's server, and calls for colibri's client. |
+| `connect_colibri` | Routes for colibri's server, and calls for colibri's client. Programs import it as `rpc`. |
 | `protoc-gen-connect-zig` | The plugin `buf generate` runs to write your `.pb.zig` files. |
 
 ### What works today
@@ -64,6 +67,11 @@ buf curl --http2-prior-knowledge --protocol grpc --schema examples/proto \
 | Full-duplex bidirectional streams (server) | ✅ | ✅ | ✅ |
 | Interceptors, server and client | ✅ | ✅ | ✅ |
 | Error details | ✅ | ✅ | ✅ |
+
+The protobuf runtime covers every scalar type, `optional`, packed and unpacked repeated fields,
+maps with every key type, oneofs, enums, recursive messages and every well-known type with its
+JSON form: Timestamp, Duration, FieldMask, the wrappers, Empty, Struct, Value, ListValue and Any.
+It reads proto2, proto3 and editions 2023 and 2024, groups and DELIMITED fields included.
 
 > [!NOTE]
 > A gRPC client needs HTTP trailers, which colibri's client does not expose yet. Until it does,
@@ -119,8 +127,10 @@ plugins:
 A handler fills its response and returns `null`, or returns the error the client reads:
 
 ```zig
-fn say(app: *App, _: *rpc.Call, request: *const eliza.SayRequest, response: *eliza.SayResponse) ?connect.RpcError {
-    app.calls += 1;
+const connect = @import("connect");
+const rpc = @import("connect_colibri");
+
+pub fn say(app: *App, _: *rpc.Call, request: *const eliza.SayRequest, response: *eliza.SayResponse) ?connect.RpcError {
     if (request.sentence.len == 0) return .{ .code = .invalid_argument, .message = "say something" };
     response.sentence = reply(app, "You said \"{s}\". How does that make you feel?", .{request.sentence});
     return null;
@@ -153,8 +163,6 @@ GET too. A method you have no handler for fails to compile. One route answers ev
 codec:
 
 ```zig
-const rpc = @import("connect_colibri");
-
 pub fn say(app: *App, call: *rpc.Call, request: *const eliza.SayRequest, response: *eliza.SayResponse) ?connect.RpcError { ... }
 pub fn introduce(...) ?connect.RpcError { ... }
 pub fn converse(...) ?connect.RpcError { ... }
@@ -182,18 +190,48 @@ _ = try pool.request(&say_proto.request, &say_proto.response);
 interceptors, error details and a server on a socket. Each checks itself, and
 [examples/README.md](examples/README.md) says where to start.
 
+## Performance
+
+`zig build bench` times four messages, and `tools/bench_check.sh` runs Go's
+`google.golang.org/protobuf` beside it on the same inputs and checks both write the same bytes.
+Each cell is Go's time over connect-zig's: above 1 means connect-zig is faster.
+
+| Message | Binary encode | Binary decode, every field read | JSON encode | JSON decode |
+| --- | ---: | ---: | ---: | ---: |
+| Small, 40 B | 4.3 | 4.4 | 3.4 | 4.0 |
+| Medium, 1 KB | 4.9 | 3.6 | 4.4 | 5.2 |
+| Large, 180 KB | 1.0 | 1.5 | 2.8 | 5.0 |
+| Deep, 50 levels | 1.9 | 2.2 | 4.0 | 3.2 |
+
+## How it is checked
+
+- `zig build test` runs every module's tests and the examples, and each check in the library was
+  broken on purpose to prove a test catches it.
+- `tools/coverage_check.sh` converts every protobuf type, and edition and proto2 files, with
+  connect-zig and with Go's runtime through `buf convert`, in each direction between binary and
+  JSON, and requires the same message.
+- `tools/interop_check.sh` calls the example server with `buf curl`, connect-go's client, in all
+  three protocols, and with curl over h11 and h2. It requires a bidirectional stream to answer
+  before the client finishes sending.
+
 ## Good to know
 
 > [!IMPORTANT]
 > A server stream is written into the router's response memory, so a long one is bounded by it
 > (decision 12). A type handler streams full-duplex (decision 18); colibri's client sends its
-> request body whole, so the client side of a stream is half-duplex. zstd and brotli are read but not written, because stdx has no encoder for them
-> yet (decision 10).
+> request body whole, so the client side of a stream is half-duplex. zstd and brotli are read
+> but not written yet: stdx has a zstd encoder, which needs colibri to pin that stdx, and its
+> brotli encoder is not written (decision 10).
+
+The library is stricter than the spec in three places: it does not report a missing required
+field, a closed enum keeps an unknown value, and every string must be valid UTF-8 (decision 23).
 
 Still to come:
 
 - [ ] The [connectrpc conformance suite](https://github.com/connectrpc/conformance) against the
-  client and the server
+  client and the server, in progress
+- [ ] HTTP/3, with a TLS identity for the examples
+- [ ] zstd and brotli compression of messages, once colibri and stdx ship the encoders
 - [ ] A gRPC client, once colibri's client exposes trailers
 - [ ] Long server streams, and full-duplex on the client side
 - [x] Full-duplex streams on the server, interceptors and error details
@@ -208,14 +246,13 @@ The rules of the tree are in [CLAUDE.md](CLAUDE.md), the design and its build pl
 [docs/decisions.md](docs/decisions.md). Before you send a change, run the same checks CI runs:
 
 ```sh
+tools/ci.sh               # every check below, as CI runs them
 zig build test            # the lint, every module's tests and the examples
 tools/generate_check.sh   # buf generate still writes examples/gen and bench/gen
 tools/interop_check.sh    # buf curl and curl against the example server
+tools/coverage_check.sh   # every protobuf type against Go's runtime
+tools/bench_check.sh      # the benchmark beside Go's
 ```
-
-To measure the protobuf runtime, run `zig build bench`, or `tools/bench_check.sh`, which also runs
-the Go benchmark in `bench/go`, checks that both encode the same bytes, and prints the two side by
-side.
 
 ## License
 
