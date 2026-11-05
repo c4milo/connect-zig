@@ -234,3 +234,41 @@ test "a oneof message member that repeats merges into the one already set" {
     const all = try proto.decode(All, &bytes);
     try testing.expectEqual(@as(i32, 3), all.choice.?.sub.a);
 }
+
+test "a nested message encodes alike into a roomy buffer and into one of its exact length" {
+    const leaf: Node = .{ .value = 3 };
+    const middle: Node = .{ .value = 2, .next = .of(&leaf) };
+    const root: Node = .{ .value = 1, .next = .of(&middle) };
+    var roomy: [64]u8 = undefined;
+    const written = try proto.encode(Node, &root, &roomy);
+    try testing.expectEqual(try proto.encoded_len(Node, &root), written.len);
+    // In a buffer of the message's exact length, a child's length placeholder does not fit, so
+    // the child is measured first; the bytes come out the same.
+    var exact: [64]u8 = undefined;
+    try testing.expectEqualSlices(u8, written, try proto.encode(Node, &root, exact[0..written.len]));
+    try testing.expectError(error.NoSpaceLeft, proto.encode(Node, &root, exact[0 .. written.len - 1]));
+}
+
+test "decode checks every level, and get reads one level and leaves the next to its own get" {
+    // next { next { <a tag with no value> } }
+    const malformed = [_]u8{ 0x12, 3, 0x12, 1, 0x08 };
+    try testing.expectError(error.Truncated, proto.decode(Node, &malformed));
+    // Bytes a program set itself fail at the level that holds the fault, when it is read.
+    const lazy: Lazy(Node) = .{ .bytes = malformed[2..] };
+    const level = (try lazy.get()).?;
+    try testing.expectError(error.Truncated, level.next.get());
+}
+
+test "a deep chain encodes into a buffer of its exact length in time linear in its depth" {
+    const depth = 64;
+    var nodes: [depth]Node = undefined;
+    nodes[0] = .{ .value = 1 };
+    for (1..depth) |index| nodes[index] = .{ .value = 1, .next = .of(&nodes[index - 1]) };
+    const root = &nodes[depth - 1];
+    var roomy: [1024]u8 = undefined;
+    const written = try proto.encode(Node, root, &roomy);
+    // Once a placeholder does not fit, the rest of the subtree is measured before it is written.
+    // Retrying the placeholder at each level would double the work at each one: 2^64 walks here.
+    var exact: [1024]u8 = undefined;
+    try testing.expectEqualSlices(u8, written, try proto.encode(Node, root, exact[0..written.len]));
+}

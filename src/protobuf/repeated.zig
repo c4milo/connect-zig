@@ -111,7 +111,7 @@ fn element(comptime T: type, comptime element_kind: Kind, it: anytype, tag: wire
     // "Message Structure": a known field with another wire type is malformed.
     if (tag.wire_type != element_kind.wire_type()) return error.WireTypeMismatch;
     if (comptime element_kind == .message) {
-        return try decode.decode_depth(T, try it.reader.length_delimited(), constants.limits.depth_max);
+        return try decode.decode_shallow(T, try it.reader.length_delimited());
     }
     return try read_scalar(T, element_kind, &it.reader);
 }
@@ -148,7 +148,7 @@ pub fn Lazy(comptime T: type) type {
         pub fn get(self: *const Self) wire.Error!?T {
             if (self.value) |value| return value.*;
             const bytes = self.bytes orelse return null;
-            return try decode.decode_depth(T, bytes, constants.limits.depth_max);
+            return try decode.decode_shallow(T, bytes);
         }
     };
 }

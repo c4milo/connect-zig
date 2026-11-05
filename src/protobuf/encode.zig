@@ -21,6 +21,9 @@ pub const Error = wire.Error || wire.Writer.WriteError;
 const Sink = struct {
     writer: ?*wire.Writer,
     len: usize = 0,
+    /// The buffer had no room for a length placeholder, so every child from here is measured
+    /// before it is written: retrying the placeholder at each level would repeat the work.
+    measured: bool = false,
 
     fn varint(sink: *Sink, number: u64) Error!void {
         if (sink.writer) |writer| try writer.varint(number);
@@ -103,16 +106,52 @@ fn encode_member(comptime T: type, comptime field: Field, comptime oneof: []cons
 }
 
 fn encode_child(comptime M: type, number: u32, child: *const M, sink: *Sink) Error!void {
-    const child_len = try encoded_len(M, child);
-    try sink.tag(number, .len);
-    try sink.varint(child_len);
-    // A counting sink needs the length alone. Walking the child again would make each level
-    // count its subtree twice, which doubles the work at every level of nesting.
-    if (sink.writer == null) {
+    const writer = sink.writer orelse {
+        // A counting sink needs the child's length alone, which one walk gives.
+        const child_len = try encoded_len(M, child);
+        try sink.tag(number, .len);
+        try sink.varint(child_len);
         sink.len += child_len;
         return;
-    }
+    };
+    try sink.tag(number, .len);
+    if (sink.measured) return write_child_measured(M, child, sink);
+    const tag_end = writer.len;
+    const tag_sink_len = sink.len;
+    write_child_once(M, child, sink, writer) catch |failure| switch (failure) {
+        // The placeholder took up to four octets more than the length will. In a buffer sized
+        // to the message, measure first, then write.
+        error.NoSpaceLeft => {
+            writer.len = tag_end;
+            sink.len = tag_sink_len;
+            sink.measured = true;
+            try write_child_measured(M, child, sink);
+        },
+        else => |other| return other,
+    };
+}
+
+fn write_child_measured(comptime M: type, child: *const M, sink: *Sink) Error!void {
+    try sink.varint(try encoded_len(M, child));
     try encode_message(M, child, sink);
+}
+
+/// Writes a child once, behind a placeholder for its length, then writes the length and moves the
+/// child up to meet it. Measuring the child first would walk its subtree at every level of
+/// nesting, and a deep message would cost its depth times its size.
+fn write_child_once(comptime M: type, child: *const M, sink: *Sink, writer: *wire.Writer) Error!void {
+    const at = try writer.padded_varint();
+    const start = writer.len;
+    const sink_start = sink.len;
+    try encode_message(M, child, sink);
+    const child_len = writer.len - start;
+    assert(sink.len - sink_start == child_len);
+    const prefix_len = wire.varint_len(child_len);
+    std.mem.copyForwards(u8, writer.buffer[at + prefix_len ..][0..child_len], writer.buffer[start..writer.len]);
+    writer.len = at;
+    try writer.varint(child_len);
+    writer.len += child_len;
+    sink.len += prefix_len;
 }
 
 fn encode_repeated(comptime field: Field, comptime F: type, item: *const F, sink: *Sink) Error!void {

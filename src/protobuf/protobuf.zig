@@ -54,7 +54,7 @@ pub fn decode(comptime T: type, bytes: []const u8) Error!T {
 /// Wins", encoding guide).
 pub fn merge(comptime T: type, message: *T, bytes: []const u8) Error!void {
     if (bytes.len > constants.limits.message_len_max) return error.LengthTooLarge;
-    return files.decode.merge_depth(T, message, bytes, constants.limits.depth_max);
+    return files.decode.merge_depth(T, message, bytes, constants.limits.depth_max, .checked);
 }
 
 /// The bytes `encode` writes for `message`.

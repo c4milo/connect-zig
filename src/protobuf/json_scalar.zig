@@ -129,8 +129,11 @@ pub fn parse_integer(comptime V: type, octets: []const u8) DecodeError!V {
     const float = std.fmt.parseFloat(f64, octets) catch return error.InvalidNumber;
     if (@trunc(float) != float) return error.InvalidNumber;
     const low: f64 = @floatFromInt(std.math.minInt(V));
-    const high: f64 = @floatFromInt(std.math.maxInt(V));
-    if (float < low or float > high) return error.NumberOutOfRange;
+    // maxInt of a 64-bit type rounds up to a power of two as an f64, so the bound is that power,
+    // exclusive: 2^63 itself must be refused, or the conversion below overflows.
+    const bits_below: i32 = @bitSizeOf(V) - @as(i32, @intFromBool(@typeInfo(V).int.signedness == .signed));
+    const high_exclusive = std.math.ldexp(@as(f64, 1), bits_below);
+    if (float < low or float >= high_exclusive) return error.NumberOutOfRange;
     return @intFromFloat(float);
 }
 
@@ -193,6 +196,11 @@ test "integers parse from exponents when integral, and refuse fractions and over
     try testing.expectEqual(@as(i32, 100), try parse_integer(i32, "1e2"));
     try testing.expectError(error.InvalidNumber, parse_integer(i32, "1.5"));
     try testing.expectError(error.NumberOutOfRange, parse_integer(i32, "2147483648"));
+    // Each text is integral and rounds to 2^63 or 2^64 as an f64: one past the type's range.
+    try testing.expectError(error.NumberOutOfRange, parse_integer(i64, "9.223372036854775807e18"));
+    try testing.expectError(error.NumberOutOfRange, parse_integer(i64, "9223372036854775807.5"));
+    try testing.expectError(error.NumberOutOfRange, parse_integer(u64, "1.8446744073709551615e19"));
+    try testing.expectEqual(@as(i64, std.math.minInt(i64)), try parse_integer(i64, "-9.223372036854775808e18"));
     try testing.expectError(error.NumberOutOfRange, parse_float(f32, "1e39", false));
     try testing.expect(std.math.isNan(try parse_float(f64, "NaN", true)));
 }
