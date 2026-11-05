@@ -133,9 +133,8 @@ pub fn Sender(comptime T: type) type {
         pub fn send(sender: *@This(), message: *const T) !void {
             const call = sender.call;
             try write_head_once(call, false);
-            const prepared = try call.reply.prepare(T, message);
             const body = call.response.body();
-            try call.reply.write_message(prepared, body);
+            try write_message(T, call, message, body);
             // The writer hands what it holds to the endpoint now, rather than at the end.
             try body.flush();
             call.sent += 1;
@@ -222,7 +221,26 @@ pub fn finish(call: *Call, failure: ?connect.RpcError) !void {
 }
 
 /// Writes a reply's one message: for Connect unary, with its head and its trailers as headers.
+/// Writes a message into the body's buffer directly, or, when it has no room, through scratch
+/// storage in pieces.
+fn write_message(comptime T: type, call: *Call, message: *const T, body: *std.Io.Writer) !void {
+    if (try call.reply.write_direct(T, message, body)) return;
+    try call.reply.write_message(try call.reply.prepare(T, message), body);
+}
+
 pub fn send_one(comptime T: type, call: *Call, message: *const T) !void {
+    if (call.reply.writes_direct()) {
+        // The head does not depend on the message, so it goes first and the message after it.
+        if (!call.reply.accepted.speaks.enveloped) {
+            const head = call.reply.head(false);
+            try apply_head(call, &head);
+            call.head_written = true;
+            try write_prefixed_trailers(call);
+        } else try write_head_once(call, false);
+        try write_message(T, call, message, call.response.body());
+        call.sent += 1;
+        return;
+    }
     const prepared = try call.reply.prepare(T, message);
     if (!call.reply.accepted.speaks.enveloped) {
         const head = call.reply.head(prepared.compressed);

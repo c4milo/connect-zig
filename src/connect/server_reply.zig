@@ -79,6 +79,43 @@ pub const Reply = struct {
         return result;
     }
 
+    /// Whether `write_direct` can write a message before the head is known to need no change: a
+    /// Connect unary head names the body's coding, so its body is written direct only when the
+    /// response is not compressed.
+    pub fn writes_direct(reply: *const Reply) bool {
+        return reply.accepted.speaks.enveloped or reply.accepted.response_coding == .identity;
+    }
+
+    /// Encodes a message straight into the free space of `body`'s buffer, after room for its
+    /// envelope prefix, so it is not copied from scratch storage. gzip, when it shrinks the
+    /// message, compresses into scratch storage and the shorter result is copied back. Returns
+    /// false, with nothing written, when the buffer has no room; the caller then calls `prepare`
+    /// and `write_message`, which write through the buffer in pieces.
+    pub fn write_direct(reply: *Reply, comptime T: type, message: *const T, body: *std.Io.Writer) Error!bool {
+        assert(reply.writes_direct());
+        const prefix_len: usize = if (reply.accepted.speaks.enveloped) constants.protocol.envelope_prefix_len else 0;
+        const room = body.unusedCapacitySlice();
+        if (room.len <= prefix_len) return false;
+        const encoded = message_codec.encode(T, reply.accepted.speaks.codec, message, room[prefix_len..]) catch |failure| switch (failure) {
+            error.NoSpaceLeft => return false,
+            else => |other| return other,
+        };
+        const result = reply.shrink(encoded);
+        if (result.compressed) @memcpy(room[prefix_len..][0..result.octets.len], result.octets);
+        if (prefix_len != 0) envelope.write_prefix(.{ .compressed = result.compressed }, result.octets.len, room[0..constants.protocol.envelope_prefix_len]);
+        body.advance(prefix_len + result.octets.len);
+        reply.sent = true;
+        return true;
+    }
+
+    /// The octets to send for an encoded message: compressed into scratch storage when the
+    /// response coding is gzip and that makes it shorter, else the octets as they are.
+    fn shrink(reply: *const Reply, encoded: []const u8) Prepared {
+        // An enveloped message is compressed one by one; a unary body only through `prepare`.
+        if (!reply.accepted.speaks.enveloped) return .{ .octets = encoded, .compressed = false };
+        return message_codec.compress(reply.accepted.response_coding, reply.encoder, encoded, reply.scratch.work);
+    }
+
     /// Writes one message: the whole body of a Connect unary response, or one envelope.
     pub fn write_message(reply: *Reply, prepared: Prepared, body: *std.Io.Writer) Error!void {
         reply.sent = true;
@@ -247,4 +284,58 @@ test "a refusal with a protocol becomes a reply, and one without has none" {
     };
     const reply = refusal_reply(refused, scratch).?;
     try testing.expect(!reply.error_only());
+}
+
+test "a message is encoded straight into the body, and scratch storage stays untouched" {
+    var buffers: TestBuffers = .{};
+    @memset(&buffers.message, 0xaa);
+    var reply = reply_for(.{ .protocol = .grpc, .codec = .proto, .enveloped = true }, &buffers);
+    var out: [64]u8 = undefined;
+    var body: std.Io.Writer = .fixed(&out);
+    try testing.expect(try reply.write_direct(Greeting, &.{ .text = "hi" }, &body));
+    try testing.expectEqualSlices(u8, &.{ 0, 0, 0, 0, 4, 0x0a, 2, 'h', 'i' }, body.buffered());
+    try testing.expect(std.mem.allEqual(u8, &buffers.message, 0xaa));
+    // A unary Connect body is the bare message.
+    var unary = reply_for(.{ .protocol = .connect, .codec = .json, .enveloped = false }, &buffers);
+    var unary_body: std.Io.Writer = .fixed(&out);
+    try testing.expect(try unary.write_direct(Greeting, &.{ .text = "hi" }, &unary_body));
+    try testing.expectEqualStrings("{\"text\":\"hi\"}", unary_body.buffered());
+}
+
+test "a body with no room for the message takes nothing, and the scratch path writes it" {
+    var buffers: TestBuffers = .{};
+    var reply = reply_for(.{ .protocol = .grpc, .codec = .proto, .enveloped = true }, &buffers);
+    var out: [6]u8 = undefined;
+    var body: std.Io.Writer = .fixed(&out);
+    try testing.expect(!try reply.write_direct(Greeting, &.{ .text = "hi" }, &body));
+    try testing.expectEqual(@as(usize, 0), body.buffered().len);
+    try testing.expect(!reply.sent);
+    // Less room than an envelope's prefix takes.
+    var tiny: [3]u8 = undefined;
+    var tiny_body: std.Io.Writer = .fixed(&tiny);
+    try testing.expect(!try reply.write_direct(Greeting, &.{ .text = "hi" }, &tiny_body));
+}
+
+test "a long message is gzipped in its envelope, and a unary gzip reply is not written direct" {
+    var buffers: [3][message_codec.compress_len_min * 2]u8 = undefined;
+    var encoder: compression.GzipEncoder = undefined;
+    var reply: Reply = .{
+        .accepted = .{ .speaks = .{ .protocol = .grpc, .codec = .proto, .enveloped = true }, .request_coding = .identity, .response_coding = .gzip, .timeout_ns = null },
+        .scratch = .{ .message = &buffers[0], .work = &buffers[1], .tokens = &buffers[2] },
+        .encoder = &encoder,
+    };
+    const text = [_]u8{'a'} ** message_codec.compress_len_min;
+    var out: [message_codec.compress_len_min * 2]u8 = undefined;
+    var body: std.Io.Writer = .fixed(&out);
+    try testing.expect(try reply.write_direct(Greeting, &.{ .text = &text }, &body));
+    const written = body.buffered();
+    try testing.expectEqual(@as(u8, 0x01), written[0]);
+    try testing.expect(written.len < text.len);
+    // The envelope holds the gzip of the message, which inflates back to it.
+    var decoder: compression.GzipDecoder = undefined;
+    var inflated: [message_codec.compress_len_min * 2]u8 = undefined;
+    const octets = try compression.decompress(.gzip, .{ .gzip = &decoder }, written[constants.protocol.envelope_prefix_len..], &inflated);
+    try testing.expectEqualStrings(&text, (try proto.decode(Greeting, octets)).text);
+    reply.accepted.speaks = .{ .protocol = .connect, .codec = .proto, .enveloped = false };
+    try testing.expect(!reply.writes_direct());
 }

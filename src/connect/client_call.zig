@@ -93,9 +93,9 @@ pub fn request(comptime method: method_file.Method, options: Options, messages: 
     var compressed_any = false;
     var len: usize = 0;
     for (messages) |*message| {
-        const packed_message = try message_codec.prepare(method.Request, options.codec, options.request_coding, options.encoder, message, buffers.scratch);
-        compressed_any = compressed_any or packed_message.compressed;
-        len += try place(speaks, packed_message.compressed, packed_message.octets, buffers.body[len..]);
+        const placed = try place(method.Request, speaks, options, message, buffers.body[len..], buffers.scratch.work);
+        compressed_any = compressed_any or placed.compressed;
+        len += placed.len;
     }
     result.body = buffers.body[0..len];
     result.add("content-type", protocol.content_type(speaks));
@@ -109,15 +109,21 @@ fn add_extra_headers(result: *Request, headers: []const Header) error{TooManyHea
     for (headers) |header| try result.add_header(header.name, header.value);
 }
 
-/// Writes one message into the body: bare for Connect unary, else in an envelope.
-fn place(speaks: protocol.Speaks, compressed: bool, octets: []const u8, room: []u8) error{NoSpaceLeft}!usize {
-    if (!speaks.enveloped) {
-        if (octets.len > room.len) return error.NoSpaceLeft;
-        @memcpy(room[0..octets.len], octets);
-        return octets.len;
-    }
-    return (try envelope.write(.{ .compressed = compressed }, octets, room)).len;
+/// Writes one message into the body: bare for Connect unary, else in an envelope. It is encoded
+/// in place, after room for its prefix, so it is not copied from scratch storage; gzip, when it
+/// shrinks the message, compresses into `work` and the shorter result is copied back.
+fn place(comptime T: type, speaks: protocol.Speaks, options: Options, message: *const T, room: []u8, work: []u8) Error!struct { len: usize, compressed: bool } {
+    const prefix_len: usize = if (speaks.enveloped) flag_prefix_len else 0;
+    if (room.len < prefix_len) return error.NoSpaceLeft;
+    const encoded = try message_codec.encode(T, options.codec, message, room[prefix_len..]);
+    const result = message_codec.compress(options.request_coding, options.encoder, encoded, work);
+    if (result.compressed) @memcpy(room[prefix_len..][0..result.octets.len], result.octets);
+    if (speaks.enveloped) envelope.write_prefix(.{ .compressed = result.compressed }, result.octets.len, room[0..flag_prefix_len]);
+    return .{ .len = prefix_len + result.octets.len, .compressed = result.compressed };
 }
+
+/// The octets of an envelope's prefix: its flags and its length.
+const flag_prefix_len = constants.protocol.envelope_prefix_len;
 
 fn add_protocol_headers(result: *Request, speaks: protocol.Speaks, options: Options, compressed: bool, values: []u8) error{NoSpaceLeft}!void {
     if (values.len < compression.accept_list_len_max + constants.protocol.connect_timeout_digits_max) return error.NoSpaceLeft;

@@ -137,6 +137,15 @@ first. Cite an entry by number in code and commits ("decision 6").
     test runner. A type outside the list fails with `UnknownAnyType`. Beaten: a runtime registry,
     which needs an allocator or a fixed table of function pointers, and loses comptime decoding.
 
+22. **A message is encoded into the body it goes out in.** The server encodes each reply message
+    into the free space of the response writer's buffer, after room for its envelope prefix, and
+    the client into its request body, so no message is copied from scratch storage. gzip, when it
+    shrinks a message, compresses into scratch storage and copies the shorter result back. A
+    server message that does not fit the buffer, and a Connect unary reply that may be
+    compressed, whose head names its coding, go through scratch storage as before. A 16 KB
+    stream message takes 0.38 us against 3.3 us. Beaten: always encoding into scratch, one copy
+    per message more.
+
 ## Tooling
 
 15. **pepegrillo is lazy.** `build.zig` requests it only when `b.pkg_hash.len == 0`, so a project
