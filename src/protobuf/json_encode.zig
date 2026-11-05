@@ -197,7 +197,7 @@ fn write_field(comptime field: Field, item: anytype, text: *json.TextWriter, com
 }
 
 fn write_value(comptime field: Field, comptime V: type, item: V, text: *json.TextWriter, comptime registry: anytype) Error!void {
-    if (comptime field.kind == .message) return write_message(V, &item, text, registry);
+    if (comptime field.kind.holds_message()) return write_message(V, &item, text, registry);
     try json_scalar.write(field.kind, V, item, text);
 }
 

@@ -110,14 +110,14 @@ fn element(comptime T: type, comptime element_kind: Kind, it: anytype, tag: wire
     }
     // "Message Structure": a known field with another wire type is malformed.
     if (tag.wire_type != element_kind.wire_type()) return error.WireTypeMismatch;
-    if (comptime element_kind == .message) {
-        return try decode.decode_shallow(T, try it.reader.length_delimited());
+    if (comptime element_kind.holds_message()) {
+        return try decode.decode_shallow(T, try decode.message_payload(element_kind, tag, &it.reader, constants.limits.depth_max));
     }
     return try read_scalar(T, element_kind, &it.reader);
 }
 
 fn read_scalar(comptime T: type, comptime element_kind: Kind, reader: *wire.Reader) wire.Error!T {
-    if (comptime element_kind == .message) unreachable;
+    if (comptime element_kind.holds_message()) unreachable;
     return scalar.read(element_kind, T, reader);
 }
 

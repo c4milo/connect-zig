@@ -60,7 +60,7 @@ const float_exponent_below = 1e-6;
 const float_exponent_above = 1e21;
 
 pub fn write(comptime kind: Kind, comptime V: type, value: V, text: *json.TextWriter) EncodeError!void {
-    comptime assert(kind != .message);
+    comptime assert(!kind.holds_message());
     switch (kind) {
         .int32, .sint32, .sfixed32 => try text.signed(value),
         .uint32, .fixed32 => try text.unsigned(value),
@@ -70,7 +70,7 @@ pub fn write(comptime kind: Kind, comptime V: type, value: V, text: *json.TextWr
         .string => try text.string(value),
         .bytes => try write_base64(value, text),
         .@"enum" => try write_enum(V, value, text),
-        .message => unreachable,
+        .message, .group => unreachable,
     }
 }
 

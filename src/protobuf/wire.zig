@@ -154,6 +154,24 @@ pub const Reader = struct {
         }
     }
 
+    /// The fields of a group whose start tag was read, up to its end tag, which it reads too
+    /// ("Groups"). The end tag's own octets are where it starts, whatever their encoding.
+    pub fn group_payload(reader: *Reader, number: u32, depth_left: u32) Error![]const u8 {
+        if (depth_left == 0) return error.DepthExceeded;
+        const start = reader.position;
+        // Each field takes at least one byte, so the input's length bounds the fields.
+        for (0..reader.bytes.len - reader.position + 1) |_| {
+            const before = reader.position;
+            const inner = try reader.tag();
+            if (inner.wire_type == .end_group) {
+                if (inner.number != number) return error.GroupMismatch;
+                return reader.bytes[start..before];
+            }
+            try reader.skip(inner, depth_left - 1);
+        }
+        return error.Truncated;
+    }
+
     fn skip_group(reader: *Reader, number: u32, depth_left: u32) Error!void {
         if (depth_left == 0) return error.DepthExceeded;
         // Each field takes at least one byte, so the input's length bounds the fields.

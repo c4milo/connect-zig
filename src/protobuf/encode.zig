@@ -75,7 +75,7 @@ fn encode_entry(comptime T: type, entry: *const T, sink: *Sink) Error!void {
         const F = @TypeOf(item);
         if (comptime repeated.is_lazy(F)) {
             const child = try item.get() orelse F.Message{};
-            try encode_child(F.Message, field.number, &child, sink);
+            try encode_child(F.Message, field.kind, field.number, &child, sink);
         } else switch (@typeInfo(F)) {
             .optional => |optional| try encode_present(field, optional.child, item orelse .{}, sink),
             else => try encode_present(field, F, item, sink),
@@ -88,7 +88,7 @@ fn encode_field(comptime field: Field, item: anytype, sink: *Sink) Error!void {
     if (comptime repeated.is_repeated(F)) return encode_repeated(field, F, &item, sink);
     if (comptime repeated.is_lazy(F)) {
         const child = try item.get() orelse return;
-        return encode_child(F.Message, field.number, &child, sink);
+        return encode_child(F.Message, field.kind, field.number, &child, sink);
     }
     switch (@typeInfo(F)) {
         .optional => |optional| {
@@ -104,7 +104,7 @@ fn encode_field(comptime field: Field, item: anytype, sink: *Sink) Error!void {
 
 /// Writes a field that is set, whatever its value.
 fn encode_present(comptime field: Field, comptime V: type, item: V, sink: *Sink) Error!void {
-    if (comptime field.kind == .message) return encode_child(V, field.number, &item, sink);
+    if (comptime field.kind.holds_message()) return encode_child(V, field.kind, field.number, &item, sink);
     try sink.tag(field.number, field.kind.wire_type());
     try sink.value(field.kind, V, item);
 }
@@ -117,12 +117,18 @@ fn encode_member(comptime T: type, comptime field: Field, comptime oneof: []cons
     const item = @field(active, field.name);
     if (comptime repeated.is_lazy(V)) {
         const child = try item.get() orelse return;
-        return encode_child(V.Message, field.number, &child, sink);
+        return encode_child(V.Message, field.kind, field.number, &child, sink);
     }
     try encode_present(field, V, item, sink);
 }
 
-fn encode_child(comptime M: type, number: u32, child: *const M, sink: *Sink) Error!void {
+fn encode_child(comptime M: type, comptime kind: Kind, number: u32, child: *const M, sink: *Sink) Error!void {
+    if (comptime kind == .group) {
+        // "Groups": the fields sit between a start and an end tag, with no length before them.
+        try sink.tag(number, .start_group);
+        try encode_message(M, child, sink);
+        return sink.tag(number, .end_group);
+    }
     const writer = sink.writer orelse {
         // A counting sink needs the child's length alone, which one walk gives.
         const child_len = try encoded_len(M, child);
@@ -177,8 +183,8 @@ fn encode_repeated(comptime field: Field, comptime F: type, item: *const F, sink
     var elements = item.iterator();
     for (0..constants.limits.elements_max) |_| {
         const element = try elements.next() orelse return;
-        if (comptime F.kind == .message) {
-            try encode_child(F.Element, field.number, &element, sink);
+        if (comptime F.kind.holds_message()) {
+            try encode_child(F.Element, F.kind, field.number, &element, sink);
         } else {
             try sink.tag(field.number, F.kind.wire_type());
             try sink.value(F.kind, F.Element, element);

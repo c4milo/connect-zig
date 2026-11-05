@@ -203,6 +203,12 @@ fn parse_bool_key(key: []const u8) Error!bool {
 /// Writes one value of `field`, with its tag, from the token `value`.
 fn write_single(comptime field: Field, comptime V: type, transcoder: *Transcoder, value: json.Item, depth_left: u32, comptime registry: anytype) Error!void {
     const writer = &transcoder.writer;
+    if (comptime field.kind == .group) {
+        // "Groups": the fields sit between a start and an end tag, with no length before them.
+        try writer.tag(field.number, .start_group);
+        try message_body(V, transcoder, value, depth_left - 1, registry);
+        return writer.tag(field.number, .end_group);
+    }
     if (comptime field.kind == .message) {
         try writer.tag(field.number, .len);
         const at = try writer.padded_varint();

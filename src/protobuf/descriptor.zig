@@ -25,6 +25,9 @@ pub const Kind = enum {
     sfixed64,
     sint32,
     sint64,
+    /// A message written between a start and an end tag, not after its length: a proto2 group,
+    /// or an editions field whose `message_encoding` is DELIMITED ("Groups").
+    group,
 
     /// The wire type a single value of this kind takes ("Message Structure").
     pub fn wire_type(kind: Kind) wire.WireType {
@@ -33,13 +36,19 @@ pub const Kind = enum {
             .fixed64, .sfixed64, .double => .i64,
             .fixed32, .sfixed32, .float => .i32,
             .string, .bytes, .message => .len,
+            .group => .start_group,
         };
+    }
+
+    /// Whether a value of this kind is a message, written with a length or between group tags.
+    pub fn holds_message(kind: Kind) bool {
+        return kind == .message or kind == .group;
     }
 
     /// Whether a repeated field of this kind may be packed: every scalar numeric kind
     /// ("Packed Repeated Fields").
     pub fn packable(kind: Kind) bool {
-        return kind.wire_type() != .len;
+        return kind.wire_type() != .len and kind != .group;
     }
 };
 

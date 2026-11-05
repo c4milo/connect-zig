@@ -75,11 +75,11 @@ fn read_field(comptime T: type, comptime field: Field, message: *T, field_start:
     const F = @FieldType(T, field.name);
     const slot = &@field(message, field.name);
     if (comptime repeated.is_repeated(F)) return read_repeated(F, slot, field_start, bytes, field.number, tag, reader, depth_left, mode);
-    if (comptime repeated.is_lazy(F)) return read_lazy(F, slot, tag, reader, depth_left, mode);
-    if (comptime field.kind == .message) {
+    if (comptime repeated.is_lazy(F)) return read_lazy(F, field.kind, slot, tag, reader, depth_left, mode);
+    if (comptime field.kind.holds_message()) {
         const Child = @typeInfo(F).optional.child;
         if (slot.* == null) slot.* = .{};
-        return read_message(Child, &slot.*.?, tag, reader, depth_left, mode);
+        return read_message(Child, field.kind, &slot.*.?, tag, reader, depth_left, mode);
     }
     const V = switch (@typeInfo(F)) {
         .optional => |optional| optional.child,
@@ -94,16 +94,22 @@ fn read_value(comptime kind: Kind, comptime V: type, tag: wire.Tag, reader: *wir
     return scalar.read(kind, V, reader);
 }
 
-fn read_message(comptime M: type, slot: *M, tag: wire.Tag, reader: *wire.Reader, depth_left: u32, comptime mode: Mode) Error!void {
-    // "Message Structure": an embedded message is length-delimited.
-    if (tag.wire_type != .len) return error.WireTypeMismatch;
-    const payload = try reader.length_delimited();
+/// The bytes of an embedded message: after its length, or between its group tags.
+pub fn message_payload(comptime kind: Kind, tag: wire.Tag, reader: *wire.Reader, depth_left: u32) Error![]const u8 {
+    // "Message Structure": an embedded message is length-delimited, and a group is written
+    // between a start and an end tag ("Groups").
+    if (tag.wire_type != kind.wire_type()) return error.WireTypeMismatch;
+    if (kind == .group) return reader.group_payload(tag.number, depth_left);
+    return reader.length_delimited();
+}
+
+fn read_message(comptime M: type, comptime kind: Kind, slot: *M, tag: wire.Tag, reader: *wire.Reader, depth_left: u32, comptime mode: Mode) Error!void {
+    const payload = try message_payload(kind, tag, reader, depth_left);
     try merge_depth(M, slot, payload, depth_left - 1, mode);
 }
 
-fn read_lazy(comptime F: type, slot: *F, tag: wire.Tag, reader: *wire.Reader, depth_left: u32, comptime mode: Mode) Error!void {
-    if (tag.wire_type != .len) return error.WireTypeMismatch;
-    const payload = try reader.length_delimited();
+fn read_lazy(comptime F: type, comptime kind: Kind, slot: *F, tag: wire.Tag, reader: *wire.Reader, depth_left: u32, comptime mode: Mode) Error!void {
+    const payload = try message_payload(kind, tag, reader, depth_left);
     // The payload is checked once here, so `Lazy.get` reads only checked bytes.
     if (mode == .checked) _ = try decode_depth(F.Message, payload, depth_left - 1);
     if (slot.present()) return error.MergeUnsupported;
@@ -118,8 +124,8 @@ fn read_repeated(comptime F: type, slot: *F, field_start: usize, bytes: []const 
     }
     if (tag.wire_type != .len or !comptime F.kind.packable()) {
         if (tag.wire_type != F.kind.wire_type()) return error.WireTypeMismatch;
-        if (comptime F.kind == .message) {
-            const payload = try reader.length_delimited();
+        if (comptime F.kind.holds_message()) {
+            const payload = try message_payload(F.kind, tag, reader, depth_left);
             if (mode == .checked) _ = try decode_depth(F.Element, payload, depth_left - 1);
         } else {
             _ = try scalar.read(F.kind, F.Element, reader);
@@ -158,18 +164,18 @@ fn read_oneof(comptime T: type, comptime field: Field, comptime oneof: []const u
     const U = @typeInfo(@FieldType(T, oneof)).optional.child;
     const V = @FieldType(U, field.name);
     const slot = &@field(message, oneof);
-    if (comptime field.kind != .message) {
+    if (comptime !field.kind.holds_message()) {
         slot.* = @unionInit(U, field.name, try read_value(field.kind, V, tag, reader));
         return;
     }
     if (comptime repeated.is_lazy(V)) {
         var lazy: V = .{};
-        try read_lazy(V, &lazy, tag, reader, depth_left, mode);
+        try read_lazy(V, field.kind, &lazy, tag, reader, depth_left, mode);
         slot.* = @unionInit(U, field.name, lazy);
         return;
     }
     // "Oneof": a member that repeats merges when it is still the one set.
     const same = if (slot.*) |active| active == @field(std.meta.Tag(U), field.name) else false;
     if (!same) slot.* = @unionInit(U, field.name, .{});
-    try read_message(V, &@field(slot.*.?, field.name), tag, reader, depth_left, mode);
+    try read_message(V, field.kind, &@field(slot.*.?, field.name), tag, reader, depth_left, mode);
 }

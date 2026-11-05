@@ -12,7 +12,7 @@ const Kind = descriptor.Kind;
 
 /// Reads one value of `kind` as `V`. The caller checked the wire type.
 pub fn read(comptime kind: Kind, comptime V: type, reader: *wire.Reader) wire.Error!V {
-    comptime assert(kind != .message);
+    comptime assert(!kind.holds_message());
     return switch (kind) {
         // "Base 128 Varints": int32 is sign-extended to 64 bits on the wire, so its value is the
         // low 32 bits. uint32 keeps the low 32 bits as well.
@@ -33,7 +33,7 @@ pub fn read(comptime kind: Kind, comptime V: type, reader: *wire.Reader) wire.Er
         .double => @bitCast(try reader.fixed64()),
         .bytes => try reader.length_delimited(),
         .string => try read_string(reader),
-        .message => unreachable,
+        .message, .group => unreachable,
     };
 }
 
@@ -60,7 +60,7 @@ fn varint_of(comptime kind: Kind, comptime V: type, value: V) u64 {
 
 /// Writes one value of `kind`, without its tag.
 pub fn write(comptime kind: Kind, comptime V: type, value: V, writer: *wire.Writer) wire.Writer.WriteError!void {
-    comptime assert(kind != .message);
+    comptime assert(!kind.holds_message());
     switch (comptime kind.wire_type()) {
         .varint => try writer.varint(varint_of(kind, V, value)),
         .i32 => try writer.fixed32(@bitCast(value)),
