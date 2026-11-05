@@ -193,8 +193,9 @@ try say_proto.init(.{}, &.{.{ .sentence = "I feel tired" }}, buffers);
 _ = try pool.request(&say_proto.request, &say_proto.response);
 ```
 
-[examples/](examples) holds seven programs, from generated messages alone to streaming,
-interceptors, error details and a server on a socket. Each checks itself, and
+[examples/](examples) holds eight programs, from generated messages alone to streaming,
+interceptors, error details, a GitHub-style API with tokens, rate limits, pages and field masks,
+and a server on a socket. Each checks itself, and
 [examples/README.md](examples/README.md) says where to start.
 
 ## Performance

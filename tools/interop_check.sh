@@ -85,6 +85,30 @@ for protocol in connect grpc grpcweb; do
             --protocol "${protocol}" -d '{"name":"Ada"}' "${h3_base}/Introduce" 2>&1 | tr -d ' \n')"
 done
 
+# The GitHub-style service: a token, typed details, a private repository and a server stream.
+# connect-go reads gRPC's trailers, so gRPC answers here where colibri's client cannot read them.
+github="http://127.0.0.1:${port}/github.v1"
+octocat='authorization: Bearer ghp_octocat_example'
+gh() {
+    gh_protocol="$1"
+    shift
+    timeout "${call_seconds}" "${buf}" curl --http2-prior-knowledge --schema examples/proto --protocol "${gh_protocol}" "$@" 2>&1 |
+        tr -d ' \n'
+}
+expect "grpc CreateRepository" '"fullName":"octocat/secrets"' \
+    "$(gh grpc -H "${octocat}" -d '{"name":"secrets","visibility":"VISIBILITY_PRIVATE"}' "${github}.RepositoryService/CreateRepository" |
+        grep -o '"fullName":"[^"]*"')"
+expect "grpc private repository reads as missing" '{"code":"not_found","message":"NotFound","details":[{"type":"github.v1.NotFound","value":"CgpSZXBvc2l0b3J5Eg9vY3RvY2F0L3NlY3JldHM"}]}' \
+    "$(gh grpc -d '{"owner":"octocat","name":"secrets"}' "${github}.RepositoryService/GetRepository")"
+gh connect -H "${octocat}" -d '{"owner":"octocat","repository":"secrets","title":"Rotate keys","labels":["security"]}' \
+    "${github}.IssueService/CreateIssue" >/dev/null
+expect "grpcweb WatchEvents" '"opened":{"title":"Rotatekeys"}|"labeled":{"label":"security"}|' \
+    "$(gh grpcweb -H "${octocat}" -d '{"owner":"octocat","repository":"secrets"}' "${github}.IssueService/WatchEvents" |
+        grep -o -e '"opened":{[^}]*}' -e '"labeled":{[^}]*}' | tr '\n' '|')"
+expect "x-ratelimit headers" 'x-ratelimit-limit: 100|x-ratelimit-remaining: 96|' \
+    "$(curl -sS -m 5 -H "${octocat}" --json '{"owner":"octocat","name":"secrets"}' -D - -o /dev/null \
+        "${github}.RepositoryService/GetRepository" | tr -d '\r' | grep -i '^x-ratelimit' | tr '\n' '|')"
+
 # The demo service: interceptors, every kind of stream, and error details.
 base="http://127.0.0.1:${port}/demo.v1.DemoService"
 demo() {

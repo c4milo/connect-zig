@@ -1,8 +1,9 @@
 //! The state the example server keeps across calls, which every handler and interceptor of the
-//! ELIZA and demo services reads as its `app`.
+//! ELIZA, demo and GitHub-style services reads as its `app`.
 const std = @import("std");
 const connect = @import("connect");
 const rpc = @import("connect_colibri");
+const github = @import("github.zig");
 
 /// The longest sentence or detail a handler writes.
 pub const text_len_max = 4096;
@@ -25,6 +26,8 @@ pub const App = struct {
     details: [1]connect.Detail = undefined,
     /// The digits of the counts `Counting` reports.
     counts: [count_digits_max]u8 = undefined,
+    /// The GitHub-style service's store, and the room its replies take.
+    github: github.Room = .{},
 };
 
 /// Writes a reply into `app.text`, which stays valid until the next call writes there.

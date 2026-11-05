@@ -175,6 +175,13 @@ ran on Linux x86-64 with Zig 0.16.0.
   `connect_colibri` gains `Call.request_headers`, `Call.request_query` and a context's
   `message_receive_limit`. It also gains 16 KiB of trailer room, for details that echo headers.
 
+- **A GitHub-style example.** `zig build example-github` runs one session against
+  `github.v1.RepositoryService` and `IssueService` over h2 and h3: tokens, a rate limit, pages,
+  an update mask, a private repository, a client stream and a server stream.
+  `tools/interop_check.sh` calls it with `buf curl` in gRPC and gRPC-Web. It found a fault in
+  colibri's h3 client, which panics on a status its enum lacks, such as 429; the rate-limit step
+  runs over h2 alone until colibri fixes it.
+
 - **h3 on the socket server.** `tools/interop_check.sh` calls Introduce with `buf curl --http3`
   in Connect, gRPC and gRPC-Web, under the test identity, beside the h2 and h11 calls (decision
   28).

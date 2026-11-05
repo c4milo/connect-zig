@@ -53,6 +53,7 @@ pub fn add(b: *std.Build, graph: Graph) *std.Build.Step {
     const services: Services = .{
         .eliza = eliza,
         .demo = generated(b, graph, "examples/gen/demo/v1/demo.pb.zig", &.{}),
+        .github = generated(b, graph, "examples/gen/github/v1/github.pb.zig", &.{}),
         .rotor = rotor,
         .test_identity = test_identity,
     };
@@ -61,6 +62,7 @@ pub fn add(b: *std.Build, graph: Graph) *std.Build.Step {
         .{ .name = "interceptors", .description = "Run calls through server and client interceptors" },
         .{ .name = "streaming", .description = "Run bidirectional, client and server streams" },
         .{ .name = "errors", .description = "Run calls that fail with typed error details" },
+        .{ .name = "github", .description = "Run a session against a GitHub-style API" },
     }) |linked| {
         const exe = program(b, graph, linked.name, b.fmt("examples/{s}.zig", .{linked.name}), services);
         const run = b.addRunArtifact(exe);
@@ -105,6 +107,7 @@ pub fn socket_loop(b: *std.Build, graph: Graph, rotor: *std.Build.Module) *std.B
 const Services = struct {
     eliza: *std.Build.Module,
     demo: *std.Build.Module,
+    github: *std.Build.Module,
     rotor: *std.Build.Module,
     test_identity: *std.Build.Module,
 };
@@ -126,6 +129,7 @@ fn program(b: *std.Build, graph: Graph, name: []const u8, path: []const u8, serv
                 .{ .name = "test_identity", .module = services.test_identity },
                 .{ .name = "eliza", .module = services.eliza },
                 .{ .name = "demo", .module = services.demo },
+                .{ .name = "github", .module = services.github },
                 .{ .name = "rotor", .module = services.rotor },
             },
         }),

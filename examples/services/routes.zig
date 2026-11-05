@@ -1,11 +1,12 @@
-//! The route table both example servers serve: the ELIZA service and the demo service, under one
-//! `server.router`.
+//! The route table both example servers serve: the ELIZA service, the demo service and the
+//! GitHub-style services, under one `server.router`.
 const server = @import("server");
 const rpc = @import("connect_colibri");
 const Service = @import("eliza").ElizaService;
 const App = @import("app.zig").App;
 const eliza = @import("eliza.zig");
 const demo = @import("demo.zig");
+const github = @import("github.zig");
 
 /// A route's error that is not an RPC's: the router answers 500.
 fn on_error(_: *App, _: *const server.Request, _: anyerror, response: *server.ResponseWriter) void {
@@ -15,7 +16,7 @@ fn on_error(_: *App, _: *const server.Request, _: anyerror, response: *server.Re
 pub const routes = server.router(App, .{
     .error_handler = on_error,
     // A method Connect does not serve gets 405, on every path of the table.
-    .routes = eliza.routes ++ demo.routes ++ rpc.Refusals(App, Service.say).routes,
+    .routes = eliza.routes ++ demo.routes ++ github.routes ++ rpc.Refusals(App, Service.say).routes,
 });
 
 /// The router's pool: the calls the server answers at once, and room for each one's request and

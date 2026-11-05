@@ -13,6 +13,7 @@ Start at the top: each example adds one layer to the one before it.
 | [streaming.zig](streaming.zig) | Bidirectional, client and server streams, and a stream that fails, over h2, h11 and h3 | `zig build example-streaming` |
 | [interceptors.zig](interceptors.zig) | Server interceptors that log and authenticate, and client interceptors, over h2 and h3 | `zig build example-interceptors` |
 | [errors.zig](errors.zig) | Errors with typed details in Connect, gRPC and gRPC-Web, over h2 and h3 | `zig build example-errors` |
+| [github.zig](github.zig) | A GitHub-style API used as a real client would: tokens, rate limits, pages, field masks, private resources, streams | `zig build example-github` |
 | [socket_server.zig](socket_server.zig) | Both services on a TCP socket, for curl and `buf curl` | `zig build run-eliza-server -- 8080` |
 
 ## The services
@@ -26,7 +27,14 @@ Start at the top: each example adds one layer to the one before it.
   [proto/demo/v1/demo.proto](proto/demo/v1/demo.proto): `Whoami` behind the `Logging` and `Auth`
   interceptors, `Chat` and `Sum` as type handlers that take each message as it arrives,
   `Countdown`, and `Divide`, which fails with a `DivisionByZero` detail.
-- [services/routes.zig](services/routes.zig) puts both under one `server.router`, which
+- [services/github.zig](services/github.zig) and [services/github_issues.zig](services/github_issues.zig)
+  serve `github.v1.RepositoryService` and `github.v1.IssueService`, from
+  [proto/github/v1/github.proto](proto/github/v1/github.proto), over the fixed tables of
+  [services/github_store.zig](services/github_store.zig). Every route runs behind `Auth`, which
+  reads a bearer token, and `RateLimit`, which counts each caller's calls and sets GitHub's
+  `x-ratelimit-*` headers. Failures carry `NotFound`, `AlreadyExists`, `BadField` and
+  `RateLimited` details, and a private repository reads as not found to anyone but its owner.
+- [services/routes.zig](services/routes.zig) puts all three under one `server.router`, which
   [services/app.zig](services/app.zig)'s `App` runs.
 - [services/link.zig](services/link.zig) and [services/link_datagram.zig](services/link_datagram.zig)
   are colibri's in-memory links for octet streams and for datagrams, copied unchanged, which stand

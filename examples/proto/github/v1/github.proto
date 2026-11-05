@@ -1,0 +1,215 @@
+// A model of a few of GitHub's REST resources as Connect services: repositories, issues and their
+// events. It shows what a real API needs: authentication and anonymous reads, rate limits,
+// pagination, partial updates through a field mask, private resources that read as missing,
+// typed error details, and streams. It is an example, not GitHub's API, and holds none of its data.
+syntax = "proto3";
+
+package github.v1;
+
+import "google/protobuf/field_mask.proto";
+import "google/protobuf/timestamp.proto";
+
+service RepositoryService {
+  // GetRepository answers a public repository to anyone, and a private one to its owner alone.
+  // Another caller gets not_found, as GitHub answers 404, so a private name does not leak.
+  rpc GetRepository(GetRepositoryRequest) returns (Repository) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+  // ListRepositories answers an owner's repositories a page at a time.
+  rpc ListRepositories(ListRepositoriesRequest) returns (ListRepositoriesResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+  // CreateRepository needs a token. A name the caller already owns fails with already_exists.
+  rpc CreateRepository(CreateRepositoryRequest) returns (Repository) {}
+}
+
+service IssueService {
+  // CreateIssue opens an issue with the next number of its repository.
+  rpc CreateIssue(CreateIssueRequest) returns (Issue) {}
+  rpc GetIssue(GetIssueRequest) returns (Issue) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+  // ListIssues filters by state and label, a page at a time.
+  rpc ListIssues(ListIssuesRequest) returns (ListIssuesResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+  // UpdateIssue changes the fields its mask names, and no other.
+  rpc UpdateIssue(UpdateIssueRequest) returns (Issue) {}
+  // ImportIssues opens one issue for each message the client streams, and answers once it ends.
+  rpc ImportIssues(stream CreateIssueRequest) returns (ImportIssuesResponse) {}
+  // WatchEvents streams a repository's events after a cursor, oldest first.
+  rpc WatchEvents(WatchEventsRequest) returns (stream Event) {}
+}
+
+enum Visibility {
+  VISIBILITY_UNSPECIFIED = 0;
+  VISIBILITY_PUBLIC = 1;
+  VISIBILITY_PRIVATE = 2;
+}
+
+enum IssueState {
+  // In a filter, every state.
+  ISSUE_STATE_UNSPECIFIED = 0;
+  ISSUE_STATE_OPEN = 1;
+  ISSUE_STATE_CLOSED = 2;
+}
+
+message User {
+  string login = 1;
+  int64 id = 2;
+}
+
+message Repository {
+  int64 id = 1;
+  User owner = 2;
+  string name = 3;
+  // "owner/name".
+  string full_name = 4;
+  string description = 5;
+  Visibility visibility = 6;
+  repeated string topics = 7;
+  int32 open_issues_count = 8;
+  google.protobuf.Timestamp created_at = 9;
+}
+
+message GetRepositoryRequest {
+  string owner = 1;
+  string name = 2;
+}
+
+message ListRepositoriesRequest {
+  string owner = 1;
+  // At most 20; 0 means 10.
+  int32 page_size = 2;
+  // The `next_page_token` of the page before, or empty for the first page.
+  string page_token = 3;
+}
+
+message ListRepositoriesResponse {
+  repeated Repository repositories = 1;
+  // Empty on the last page.
+  string next_page_token = 2;
+}
+
+message CreateRepositoryRequest {
+  string name = 1;
+  string description = 2;
+  Visibility visibility = 3;
+  repeated string topics = 4;
+}
+
+message Issue {
+  int64 id = 1;
+  // The repository's full name, "owner/name".
+  string repository = 2;
+  int32 number = 3;
+  string title = 4;
+  string body = 5;
+  IssueState state = 6;
+  User author = 7;
+  repeated string labels = 8;
+  google.protobuf.Timestamp created_at = 9;
+  // Set once the issue is closed.
+  google.protobuf.Timestamp closed_at = 10;
+}
+
+message CreateIssueRequest {
+  string owner = 1;
+  string repository = 2;
+  string title = 3;
+  string body = 4;
+  repeated string labels = 5;
+}
+
+message GetIssueRequest {
+  string owner = 1;
+  string repository = 2;
+  int32 number = 3;
+}
+
+message ListIssuesRequest {
+  string owner = 1;
+  string repository = 2;
+  IssueState state = 3;
+  // Only issues with this label, when set.
+  string label = 4;
+  int32 page_size = 5;
+  string page_token = 6;
+}
+
+message ListIssuesResponse {
+  repeated Issue issues = 1;
+  string next_page_token = 2;
+  // The issues the filter matches, over every page.
+  int32 total_count = 3;
+}
+
+message UpdateIssueRequest {
+  string owner = 1;
+  string repository = 2;
+  int32 number = 3;
+  // The new values. Only the fields `update_mask` names are read.
+  Issue issue = 4;
+  // Paths among "title", "body", "state" and "labels".
+  google.protobuf.FieldMask update_mask = 5;
+}
+
+message ImportIssuesResponse {
+  int32 created = 1;
+  repeated int32 numbers = 2;
+}
+
+message WatchEventsRequest {
+  string owner = 1;
+  string repository = 2;
+  // The id of the last event the client saw, or 0 for every event.
+  int64 after_id = 3;
+}
+
+message Event {
+  int64 id = 1;
+  User actor = 2;
+  google.protobuf.Timestamp created_at = 3;
+  int32 issue_number = 4;
+  oneof payload {
+    IssueOpened opened = 5;
+    IssueClosed closed = 6;
+    IssueLabeled labeled = 7;
+  }
+}
+
+message IssueOpened {
+  string title = 1;
+}
+
+message IssueClosed {}
+
+message IssueLabeled {
+  string label = 1;
+}
+
+// The details errors carry, which a client decodes by their type name.
+
+// not_found: a resource that does not exist, or that the caller may not see.
+message NotFound {
+  string resource_type = 1;
+  string resource_name = 2;
+}
+
+// already_exists: a resource the caller already has.
+message AlreadyExists {
+  string resource_type = 1;
+  string resource_name = 2;
+}
+
+// invalid_argument: the field that was wrong, and why.
+message BadField {
+  string field = 1;
+  string description = 2;
+}
+
+// resource_exhausted: the caller used every call of its limit.
+message RateLimited {
+  int32 limit = 1;
+  int32 used = 2;
+}
