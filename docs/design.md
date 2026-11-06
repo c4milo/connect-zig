@@ -219,8 +219,13 @@ ran on Linux x86-64 with Zig 0.16.0.
   `tools/interop_check.sh` calls it over https and passes; `tools/interop_languages_check.sh`
   runs 507 scenarios across Go, TypeScript, Python and Rust over TLS, all passing.
   `zig build example-github` runs the rate-limit step over h3 too, now that colibri's h3 client
-  reads 429. The server sets the endpoint's `ecn`, since colibri's server reads each datagram's
-  ECN codepoint and v0.14.0 leaves the endpoint's flag to the caller.
+  reads 429. The server set the endpoint's `ecn`, since v0.14.0's server read each datagram's
+  ECN codepoint and left the endpoint's flag at false.
+
+- **colibri v0.14.1.** colibri's server sets `ecn` itself, so the example server drops its own.
+  The pin moves with colibri's: Rotor v0.9.0 for the examples, chapulin v0.3.0 through colibri.
+  `tools/interop_check.sh` passes, h3 calls among them, as do `zig build test`, the 507
+  scenarios across languages, conformance 2714/2714 and the perf gate.
 
 - **One generated file per .proto file.** The plugin writes each .proto file as one
   `<file>.pb.zig`, and the file-length rule skips `.pb.zig` (decision 17). `coverage.proto`'s 28

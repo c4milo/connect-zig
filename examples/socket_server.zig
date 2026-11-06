@@ -68,9 +68,6 @@ pub fn main(init: std.process.Init) !void {
         .port = port,
         .identity = .{ .chain = identity.chain_pem, .key = identity.key_pem },
         .cpu = cpu,
-        // colibri's server reads each datagram's ECN codepoint and hands it to the endpoint, so
-        // the endpoint must expect it (colibri decision 68). v0.14.0 leaves this to the caller.
-        .endpoint = .{ .ecn = true },
     });
     defer http_server.deinit();
     // A script that asked for port 0 reads the port from this line.
