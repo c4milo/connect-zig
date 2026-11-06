@@ -222,6 +222,10 @@ ran on Linux x86-64 with Zig 0.16.0.
   reads 429. The server sets the endpoint's `ecn`, since colibri's server reads each datagram's
   ECN codepoint and v0.14.0 leaves the endpoint's flag to the caller.
 
+- **One generated file per .proto file.** The plugin writes each .proto file as one
+  `<file>.pb.zig`, and the file-length rule skips `.pb.zig` (decision 17). `coverage.proto`'s 28
+  files become one of 814 lines. `zig build test` passes, and `tools/generate_check.sh` matches.
+
 ### What a later step owes
 
 - The connectrpc conformance suite against the client (step 7), once colibri's client exposes

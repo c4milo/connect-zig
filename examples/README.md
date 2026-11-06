@@ -108,8 +108,8 @@ A client interceptor is a type an `ClientCallWith` lists, with `on_request` and 
   [coverage.zig](coverage.zig) and with Go, over the cases in [testdata/coverage](testdata/coverage);
 - `kitchen/v1/kitchen.proto`: every shape the generator writes, from maps and oneofs to
   recursion and well-known types;
-- `large/v1/large.proto`: a file long enough that the plugin splits it into a file for each
-  declaration.
+- `large/v1/large.proto`: a file of many wide messages, past the 500 lines hand-written code
+  keeps to, which the plugin still writes as one file.
 
 [generated_test.zig](generated_test.zig) compiles all of it and round-trips its messages, and
 `tools/generate_check.sh` fails when `buf generate` writes anything other than what is committed.

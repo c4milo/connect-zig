@@ -7,6 +7,9 @@ const proto = @import("protobuf");
 const pb = @import("descriptor_pb.zig");
 const main = @import("main.zig");
 
+/// The file-length rule's limit on hand-written code (CLAUDE.md); generated code has none.
+const hand_written_lines_max = 500;
+
 fn field(name: []const u8, number: i32, kind: pb.Type, label: pb.Label) pb.FieldDescriptorProto {
     return .{ .name = name, .number = number, .type = kind, .label = label, .json_name = name };
 }
@@ -134,7 +137,7 @@ fn wide_message(arena: std.mem.Allocator, name: []const u8, count: usize) !pb.De
     return .{ .name = name, .field = .of(fields) };
 }
 
-test "a file past the line limit is split into a piece for each declaration" {
+test "a file past the hand-written line limit stays one file" {
     var arena_state = std.heap.ArenaAllocator.init(testing.allocator);
     defer arena_state.deinit();
     const arena = arena_state.allocator();
@@ -157,26 +160,16 @@ test "a file past the line limit is split into a piece for each declaration" {
     };
     const request: pb.CodeGeneratorRequest = .{ .file_to_generate = .of(&.{"demo/v1/demo.proto"}), .proto_file = .of(&.{file}) };
     const files = try generated_files(arena, &request);
-    const expected = [_][]const u8{
-        "demo/v1/demo/Demo.pb.zig",        "demo/v1/demo/Outer.pb.zig",            "demo/v1/demo/Second.pb.zig",
-        "demo/v1/demo/Outer.Inner.pb.zig", "demo/v1/demo/Outer.Inner.Kind.pb.zig", "demo/v1/demo.pb.zig",
-    };
-    try testing.expectEqual(expected.len, files.len);
-    for (files, expected) |output, name| {
-        try testing.expectEqualStrings(name, output.name.?);
-        try testing.expect(std.mem.count(u8, output.content.?, "\n") <= @import("generate.zig").file_lines_max);
-        // No piece climbs out of its directory by path.
-        try testing.expect(std.mem.indexOf(u8, output.content.?, "../") == null);
-    }
-    try expect_contains(files[5].content.?, "//! The build gives this file the modules protobuf, connect.\n");
-    try expect_contains(files[5].content.?, "pub const Outer = @import(\"demo/Outer.pb.zig\").Outer;\n");
-    try expect_contains(files[1].content.?, "    pub const Inner = @import(\"Outer.Inner.pb.zig\").Inner;\n");
-    try expect_contains(files[2].content.?, "const Outer = @import(\"Outer.pb.zig\").Outer;\n");
-    try expect_contains(files[2].content.?, "    link: proto.Lazy(Second) = .{},\n    kind: Outer.Inner.Kind = @enumFromInt(0),\n");
-    try expect_contains(files[0].content.?, "const Second = @import(\"Second.pb.zig\").Second;\n");
-    // A top-level piece names itself and imports nothing for it.
-    try testing.expect(std.mem.indexOf(u8, files[2].content.?, "const Second = @import") == null);
-    try expect_contains(files[4].content.?, "pub const Kind = enum(i32) {\n");
+    try testing.expectEqual(1, files.len);
+    try testing.expectEqualStrings("demo/v1/demo.pb.zig", files[0].name.?);
+    const content = files[0].content.?;
+    // Longer than the hand-written code's limit, and still one file (decision 17).
+    try testing.expect(std.mem.count(u8, content, "\n") > hand_written_lines_max);
+    try expect_contains(content, "//! The build gives this file the modules protobuf, connect.\n");
+    try expect_contains(content, "    pub const Inner = struct {\n");
+    try expect_contains(content, "        pub const Kind = enum(i32) {\n");
+    try expect_contains(content, "    link: proto.Lazy(Second) = .{},\n    kind: Outer.Inner.Kind = @enumFromInt(0),\n");
+    try testing.expect(std.mem.indexOf(u8, content, "@import(\"demo/") == null);
 }
 
 test "a type of another file is named through that file's module" {

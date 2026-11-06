@@ -52,10 +52,10 @@ pub const unbounded_loop = rules.unbounded_loop.Rule(.{
     },
 });
 
-/// CLAUDE.md, Conventions: a file stays at or under 500 lines, generated code included: the plugin
-/// splits a long output into a file for each declaration.
+/// CLAUDE.md, Conventions: a file stays at or under 500 lines. Generated code is one file per
+/// .proto file, whatever its length, as other generators write it (decision 17).
 pub const file_length = rules.file_length.Rule(.{
-    .scope = .{ .extensions = &.{ ".zig", ".sh" } },
+    .scope = .{ .extensions = &.{ ".zig", ".sh" }, .exclude_basename_suffixes = &.{".pb.zig"} },
     .message_suffix = "; split the file",
 });
 

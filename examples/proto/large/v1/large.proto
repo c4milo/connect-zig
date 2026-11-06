@@ -1,6 +1,6 @@
-// A file long enough that the plugin splits its output into a piece for each declaration, so
-// CI generates, compiles and lints split code. Each message holds many fields, as an API's
-// resource messages do.
+// A file whose output runs past the 500 lines hand-written code keeps to, which the plugin
+// still writes as one file, so CI generates, compiles and lints long code. Each message holds
+// many fields, as an API's resource messages do.
 syntax = "proto3";
 
 package large.v1;

@@ -5,25 +5,589 @@ const proto = @import("protobuf");
 const connect = @import("connect");
 const connectrpc_conformance_v1_config = @import("connectrpc_conformance_v1_config");
 
-pub const UnaryResponseDefinition = @import("service/UnaryResponseDefinition.pb.zig").UnaryResponseDefinition;
-pub const StreamResponseDefinition = @import("service/StreamResponseDefinition.pb.zig").StreamResponseDefinition;
-pub const UnaryRequest = @import("service/UnaryRequest.pb.zig").UnaryRequest;
-pub const UnaryResponse = @import("service/UnaryResponse.pb.zig").UnaryResponse;
-pub const IdempotentUnaryRequest = @import("service/IdempotentUnaryRequest.pb.zig").IdempotentUnaryRequest;
-pub const IdempotentUnaryResponse = @import("service/IdempotentUnaryResponse.pb.zig").IdempotentUnaryResponse;
-pub const ServerStreamRequest = @import("service/ServerStreamRequest.pb.zig").ServerStreamRequest;
-pub const ServerStreamResponse = @import("service/ServerStreamResponse.pb.zig").ServerStreamResponse;
-pub const ClientStreamRequest = @import("service/ClientStreamRequest.pb.zig").ClientStreamRequest;
-pub const ClientStreamResponse = @import("service/ClientStreamResponse.pb.zig").ClientStreamResponse;
-pub const BidiStreamRequest = @import("service/BidiStreamRequest.pb.zig").BidiStreamRequest;
-pub const BidiStreamResponse = @import("service/BidiStreamResponse.pb.zig").BidiStreamResponse;
-pub const UnimplementedRequest = @import("service/UnimplementedRequest.pb.zig").UnimplementedRequest;
-pub const UnimplementedResponse = @import("service/UnimplementedResponse.pb.zig").UnimplementedResponse;
-pub const ConformancePayload = @import("service/ConformancePayload.pb.zig").ConformancePayload;
-pub const Error = @import("service/Error.pb.zig").Error;
-pub const Header = @import("service/Header.pb.zig").Header;
-pub const RawHTTPRequest = @import("service/RawHTTPRequest.pb.zig").RawHTTPRequest;
-pub const MessageContents = @import("service/MessageContents.pb.zig").MessageContents;
-pub const StreamContents = @import("service/StreamContents.pb.zig").StreamContents;
-pub const RawHTTPResponse = @import("service/RawHTTPResponse.pb.zig").RawHTTPResponse;
-pub const ConformanceService = @import("service/ConformanceService.pb.zig").ConformanceService;
+pub const UnaryResponseDefinition = struct {
+    response_headers: proto.Repeated(Header, .message) = .{},
+    response: ?union(enum) {
+        response_data: []const u8,
+        @"error": Error,
+    } = null,
+    response_trailers: proto.Repeated(Header, .message) = .{},
+    response_delay_ms: u32 = 0,
+    raw_response: ?RawHTTPResponse = null,
+    _unknown: proto.Unknown = .{},
+
+    pub const FieldNumber = enum(u29) {
+        response_headers = 1,
+        response_data = 2,
+        @"error" = 3,
+        response_trailers = 4,
+        response_delay_ms = 6,
+        raw_response = 5,
+    };
+
+    pub const protobuf: proto.Descriptor = .{
+        .full_name = "connectrpc.conformance.v1.UnaryResponseDefinition",
+        .fields = &.{
+            .{ .name = "response_headers", .number = @intFromEnum(@This().FieldNumber.response_headers), .kind = .message, .json_name = "responseHeaders", .proto_name = "response_headers" },
+            .{ .name = "response_data", .number = @intFromEnum(@This().FieldNumber.response_data), .kind = .bytes, .json_name = "responseData", .proto_name = "response_data", .oneof = "response" },
+            .{ .name = "error", .number = @intFromEnum(@This().FieldNumber.@"error"), .kind = .message, .json_name = "error", .proto_name = "error", .oneof = "response" },
+            .{ .name = "response_trailers", .number = @intFromEnum(@This().FieldNumber.response_trailers), .kind = .message, .json_name = "responseTrailers", .proto_name = "response_trailers" },
+            .{ .name = "raw_response", .number = @intFromEnum(@This().FieldNumber.raw_response), .kind = .message, .json_name = "rawResponse", .proto_name = "raw_response" },
+            .{ .name = "response_delay_ms", .number = @intFromEnum(@This().FieldNumber.response_delay_ms), .kind = .uint32, .json_name = "responseDelayMs", .proto_name = "response_delay_ms" },
+        },
+    };
+};
+
+pub const StreamResponseDefinition = struct {
+    response_headers: proto.Repeated(Header, .message) = .{},
+    response_data: proto.Repeated([]const u8, .bytes) = .{},
+    response_delay_ms: u32 = 0,
+    @"error": ?Error = null,
+    response_trailers: proto.Repeated(Header, .message) = .{},
+    raw_response: ?RawHTTPResponse = null,
+    _unknown: proto.Unknown = .{},
+
+    pub const FieldNumber = enum(u29) {
+        response_headers = 1,
+        response_data = 2,
+        response_delay_ms = 3,
+        @"error" = 4,
+        response_trailers = 5,
+        raw_response = 6,
+    };
+
+    pub const protobuf: proto.Descriptor = .{
+        .full_name = "connectrpc.conformance.v1.StreamResponseDefinition",
+        .fields = &.{
+            .{ .name = "response_headers", .number = @intFromEnum(@This().FieldNumber.response_headers), .kind = .message, .json_name = "responseHeaders", .proto_name = "response_headers" },
+            .{ .name = "response_data", .number = @intFromEnum(@This().FieldNumber.response_data), .kind = .bytes, .json_name = "responseData", .proto_name = "response_data" },
+            .{ .name = "response_delay_ms", .number = @intFromEnum(@This().FieldNumber.response_delay_ms), .kind = .uint32, .json_name = "responseDelayMs", .proto_name = "response_delay_ms" },
+            .{ .name = "error", .number = @intFromEnum(@This().FieldNumber.@"error"), .kind = .message, .json_name = "error", .proto_name = "error" },
+            .{ .name = "response_trailers", .number = @intFromEnum(@This().FieldNumber.response_trailers), .kind = .message, .json_name = "responseTrailers", .proto_name = "response_trailers" },
+            .{ .name = "raw_response", .number = @intFromEnum(@This().FieldNumber.raw_response), .kind = .message, .json_name = "rawResponse", .proto_name = "raw_response" },
+        },
+    };
+};
+
+pub const UnaryRequest = struct {
+    response_definition: ?UnaryResponseDefinition = null,
+    request_data: []const u8 = "",
+    _unknown: proto.Unknown = .{},
+
+    pub const FieldNumber = enum(u29) {
+        response_definition = 1,
+        request_data = 2,
+    };
+
+    pub const protobuf: proto.Descriptor = .{
+        .full_name = "connectrpc.conformance.v1.UnaryRequest",
+        .fields = &.{
+            .{ .name = "response_definition", .number = @intFromEnum(@This().FieldNumber.response_definition), .kind = .message, .json_name = "responseDefinition", .proto_name = "response_definition" },
+            .{ .name = "request_data", .number = @intFromEnum(@This().FieldNumber.request_data), .kind = .bytes, .json_name = "requestData", .proto_name = "request_data" },
+        },
+    };
+};
+
+pub const UnaryResponse = struct {
+    payload: ?ConformancePayload = null,
+    _unknown: proto.Unknown = .{},
+
+    pub const FieldNumber = enum(u29) {
+        payload = 1,
+    };
+
+    pub const protobuf: proto.Descriptor = .{
+        .full_name = "connectrpc.conformance.v1.UnaryResponse",
+        .fields = &.{
+            .{ .name = "payload", .number = @intFromEnum(@This().FieldNumber.payload), .kind = .message, .json_name = "payload", .proto_name = "payload" },
+        },
+    };
+};
+
+pub const IdempotentUnaryRequest = struct {
+    response_definition: ?UnaryResponseDefinition = null,
+    request_data: []const u8 = "",
+    _unknown: proto.Unknown = .{},
+
+    pub const FieldNumber = enum(u29) {
+        response_definition = 1,
+        request_data = 2,
+    };
+
+    pub const protobuf: proto.Descriptor = .{
+        .full_name = "connectrpc.conformance.v1.IdempotentUnaryRequest",
+        .fields = &.{
+            .{ .name = "response_definition", .number = @intFromEnum(@This().FieldNumber.response_definition), .kind = .message, .json_name = "responseDefinition", .proto_name = "response_definition" },
+            .{ .name = "request_data", .number = @intFromEnum(@This().FieldNumber.request_data), .kind = .bytes, .json_name = "requestData", .proto_name = "request_data" },
+        },
+    };
+};
+
+pub const IdempotentUnaryResponse = struct {
+    payload: ?ConformancePayload = null,
+    _unknown: proto.Unknown = .{},
+
+    pub const FieldNumber = enum(u29) {
+        payload = 1,
+    };
+
+    pub const protobuf: proto.Descriptor = .{
+        .full_name = "connectrpc.conformance.v1.IdempotentUnaryResponse",
+        .fields = &.{
+            .{ .name = "payload", .number = @intFromEnum(@This().FieldNumber.payload), .kind = .message, .json_name = "payload", .proto_name = "payload" },
+        },
+    };
+};
+
+pub const ServerStreamRequest = struct {
+    response_definition: ?StreamResponseDefinition = null,
+    request_data: []const u8 = "",
+    _unknown: proto.Unknown = .{},
+
+    pub const FieldNumber = enum(u29) {
+        response_definition = 1,
+        request_data = 2,
+    };
+
+    pub const protobuf: proto.Descriptor = .{
+        .full_name = "connectrpc.conformance.v1.ServerStreamRequest",
+        .fields = &.{
+            .{ .name = "response_definition", .number = @intFromEnum(@This().FieldNumber.response_definition), .kind = .message, .json_name = "responseDefinition", .proto_name = "response_definition" },
+            .{ .name = "request_data", .number = @intFromEnum(@This().FieldNumber.request_data), .kind = .bytes, .json_name = "requestData", .proto_name = "request_data" },
+        },
+    };
+};
+
+pub const ServerStreamResponse = struct {
+    payload: ?ConformancePayload = null,
+    _unknown: proto.Unknown = .{},
+
+    pub const FieldNumber = enum(u29) {
+        payload = 1,
+    };
+
+    pub const protobuf: proto.Descriptor = .{
+        .full_name = "connectrpc.conformance.v1.ServerStreamResponse",
+        .fields = &.{
+            .{ .name = "payload", .number = @intFromEnum(@This().FieldNumber.payload), .kind = .message, .json_name = "payload", .proto_name = "payload" },
+        },
+    };
+};
+
+pub const ClientStreamRequest = struct {
+    response_definition: ?UnaryResponseDefinition = null,
+    request_data: []const u8 = "",
+    _unknown: proto.Unknown = .{},
+
+    pub const FieldNumber = enum(u29) {
+        response_definition = 1,
+        request_data = 2,
+    };
+
+    pub const protobuf: proto.Descriptor = .{
+        .full_name = "connectrpc.conformance.v1.ClientStreamRequest",
+        .fields = &.{
+            .{ .name = "response_definition", .number = @intFromEnum(@This().FieldNumber.response_definition), .kind = .message, .json_name = "responseDefinition", .proto_name = "response_definition" },
+            .{ .name = "request_data", .number = @intFromEnum(@This().FieldNumber.request_data), .kind = .bytes, .json_name = "requestData", .proto_name = "request_data" },
+        },
+    };
+};
+
+pub const ClientStreamResponse = struct {
+    payload: ?ConformancePayload = null,
+    _unknown: proto.Unknown = .{},
+
+    pub const FieldNumber = enum(u29) {
+        payload = 1,
+    };
+
+    pub const protobuf: proto.Descriptor = .{
+        .full_name = "connectrpc.conformance.v1.ClientStreamResponse",
+        .fields = &.{
+            .{ .name = "payload", .number = @intFromEnum(@This().FieldNumber.payload), .kind = .message, .json_name = "payload", .proto_name = "payload" },
+        },
+    };
+};
+
+pub const BidiStreamRequest = struct {
+    response_definition: ?StreamResponseDefinition = null,
+    full_duplex: bool = false,
+    request_data: []const u8 = "",
+    _unknown: proto.Unknown = .{},
+
+    pub const FieldNumber = enum(u29) {
+        response_definition = 1,
+        full_duplex = 2,
+        request_data = 3,
+    };
+
+    pub const protobuf: proto.Descriptor = .{
+        .full_name = "connectrpc.conformance.v1.BidiStreamRequest",
+        .fields = &.{
+            .{ .name = "response_definition", .number = @intFromEnum(@This().FieldNumber.response_definition), .kind = .message, .json_name = "responseDefinition", .proto_name = "response_definition" },
+            .{ .name = "full_duplex", .number = @intFromEnum(@This().FieldNumber.full_duplex), .kind = .bool, .json_name = "fullDuplex", .proto_name = "full_duplex" },
+            .{ .name = "request_data", .number = @intFromEnum(@This().FieldNumber.request_data), .kind = .bytes, .json_name = "requestData", .proto_name = "request_data" },
+        },
+    };
+};
+
+pub const BidiStreamResponse = struct {
+    payload: ?ConformancePayload = null,
+    _unknown: proto.Unknown = .{},
+
+    pub const FieldNumber = enum(u29) {
+        payload = 1,
+    };
+
+    pub const protobuf: proto.Descriptor = .{
+        .full_name = "connectrpc.conformance.v1.BidiStreamResponse",
+        .fields = &.{
+            .{ .name = "payload", .number = @intFromEnum(@This().FieldNumber.payload), .kind = .message, .json_name = "payload", .proto_name = "payload" },
+        },
+    };
+};
+
+pub const UnimplementedRequest = struct {
+    _unknown: proto.Unknown = .{},
+    pub const protobuf: proto.Descriptor = .{
+        .full_name = "connectrpc.conformance.v1.UnimplementedRequest",
+        .fields = &.{},
+    };
+};
+
+pub const UnimplementedResponse = struct {
+    _unknown: proto.Unknown = .{},
+    pub const protobuf: proto.Descriptor = .{
+        .full_name = "connectrpc.conformance.v1.UnimplementedResponse",
+        .fields = &.{},
+    };
+};
+
+pub const ConformancePayload = struct {
+    data: []const u8 = "",
+    request_info: ?ConformancePayload.RequestInfo = null,
+    _unknown: proto.Unknown = .{},
+
+    pub const FieldNumber = enum(u29) {
+        data = 1,
+        request_info = 2,
+    };
+
+    pub const protobuf: proto.Descriptor = .{
+        .full_name = "connectrpc.conformance.v1.ConformancePayload",
+        .fields = &.{
+            .{ .name = "data", .number = @intFromEnum(@This().FieldNumber.data), .kind = .bytes, .json_name = "data", .proto_name = "data" },
+            .{ .name = "request_info", .number = @intFromEnum(@This().FieldNumber.request_info), .kind = .message, .json_name = "requestInfo", .proto_name = "request_info" },
+        },
+    };
+
+    pub const RequestInfo = struct {
+        request_headers: proto.Repeated(Header, .message) = .{},
+        timeout_ms: ?i64 = null,
+        requests: proto.Repeated(proto.wkt.Any, .message) = .{},
+        connect_get_info: ?ConformancePayload.ConnectGetInfo = null,
+        _unknown: proto.Unknown = .{},
+
+        pub const FieldNumber = enum(u29) {
+            request_headers = 1,
+            timeout_ms = 2,
+            requests = 3,
+            connect_get_info = 4,
+        };
+
+        pub const protobuf: proto.Descriptor = .{
+            .full_name = "connectrpc.conformance.v1.ConformancePayload.RequestInfo",
+            .fields = &.{
+                .{ .name = "request_headers", .number = @intFromEnum(@This().FieldNumber.request_headers), .kind = .message, .json_name = "requestHeaders", .proto_name = "request_headers" },
+                .{ .name = "timeout_ms", .number = @intFromEnum(@This().FieldNumber.timeout_ms), .kind = .int64, .json_name = "timeoutMs", .proto_name = "timeout_ms" },
+                .{ .name = "requests", .number = @intFromEnum(@This().FieldNumber.requests), .kind = .message, .json_name = "requests", .proto_name = "requests" },
+                .{ .name = "connect_get_info", .number = @intFromEnum(@This().FieldNumber.connect_get_info), .kind = .message, .json_name = "connectGetInfo", .proto_name = "connect_get_info" },
+            },
+        };
+    };
+
+    pub const ConnectGetInfo = struct {
+        query_params: proto.Repeated(Header, .message) = .{},
+        _unknown: proto.Unknown = .{},
+
+        pub const FieldNumber = enum(u29) {
+            query_params = 1,
+        };
+
+        pub const protobuf: proto.Descriptor = .{
+            .full_name = "connectrpc.conformance.v1.ConformancePayload.ConnectGetInfo",
+            .fields = &.{
+                .{ .name = "query_params", .number = @intFromEnum(@This().FieldNumber.query_params), .kind = .message, .json_name = "queryParams", .proto_name = "query_params" },
+            },
+        };
+    };
+};
+
+pub const Error = struct {
+    code: connectrpc_conformance_v1_config.Code = @enumFromInt(0),
+    message: ?[]const u8 = null,
+    details: proto.Repeated(proto.wkt.Any, .message) = .{},
+    _unknown: proto.Unknown = .{},
+
+    pub const FieldNumber = enum(u29) {
+        code = 1,
+        message = 2,
+        details = 3,
+    };
+
+    pub const protobuf: proto.Descriptor = .{
+        .full_name = "connectrpc.conformance.v1.Error",
+        .fields = &.{
+            .{ .name = "code", .number = @intFromEnum(@This().FieldNumber.code), .kind = .@"enum", .json_name = "code", .proto_name = "code" },
+            .{ .name = "message", .number = @intFromEnum(@This().FieldNumber.message), .kind = .string, .json_name = "message", .proto_name = "message" },
+            .{ .name = "details", .number = @intFromEnum(@This().FieldNumber.details), .kind = .message, .json_name = "details", .proto_name = "details" },
+        },
+    };
+};
+
+pub const Header = struct {
+    name: []const u8 = "",
+    value: proto.Repeated([]const u8, .string) = .{},
+    _unknown: proto.Unknown = .{},
+
+    pub const FieldNumber = enum(u29) {
+        name = 1,
+        value = 2,
+    };
+
+    pub const protobuf: proto.Descriptor = .{
+        .full_name = "connectrpc.conformance.v1.Header",
+        .fields = &.{
+            .{ .name = "name", .number = @intFromEnum(@This().FieldNumber.name), .kind = .string, .json_name = "name", .proto_name = "name" },
+            .{ .name = "value", .number = @intFromEnum(@This().FieldNumber.value), .kind = .string, .json_name = "value", .proto_name = "value" },
+        },
+    };
+};
+
+pub const RawHTTPRequest = struct {
+    verb: []const u8 = "",
+    uri: []const u8 = "",
+    headers: proto.Repeated(Header, .message) = .{},
+    raw_query_params: proto.Repeated(Header, .message) = .{},
+    encoded_query_params: proto.Repeated(RawHTTPRequest.EncodedQueryParam, .message) = .{},
+    body: ?union(enum) {
+        unary: MessageContents,
+        stream: StreamContents,
+    } = null,
+    _unknown: proto.Unknown = .{},
+
+    pub const FieldNumber = enum(u29) {
+        verb = 1,
+        uri = 2,
+        headers = 3,
+        raw_query_params = 4,
+        encoded_query_params = 5,
+        unary = 6,
+        stream = 7,
+    };
+
+    pub const protobuf: proto.Descriptor = .{
+        .full_name = "connectrpc.conformance.v1.RawHTTPRequest",
+        .fields = &.{
+            .{ .name = "verb", .number = @intFromEnum(@This().FieldNumber.verb), .kind = .string, .json_name = "verb", .proto_name = "verb" },
+            .{ .name = "uri", .number = @intFromEnum(@This().FieldNumber.uri), .kind = .string, .json_name = "uri", .proto_name = "uri" },
+            .{ .name = "headers", .number = @intFromEnum(@This().FieldNumber.headers), .kind = .message, .json_name = "headers", .proto_name = "headers" },
+            .{ .name = "raw_query_params", .number = @intFromEnum(@This().FieldNumber.raw_query_params), .kind = .message, .json_name = "rawQueryParams", .proto_name = "raw_query_params" },
+            .{ .name = "encoded_query_params", .number = @intFromEnum(@This().FieldNumber.encoded_query_params), .kind = .message, .json_name = "encodedQueryParams", .proto_name = "encoded_query_params" },
+            .{ .name = "unary", .number = @intFromEnum(@This().FieldNumber.unary), .kind = .message, .json_name = "unary", .proto_name = "unary", .oneof = "body" },
+            .{ .name = "stream", .number = @intFromEnum(@This().FieldNumber.stream), .kind = .message, .json_name = "stream", .proto_name = "stream", .oneof = "body" },
+        },
+    };
+
+    pub const EncodedQueryParam = struct {
+        name: []const u8 = "",
+        value: ?MessageContents = null,
+        base64_encode: bool = false,
+        _unknown: proto.Unknown = .{},
+
+        pub const FieldNumber = enum(u29) {
+            name = 1,
+            value = 2,
+            base64_encode = 3,
+        };
+
+        pub const protobuf: proto.Descriptor = .{
+            .full_name = "connectrpc.conformance.v1.RawHTTPRequest.EncodedQueryParam",
+            .fields = &.{
+                .{ .name = "name", .number = @intFromEnum(@This().FieldNumber.name), .kind = .string, .json_name = "name", .proto_name = "name" },
+                .{ .name = "value", .number = @intFromEnum(@This().FieldNumber.value), .kind = .message, .json_name = "value", .proto_name = "value" },
+                .{ .name = "base64_encode", .number = @intFromEnum(@This().FieldNumber.base64_encode), .kind = .bool, .json_name = "base64Encode", .proto_name = "base64_encode" },
+            },
+        };
+    };
+};
+
+pub const MessageContents = struct {
+    data: ?union(enum) {
+        binary: []const u8,
+        text: []const u8,
+        binary_message: proto.wkt.Any,
+    } = null,
+    compression: connectrpc_conformance_v1_config.Compression = @enumFromInt(0),
+    _unknown: proto.Unknown = .{},
+
+    pub const FieldNumber = enum(u29) {
+        binary = 1,
+        text = 2,
+        binary_message = 3,
+        compression = 4,
+    };
+
+    pub const protobuf: proto.Descriptor = .{
+        .full_name = "connectrpc.conformance.v1.MessageContents",
+        .fields = &.{
+            .{ .name = "binary", .number = @intFromEnum(@This().FieldNumber.binary), .kind = .bytes, .json_name = "binary", .proto_name = "binary", .oneof = "data" },
+            .{ .name = "text", .number = @intFromEnum(@This().FieldNumber.text), .kind = .string, .json_name = "text", .proto_name = "text", .oneof = "data" },
+            .{ .name = "binary_message", .number = @intFromEnum(@This().FieldNumber.binary_message), .kind = .message, .json_name = "binaryMessage", .proto_name = "binary_message", .oneof = "data" },
+            .{ .name = "compression", .number = @intFromEnum(@This().FieldNumber.compression), .kind = .@"enum", .json_name = "compression", .proto_name = "compression" },
+        },
+    };
+};
+
+pub const StreamContents = struct {
+    items: proto.Repeated(StreamContents.StreamItem, .message) = .{},
+    _unknown: proto.Unknown = .{},
+
+    pub const FieldNumber = enum(u29) {
+        items = 1,
+    };
+
+    pub const protobuf: proto.Descriptor = .{
+        .full_name = "connectrpc.conformance.v1.StreamContents",
+        .fields = &.{
+            .{ .name = "items", .number = @intFromEnum(@This().FieldNumber.items), .kind = .message, .json_name = "items", .proto_name = "items" },
+        },
+    };
+
+    pub const StreamItem = struct {
+        flags: u32 = 0,
+        length: ?u32 = null,
+        payload: ?MessageContents = null,
+        _unknown: proto.Unknown = .{},
+
+        pub const FieldNumber = enum(u29) {
+            flags = 1,
+            length = 2,
+            payload = 3,
+        };
+
+        pub const protobuf: proto.Descriptor = .{
+            .full_name = "connectrpc.conformance.v1.StreamContents.StreamItem",
+            .fields = &.{
+                .{ .name = "flags", .number = @intFromEnum(@This().FieldNumber.flags), .kind = .uint32, .json_name = "flags", .proto_name = "flags" },
+                .{ .name = "length", .number = @intFromEnum(@This().FieldNumber.length), .kind = .uint32, .json_name = "length", .proto_name = "length" },
+                .{ .name = "payload", .number = @intFromEnum(@This().FieldNumber.payload), .kind = .message, .json_name = "payload", .proto_name = "payload" },
+            },
+        };
+    };
+};
+
+pub const RawHTTPResponse = struct {
+    status_code: u32 = 0,
+    headers: proto.Repeated(Header, .message) = .{},
+    body: ?union(enum) {
+        unary: MessageContents,
+        stream: StreamContents,
+    } = null,
+    trailers: proto.Repeated(Header, .message) = .{},
+    _unknown: proto.Unknown = .{},
+
+    pub const FieldNumber = enum(u29) {
+        status_code = 1,
+        headers = 2,
+        unary = 3,
+        stream = 4,
+        trailers = 5,
+    };
+
+    pub const protobuf: proto.Descriptor = .{
+        .full_name = "connectrpc.conformance.v1.RawHTTPResponse",
+        .fields = &.{
+            .{ .name = "status_code", .number = @intFromEnum(@This().FieldNumber.status_code), .kind = .uint32, .json_name = "statusCode", .proto_name = "status_code" },
+            .{ .name = "headers", .number = @intFromEnum(@This().FieldNumber.headers), .kind = .message, .json_name = "headers", .proto_name = "headers" },
+            .{ .name = "unary", .number = @intFromEnum(@This().FieldNumber.unary), .kind = .message, .json_name = "unary", .proto_name = "unary", .oneof = "body" },
+            .{ .name = "stream", .number = @intFromEnum(@This().FieldNumber.stream), .kind = .message, .json_name = "stream", .proto_name = "stream", .oneof = "body" },
+            .{ .name = "trailers", .number = @intFromEnum(@This().FieldNumber.trailers), .kind = .message, .json_name = "trailers", .proto_name = "trailers" },
+        },
+    };
+};
+
+pub const ConformanceService = struct {
+    pub const service_name = "connectrpc.conformance.v1.ConformanceService";
+
+    pub const unary: connect.Method = .{
+        .service = service_name,
+        .name = "Unary",
+        .Request = UnaryRequest,
+        .Response = UnaryResponse,
+        .stream_type = .unary,
+        .idempotency = .unknown,
+    };
+
+    pub const server_stream: connect.Method = .{
+        .service = service_name,
+        .name = "ServerStream",
+        .Request = ServerStreamRequest,
+        .Response = ServerStreamResponse,
+        .stream_type = .server_stream,
+        .idempotency = .unknown,
+    };
+
+    pub const client_stream: connect.Method = .{
+        .service = service_name,
+        .name = "ClientStream",
+        .Request = ClientStreamRequest,
+        .Response = ClientStreamResponse,
+        .stream_type = .client_stream,
+        .idempotency = .unknown,
+    };
+
+    pub const bidi_stream: connect.Method = .{
+        .service = service_name,
+        .name = "BidiStream",
+        .Request = BidiStreamRequest,
+        .Response = BidiStreamResponse,
+        .stream_type = .bidi_stream,
+        .idempotency = .unknown,
+    };
+
+    pub const unimplemented: connect.Method = .{
+        .service = service_name,
+        .name = "Unimplemented",
+        .Request = UnimplementedRequest,
+        .Response = UnimplementedResponse,
+        .stream_type = .unary,
+        .idempotency = .unknown,
+    };
+
+    pub const idempotent_unary: connect.Method = .{
+        .service = service_name,
+        .name = "IdempotentUnary",
+        .Request = IdempotentUnaryRequest,
+        .Response = IdempotentUnaryResponse,
+        .stream_type = .unary,
+        .idempotency = .no_side_effects,
+    };
+
+    /// Every method as a route of `transport`, such as `connect_colibri`, in `routes`. Each
+    /// handler is the declaration of `Handlers` the method names, so one a service lacks fails
+    /// to compile.
+    pub fn Routes(comptime transport: type, comptime App: type, comptime Handlers: type, comptime options: transport.RouteOptions) type {
+        return struct {
+            pub const routes = .{
+                transport.post(App, unary, Handlers.unary, options),
+                transport.post(App, server_stream, Handlers.server_stream, options),
+                transport.post(App, client_stream, Handlers.client_stream, options),
+                transport.post(App, bidi_stream, Handlers.bidi_stream, options),
+                transport.post(App, unimplemented, Handlers.unimplemented, options),
+                transport.post(App, idempotent_unary, Handlers.idempotent_unary, options),
+                transport.get(App, idempotent_unary, Handlers.idempotent_unary, options),
+            };
+        };
+    }
+};

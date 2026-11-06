@@ -3,13 +3,812 @@
 //! The build gives this file the modules protobuf.
 const proto = @import("protobuf");
 
-pub const Nested = @import("coverage/Nested.pb.zig").Nested;
-pub const Scalars = @import("coverage/Scalars.pb.zig").Scalars;
-pub const Optionals = @import("coverage/Optionals.pb.zig").Optionals;
-pub const Repeateds = @import("coverage/Repeateds.pb.zig").Repeateds;
-pub const Maps = @import("coverage/Maps.pb.zig").Maps;
-pub const Choice = @import("coverage/Choice.pb.zig").Choice;
-pub const WellKnown = @import("coverage/WellKnown.pb.zig").WellKnown;
-pub const Everything = @import("coverage/Everything.pb.zig").Everything;
-pub const Partial = @import("coverage/Partial.pb.zig").Partial;
-pub const Color = @import("coverage/Color.pb.zig").Color;
+pub const Nested = struct {
+    a: i32 = 0,
+    b: []const u8 = "",
+    _unknown: proto.Unknown = .{},
+
+    pub const FieldNumber = enum(u29) {
+        a = 1,
+        b = 2,
+    };
+
+    pub const protobuf: proto.Descriptor = .{
+        .full_name = "coverage.v1.Nested",
+        .fields = &.{
+            .{ .name = "a", .number = @intFromEnum(@This().FieldNumber.a), .kind = .int32, .json_name = "a", .proto_name = "a" },
+            .{ .name = "b", .number = @intFromEnum(@This().FieldNumber.b), .kind = .string, .json_name = "b", .proto_name = "b" },
+        },
+    };
+};
+
+pub const Scalars = struct {
+    f_double: f64 = 0,
+    f_float: f32 = 0,
+    f_int32: i32 = 0,
+    f_int64: i64 = 0,
+    f_uint32: u32 = 0,
+    f_uint64: u64 = 0,
+    f_sint32: i32 = 0,
+    f_sint64: i64 = 0,
+    f_fixed32: u32 = 0,
+    f_fixed64: u64 = 0,
+    f_sfixed32: i32 = 0,
+    f_sfixed64: i64 = 0,
+    f_bool: bool = false,
+    f_string: []const u8 = "",
+    f_bytes: []const u8 = "",
+    f_color: Color = @enumFromInt(0),
+    _unknown: proto.Unknown = .{},
+
+    pub const FieldNumber = enum(u29) {
+        f_double = 1,
+        f_float = 2,
+        f_int32 = 3,
+        f_int64 = 4,
+        f_uint32 = 5,
+        f_uint64 = 6,
+        f_sint32 = 7,
+        f_sint64 = 8,
+        f_fixed32 = 9,
+        f_fixed64 = 10,
+        f_sfixed32 = 11,
+        f_sfixed64 = 12,
+        f_bool = 13,
+        f_string = 14,
+        f_bytes = 15,
+        f_color = 16,
+    };
+
+    pub const protobuf: proto.Descriptor = .{
+        .full_name = "coverage.v1.Scalars",
+        .fields = &.{
+            .{ .name = "f_double", .number = @intFromEnum(@This().FieldNumber.f_double), .kind = .double, .json_name = "fDouble", .proto_name = "f_double" },
+            .{ .name = "f_float", .number = @intFromEnum(@This().FieldNumber.f_float), .kind = .float, .json_name = "fFloat", .proto_name = "f_float" },
+            .{ .name = "f_int32", .number = @intFromEnum(@This().FieldNumber.f_int32), .kind = .int32, .json_name = "fInt32", .proto_name = "f_int32" },
+            .{ .name = "f_int64", .number = @intFromEnum(@This().FieldNumber.f_int64), .kind = .int64, .json_name = "fInt64", .proto_name = "f_int64" },
+            .{ .name = "f_uint32", .number = @intFromEnum(@This().FieldNumber.f_uint32), .kind = .uint32, .json_name = "fUint32", .proto_name = "f_uint32" },
+            .{ .name = "f_uint64", .number = @intFromEnum(@This().FieldNumber.f_uint64), .kind = .uint64, .json_name = "fUint64", .proto_name = "f_uint64" },
+            .{ .name = "f_sint32", .number = @intFromEnum(@This().FieldNumber.f_sint32), .kind = .sint32, .json_name = "fSint32", .proto_name = "f_sint32" },
+            .{ .name = "f_sint64", .number = @intFromEnum(@This().FieldNumber.f_sint64), .kind = .sint64, .json_name = "fSint64", .proto_name = "f_sint64" },
+            .{ .name = "f_fixed32", .number = @intFromEnum(@This().FieldNumber.f_fixed32), .kind = .fixed32, .json_name = "fFixed32", .proto_name = "f_fixed32" },
+            .{ .name = "f_fixed64", .number = @intFromEnum(@This().FieldNumber.f_fixed64), .kind = .fixed64, .json_name = "fFixed64", .proto_name = "f_fixed64" },
+            .{ .name = "f_sfixed32", .number = @intFromEnum(@This().FieldNumber.f_sfixed32), .kind = .sfixed32, .json_name = "fSfixed32", .proto_name = "f_sfixed32" },
+            .{ .name = "f_sfixed64", .number = @intFromEnum(@This().FieldNumber.f_sfixed64), .kind = .sfixed64, .json_name = "fSfixed64", .proto_name = "f_sfixed64" },
+            .{ .name = "f_bool", .number = @intFromEnum(@This().FieldNumber.f_bool), .kind = .bool, .json_name = "fBool", .proto_name = "f_bool" },
+            .{ .name = "f_string", .number = @intFromEnum(@This().FieldNumber.f_string), .kind = .string, .json_name = "fString", .proto_name = "f_string" },
+            .{ .name = "f_bytes", .number = @intFromEnum(@This().FieldNumber.f_bytes), .kind = .bytes, .json_name = "fBytes", .proto_name = "f_bytes" },
+            .{ .name = "f_color", .number = @intFromEnum(@This().FieldNumber.f_color), .kind = .@"enum", .json_name = "fColor", .proto_name = "f_color" },
+        },
+    };
+};
+
+pub const Optionals = struct {
+    o_double: ?f64 = null,
+    o_float: ?f32 = null,
+    o_int32: ?i32 = null,
+    o_int64: ?i64 = null,
+    o_uint32: ?u32 = null,
+    o_uint64: ?u64 = null,
+    o_sint32: ?i32 = null,
+    o_sint64: ?i64 = null,
+    o_fixed32: ?u32 = null,
+    o_fixed64: ?u64 = null,
+    o_sfixed32: ?i32 = null,
+    o_sfixed64: ?i64 = null,
+    o_bool: ?bool = null,
+    o_string: ?[]const u8 = null,
+    o_bytes: ?[]const u8 = null,
+    o_color: ?Color = null,
+    _unknown: proto.Unknown = .{},
+
+    pub const FieldNumber = enum(u29) {
+        o_double = 1,
+        o_float = 2,
+        o_int32 = 3,
+        o_int64 = 4,
+        o_uint32 = 5,
+        o_uint64 = 6,
+        o_sint32 = 7,
+        o_sint64 = 8,
+        o_fixed32 = 9,
+        o_fixed64 = 10,
+        o_sfixed32 = 11,
+        o_sfixed64 = 12,
+        o_bool = 13,
+        o_string = 14,
+        o_bytes = 15,
+        o_color = 16,
+    };
+
+    pub const protobuf: proto.Descriptor = .{
+        .full_name = "coverage.v1.Optionals",
+        .fields = &.{
+            .{ .name = "o_double", .number = @intFromEnum(@This().FieldNumber.o_double), .kind = .double, .json_name = "oDouble", .proto_name = "o_double" },
+            .{ .name = "o_float", .number = @intFromEnum(@This().FieldNumber.o_float), .kind = .float, .json_name = "oFloat", .proto_name = "o_float" },
+            .{ .name = "o_int32", .number = @intFromEnum(@This().FieldNumber.o_int32), .kind = .int32, .json_name = "oInt32", .proto_name = "o_int32" },
+            .{ .name = "o_int64", .number = @intFromEnum(@This().FieldNumber.o_int64), .kind = .int64, .json_name = "oInt64", .proto_name = "o_int64" },
+            .{ .name = "o_uint32", .number = @intFromEnum(@This().FieldNumber.o_uint32), .kind = .uint32, .json_name = "oUint32", .proto_name = "o_uint32" },
+            .{ .name = "o_uint64", .number = @intFromEnum(@This().FieldNumber.o_uint64), .kind = .uint64, .json_name = "oUint64", .proto_name = "o_uint64" },
+            .{ .name = "o_sint32", .number = @intFromEnum(@This().FieldNumber.o_sint32), .kind = .sint32, .json_name = "oSint32", .proto_name = "o_sint32" },
+            .{ .name = "o_sint64", .number = @intFromEnum(@This().FieldNumber.o_sint64), .kind = .sint64, .json_name = "oSint64", .proto_name = "o_sint64" },
+            .{ .name = "o_fixed32", .number = @intFromEnum(@This().FieldNumber.o_fixed32), .kind = .fixed32, .json_name = "oFixed32", .proto_name = "o_fixed32" },
+            .{ .name = "o_fixed64", .number = @intFromEnum(@This().FieldNumber.o_fixed64), .kind = .fixed64, .json_name = "oFixed64", .proto_name = "o_fixed64" },
+            .{ .name = "o_sfixed32", .number = @intFromEnum(@This().FieldNumber.o_sfixed32), .kind = .sfixed32, .json_name = "oSfixed32", .proto_name = "o_sfixed32" },
+            .{ .name = "o_sfixed64", .number = @intFromEnum(@This().FieldNumber.o_sfixed64), .kind = .sfixed64, .json_name = "oSfixed64", .proto_name = "o_sfixed64" },
+            .{ .name = "o_bool", .number = @intFromEnum(@This().FieldNumber.o_bool), .kind = .bool, .json_name = "oBool", .proto_name = "o_bool" },
+            .{ .name = "o_string", .number = @intFromEnum(@This().FieldNumber.o_string), .kind = .string, .json_name = "oString", .proto_name = "o_string" },
+            .{ .name = "o_bytes", .number = @intFromEnum(@This().FieldNumber.o_bytes), .kind = .bytes, .json_name = "oBytes", .proto_name = "o_bytes" },
+            .{ .name = "o_color", .number = @intFromEnum(@This().FieldNumber.o_color), .kind = .@"enum", .json_name = "oColor", .proto_name = "o_color" },
+        },
+    };
+};
+
+pub const Repeateds = struct {
+    r_double: proto.Repeated(f64, .double) = .{},
+    r_float: proto.Repeated(f32, .float) = .{},
+    r_int32: proto.Repeated(i32, .int32) = .{},
+    r_int64: proto.Repeated(i64, .int64) = .{},
+    r_uint32: proto.Repeated(u32, .uint32) = .{},
+    r_uint64: proto.Repeated(u64, .uint64) = .{},
+    r_sint32: proto.Repeated(i32, .sint32) = .{},
+    r_sint64: proto.Repeated(i64, .sint64) = .{},
+    r_fixed32: proto.Repeated(u32, .fixed32) = .{},
+    r_fixed64: proto.Repeated(u64, .fixed64) = .{},
+    r_sfixed32: proto.Repeated(i32, .sfixed32) = .{},
+    r_sfixed64: proto.Repeated(i64, .sfixed64) = .{},
+    r_bool: proto.Repeated(bool, .bool) = .{},
+    r_string: proto.Repeated([]const u8, .string) = .{},
+    r_bytes: proto.Repeated([]const u8, .bytes) = .{},
+    r_color: proto.Repeated(Color, .@"enum") = .{},
+    r_nested: proto.Repeated(Nested, .message) = .{},
+    u_int32: proto.Repeated(i32, .int32) = .{},
+    u_sint64: proto.Repeated(i64, .sint64) = .{},
+    u_double: proto.Repeated(f64, .double) = .{},
+    u_bool: proto.Repeated(bool, .bool) = .{},
+    u_color: proto.Repeated(Color, .@"enum") = .{},
+    _unknown: proto.Unknown = .{},
+
+    pub const FieldNumber = enum(u29) {
+        r_double = 1,
+        r_float = 2,
+        r_int32 = 3,
+        r_int64 = 4,
+        r_uint32 = 5,
+        r_uint64 = 6,
+        r_sint32 = 7,
+        r_sint64 = 8,
+        r_fixed32 = 9,
+        r_fixed64 = 10,
+        r_sfixed32 = 11,
+        r_sfixed64 = 12,
+        r_bool = 13,
+        r_string = 14,
+        r_bytes = 15,
+        r_color = 16,
+        r_nested = 17,
+        u_int32 = 18,
+        u_sint64 = 19,
+        u_double = 20,
+        u_bool = 21,
+        u_color = 22,
+    };
+
+    pub const protobuf: proto.Descriptor = .{
+        .full_name = "coverage.v1.Repeateds",
+        .fields = &.{
+            .{ .name = "r_double", .number = @intFromEnum(@This().FieldNumber.r_double), .kind = .double, .json_name = "rDouble", .proto_name = "r_double" },
+            .{ .name = "r_float", .number = @intFromEnum(@This().FieldNumber.r_float), .kind = .float, .json_name = "rFloat", .proto_name = "r_float" },
+            .{ .name = "r_int32", .number = @intFromEnum(@This().FieldNumber.r_int32), .kind = .int32, .json_name = "rInt32", .proto_name = "r_int32" },
+            .{ .name = "r_int64", .number = @intFromEnum(@This().FieldNumber.r_int64), .kind = .int64, .json_name = "rInt64", .proto_name = "r_int64" },
+            .{ .name = "r_uint32", .number = @intFromEnum(@This().FieldNumber.r_uint32), .kind = .uint32, .json_name = "rUint32", .proto_name = "r_uint32" },
+            .{ .name = "r_uint64", .number = @intFromEnum(@This().FieldNumber.r_uint64), .kind = .uint64, .json_name = "rUint64", .proto_name = "r_uint64" },
+            .{ .name = "r_sint32", .number = @intFromEnum(@This().FieldNumber.r_sint32), .kind = .sint32, .json_name = "rSint32", .proto_name = "r_sint32" },
+            .{ .name = "r_sint64", .number = @intFromEnum(@This().FieldNumber.r_sint64), .kind = .sint64, .json_name = "rSint64", .proto_name = "r_sint64" },
+            .{ .name = "r_fixed32", .number = @intFromEnum(@This().FieldNumber.r_fixed32), .kind = .fixed32, .json_name = "rFixed32", .proto_name = "r_fixed32" },
+            .{ .name = "r_fixed64", .number = @intFromEnum(@This().FieldNumber.r_fixed64), .kind = .fixed64, .json_name = "rFixed64", .proto_name = "r_fixed64" },
+            .{ .name = "r_sfixed32", .number = @intFromEnum(@This().FieldNumber.r_sfixed32), .kind = .sfixed32, .json_name = "rSfixed32", .proto_name = "r_sfixed32" },
+            .{ .name = "r_sfixed64", .number = @intFromEnum(@This().FieldNumber.r_sfixed64), .kind = .sfixed64, .json_name = "rSfixed64", .proto_name = "r_sfixed64" },
+            .{ .name = "r_bool", .number = @intFromEnum(@This().FieldNumber.r_bool), .kind = .bool, .json_name = "rBool", .proto_name = "r_bool" },
+            .{ .name = "r_string", .number = @intFromEnum(@This().FieldNumber.r_string), .kind = .string, .json_name = "rString", .proto_name = "r_string" },
+            .{ .name = "r_bytes", .number = @intFromEnum(@This().FieldNumber.r_bytes), .kind = .bytes, .json_name = "rBytes", .proto_name = "r_bytes" },
+            .{ .name = "r_color", .number = @intFromEnum(@This().FieldNumber.r_color), .kind = .@"enum", .json_name = "rColor", .proto_name = "r_color" },
+            .{ .name = "r_nested", .number = @intFromEnum(@This().FieldNumber.r_nested), .kind = .message, .json_name = "rNested", .proto_name = "r_nested" },
+            .{ .name = "u_int32", .number = @intFromEnum(@This().FieldNumber.u_int32), .kind = .int32, .json_name = "uInt32", .proto_name = "u_int32", .@"packed" = false },
+            .{ .name = "u_sint64", .number = @intFromEnum(@This().FieldNumber.u_sint64), .kind = .sint64, .json_name = "uSint64", .proto_name = "u_sint64", .@"packed" = false },
+            .{ .name = "u_double", .number = @intFromEnum(@This().FieldNumber.u_double), .kind = .double, .json_name = "uDouble", .proto_name = "u_double", .@"packed" = false },
+            .{ .name = "u_bool", .number = @intFromEnum(@This().FieldNumber.u_bool), .kind = .bool, .json_name = "uBool", .proto_name = "u_bool", .@"packed" = false },
+            .{ .name = "u_color", .number = @intFromEnum(@This().FieldNumber.u_color), .kind = .@"enum", .json_name = "uColor", .proto_name = "u_color", .@"packed" = false },
+        },
+    };
+};
+
+pub const Maps = struct {
+    m_int32: proto.Repeated(Maps.MInt32Entry, .message) = .{},
+    m_int64: proto.Repeated(Maps.MInt64Entry, .message) = .{},
+    m_uint32: proto.Repeated(Maps.MUint32Entry, .message) = .{},
+    m_uint64: proto.Repeated(Maps.MUint64Entry, .message) = .{},
+    m_sint32: proto.Repeated(Maps.MSint32Entry, .message) = .{},
+    m_sint64: proto.Repeated(Maps.MSint64Entry, .message) = .{},
+    m_fixed32: proto.Repeated(Maps.MFixed32Entry, .message) = .{},
+    m_fixed64: proto.Repeated(Maps.MFixed64Entry, .message) = .{},
+    m_sfixed32: proto.Repeated(Maps.MSfixed32Entry, .message) = .{},
+    m_sfixed64: proto.Repeated(Maps.MSfixed64Entry, .message) = .{},
+    m_bool: proto.Repeated(Maps.MBoolEntry, .message) = .{},
+    m_string: proto.Repeated(Maps.MStringEntry, .message) = .{},
+    m_nested: proto.Repeated(Maps.MNestedEntry, .message) = .{},
+    m_color: proto.Repeated(Maps.MColorEntry, .message) = .{},
+    m_bytes: proto.Repeated(Maps.MBytesEntry, .message) = .{},
+    m_double: proto.Repeated(Maps.MDoubleEntry, .message) = .{},
+    m_int32_int64: proto.Repeated(Maps.MInt32Int64Entry, .message) = .{},
+    _unknown: proto.Unknown = .{},
+
+    pub const FieldNumber = enum(u29) {
+        m_int32 = 1,
+        m_int64 = 2,
+        m_uint32 = 3,
+        m_uint64 = 4,
+        m_sint32 = 5,
+        m_sint64 = 6,
+        m_fixed32 = 7,
+        m_fixed64 = 8,
+        m_sfixed32 = 9,
+        m_sfixed64 = 10,
+        m_bool = 11,
+        m_string = 12,
+        m_nested = 13,
+        m_color = 14,
+        m_bytes = 15,
+        m_double = 16,
+        m_int32_int64 = 17,
+    };
+
+    pub const protobuf: proto.Descriptor = .{
+        .full_name = "coverage.v1.Maps",
+        .fields = &.{
+            .{ .name = "m_int32", .number = @intFromEnum(@This().FieldNumber.m_int32), .kind = .message, .json_name = "mInt32", .proto_name = "m_int32" },
+            .{ .name = "m_int64", .number = @intFromEnum(@This().FieldNumber.m_int64), .kind = .message, .json_name = "mInt64", .proto_name = "m_int64" },
+            .{ .name = "m_uint32", .number = @intFromEnum(@This().FieldNumber.m_uint32), .kind = .message, .json_name = "mUint32", .proto_name = "m_uint32" },
+            .{ .name = "m_uint64", .number = @intFromEnum(@This().FieldNumber.m_uint64), .kind = .message, .json_name = "mUint64", .proto_name = "m_uint64" },
+            .{ .name = "m_sint32", .number = @intFromEnum(@This().FieldNumber.m_sint32), .kind = .message, .json_name = "mSint32", .proto_name = "m_sint32" },
+            .{ .name = "m_sint64", .number = @intFromEnum(@This().FieldNumber.m_sint64), .kind = .message, .json_name = "mSint64", .proto_name = "m_sint64" },
+            .{ .name = "m_fixed32", .number = @intFromEnum(@This().FieldNumber.m_fixed32), .kind = .message, .json_name = "mFixed32", .proto_name = "m_fixed32" },
+            .{ .name = "m_fixed64", .number = @intFromEnum(@This().FieldNumber.m_fixed64), .kind = .message, .json_name = "mFixed64", .proto_name = "m_fixed64" },
+            .{ .name = "m_sfixed32", .number = @intFromEnum(@This().FieldNumber.m_sfixed32), .kind = .message, .json_name = "mSfixed32", .proto_name = "m_sfixed32" },
+            .{ .name = "m_sfixed64", .number = @intFromEnum(@This().FieldNumber.m_sfixed64), .kind = .message, .json_name = "mSfixed64", .proto_name = "m_sfixed64" },
+            .{ .name = "m_bool", .number = @intFromEnum(@This().FieldNumber.m_bool), .kind = .message, .json_name = "mBool", .proto_name = "m_bool" },
+            .{ .name = "m_string", .number = @intFromEnum(@This().FieldNumber.m_string), .kind = .message, .json_name = "mString", .proto_name = "m_string" },
+            .{ .name = "m_nested", .number = @intFromEnum(@This().FieldNumber.m_nested), .kind = .message, .json_name = "mNested", .proto_name = "m_nested" },
+            .{ .name = "m_color", .number = @intFromEnum(@This().FieldNumber.m_color), .kind = .message, .json_name = "mColor", .proto_name = "m_color" },
+            .{ .name = "m_bytes", .number = @intFromEnum(@This().FieldNumber.m_bytes), .kind = .message, .json_name = "mBytes", .proto_name = "m_bytes" },
+            .{ .name = "m_double", .number = @intFromEnum(@This().FieldNumber.m_double), .kind = .message, .json_name = "mDouble", .proto_name = "m_double" },
+            .{ .name = "m_int32_int64", .number = @intFromEnum(@This().FieldNumber.m_int32_int64), .kind = .message, .json_name = "mInt32Int64", .proto_name = "m_int32_int64" },
+        },
+    };
+
+    pub const MInt32Entry = struct {
+        key: i32 = 0,
+        value: []const u8 = "",
+
+        pub const FieldNumber = enum(u29) {
+            key = 1,
+            value = 2,
+        };
+
+        pub const protobuf: proto.Descriptor = .{
+            .full_name = "coverage.v1.Maps.MInt32Entry",
+            .map_entry = true,
+            .fields = &.{
+                .{ .name = "key", .number = @intFromEnum(@This().FieldNumber.key), .kind = .int32, .json_name = "key", .proto_name = "key" },
+                .{ .name = "value", .number = @intFromEnum(@This().FieldNumber.value), .kind = .string, .json_name = "value", .proto_name = "value" },
+            },
+        };
+    };
+
+    pub const MInt64Entry = struct {
+        key: i64 = 0,
+        value: []const u8 = "",
+
+        pub const FieldNumber = enum(u29) {
+            key = 1,
+            value = 2,
+        };
+
+        pub const protobuf: proto.Descriptor = .{
+            .full_name = "coverage.v1.Maps.MInt64Entry",
+            .map_entry = true,
+            .fields = &.{
+                .{ .name = "key", .number = @intFromEnum(@This().FieldNumber.key), .kind = .int64, .json_name = "key", .proto_name = "key" },
+                .{ .name = "value", .number = @intFromEnum(@This().FieldNumber.value), .kind = .string, .json_name = "value", .proto_name = "value" },
+            },
+        };
+    };
+
+    pub const MUint32Entry = struct {
+        key: u32 = 0,
+        value: []const u8 = "",
+
+        pub const FieldNumber = enum(u29) {
+            key = 1,
+            value = 2,
+        };
+
+        pub const protobuf: proto.Descriptor = .{
+            .full_name = "coverage.v1.Maps.MUint32Entry",
+            .map_entry = true,
+            .fields = &.{
+                .{ .name = "key", .number = @intFromEnum(@This().FieldNumber.key), .kind = .uint32, .json_name = "key", .proto_name = "key" },
+                .{ .name = "value", .number = @intFromEnum(@This().FieldNumber.value), .kind = .string, .json_name = "value", .proto_name = "value" },
+            },
+        };
+    };
+
+    pub const MUint64Entry = struct {
+        key: u64 = 0,
+        value: []const u8 = "",
+
+        pub const FieldNumber = enum(u29) {
+            key = 1,
+            value = 2,
+        };
+
+        pub const protobuf: proto.Descriptor = .{
+            .full_name = "coverage.v1.Maps.MUint64Entry",
+            .map_entry = true,
+            .fields = &.{
+                .{ .name = "key", .number = @intFromEnum(@This().FieldNumber.key), .kind = .uint64, .json_name = "key", .proto_name = "key" },
+                .{ .name = "value", .number = @intFromEnum(@This().FieldNumber.value), .kind = .string, .json_name = "value", .proto_name = "value" },
+            },
+        };
+    };
+
+    pub const MSint32Entry = struct {
+        key: i32 = 0,
+        value: []const u8 = "",
+
+        pub const FieldNumber = enum(u29) {
+            key = 1,
+            value = 2,
+        };
+
+        pub const protobuf: proto.Descriptor = .{
+            .full_name = "coverage.v1.Maps.MSint32Entry",
+            .map_entry = true,
+            .fields = &.{
+                .{ .name = "key", .number = @intFromEnum(@This().FieldNumber.key), .kind = .sint32, .json_name = "key", .proto_name = "key" },
+                .{ .name = "value", .number = @intFromEnum(@This().FieldNumber.value), .kind = .string, .json_name = "value", .proto_name = "value" },
+            },
+        };
+    };
+
+    pub const MSint64Entry = struct {
+        key: i64 = 0,
+        value: []const u8 = "",
+
+        pub const FieldNumber = enum(u29) {
+            key = 1,
+            value = 2,
+        };
+
+        pub const protobuf: proto.Descriptor = .{
+            .full_name = "coverage.v1.Maps.MSint64Entry",
+            .map_entry = true,
+            .fields = &.{
+                .{ .name = "key", .number = @intFromEnum(@This().FieldNumber.key), .kind = .sint64, .json_name = "key", .proto_name = "key" },
+                .{ .name = "value", .number = @intFromEnum(@This().FieldNumber.value), .kind = .string, .json_name = "value", .proto_name = "value" },
+            },
+        };
+    };
+
+    pub const MFixed32Entry = struct {
+        key: u32 = 0,
+        value: []const u8 = "",
+
+        pub const FieldNumber = enum(u29) {
+            key = 1,
+            value = 2,
+        };
+
+        pub const protobuf: proto.Descriptor = .{
+            .full_name = "coverage.v1.Maps.MFixed32Entry",
+            .map_entry = true,
+            .fields = &.{
+                .{ .name = "key", .number = @intFromEnum(@This().FieldNumber.key), .kind = .fixed32, .json_name = "key", .proto_name = "key" },
+                .{ .name = "value", .number = @intFromEnum(@This().FieldNumber.value), .kind = .string, .json_name = "value", .proto_name = "value" },
+            },
+        };
+    };
+
+    pub const MFixed64Entry = struct {
+        key: u64 = 0,
+        value: []const u8 = "",
+
+        pub const FieldNumber = enum(u29) {
+            key = 1,
+            value = 2,
+        };
+
+        pub const protobuf: proto.Descriptor = .{
+            .full_name = "coverage.v1.Maps.MFixed64Entry",
+            .map_entry = true,
+            .fields = &.{
+                .{ .name = "key", .number = @intFromEnum(@This().FieldNumber.key), .kind = .fixed64, .json_name = "key", .proto_name = "key" },
+                .{ .name = "value", .number = @intFromEnum(@This().FieldNumber.value), .kind = .string, .json_name = "value", .proto_name = "value" },
+            },
+        };
+    };
+
+    pub const MSfixed32Entry = struct {
+        key: i32 = 0,
+        value: []const u8 = "",
+
+        pub const FieldNumber = enum(u29) {
+            key = 1,
+            value = 2,
+        };
+
+        pub const protobuf: proto.Descriptor = .{
+            .full_name = "coverage.v1.Maps.MSfixed32Entry",
+            .map_entry = true,
+            .fields = &.{
+                .{ .name = "key", .number = @intFromEnum(@This().FieldNumber.key), .kind = .sfixed32, .json_name = "key", .proto_name = "key" },
+                .{ .name = "value", .number = @intFromEnum(@This().FieldNumber.value), .kind = .string, .json_name = "value", .proto_name = "value" },
+            },
+        };
+    };
+
+    pub const MSfixed64Entry = struct {
+        key: i64 = 0,
+        value: []const u8 = "",
+
+        pub const FieldNumber = enum(u29) {
+            key = 1,
+            value = 2,
+        };
+
+        pub const protobuf: proto.Descriptor = .{
+            .full_name = "coverage.v1.Maps.MSfixed64Entry",
+            .map_entry = true,
+            .fields = &.{
+                .{ .name = "key", .number = @intFromEnum(@This().FieldNumber.key), .kind = .sfixed64, .json_name = "key", .proto_name = "key" },
+                .{ .name = "value", .number = @intFromEnum(@This().FieldNumber.value), .kind = .string, .json_name = "value", .proto_name = "value" },
+            },
+        };
+    };
+
+    pub const MBoolEntry = struct {
+        key: bool = false,
+        value: []const u8 = "",
+
+        pub const FieldNumber = enum(u29) {
+            key = 1,
+            value = 2,
+        };
+
+        pub const protobuf: proto.Descriptor = .{
+            .full_name = "coverage.v1.Maps.MBoolEntry",
+            .map_entry = true,
+            .fields = &.{
+                .{ .name = "key", .number = @intFromEnum(@This().FieldNumber.key), .kind = .bool, .json_name = "key", .proto_name = "key" },
+                .{ .name = "value", .number = @intFromEnum(@This().FieldNumber.value), .kind = .string, .json_name = "value", .proto_name = "value" },
+            },
+        };
+    };
+
+    pub const MStringEntry = struct {
+        key: []const u8 = "",
+        value: []const u8 = "",
+
+        pub const FieldNumber = enum(u29) {
+            key = 1,
+            value = 2,
+        };
+
+        pub const protobuf: proto.Descriptor = .{
+            .full_name = "coverage.v1.Maps.MStringEntry",
+            .map_entry = true,
+            .fields = &.{
+                .{ .name = "key", .number = @intFromEnum(@This().FieldNumber.key), .kind = .string, .json_name = "key", .proto_name = "key" },
+                .{ .name = "value", .number = @intFromEnum(@This().FieldNumber.value), .kind = .string, .json_name = "value", .proto_name = "value" },
+            },
+        };
+    };
+
+    pub const MNestedEntry = struct {
+        key: []const u8 = "",
+        value: ?Nested = null,
+
+        pub const FieldNumber = enum(u29) {
+            key = 1,
+            value = 2,
+        };
+
+        pub const protobuf: proto.Descriptor = .{
+            .full_name = "coverage.v1.Maps.MNestedEntry",
+            .map_entry = true,
+            .fields = &.{
+                .{ .name = "key", .number = @intFromEnum(@This().FieldNumber.key), .kind = .string, .json_name = "key", .proto_name = "key" },
+                .{ .name = "value", .number = @intFromEnum(@This().FieldNumber.value), .kind = .message, .json_name = "value", .proto_name = "value" },
+            },
+        };
+    };
+
+    pub const MColorEntry = struct {
+        key: []const u8 = "",
+        value: Color = @enumFromInt(0),
+
+        pub const FieldNumber = enum(u29) {
+            key = 1,
+            value = 2,
+        };
+
+        pub const protobuf: proto.Descriptor = .{
+            .full_name = "coverage.v1.Maps.MColorEntry",
+            .map_entry = true,
+            .fields = &.{
+                .{ .name = "key", .number = @intFromEnum(@This().FieldNumber.key), .kind = .string, .json_name = "key", .proto_name = "key" },
+                .{ .name = "value", .number = @intFromEnum(@This().FieldNumber.value), .kind = .@"enum", .json_name = "value", .proto_name = "value" },
+            },
+        };
+    };
+
+    pub const MBytesEntry = struct {
+        key: []const u8 = "",
+        value: []const u8 = "",
+
+        pub const FieldNumber = enum(u29) {
+            key = 1,
+            value = 2,
+        };
+
+        pub const protobuf: proto.Descriptor = .{
+            .full_name = "coverage.v1.Maps.MBytesEntry",
+            .map_entry = true,
+            .fields = &.{
+                .{ .name = "key", .number = @intFromEnum(@This().FieldNumber.key), .kind = .string, .json_name = "key", .proto_name = "key" },
+                .{ .name = "value", .number = @intFromEnum(@This().FieldNumber.value), .kind = .bytes, .json_name = "value", .proto_name = "value" },
+            },
+        };
+    };
+
+    pub const MDoubleEntry = struct {
+        key: []const u8 = "",
+        value: f64 = 0,
+
+        pub const FieldNumber = enum(u29) {
+            key = 1,
+            value = 2,
+        };
+
+        pub const protobuf: proto.Descriptor = .{
+            .full_name = "coverage.v1.Maps.MDoubleEntry",
+            .map_entry = true,
+            .fields = &.{
+                .{ .name = "key", .number = @intFromEnum(@This().FieldNumber.key), .kind = .string, .json_name = "key", .proto_name = "key" },
+                .{ .name = "value", .number = @intFromEnum(@This().FieldNumber.value), .kind = .double, .json_name = "value", .proto_name = "value" },
+            },
+        };
+    };
+
+    pub const MInt32Int64Entry = struct {
+        key: i32 = 0,
+        value: i64 = 0,
+
+        pub const FieldNumber = enum(u29) {
+            key = 1,
+            value = 2,
+        };
+
+        pub const protobuf: proto.Descriptor = .{
+            .full_name = "coverage.v1.Maps.MInt32Int64Entry",
+            .map_entry = true,
+            .fields = &.{
+                .{ .name = "key", .number = @intFromEnum(@This().FieldNumber.key), .kind = .int32, .json_name = "key", .proto_name = "key" },
+                .{ .name = "value", .number = @intFromEnum(@This().FieldNumber.value), .kind = .int64, .json_name = "value", .proto_name = "value" },
+            },
+        };
+    };
+};
+
+pub const Choice = struct {
+    kind: ?union(enum) {
+        c_int32: i32,
+        c_string: []const u8,
+        c_bytes: []const u8,
+        c_nested: Nested,
+        c_color: Color,
+        c_double: f64,
+        c_bool: bool,
+    } = null,
+    _unknown: proto.Unknown = .{},
+
+    pub const FieldNumber = enum(u29) {
+        c_int32 = 1,
+        c_string = 2,
+        c_bytes = 3,
+        c_nested = 4,
+        c_color = 5,
+        c_double = 6,
+        c_bool = 7,
+    };
+
+    pub const protobuf: proto.Descriptor = .{
+        .full_name = "coverage.v1.Choice",
+        .fields = &.{
+            .{ .name = "c_int32", .number = @intFromEnum(@This().FieldNumber.c_int32), .kind = .int32, .json_name = "cInt32", .proto_name = "c_int32", .oneof = "kind" },
+            .{ .name = "c_string", .number = @intFromEnum(@This().FieldNumber.c_string), .kind = .string, .json_name = "cString", .proto_name = "c_string", .oneof = "kind" },
+            .{ .name = "c_bytes", .number = @intFromEnum(@This().FieldNumber.c_bytes), .kind = .bytes, .json_name = "cBytes", .proto_name = "c_bytes", .oneof = "kind" },
+            .{ .name = "c_nested", .number = @intFromEnum(@This().FieldNumber.c_nested), .kind = .message, .json_name = "cNested", .proto_name = "c_nested", .oneof = "kind" },
+            .{ .name = "c_color", .number = @intFromEnum(@This().FieldNumber.c_color), .kind = .@"enum", .json_name = "cColor", .proto_name = "c_color", .oneof = "kind" },
+            .{ .name = "c_double", .number = @intFromEnum(@This().FieldNumber.c_double), .kind = .double, .json_name = "cDouble", .proto_name = "c_double", .oneof = "kind" },
+            .{ .name = "c_bool", .number = @intFromEnum(@This().FieldNumber.c_bool), .kind = .bool, .json_name = "cBool", .proto_name = "c_bool", .oneof = "kind" },
+        },
+    };
+};
+
+pub const WellKnown = struct {
+    timestamp: ?proto.wkt.Timestamp = null,
+    duration: ?proto.wkt.Duration = null,
+    field_mask: ?proto.wkt.FieldMask = null,
+    empty: ?proto.wkt.Empty = null,
+    struct_value: ?proto.wkt.Struct = null,
+    value: ?proto.wkt.Value = null,
+    list_value: ?proto.wkt.ListValue = null,
+    any: ?proto.wkt.Any = null,
+    null_value: proto.wkt.NullValue = @enumFromInt(0),
+    double_value: ?proto.wkt.DoubleValue = null,
+    float_value: ?proto.wkt.FloatValue = null,
+    int64_value: ?proto.wkt.Int64Value = null,
+    uint64_value: ?proto.wkt.UInt64Value = null,
+    int32_value: ?proto.wkt.Int32Value = null,
+    uint32_value: ?proto.wkt.UInt32Value = null,
+    bool_value: ?proto.wkt.BoolValue = null,
+    string_value: ?proto.wkt.StringValue = null,
+    bytes_value: ?proto.wkt.BytesValue = null,
+    timestamps: proto.Repeated(proto.wkt.Timestamp, .message) = .{},
+    values: proto.Repeated(proto.wkt.Value, .message) = .{},
+    anys: proto.Repeated(proto.wkt.Any, .message) = .{},
+    value_map: proto.Repeated(WellKnown.ValueMapEntry, .message) = .{},
+    _unknown: proto.Unknown = .{},
+
+    pub const FieldNumber = enum(u29) {
+        timestamp = 1,
+        duration = 2,
+        field_mask = 3,
+        empty = 4,
+        struct_value = 5,
+        value = 6,
+        list_value = 7,
+        any = 8,
+        null_value = 9,
+        double_value = 10,
+        float_value = 11,
+        int64_value = 12,
+        uint64_value = 13,
+        int32_value = 14,
+        uint32_value = 15,
+        bool_value = 16,
+        string_value = 17,
+        bytes_value = 18,
+        timestamps = 19,
+        values = 20,
+        anys = 21,
+        value_map = 22,
+    };
+
+    pub const protobuf: proto.Descriptor = .{
+        .full_name = "coverage.v1.WellKnown",
+        .fields = &.{
+            .{ .name = "timestamp", .number = @intFromEnum(@This().FieldNumber.timestamp), .kind = .message, .json_name = "timestamp", .proto_name = "timestamp" },
+            .{ .name = "duration", .number = @intFromEnum(@This().FieldNumber.duration), .kind = .message, .json_name = "duration", .proto_name = "duration" },
+            .{ .name = "field_mask", .number = @intFromEnum(@This().FieldNumber.field_mask), .kind = .message, .json_name = "fieldMask", .proto_name = "field_mask" },
+            .{ .name = "empty", .number = @intFromEnum(@This().FieldNumber.empty), .kind = .message, .json_name = "empty", .proto_name = "empty" },
+            .{ .name = "struct_value", .number = @intFromEnum(@This().FieldNumber.struct_value), .kind = .message, .json_name = "structValue", .proto_name = "struct_value" },
+            .{ .name = "value", .number = @intFromEnum(@This().FieldNumber.value), .kind = .message, .json_name = "value", .proto_name = "value" },
+            .{ .name = "list_value", .number = @intFromEnum(@This().FieldNumber.list_value), .kind = .message, .json_name = "listValue", .proto_name = "list_value" },
+            .{ .name = "any", .number = @intFromEnum(@This().FieldNumber.any), .kind = .message, .json_name = "any", .proto_name = "any" },
+            .{ .name = "null_value", .number = @intFromEnum(@This().FieldNumber.null_value), .kind = .@"enum", .json_name = "nullValue", .proto_name = "null_value" },
+            .{ .name = "double_value", .number = @intFromEnum(@This().FieldNumber.double_value), .kind = .message, .json_name = "doubleValue", .proto_name = "double_value" },
+            .{ .name = "float_value", .number = @intFromEnum(@This().FieldNumber.float_value), .kind = .message, .json_name = "floatValue", .proto_name = "float_value" },
+            .{ .name = "int64_value", .number = @intFromEnum(@This().FieldNumber.int64_value), .kind = .message, .json_name = "int64Value", .proto_name = "int64_value" },
+            .{ .name = "uint64_value", .number = @intFromEnum(@This().FieldNumber.uint64_value), .kind = .message, .json_name = "uint64Value", .proto_name = "uint64_value" },
+            .{ .name = "int32_value", .number = @intFromEnum(@This().FieldNumber.int32_value), .kind = .message, .json_name = "int32Value", .proto_name = "int32_value" },
+            .{ .name = "uint32_value", .number = @intFromEnum(@This().FieldNumber.uint32_value), .kind = .message, .json_name = "uint32Value", .proto_name = "uint32_value" },
+            .{ .name = "bool_value", .number = @intFromEnum(@This().FieldNumber.bool_value), .kind = .message, .json_name = "boolValue", .proto_name = "bool_value" },
+            .{ .name = "string_value", .number = @intFromEnum(@This().FieldNumber.string_value), .kind = .message, .json_name = "stringValue", .proto_name = "string_value" },
+            .{ .name = "bytes_value", .number = @intFromEnum(@This().FieldNumber.bytes_value), .kind = .message, .json_name = "bytesValue", .proto_name = "bytes_value" },
+            .{ .name = "timestamps", .number = @intFromEnum(@This().FieldNumber.timestamps), .kind = .message, .json_name = "timestamps", .proto_name = "timestamps" },
+            .{ .name = "values", .number = @intFromEnum(@This().FieldNumber.values), .kind = .message, .json_name = "values", .proto_name = "values" },
+            .{ .name = "anys", .number = @intFromEnum(@This().FieldNumber.anys), .kind = .message, .json_name = "anys", .proto_name = "anys" },
+            .{ .name = "value_map", .number = @intFromEnum(@This().FieldNumber.value_map), .kind = .message, .json_name = "valueMap", .proto_name = "value_map" },
+        },
+    };
+
+    pub const ValueMapEntry = struct {
+        key: []const u8 = "",
+        value: ?proto.wkt.Value = null,
+
+        pub const FieldNumber = enum(u29) {
+            key = 1,
+            value = 2,
+        };
+
+        pub const protobuf: proto.Descriptor = .{
+            .full_name = "coverage.v1.WellKnown.ValueMapEntry",
+            .map_entry = true,
+            .fields = &.{
+                .{ .name = "key", .number = @intFromEnum(@This().FieldNumber.key), .kind = .string, .json_name = "key", .proto_name = "key" },
+                .{ .name = "value", .number = @intFromEnum(@This().FieldNumber.value), .kind = .message, .json_name = "value", .proto_name = "value" },
+            },
+        };
+    };
+};
+
+pub const Everything = struct {
+    scalars: ?Scalars = null,
+    optionals: ?Optionals = null,
+    repeateds: ?Repeateds = null,
+    maps: ?Maps = null,
+    choice: ?Choice = null,
+    well_known: ?WellKnown = null,
+    child: proto.Lazy(Everything) = .{},
+    children: proto.Repeated(Everything, .message) = .{},
+    _unknown: proto.Unknown = .{},
+
+    pub const FieldNumber = enum(u29) {
+        scalars = 1,
+        optionals = 2,
+        repeateds = 3,
+        maps = 4,
+        choice = 5,
+        well_known = 6,
+        child = 7,
+        children = 8,
+    };
+
+    pub const protobuf: proto.Descriptor = .{
+        .full_name = "coverage.v1.Everything",
+        .fields = &.{
+            .{ .name = "scalars", .number = @intFromEnum(@This().FieldNumber.scalars), .kind = .message, .json_name = "scalars", .proto_name = "scalars" },
+            .{ .name = "optionals", .number = @intFromEnum(@This().FieldNumber.optionals), .kind = .message, .json_name = "optionals", .proto_name = "optionals" },
+            .{ .name = "repeateds", .number = @intFromEnum(@This().FieldNumber.repeateds), .kind = .message, .json_name = "repeateds", .proto_name = "repeateds" },
+            .{ .name = "maps", .number = @intFromEnum(@This().FieldNumber.maps), .kind = .message, .json_name = "maps", .proto_name = "maps" },
+            .{ .name = "choice", .number = @intFromEnum(@This().FieldNumber.choice), .kind = .message, .json_name = "choice", .proto_name = "choice" },
+            .{ .name = "well_known", .number = @intFromEnum(@This().FieldNumber.well_known), .kind = .message, .json_name = "wellKnown", .proto_name = "well_known" },
+            .{ .name = "child", .number = @intFromEnum(@This().FieldNumber.child), .kind = .message, .json_name = "child", .proto_name = "child" },
+            .{ .name = "children", .number = @intFromEnum(@This().FieldNumber.children), .kind = .message, .json_name = "children", .proto_name = "children" },
+        },
+    };
+};
+
+pub const Partial = struct {
+    scalars: ?Scalars = null,
+    _unknown: proto.Unknown = .{},
+
+    pub const FieldNumber = enum(u29) {
+        scalars = 1,
+    };
+
+    pub const protobuf: proto.Descriptor = .{
+        .full_name = "coverage.v1.Partial",
+        .fields = &.{
+            .{ .name = "scalars", .number = @intFromEnum(@This().FieldNumber.scalars), .kind = .message, .json_name = "scalars", .proto_name = "scalars" },
+        },
+    };
+};
+
+pub const Color = enum(i32) {
+    color_unspecified = 0,
+    color_red = 1,
+    color_blue = 2,
+    color_negative = -1,
+    _,
+
+    pub const protobuf: proto.EnumDescriptor = .{ .full_name = "coverage.v1.Color", .values = &.{
+        .{ .name = "COLOR_UNSPECIFIED", .number = @intFromEnum(@This().color_unspecified) },
+        .{ .name = "COLOR_RED", .number = @intFromEnum(@This().color_red) },
+        .{ .name = "COLOR_CRIMSON", .number = @intFromEnum(@This().color_red) },
+        .{ .name = "COLOR_BLUE", .number = @intFromEnum(@This().color_blue) },
+        .{ .name = "COLOR_NEGATIVE", .number = @intFromEnum(@This().color_negative) },
+    } };
+};

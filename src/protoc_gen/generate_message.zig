@@ -12,31 +12,13 @@ const generate_enum = @import("generate_enum.zig");
 const Out = generate_out.Out;
 const Error = generate_out.Error;
 
-/// A message or enum a piece declares through an import, which gets a piece of its own.
-pub const Pending = struct {
-    /// Its full name's scope in the .proto file, "kitchen.v1.Tree".
-    scope: []const u8,
-    /// Its piece's name, the Zig path joined by dots: "Tree.Leaf".
-    path: []const u8,
-    declaration: union(enum) { message: pb.DescriptorProto, enumeration: pb.EnumDescriptorProto },
-    /// The features in effect where it is declared.
-    features: Features,
-};
-
-/// Where nested declarations go: inline, or into pieces of their own.
-pub const Nesting = struct {
-    pending: ?*std.ArrayList(Pending) = null,
-    /// The piece name of the enclosing message, under which a nested one is named.
-    path: []const u8 = "",
-};
-
 /// The name of the enum that numbers a message's fields.
 const field_number_enum = "FieldNumber";
 
 /// A field with the name the oneof's union holds it under, or none.
 const Member = struct { field: pb.FieldDescriptorProto, oneof: ?[]const u8 };
 
-pub fn write(out: *Out, scope: []const u8, message: pb.DescriptorProto, depth: usize, nesting: Nesting) Error!void {
+pub fn write(out: *Out, scope: []const u8, message: pb.DescriptorProto, depth: usize) Error!void {
     const name = message.name orelse "";
     const full = try generate_out.full_name(out.arena, scope, name);
     const fields = try collect_fields(out, message);
@@ -52,41 +34,16 @@ pub fn write(out: *Out, scope: []const u8, message: pb.DescriptorProto, depth: u
     try write_unknown_field(out, message, depth + 1);
     try write_field_numbers(out, fields, depth + 1);
     try write_descriptor(out, full, message, fields, depth + 1);
-    const path = if (nesting.path.len == 0) name else try std.fmt.allocPrint(out.arena, "{s}.{s}", .{ nesting.path, name });
-    try write_nested(out, full, message, depth + 1, .{ .pending = nesting.pending, .path = path });
+    try write_nested(out, full, message, depth + 1);
     try out.indent(depth);
     try out.print("}};\n", .{});
 }
 
-fn write_nested(out: *Out, full: []const u8, message: pb.DescriptorProto, depth: usize, nesting: Nesting) Error!void {
+fn write_nested(out: *Out, full: []const u8, message: pb.DescriptorProto, depth: usize) Error!void {
     var nested = message.nested_type.iterator();
-    while (try nested.next()) |child| {
-        const pending = nesting.pending orelse {
-            try write(out, full, child, depth, nesting);
-            continue;
-        };
-        const child_path = try std.fmt.allocPrint(out.arena, "{s}.{s}", .{ nesting.path, child.name orelse "" });
-        try write_import(out, child.name orelse "", child_path, depth);
-        try pending.append(out.arena, .{ .scope = full, .path = child_path, .declaration = .{ .message = child }, .features = out.features });
-    }
+    while (try nested.next()) |child| try write(out, full, child, depth);
     var enums = message.enum_type.iterator();
-    while (try enums.next()) |enumeration| {
-        const pending = nesting.pending orelse {
-            try generate_enum.write(out, full, enumeration, depth);
-            continue;
-        };
-        const child_path = try std.fmt.allocPrint(out.arena, "{s}.{s}", .{ nesting.path, enumeration.name orelse "" });
-        try write_import(out, enumeration.name orelse "", child_path, depth);
-        try pending.append(out.arena, .{ .scope = full, .path = child_path, .declaration = .{ .enumeration = enumeration }, .features = out.features });
-    }
-}
-
-/// Declares a nested type that lives in a piece of its own: `pub const Leaf = @import(...).Leaf;`.
-pub fn write_import(out: *Out, name: []const u8, path: []const u8, depth: usize) Error!void {
-    const identifier = try names.identifier(out.arena, name);
-    try out.print("\n", .{});
-    try out.indent(depth);
-    try out.print("pub const {s} = @import(\"{s}.pb.zig\").{s};\n", .{ identifier, path, identifier });
+    while (try enums.next()) |enumeration| try generate_enum.write(out, full, enumeration, depth);
 }
 
 /// A nested declaration named `FieldNumber` would collide with the enum the generator adds.

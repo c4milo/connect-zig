@@ -4,29 +4,661 @@
 const proto = @import("protobuf");
 const connect = @import("connect");
 
-pub const User = @import("github/User.pb.zig").User;
-pub const Repository = @import("github/Repository.pb.zig").Repository;
-pub const GetRepositoryRequest = @import("github/GetRepositoryRequest.pb.zig").GetRepositoryRequest;
-pub const ListRepositoriesRequest = @import("github/ListRepositoriesRequest.pb.zig").ListRepositoriesRequest;
-pub const ListRepositoriesResponse = @import("github/ListRepositoriesResponse.pb.zig").ListRepositoriesResponse;
-pub const CreateRepositoryRequest = @import("github/CreateRepositoryRequest.pb.zig").CreateRepositoryRequest;
-pub const Issue = @import("github/Issue.pb.zig").Issue;
-pub const CreateIssueRequest = @import("github/CreateIssueRequest.pb.zig").CreateIssueRequest;
-pub const GetIssueRequest = @import("github/GetIssueRequest.pb.zig").GetIssueRequest;
-pub const ListIssuesRequest = @import("github/ListIssuesRequest.pb.zig").ListIssuesRequest;
-pub const ListIssuesResponse = @import("github/ListIssuesResponse.pb.zig").ListIssuesResponse;
-pub const UpdateIssueRequest = @import("github/UpdateIssueRequest.pb.zig").UpdateIssueRequest;
-pub const ImportIssuesResponse = @import("github/ImportIssuesResponse.pb.zig").ImportIssuesResponse;
-pub const WatchEventsRequest = @import("github/WatchEventsRequest.pb.zig").WatchEventsRequest;
-pub const Event = @import("github/Event.pb.zig").Event;
-pub const IssueOpened = @import("github/IssueOpened.pb.zig").IssueOpened;
-pub const IssueClosed = @import("github/IssueClosed.pb.zig").IssueClosed;
-pub const IssueLabeled = @import("github/IssueLabeled.pb.zig").IssueLabeled;
-pub const NotFound = @import("github/NotFound.pb.zig").NotFound;
-pub const AlreadyExists = @import("github/AlreadyExists.pb.zig").AlreadyExists;
-pub const BadField = @import("github/BadField.pb.zig").BadField;
-pub const RateLimited = @import("github/RateLimited.pb.zig").RateLimited;
-pub const Visibility = @import("github/Visibility.pb.zig").Visibility;
-pub const IssueState = @import("github/IssueState.pb.zig").IssueState;
-pub const RepositoryService = @import("github/RepositoryService.pb.zig").RepositoryService;
-pub const IssueService = @import("github/IssueService.pb.zig").IssueService;
+pub const User = struct {
+    login: []const u8 = "",
+    id: i64 = 0,
+    _unknown: proto.Unknown = .{},
+
+    pub const FieldNumber = enum(u29) {
+        login = 1,
+        id = 2,
+    };
+
+    pub const protobuf: proto.Descriptor = .{
+        .full_name = "github.v1.User",
+        .fields = &.{
+            .{ .name = "login", .number = @intFromEnum(@This().FieldNumber.login), .kind = .string, .json_name = "login", .proto_name = "login" },
+            .{ .name = "id", .number = @intFromEnum(@This().FieldNumber.id), .kind = .int64, .json_name = "id", .proto_name = "id" },
+        },
+    };
+};
+
+pub const Repository = struct {
+    id: i64 = 0,
+    owner: ?User = null,
+    name: []const u8 = "",
+    full_name: []const u8 = "",
+    description: []const u8 = "",
+    visibility: Visibility = @enumFromInt(0),
+    topics: proto.Repeated([]const u8, .string) = .{},
+    open_issues_count: i32 = 0,
+    created_at: ?proto.wkt.Timestamp = null,
+    _unknown: proto.Unknown = .{},
+
+    pub const FieldNumber = enum(u29) {
+        id = 1,
+        owner = 2,
+        name = 3,
+        full_name = 4,
+        description = 5,
+        visibility = 6,
+        topics = 7,
+        open_issues_count = 8,
+        created_at = 9,
+    };
+
+    pub const protobuf: proto.Descriptor = .{
+        .full_name = "github.v1.Repository",
+        .fields = &.{
+            .{ .name = "id", .number = @intFromEnum(@This().FieldNumber.id), .kind = .int64, .json_name = "id", .proto_name = "id" },
+            .{ .name = "owner", .number = @intFromEnum(@This().FieldNumber.owner), .kind = .message, .json_name = "owner", .proto_name = "owner" },
+            .{ .name = "name", .number = @intFromEnum(@This().FieldNumber.name), .kind = .string, .json_name = "name", .proto_name = "name" },
+            .{ .name = "full_name", .number = @intFromEnum(@This().FieldNumber.full_name), .kind = .string, .json_name = "fullName", .proto_name = "full_name" },
+            .{ .name = "description", .number = @intFromEnum(@This().FieldNumber.description), .kind = .string, .json_name = "description", .proto_name = "description" },
+            .{ .name = "visibility", .number = @intFromEnum(@This().FieldNumber.visibility), .kind = .@"enum", .json_name = "visibility", .proto_name = "visibility" },
+            .{ .name = "topics", .number = @intFromEnum(@This().FieldNumber.topics), .kind = .string, .json_name = "topics", .proto_name = "topics" },
+            .{ .name = "open_issues_count", .number = @intFromEnum(@This().FieldNumber.open_issues_count), .kind = .int32, .json_name = "openIssuesCount", .proto_name = "open_issues_count" },
+            .{ .name = "created_at", .number = @intFromEnum(@This().FieldNumber.created_at), .kind = .message, .json_name = "createdAt", .proto_name = "created_at" },
+        },
+    };
+};
+
+pub const GetRepositoryRequest = struct {
+    owner: []const u8 = "",
+    name: []const u8 = "",
+    _unknown: proto.Unknown = .{},
+
+    pub const FieldNumber = enum(u29) {
+        owner = 1,
+        name = 2,
+    };
+
+    pub const protobuf: proto.Descriptor = .{
+        .full_name = "github.v1.GetRepositoryRequest",
+        .fields = &.{
+            .{ .name = "owner", .number = @intFromEnum(@This().FieldNumber.owner), .kind = .string, .json_name = "owner", .proto_name = "owner" },
+            .{ .name = "name", .number = @intFromEnum(@This().FieldNumber.name), .kind = .string, .json_name = "name", .proto_name = "name" },
+        },
+    };
+};
+
+pub const ListRepositoriesRequest = struct {
+    owner: []const u8 = "",
+    page_size: i32 = 0,
+    page_token: []const u8 = "",
+    _unknown: proto.Unknown = .{},
+
+    pub const FieldNumber = enum(u29) {
+        owner = 1,
+        page_size = 2,
+        page_token = 3,
+    };
+
+    pub const protobuf: proto.Descriptor = .{
+        .full_name = "github.v1.ListRepositoriesRequest",
+        .fields = &.{
+            .{ .name = "owner", .number = @intFromEnum(@This().FieldNumber.owner), .kind = .string, .json_name = "owner", .proto_name = "owner" },
+            .{ .name = "page_size", .number = @intFromEnum(@This().FieldNumber.page_size), .kind = .int32, .json_name = "pageSize", .proto_name = "page_size" },
+            .{ .name = "page_token", .number = @intFromEnum(@This().FieldNumber.page_token), .kind = .string, .json_name = "pageToken", .proto_name = "page_token" },
+        },
+    };
+};
+
+pub const ListRepositoriesResponse = struct {
+    repositories: proto.Repeated(Repository, .message) = .{},
+    next_page_token: []const u8 = "",
+    _unknown: proto.Unknown = .{},
+
+    pub const FieldNumber = enum(u29) {
+        repositories = 1,
+        next_page_token = 2,
+    };
+
+    pub const protobuf: proto.Descriptor = .{
+        .full_name = "github.v1.ListRepositoriesResponse",
+        .fields = &.{
+            .{ .name = "repositories", .number = @intFromEnum(@This().FieldNumber.repositories), .kind = .message, .json_name = "repositories", .proto_name = "repositories" },
+            .{ .name = "next_page_token", .number = @intFromEnum(@This().FieldNumber.next_page_token), .kind = .string, .json_name = "nextPageToken", .proto_name = "next_page_token" },
+        },
+    };
+};
+
+pub const CreateRepositoryRequest = struct {
+    name: []const u8 = "",
+    description: []const u8 = "",
+    visibility: Visibility = @enumFromInt(0),
+    topics: proto.Repeated([]const u8, .string) = .{},
+    _unknown: proto.Unknown = .{},
+
+    pub const FieldNumber = enum(u29) {
+        name = 1,
+        description = 2,
+        visibility = 3,
+        topics = 4,
+    };
+
+    pub const protobuf: proto.Descriptor = .{
+        .full_name = "github.v1.CreateRepositoryRequest",
+        .fields = &.{
+            .{ .name = "name", .number = @intFromEnum(@This().FieldNumber.name), .kind = .string, .json_name = "name", .proto_name = "name" },
+            .{ .name = "description", .number = @intFromEnum(@This().FieldNumber.description), .kind = .string, .json_name = "description", .proto_name = "description" },
+            .{ .name = "visibility", .number = @intFromEnum(@This().FieldNumber.visibility), .kind = .@"enum", .json_name = "visibility", .proto_name = "visibility" },
+            .{ .name = "topics", .number = @intFromEnum(@This().FieldNumber.topics), .kind = .string, .json_name = "topics", .proto_name = "topics" },
+        },
+    };
+};
+
+pub const Issue = struct {
+    id: i64 = 0,
+    repository: []const u8 = "",
+    number: i32 = 0,
+    title: []const u8 = "",
+    body: []const u8 = "",
+    state: IssueState = @enumFromInt(0),
+    author: ?User = null,
+    labels: proto.Repeated([]const u8, .string) = .{},
+    created_at: ?proto.wkt.Timestamp = null,
+    closed_at: ?proto.wkt.Timestamp = null,
+    _unknown: proto.Unknown = .{},
+
+    pub const FieldNumber = enum(u29) {
+        id = 1,
+        repository = 2,
+        number = 3,
+        title = 4,
+        body = 5,
+        state = 6,
+        author = 7,
+        labels = 8,
+        created_at = 9,
+        closed_at = 10,
+    };
+
+    pub const protobuf: proto.Descriptor = .{
+        .full_name = "github.v1.Issue",
+        .fields = &.{
+            .{ .name = "id", .number = @intFromEnum(@This().FieldNumber.id), .kind = .int64, .json_name = "id", .proto_name = "id" },
+            .{ .name = "repository", .number = @intFromEnum(@This().FieldNumber.repository), .kind = .string, .json_name = "repository", .proto_name = "repository" },
+            .{ .name = "number", .number = @intFromEnum(@This().FieldNumber.number), .kind = .int32, .json_name = "number", .proto_name = "number" },
+            .{ .name = "title", .number = @intFromEnum(@This().FieldNumber.title), .kind = .string, .json_name = "title", .proto_name = "title" },
+            .{ .name = "body", .number = @intFromEnum(@This().FieldNumber.body), .kind = .string, .json_name = "body", .proto_name = "body" },
+            .{ .name = "state", .number = @intFromEnum(@This().FieldNumber.state), .kind = .@"enum", .json_name = "state", .proto_name = "state" },
+            .{ .name = "author", .number = @intFromEnum(@This().FieldNumber.author), .kind = .message, .json_name = "author", .proto_name = "author" },
+            .{ .name = "labels", .number = @intFromEnum(@This().FieldNumber.labels), .kind = .string, .json_name = "labels", .proto_name = "labels" },
+            .{ .name = "created_at", .number = @intFromEnum(@This().FieldNumber.created_at), .kind = .message, .json_name = "createdAt", .proto_name = "created_at" },
+            .{ .name = "closed_at", .number = @intFromEnum(@This().FieldNumber.closed_at), .kind = .message, .json_name = "closedAt", .proto_name = "closed_at" },
+        },
+    };
+};
+
+pub const CreateIssueRequest = struct {
+    owner: []const u8 = "",
+    repository: []const u8 = "",
+    title: []const u8 = "",
+    body: []const u8 = "",
+    labels: proto.Repeated([]const u8, .string) = .{},
+    _unknown: proto.Unknown = .{},
+
+    pub const FieldNumber = enum(u29) {
+        owner = 1,
+        repository = 2,
+        title = 3,
+        body = 4,
+        labels = 5,
+    };
+
+    pub const protobuf: proto.Descriptor = .{
+        .full_name = "github.v1.CreateIssueRequest",
+        .fields = &.{
+            .{ .name = "owner", .number = @intFromEnum(@This().FieldNumber.owner), .kind = .string, .json_name = "owner", .proto_name = "owner" },
+            .{ .name = "repository", .number = @intFromEnum(@This().FieldNumber.repository), .kind = .string, .json_name = "repository", .proto_name = "repository" },
+            .{ .name = "title", .number = @intFromEnum(@This().FieldNumber.title), .kind = .string, .json_name = "title", .proto_name = "title" },
+            .{ .name = "body", .number = @intFromEnum(@This().FieldNumber.body), .kind = .string, .json_name = "body", .proto_name = "body" },
+            .{ .name = "labels", .number = @intFromEnum(@This().FieldNumber.labels), .kind = .string, .json_name = "labels", .proto_name = "labels" },
+        },
+    };
+};
+
+pub const GetIssueRequest = struct {
+    owner: []const u8 = "",
+    repository: []const u8 = "",
+    number: i32 = 0,
+    _unknown: proto.Unknown = .{},
+
+    pub const FieldNumber = enum(u29) {
+        owner = 1,
+        repository = 2,
+        number = 3,
+    };
+
+    pub const protobuf: proto.Descriptor = .{
+        .full_name = "github.v1.GetIssueRequest",
+        .fields = &.{
+            .{ .name = "owner", .number = @intFromEnum(@This().FieldNumber.owner), .kind = .string, .json_name = "owner", .proto_name = "owner" },
+            .{ .name = "repository", .number = @intFromEnum(@This().FieldNumber.repository), .kind = .string, .json_name = "repository", .proto_name = "repository" },
+            .{ .name = "number", .number = @intFromEnum(@This().FieldNumber.number), .kind = .int32, .json_name = "number", .proto_name = "number" },
+        },
+    };
+};
+
+pub const ListIssuesRequest = struct {
+    owner: []const u8 = "",
+    repository: []const u8 = "",
+    state: IssueState = @enumFromInt(0),
+    label: []const u8 = "",
+    page_size: i32 = 0,
+    page_token: []const u8 = "",
+    _unknown: proto.Unknown = .{},
+
+    pub const FieldNumber = enum(u29) {
+        owner = 1,
+        repository = 2,
+        state = 3,
+        label = 4,
+        page_size = 5,
+        page_token = 6,
+    };
+
+    pub const protobuf: proto.Descriptor = .{
+        .full_name = "github.v1.ListIssuesRequest",
+        .fields = &.{
+            .{ .name = "owner", .number = @intFromEnum(@This().FieldNumber.owner), .kind = .string, .json_name = "owner", .proto_name = "owner" },
+            .{ .name = "repository", .number = @intFromEnum(@This().FieldNumber.repository), .kind = .string, .json_name = "repository", .proto_name = "repository" },
+            .{ .name = "state", .number = @intFromEnum(@This().FieldNumber.state), .kind = .@"enum", .json_name = "state", .proto_name = "state" },
+            .{ .name = "label", .number = @intFromEnum(@This().FieldNumber.label), .kind = .string, .json_name = "label", .proto_name = "label" },
+            .{ .name = "page_size", .number = @intFromEnum(@This().FieldNumber.page_size), .kind = .int32, .json_name = "pageSize", .proto_name = "page_size" },
+            .{ .name = "page_token", .number = @intFromEnum(@This().FieldNumber.page_token), .kind = .string, .json_name = "pageToken", .proto_name = "page_token" },
+        },
+    };
+};
+
+pub const ListIssuesResponse = struct {
+    issues: proto.Repeated(Issue, .message) = .{},
+    next_page_token: []const u8 = "",
+    total_count: i32 = 0,
+    _unknown: proto.Unknown = .{},
+
+    pub const FieldNumber = enum(u29) {
+        issues = 1,
+        next_page_token = 2,
+        total_count = 3,
+    };
+
+    pub const protobuf: proto.Descriptor = .{
+        .full_name = "github.v1.ListIssuesResponse",
+        .fields = &.{
+            .{ .name = "issues", .number = @intFromEnum(@This().FieldNumber.issues), .kind = .message, .json_name = "issues", .proto_name = "issues" },
+            .{ .name = "next_page_token", .number = @intFromEnum(@This().FieldNumber.next_page_token), .kind = .string, .json_name = "nextPageToken", .proto_name = "next_page_token" },
+            .{ .name = "total_count", .number = @intFromEnum(@This().FieldNumber.total_count), .kind = .int32, .json_name = "totalCount", .proto_name = "total_count" },
+        },
+    };
+};
+
+pub const UpdateIssueRequest = struct {
+    owner: []const u8 = "",
+    repository: []const u8 = "",
+    number: i32 = 0,
+    issue: ?Issue = null,
+    update_mask: ?proto.wkt.FieldMask = null,
+    _unknown: proto.Unknown = .{},
+
+    pub const FieldNumber = enum(u29) {
+        owner = 1,
+        repository = 2,
+        number = 3,
+        issue = 4,
+        update_mask = 5,
+    };
+
+    pub const protobuf: proto.Descriptor = .{
+        .full_name = "github.v1.UpdateIssueRequest",
+        .fields = &.{
+            .{ .name = "owner", .number = @intFromEnum(@This().FieldNumber.owner), .kind = .string, .json_name = "owner", .proto_name = "owner" },
+            .{ .name = "repository", .number = @intFromEnum(@This().FieldNumber.repository), .kind = .string, .json_name = "repository", .proto_name = "repository" },
+            .{ .name = "number", .number = @intFromEnum(@This().FieldNumber.number), .kind = .int32, .json_name = "number", .proto_name = "number" },
+            .{ .name = "issue", .number = @intFromEnum(@This().FieldNumber.issue), .kind = .message, .json_name = "issue", .proto_name = "issue" },
+            .{ .name = "update_mask", .number = @intFromEnum(@This().FieldNumber.update_mask), .kind = .message, .json_name = "updateMask", .proto_name = "update_mask" },
+        },
+    };
+};
+
+pub const ImportIssuesResponse = struct {
+    created: i32 = 0,
+    numbers: proto.Repeated(i32, .int32) = .{},
+    _unknown: proto.Unknown = .{},
+
+    pub const FieldNumber = enum(u29) {
+        created = 1,
+        numbers = 2,
+    };
+
+    pub const protobuf: proto.Descriptor = .{
+        .full_name = "github.v1.ImportIssuesResponse",
+        .fields = &.{
+            .{ .name = "created", .number = @intFromEnum(@This().FieldNumber.created), .kind = .int32, .json_name = "created", .proto_name = "created" },
+            .{ .name = "numbers", .number = @intFromEnum(@This().FieldNumber.numbers), .kind = .int32, .json_name = "numbers", .proto_name = "numbers" },
+        },
+    };
+};
+
+pub const WatchEventsRequest = struct {
+    owner: []const u8 = "",
+    repository: []const u8 = "",
+    after_id: i64 = 0,
+    _unknown: proto.Unknown = .{},
+
+    pub const FieldNumber = enum(u29) {
+        owner = 1,
+        repository = 2,
+        after_id = 3,
+    };
+
+    pub const protobuf: proto.Descriptor = .{
+        .full_name = "github.v1.WatchEventsRequest",
+        .fields = &.{
+            .{ .name = "owner", .number = @intFromEnum(@This().FieldNumber.owner), .kind = .string, .json_name = "owner", .proto_name = "owner" },
+            .{ .name = "repository", .number = @intFromEnum(@This().FieldNumber.repository), .kind = .string, .json_name = "repository", .proto_name = "repository" },
+            .{ .name = "after_id", .number = @intFromEnum(@This().FieldNumber.after_id), .kind = .int64, .json_name = "afterId", .proto_name = "after_id" },
+        },
+    };
+};
+
+pub const Event = struct {
+    id: i64 = 0,
+    actor: ?User = null,
+    created_at: ?proto.wkt.Timestamp = null,
+    issue_number: i32 = 0,
+    payload: ?union(enum) {
+        opened: IssueOpened,
+        closed: IssueClosed,
+        labeled: IssueLabeled,
+    } = null,
+    _unknown: proto.Unknown = .{},
+
+    pub const FieldNumber = enum(u29) {
+        id = 1,
+        actor = 2,
+        created_at = 3,
+        issue_number = 4,
+        opened = 5,
+        closed = 6,
+        labeled = 7,
+    };
+
+    pub const protobuf: proto.Descriptor = .{
+        .full_name = "github.v1.Event",
+        .fields = &.{
+            .{ .name = "id", .number = @intFromEnum(@This().FieldNumber.id), .kind = .int64, .json_name = "id", .proto_name = "id" },
+            .{ .name = "actor", .number = @intFromEnum(@This().FieldNumber.actor), .kind = .message, .json_name = "actor", .proto_name = "actor" },
+            .{ .name = "created_at", .number = @intFromEnum(@This().FieldNumber.created_at), .kind = .message, .json_name = "createdAt", .proto_name = "created_at" },
+            .{ .name = "issue_number", .number = @intFromEnum(@This().FieldNumber.issue_number), .kind = .int32, .json_name = "issueNumber", .proto_name = "issue_number" },
+            .{ .name = "opened", .number = @intFromEnum(@This().FieldNumber.opened), .kind = .message, .json_name = "opened", .proto_name = "opened", .oneof = "payload" },
+            .{ .name = "closed", .number = @intFromEnum(@This().FieldNumber.closed), .kind = .message, .json_name = "closed", .proto_name = "closed", .oneof = "payload" },
+            .{ .name = "labeled", .number = @intFromEnum(@This().FieldNumber.labeled), .kind = .message, .json_name = "labeled", .proto_name = "labeled", .oneof = "payload" },
+        },
+    };
+};
+
+pub const IssueOpened = struct {
+    title: []const u8 = "",
+    _unknown: proto.Unknown = .{},
+
+    pub const FieldNumber = enum(u29) {
+        title = 1,
+    };
+
+    pub const protobuf: proto.Descriptor = .{
+        .full_name = "github.v1.IssueOpened",
+        .fields = &.{
+            .{ .name = "title", .number = @intFromEnum(@This().FieldNumber.title), .kind = .string, .json_name = "title", .proto_name = "title" },
+        },
+    };
+};
+
+pub const IssueClosed = struct {
+    _unknown: proto.Unknown = .{},
+    pub const protobuf: proto.Descriptor = .{
+        .full_name = "github.v1.IssueClosed",
+        .fields = &.{},
+    };
+};
+
+pub const IssueLabeled = struct {
+    label: []const u8 = "",
+    _unknown: proto.Unknown = .{},
+
+    pub const FieldNumber = enum(u29) {
+        label = 1,
+    };
+
+    pub const protobuf: proto.Descriptor = .{
+        .full_name = "github.v1.IssueLabeled",
+        .fields = &.{
+            .{ .name = "label", .number = @intFromEnum(@This().FieldNumber.label), .kind = .string, .json_name = "label", .proto_name = "label" },
+        },
+    };
+};
+
+pub const NotFound = struct {
+    resource_type: []const u8 = "",
+    resource_name: []const u8 = "",
+    _unknown: proto.Unknown = .{},
+
+    pub const FieldNumber = enum(u29) {
+        resource_type = 1,
+        resource_name = 2,
+    };
+
+    pub const protobuf: proto.Descriptor = .{
+        .full_name = "github.v1.NotFound",
+        .fields = &.{
+            .{ .name = "resource_type", .number = @intFromEnum(@This().FieldNumber.resource_type), .kind = .string, .json_name = "resourceType", .proto_name = "resource_type" },
+            .{ .name = "resource_name", .number = @intFromEnum(@This().FieldNumber.resource_name), .kind = .string, .json_name = "resourceName", .proto_name = "resource_name" },
+        },
+    };
+};
+
+pub const AlreadyExists = struct {
+    resource_type: []const u8 = "",
+    resource_name: []const u8 = "",
+    _unknown: proto.Unknown = .{},
+
+    pub const FieldNumber = enum(u29) {
+        resource_type = 1,
+        resource_name = 2,
+    };
+
+    pub const protobuf: proto.Descriptor = .{
+        .full_name = "github.v1.AlreadyExists",
+        .fields = &.{
+            .{ .name = "resource_type", .number = @intFromEnum(@This().FieldNumber.resource_type), .kind = .string, .json_name = "resourceType", .proto_name = "resource_type" },
+            .{ .name = "resource_name", .number = @intFromEnum(@This().FieldNumber.resource_name), .kind = .string, .json_name = "resourceName", .proto_name = "resource_name" },
+        },
+    };
+};
+
+pub const BadField = struct {
+    field: []const u8 = "",
+    description: []const u8 = "",
+    _unknown: proto.Unknown = .{},
+
+    pub const FieldNumber = enum(u29) {
+        field = 1,
+        description = 2,
+    };
+
+    pub const protobuf: proto.Descriptor = .{
+        .full_name = "github.v1.BadField",
+        .fields = &.{
+            .{ .name = "field", .number = @intFromEnum(@This().FieldNumber.field), .kind = .string, .json_name = "field", .proto_name = "field" },
+            .{ .name = "description", .number = @intFromEnum(@This().FieldNumber.description), .kind = .string, .json_name = "description", .proto_name = "description" },
+        },
+    };
+};
+
+pub const RateLimited = struct {
+    limit: i32 = 0,
+    used: i32 = 0,
+    _unknown: proto.Unknown = .{},
+
+    pub const FieldNumber = enum(u29) {
+        limit = 1,
+        used = 2,
+    };
+
+    pub const protobuf: proto.Descriptor = .{
+        .full_name = "github.v1.RateLimited",
+        .fields = &.{
+            .{ .name = "limit", .number = @intFromEnum(@This().FieldNumber.limit), .kind = .int32, .json_name = "limit", .proto_name = "limit" },
+            .{ .name = "used", .number = @intFromEnum(@This().FieldNumber.used), .kind = .int32, .json_name = "used", .proto_name = "used" },
+        },
+    };
+};
+
+pub const Visibility = enum(i32) {
+    visibility_unspecified = 0,
+    visibility_public = 1,
+    visibility_private = 2,
+    _,
+
+    pub const protobuf: proto.EnumDescriptor = .{ .full_name = "github.v1.Visibility", .values = &.{
+        .{ .name = "VISIBILITY_UNSPECIFIED", .number = @intFromEnum(@This().visibility_unspecified) },
+        .{ .name = "VISIBILITY_PUBLIC", .number = @intFromEnum(@This().visibility_public) },
+        .{ .name = "VISIBILITY_PRIVATE", .number = @intFromEnum(@This().visibility_private) },
+    } };
+};
+
+pub const IssueState = enum(i32) {
+    issue_state_unspecified = 0,
+    issue_state_open = 1,
+    issue_state_closed = 2,
+    _,
+
+    pub const protobuf: proto.EnumDescriptor = .{ .full_name = "github.v1.IssueState", .values = &.{
+        .{ .name = "ISSUE_STATE_UNSPECIFIED", .number = @intFromEnum(@This().issue_state_unspecified) },
+        .{ .name = "ISSUE_STATE_OPEN", .number = @intFromEnum(@This().issue_state_open) },
+        .{ .name = "ISSUE_STATE_CLOSED", .number = @intFromEnum(@This().issue_state_closed) },
+    } };
+};
+
+pub const RepositoryService = struct {
+    pub const service_name = "github.v1.RepositoryService";
+
+    pub const get_repository: connect.Method = .{
+        .service = service_name,
+        .name = "GetRepository",
+        .Request = GetRepositoryRequest,
+        .Response = Repository,
+        .stream_type = .unary,
+        .idempotency = .no_side_effects,
+    };
+
+    pub const list_repositories: connect.Method = .{
+        .service = service_name,
+        .name = "ListRepositories",
+        .Request = ListRepositoriesRequest,
+        .Response = ListRepositoriesResponse,
+        .stream_type = .unary,
+        .idempotency = .no_side_effects,
+    };
+
+    pub const create_repository: connect.Method = .{
+        .service = service_name,
+        .name = "CreateRepository",
+        .Request = CreateRepositoryRequest,
+        .Response = Repository,
+        .stream_type = .unary,
+        .idempotency = .unknown,
+    };
+
+    /// Every method as a route of `transport`, such as `connect_colibri`, in `routes`. Each
+    /// handler is the declaration of `Handlers` the method names, so one a service lacks fails
+    /// to compile.
+    pub fn Routes(comptime transport: type, comptime App: type, comptime Handlers: type, comptime options: transport.RouteOptions) type {
+        return struct {
+            pub const routes = .{
+                transport.post(App, get_repository, Handlers.get_repository, options),
+                transport.get(App, get_repository, Handlers.get_repository, options),
+                transport.post(App, list_repositories, Handlers.list_repositories, options),
+                transport.get(App, list_repositories, Handlers.list_repositories, options),
+                transport.post(App, create_repository, Handlers.create_repository, options),
+            };
+        };
+    }
+};
+
+pub const IssueService = struct {
+    pub const service_name = "github.v1.IssueService";
+
+    pub const create_issue: connect.Method = .{
+        .service = service_name,
+        .name = "CreateIssue",
+        .Request = CreateIssueRequest,
+        .Response = Issue,
+        .stream_type = .unary,
+        .idempotency = .unknown,
+    };
+
+    pub const get_issue: connect.Method = .{
+        .service = service_name,
+        .name = "GetIssue",
+        .Request = GetIssueRequest,
+        .Response = Issue,
+        .stream_type = .unary,
+        .idempotency = .no_side_effects,
+    };
+
+    pub const list_issues: connect.Method = .{
+        .service = service_name,
+        .name = "ListIssues",
+        .Request = ListIssuesRequest,
+        .Response = ListIssuesResponse,
+        .stream_type = .unary,
+        .idempotency = .no_side_effects,
+    };
+
+    pub const update_issue: connect.Method = .{
+        .service = service_name,
+        .name = "UpdateIssue",
+        .Request = UpdateIssueRequest,
+        .Response = Issue,
+        .stream_type = .unary,
+        .idempotency = .unknown,
+    };
+
+    pub const import_issues: connect.Method = .{
+        .service = service_name,
+        .name = "ImportIssues",
+        .Request = CreateIssueRequest,
+        .Response = ImportIssuesResponse,
+        .stream_type = .client_stream,
+        .idempotency = .unknown,
+    };
+
+    pub const watch_events: connect.Method = .{
+        .service = service_name,
+        .name = "WatchEvents",
+        .Request = WatchEventsRequest,
+        .Response = Event,
+        .stream_type = .server_stream,
+        .idempotency = .unknown,
+    };
+
+    /// Every method as a route of `transport`, such as `connect_colibri`, in `routes`. Each
+    /// handler is the declaration of `Handlers` the method names, so one a service lacks fails
+    /// to compile.
+    pub fn Routes(comptime transport: type, comptime App: type, comptime Handlers: type, comptime options: transport.RouteOptions) type {
+        return struct {
+            pub const routes = .{
+                transport.post(App, create_issue, Handlers.create_issue, options),
+                transport.post(App, get_issue, Handlers.get_issue, options),
+                transport.get(App, get_issue, Handlers.get_issue, options),
+                transport.post(App, list_issues, Handlers.list_issues, options),
+                transport.get(App, list_issues, Handlers.list_issues, options),
+                transport.post(App, update_issue, Handlers.update_issue, options),
+                transport.post(App, import_issues, Handlers.import_issues, options),
+                transport.post(App, watch_events, Handlers.watch_events, options),
+            };
+        };
+    }
+};
