@@ -7,7 +7,7 @@ use prost::Message;
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
 use tonic::codec::CompressionEncoding;
-use tonic::transport::Channel;
+use tonic::transport::{Certificate, Channel, ClientTlsConfig};
 use tonic::{Code, Request};
 
 #[allow(dead_code)]
@@ -53,16 +53,27 @@ struct Case {
 #[tokio::main]
 async fn main() {
     let args: Vec<String> = std::env::args().collect();
-    if args.len() != 3 {
-        eprintln!("usage: interop-rust <base-url> <cases-dir>");
+    if args.len() != 4 {
+        eprintln!("usage: interop-rust <base-url> <cases-dir> <ca>");
         std::process::exit(2);
     }
     let cases = read_cases(&args[2]).unwrap_or_else(|error| {
         eprintln!("reading cases: {error}");
         std::process::exit(2);
     });
+    // The server's TLS identity is the test one, whose CA the channel trusts.
+    let ca = std::fs::read(&args[3]).unwrap_or_else(|error| {
+        eprintln!("reading {}: {error}", args[3]);
+        std::process::exit(2);
+    });
+    let tls = ClientTlsConfig::new().ca_certificate(Certificate::from_pem(ca));
     let channel = Channel::from_shared(args[1].clone())
         .expect("a valid base URL")
+        .tls_config(tls)
+        .unwrap_or_else(|error| {
+            eprintln!("configuring TLS: {error}");
+            std::process::exit(2);
+        })
         .connect()
         .await
         .unwrap_or_else(|error| {

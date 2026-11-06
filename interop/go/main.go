@@ -1,17 +1,17 @@
 // The Go interop client: connect-go in Connect, gRPC and gRPC-Web, and grpc-go in gRPC, against
 // connect-zig's server. interop/README.md names the scenarios and the output.
 //
-//	go run . <base-url> <cases-dir>
+//	go run . <base-url> <cases-dir> <ca>
 package main
 
 import (
 	"bytes"
 	"context"
 	"crypto/tls"
+	"crypto/x509"
 	"errors"
 	"fmt"
 	"io"
-	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -24,7 +24,7 @@ import (
 	"golang.org/x/net/http2"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/encoding/gzip"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
@@ -36,13 +36,13 @@ import (
 )
 
 const (
-	client       = "go"
-	header       = "x-interop-client"
-	repeatCount  = 3
-	failCode     = 5
-	failMessage  = "gone"
-	timeout      = 5 * time.Second
-	callTimeout  = 10 * time.Second
+	client      = "go"
+	header      = "x-interop-client"
+	repeatCount = 3
+	failCode    = 5
+	failMessage = "gone"
+	timeout     = 5 * time.Second
+	callTimeout = 10 * time.Second
 	// grpc-core rounds a deadline up to the next 10 ms (interop/README.md).
 	timeoutMaxMS = 5010
 )
@@ -56,8 +56,8 @@ type testCase struct {
 var failures int
 
 func main() {
-	if len(os.Args) != 3 {
-		fmt.Fprintln(os.Stderr, "usage: go run . <base-url> <cases-dir>")
+	if len(os.Args) != 4 {
+		fmt.Fprintln(os.Stderr, "usage: go run . <base-url> <cases-dir> <ca>")
 		os.Exit(2)
 	}
 	base := os.Args[1]
@@ -66,13 +66,16 @@ func main() {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(2)
 	}
-	h2 := &http.Client{Transport: &http2.Transport{
-		AllowHTTP: true,
-		DialTLSContext: func(ctx context.Context, network, address string, _ *tls.Config) (net.Conn, error) {
-			return (&net.Dialer{}).DialContext(ctx, network, address)
-		},
-	}}
-	h1 := &http.Client{}
+	trusted, err := trust(os.Args[3])
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(2)
+	}
+	// The server picks h2 or h11 by ALPN, as each transport offers one.
+	h2 := &http.Client{Transport: &http2.Transport{TLSClientConfig: trusted}}
+	h1Config := trusted.Clone()
+	h1Config.NextProtos = []string{"http/1.1"}
+	h1 := &http.Client{Transport: &http.Transport{TLSClientConfig: h1Config}}
 	for _, run := range []struct {
 		protocol string
 		http     *http.Client
@@ -89,10 +92,23 @@ func main() {
 		c := connectRun{protocol: run.protocol, base: base, http: run.http, options: run.options}
 		c.all(cases, run.duplex, run.get)
 	}
-	grpcRun(base, cases)
+	grpcRun(base, cases, trusted)
 	if failures > 0 {
 		os.Exit(1)
 	}
+}
+
+// trust reads the server's CA, the test identity's, from a PEM file.
+func trust(path string) (*tls.Config, error) {
+	pem, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	roots := x509.NewCertPool()
+	if !roots.AppendCertsFromPEM(pem) {
+		return nil, fmt.Errorf("%s holds no certificate", path)
+	}
+	return &tls.Config{RootCAs: roots, MinVersion: tls.VersionTLS13}, nil
 }
 
 func readCases(directory string) ([]testCase, error) {
@@ -318,14 +334,14 @@ func inspected(response *interopv1.InspectResponse) error {
 }
 
 // grpcRun runs the scenarios through grpc-go, Google's own gRPC.
-func grpcRun(base string, cases []testCase) {
+func grpcRun(base string, cases []testCase, trusted *tls.Config) {
 	const protocol = "grpc-go"
 	origin, err := url.Parse(base)
 	if err != nil {
 		report(protocol, "connect", err)
 		return
 	}
-	connection, err := grpc.NewClient(origin.Host, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	connection, err := grpc.NewClient(origin.Host, grpc.WithTransportCredentials(credentials.NewTLS(trusted.Clone())))
 	if err != nil {
 		report(protocol, "connect", err)
 		return

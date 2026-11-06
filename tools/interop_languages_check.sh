@@ -30,7 +30,9 @@ for _ in $(seq 1 50); do
     sleep 0.1
 done
 [ -n "${port}" ] || { echo "the server printed no port" >&2; exit 1; }
-base="http://127.0.0.1:${port}"
+# The server's TCP is TLS under the test identity: each client trusts its CA.
+base="https://127.0.0.1:${port}"
+ca="$(pwd)/examples/testdata/tls/ca.pem"
 # The cases in binary, which every runtime reads, and the schema for the clients that compile it.
 mkdir -p "${work}/cases"
 for case in examples/testdata/coverage/*.json; do
@@ -70,7 +72,7 @@ failed=0
 for client in ${clients}; do
     echo "== ${client}"
     status=0
-    timeout "${client_seconds}" "interop/${client}/run.sh" "${base}" "${work}/cases" "${work}/descriptors.binpb" \
+    timeout "${client_seconds}" "interop/${client}/run.sh" "${base}" "${work}/cases" "${work}/descriptors.binpb" "${ca}" \
         >"${work}/${client}.out" 2>&1 || status=$?
     cat "${work}/${client}.out"
     grep -e '^ok: ' -e '^FAIL: ' "${work}/${client}.out" >"${work}/${client}.lines" || true

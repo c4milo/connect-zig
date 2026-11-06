@@ -1,6 +1,6 @@
 """The grpcio interop client: calls interop.v1.InteropService over gRPC on h2 cleartext.
 
-Usage: client.py <generated-dir> <base-url> <cases-dir>
+Usage: client.py <generated-dir> <base-url> <cases-dir> <ca>
 It prints one line per scenario and exits 1 when any scenario fails (interop/README.md).
 """
 
@@ -162,7 +162,7 @@ def report(scenario, check, *arguments, **options):
 
 
 def main():
-    generated_dir, base_url, cases_dir = sys.argv[1:]
+    generated_dir, base_url, cases_dir, ca_path = sys.argv[1:]
     sys.path.insert(0, generated_dir)
     from coverage.v1 import coverage_pb2
     from interop.v1 import interop_pb2, interop_pb2_grpc
@@ -176,7 +176,10 @@ def main():
 
     target = urllib.parse.urlsplit(base_url).netloc
     results = []
-    with grpc.insecure_channel(target) as channel:
+    # The server's TLS identity is the test one, whose CA the channel trusts.
+    with open(ca_path, "rb") as file:
+        credentials = grpc.ssl_channel_credentials(root_certificates=file.read())
+    with grpc.secure_channel(target, credentials) as channel:
         stub = interop_pb2_grpc.InteropServiceStub(channel)
         for name, message in cases:
             results.append(report(f"echo {name}", run_echo, stub, message))

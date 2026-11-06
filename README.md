@@ -31,8 +31,8 @@ zig build run-eliza-server -- 8080
 In a second terminal, talk to [ELIZA](https://en.wikipedia.org/wiki/ELIZA):
 
 ```sh
-curl --json '{"sentence":"I feel tired"}' \
-  http://127.0.0.1:8080/connectrpc.eliza.v1.ElizaService/Say
+curl --cacert examples/testdata/tls/ca.pem --json '{"sentence":"I feel tired"}' \
+  https://localhost:8080/connectrpc.eliza.v1.ElizaService/Say
 ```
 
 ```json
@@ -40,11 +40,11 @@ curl --json '{"sentence":"I feel tired"}' \
 ```
 
 The same server answers [`buf curl`](https://buf.build/docs/reference/cli/buf/curl) in every
-protocol. Try `--protocol grpc` or `--protocol grpcweb`:
+protocol, over h2 or, with `--http3`, h3. Try `--protocol grpc` or `--protocol grpcweb`:
 
 ```sh
-buf curl --http2-prior-knowledge --protocol grpc --schema examples/proto \
-  -d '{"name":"Ada"}' http://127.0.0.1:8080/connectrpc.eliza.v1.ElizaService/Introduce
+buf curl --cacert examples/testdata/tls/ca.pem --protocol grpc --schema examples/proto \
+  -d '{"name":"Ada"}' https://localhost:8080/connectrpc.eliza.v1.ElizaService/Introduce
 ```
 
 ## What's inside

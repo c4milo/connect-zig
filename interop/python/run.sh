@@ -1,15 +1,16 @@
 #!/bin/sh
 # Runs the grpcio interop client against a connect-zig server.
-# Usage: interop/python/run.sh <base-url> <cases-dir> <descriptors>
+# Usage: interop/python/run.sh <base-url> <cases-dir> <descriptors> <ca>
 # The descriptors go unused: grpcio-tools compiles examples/proto itself.
 set -eu
 
-if [ "$#" -ne 3 ]; then
-    echo "usage: $0 <base-url> <cases-dir> <descriptors>" >&2
+if [ "$#" -ne 4 ]; then
+    echo "usage: $0 <base-url> <cases-dir> <descriptors> <ca>" >&2
     exit 2
 fi
 base_url="$1"
 cases_dir="$2"
+ca="$4"
 
 here="$(cd "$(dirname "$0")" && pwd)"
 repo="$(cd "${here}/../.." && pwd)"
@@ -34,4 +35,4 @@ trap 'rm -rf "${gen}"' EXIT INT TERM
     "${repo}/examples/proto/coverage/v1/coverage.proto" \
     "${repo}/examples/proto/interop/v1/interop.proto"
 
-"${venv}/bin/python" -I "${here}/client.py" "${gen}" "${base_url}" "${cases_dir}"
+"${venv}/bin/python" -I "${here}/client.py" "${gen}" "${base_url}" "${cases_dir}" "${ca}"

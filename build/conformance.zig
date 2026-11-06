@@ -2,7 +2,6 @@
 //! to zig-out/bin, where `tools/conformance_check.sh` runs it under the connectrpc conformance
 //! runner (design §8 step 7). `zig build test-conformance` runs its unit tests.
 const std = @import("std");
-const examples = @import("examples.zig");
 
 const Graph = @import("graph.zig").Graph;
 
@@ -10,7 +9,7 @@ const Graph = @import("graph.zig").Graph;
 const generated_directory = "conformance/gen/connectrpc/conformance/v1/";
 
 /// Adds the server's steps and returns the step that runs its unit tests.
-pub fn add(b: *std.Build, graph: Graph, rotor: *std.Build.Module) *std.Build.Step {
+pub fn add(b: *std.Build, graph: Graph) *std.Build.Step {
     const config = generated(b, graph, "config", &.{});
     const config_import: std.Build.Module.Import = .{ .name = "connectrpc_conformance_v1_config", .module = config };
     const service = generated(b, graph, "service", &.{config_import});
@@ -21,7 +20,8 @@ pub fn add(b: *std.Build, graph: Graph, rotor: *std.Build.Module) *std.Build.Ste
         .{ .name = "connect_colibri", .module = graph.connect_colibri },
         .{ .name = "server", .module = graph.colibri.module("server") },
         .{ .name = "http", .module = graph.colibri.module("http") },
-        .{ .name = "socket_loop", .module = examples.socket_loop(b, graph, rotor) },
+        .{ .name = "colibri", .module = graph.colibri.module("colibri") },
+        .{ .name = "tls", .module = graph.colibri.module("tls") },
         config_import,
         .{ .name = "connectrpc_conformance_v1_service", .module = service },
         .{ .name = "connectrpc_conformance_v1_server_compat", .module = server_compat },

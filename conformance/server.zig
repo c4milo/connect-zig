@@ -9,7 +9,8 @@
 const std = @import("std");
 const connect = @import("connect");
 const proto = @import("protobuf");
-const socket_loop = @import("socket_loop");
+const colibri = @import("colibri");
+const tls = @import("tls");
 const service = @import("connectrpc_conformance_v1_service");
 const server_compat = @import("connectrpc_conformance_v1_server_compat");
 const constants = @import("constants.zig");
@@ -30,14 +31,22 @@ pub const protobuf_any_types = .{
     service.Header,
 };
 
-const Server = socket_loop.SocketServer(App, Router, .{
-    .sockets_max = constants.sockets_max,
-    .socket_buffer_len = constants.socket_buffer_len,
-    .log_requests = false,
-    .timeouts = .{ .first_request_ns = constants.first_request_timeout_ns, .idle_ns = constants.idle_timeout_ns },
-});
+comptime {
+    // chapulin's hook, which every program over colibri's `tls` defines (colibri decision 94).
+    _ = @import("hooks.zig");
+}
 
-var socket_server: Server align(@alignOf(Server)) = .{};
+/// TCP connections alone: config.yaml declares no TLS, so the server serves no h3.
+const Server = colibri.ServerOf(.{ .tcp_connections = constants.sockets_max, .quic_connections = 0 });
+
+/// The server speaks cleartext, so no TLS session runs on this CPU description.
+const cpu: tls.Cpu = .{
+    .probe = .{ .aes_clmul = .not_known, .dit = .not_known, .sha256 = .not_known, .sha512 = .not_known, .sha3 = .not_known, .ssse3 = .not_known, .sse4_1 = .not_known, .avx2 = .not_known, .vaes = .not_known },
+    .timing = .not_stated,
+};
+
+var http_server: Server align(@alignOf(Server)) = undefined;
+var router: Router align(@alignOf(Router)) = .{};
 var app: App align(@alignOf(App)) = .{};
 var gzip_decoder: connect.GzipDecoder align(@alignOf(connect.GzipDecoder)) = undefined;
 var gzip_encoder: connect.GzipEncoder align(@alignOf(connect.GzipEncoder)) = undefined;
@@ -61,7 +70,15 @@ pub fn main(init: std.process.Init) !void {
         .decoders = .{ .gzip = &gzip_decoder, .zstd = &zstd_decoder },
         .encoders = .{ .gzip = &gzip_encoder, .zstd = &zstd_encoder },
     };
-    try socket_server.serve(&app, 0, Listening{ .io = init.io });
+    try http_server.init(.{
+        .host = host,
+        .port = 0,
+        .cpu = cpu,
+        .endpoint = .{ .timeouts = .{ .first_request_ns = constants.first_request_timeout_ns, .idle_ns = constants.idle_timeout_ns } },
+    });
+    defer http_server.deinit();
+    try write_response(init.io, http_server.port());
+    try http_server.run(&router, &app);
 }
 
 /// Reads the length-prefixed ServerCompatRequest from stdin.
@@ -78,19 +95,15 @@ fn read_request(io: std.Io) ![]const u8 {
 }
 
 /// Writes the length-prefixed ServerCompatResponse, with the port the server bound, to stdout.
-const Listening = struct {
-    io: std.Io,
-
-    pub fn on_listening(listening: Listening, port: u16) !void {
-        var message: [constants.compat_response_bytes]u8 = undefined;
-        const response: server_compat.ServerCompatResponse = .{ .host = host, .port = port };
-        const encoded = try proto.encode(server_compat.ServerCompatResponse, &response, &message);
-        var prefix: [constants.length_prefix_len]u8 = undefined;
-        std.mem.writeInt(u32, &prefix, @intCast(encoded.len), .big);
-        var buffer: [constants.compat_response_bytes]u8 = undefined;
-        var stdout = std.Io.File.stdout().writer(listening.io, &buffer);
-        try stdout.interface.writeAll(&prefix);
-        try stdout.interface.writeAll(encoded);
-        try stdout.interface.flush();
-    }
-};
+fn write_response(io: std.Io, port: u16) !void {
+    var message: [constants.compat_response_bytes]u8 = undefined;
+    const response: server_compat.ServerCompatResponse = .{ .host = host, .port = port };
+    const encoded = try proto.encode(server_compat.ServerCompatResponse, &response, &message);
+    var prefix: [constants.length_prefix_len]u8 = undefined;
+    std.mem.writeInt(u32, &prefix, @intCast(encoded.len), .big);
+    var buffer: [constants.compat_response_bytes]u8 = undefined;
+    var stdout = std.Io.File.stdout().writer(io, &buffer);
+    try stdout.interface.writeAll(&prefix);
+    try stdout.interface.writeAll(encoded);
+    try stdout.interface.flush();
+}

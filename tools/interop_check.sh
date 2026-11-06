@@ -1,8 +1,8 @@
 #!/bin/sh
 # Runs the example socket server and calls it with buf curl, whose client is connect-go's, in each
-# protocol, over h2 and h3, and with curl over h11 and h2. It requires each answer octet for octet,
-# so connect-go checks the server as connect-zig's own client checks it in the examples.
-# It needs buf on the path, or BUF naming it, and curl.
+# protocol, over h2 and h3, and with curl over h11 and h2, all over TLS under the test identity. It
+# requires each answer octet for octet, so connect-go checks the server as connect-zig's own client
+# checks it in the examples. It needs buf on the path, or BUF naming it, curl and python3.
 set -eu
 cd "$(dirname "$0")/.."
 buf="${BUF:-buf}"
@@ -12,6 +12,14 @@ export QUIC_GO_DISABLE_RECEIVE_BUFFER_WARNING=true
 # Each call gets this many seconds, so a server that sends a broken reply fails the check and
 # never hangs it.
 call_seconds=10
+# The server advertises its h3 in an ALTSVC frame on each h2 connection (RFC 7838 section 4).
+# Go's h2 client reads no ALTSVC and logs the frame, so the checks drop that line.
+unlogged() {
+    grep -v 'Transport: unhandled response frame type'
+}
+# The server's TCP is TLS, as its h3 is, under the test identity: every client trusts its CA, and
+# picks h11 or h2 by ALPN.
+ca=examples/testdata/tls/ca.pem
 zig build
 log="$(mktemp)"
 trap 'kill "${server}" 2>/dev/null || true; rm -f "${log}" "${log}.body" "${log}.fifo" "${log}.chat"' EXIT
@@ -25,7 +33,7 @@ for _ in $(seq 1 50); do
     sleep 0.1
 done
 [ -n "${port}" ] || { echo "the server printed no port" >&2; cat "${log}" >&2; exit 1; }
-base="http://127.0.0.1:${port}/connectrpc.eliza.v1.ElizaService"
+base="https://127.0.0.1:${port}/connectrpc.eliza.v1.ElizaService"
 failures=0
 expect() {
     name="$1"
@@ -39,7 +47,7 @@ expect() {
     fi
 }
 call() {
-    timeout "${call_seconds}" "${buf}" curl --http2-prior-knowledge --schema examples/proto --protocol "$1" -d "$2" "${base}/$3" 2>&1 | tr -d ' \n'
+    timeout "${call_seconds}" "${buf}" curl --cacert "${ca}" --schema examples/proto --protocol "$1" -d "$2" "${base}/$3" 2>&1 | unlogged | tr -d ' \n'
 }
 introduced='{"sentence":"HiAda,IamEliza."}{"sentence":"Beforewebegin,Ada,tellmehowyoucamehere."}{"sentence":"Howareyoufeelingtoday,Ada?"}'
 conversed='{"sentence":"Whydoyousay\"a\"?"}{"sentence":"Whydoyousay\"b\"?"}'
@@ -50,53 +58,53 @@ for protocol in connect grpc grpcweb; do
     expect "${protocol} Say error" '{"code":"invalid_argument","message":"saysomething"}' "$(call "${protocol}" '{}' Say)"
 done
 expect "curl h11 POST" '{"sentence":"You said \"hi\". How does that make you feel?"}' \
-    "$(curl -sS -m 5 --json '{"sentence":"hi"}' "${base}/Say")"
+    "$(curl -sS -m 5 --cacert "${ca}" --http1.1 --json '{"sentence":"hi"}' "${base}/Say")"
 expect "curl h2 GET" '{"sentence":"You said \"hi\". How does that make you feel?"}' \
-    "$(curl -sS -m 5 --http2-prior-knowledge "${base}/Say?connect=v1&encoding=json&message=%7B%22sentence%22%3A%22hi%22%7D")"
+    "$(curl -sS -m 5 --cacert "${ca}" --http2 "${base}/Say?connect=v1&encoding=json&message=%7B%22sentence%22%3A%22hi%22%7D")"
 expect "curl error status" '400' \
-    "$(curl -sS -m 5 -o /dev/null -w '%{http_code}' --json '{}' "${base}/Say")"
+    "$(curl -sS -m 5 --cacert "${ca}" -o /dev/null -w '%{http_code}' --json '{}' "${base}/Say")"
 # A method Connect does not serve gets 405, with the methods the path serves in Allow: on the
 # path of the table's refusal entries, and on any other.
 expect "DELETE refused" '405|allow: GET, HEAD, POST|' \
-    "$(curl -sS -m 5 -X DELETE -o /dev/null -D - "${base}/Say" | tr -d '\r' |
+    "$(curl -sS -m 5 --cacert "${ca}" -X DELETE -o /dev/null -D - "${base}/Say" | tr -d '\r' |
         sed -n -e 's/^HTTP[^ ]* \([0-9]*\).*$/\1/p' -e '/^allow:/Ip' | tr '\n' '|')"
 expect "PUT refused" '405|allow: POST|' \
-    "$(curl -sS -m 5 -X PUT -o /dev/null -D - "${base}/Converse" | tr -d '\r' |
+    "$(curl -sS -m 5 --cacert "${ca}" -X PUT -o /dev/null -D - "${base}/Converse" | tr -d '\r' |
         sed -n -e 's/^HTTP[^ ]* \([0-9]*\).*$/\1/p' -e '/^allow:/Ip' | tr '\n' '|')"
 # A long answer to a client that accepts gzip goes out compressed.
 long="$(printf 'a%.0s' $(seq 1 2000))"
 expect "gzip answer" 'gzip' \
-    "$(curl -sS -m 5 -H 'accept-encoding: gzip' --json "{\"sentence\":\"${long}\"}" -D - -o /dev/null "${base}/Say" |
+    "$(curl -sS -m 5 --cacert "${ca}" -H 'accept-encoding: gzip' --json "{\"sentence\":\"${long}\"}" -D - -o /dev/null "${base}/Say" |
         sed -n 's/^content-encoding: *\([a-z]*\).*$/\1/Ip' | tr -d '\r')"
 # A client that lists zstd first gets zstd, which curl decodes back to the same answer.
 expect "zstd answer" 'zstd' \
-    "$(curl -sS -m 5 -H 'accept-encoding: zstd, gzip' --json "{\"sentence\":\"${long}\"}" -D - -o /dev/null "${base}/Say" |
+    "$(curl -sS -m 5 --cacert "${ca}" -H 'accept-encoding: zstd, gzip' --json "{\"sentence\":\"${long}\"}" -D - -o /dev/null "${base}/Say" |
         sed -n 's/^content-encoding: *\([a-z]*\).*$/\1/Ip' | tr -d '\r')"
 expect "zstd answer decodes" "{\"sentence\":\"You said \\\"${long}\\\". How does that make you feel?\"}" \
-    "$(curl -sS -m 5 -H 'accept-encoding: zstd' --compressed --json "{\"sentence\":\"${long}\"}" "${base}/Say")"
+    "$(curl -sS -m 5 --cacert "${ca}" -H 'accept-encoding: zstd' --compressed --json "{\"sentence\":\"${long}\"}" "${base}/Say")"
 # A unary request with two messages is refused with UNIMPLEMENTED, in gRPC-Web's trailers frame.
 printf '\000\000\000\000\003\012\001a\000\000\000\000\003\012\001a' >"${log}.body"
 expect "two messages for a unary call" '1' \
-    "$(curl -sS -m 5 --http2-prior-knowledge -H 'content-type: application/grpc-web+proto' --data-binary "@${log}.body" "${base}/Say" |
+    "$(curl -sS -m 5 --cacert "${ca}" --http2 -H 'content-type: application/grpc-web+proto' --data-binary "@${log}.body" "${base}/Say" |
         grep -ac 'grpc-status: 12')"
 rm -f "${log}.body"
-# h3 on the UDP socket of the same port, under the test identity: buf curl over quic-go.
-h3_base="https://127.0.0.1:${port}/connectrpc.eliza.v1.ElizaService"
+# h3 on the UDP socket of the same port: buf curl over quic-go.
+h3_base="${base}"
 for protocol in connect grpc grpcweb; do
     expect "${protocol} Introduce over h3" "${introduced}" \
-        "$(timeout "${call_seconds}" "${buf}" curl --http3 --cacert examples/testdata/tls/ca.pem --schema examples/proto \
+        "$(timeout "${call_seconds}" "${buf}" curl --http3 --cacert "${ca}" --schema examples/proto \
             --protocol "${protocol}" -d '{"name":"Ada"}' "${h3_base}/Introduce" 2>&1 | tr -d ' \n')"
 done
 
 # The GitHub-style service: a token, typed details, a private repository and a server stream.
 # connect-go reads gRPC's trailers, so gRPC answers here where colibri's client cannot read them.
-github="http://127.0.0.1:${port}/github.v1"
+github="https://127.0.0.1:${port}/github.v1"
 octocat='authorization: Bearer ghp_octocat_example'
 gh() {
     gh_protocol="$1"
     shift
-    timeout "${call_seconds}" "${buf}" curl --http2-prior-knowledge --schema examples/proto --protocol "${gh_protocol}" "$@" 2>&1 |
-        tr -d ' \n'
+    timeout "${call_seconds}" "${buf}" curl --cacert "${ca}" --schema examples/proto --protocol "${gh_protocol}" "$@" 2>&1 |
+        unlogged | tr -d ' \n'
 }
 expect "grpc CreateRepository" '"fullName":"octocat/secrets"' \
     "$(gh grpc -H "${octocat}" -d '{"name":"secrets","visibility":"VISIBILITY_PRIVATE"}' "${github}.RepositoryService/CreateRepository" |
@@ -109,31 +117,33 @@ expect "grpcweb WatchEvents" '"opened":{"title":"Rotatekeys"}|"labeled":{"label"
     "$(gh grpcweb -H "${octocat}" -d '{"owner":"octocat","repository":"secrets"}' "${github}.IssueService/WatchEvents" |
         grep -o -e '"opened":{[^}]*}' -e '"labeled":{[^}]*}' | tr '\n' '|')"
 expect "x-ratelimit headers" 'x-ratelimit-limit: 100|x-ratelimit-remaining: 96|' \
-    "$(curl -sS -m 5 -H "${octocat}" --json '{"owner":"octocat","name":"secrets"}' -D - -o /dev/null \
+    "$(curl -sS -m 5 --cacert "${ca}" -H "${octocat}" --json '{"owner":"octocat","name":"secrets"}' -D - -o /dev/null \
         "${github}.RepositoryService/GetRepository" | tr -d '\r' | grep -i '^x-ratelimit' | tr '\n' '|')"
 
-# A connection beyond the server's sockets is closed at once, not left in the kernel's queue
-# until the client's deadline: 64 idle connections fill the example server, and a 65th must read
-# the end of its stream within 2 s.
-expect "a connection beyond the limit is refused" 'closed' "$(python3 -I - "${port}" <<'PYTHON'
-import socket, sys
-port = int(sys.argv[1])
+# A connection beyond the server's sockets waits in the kernel's backlog until one frees, then
+# the server takes it: 64 idle connections fill the example server, one closes, and a 65th must
+# finish its TLS handshake within 2 s.
+expect "a connection beyond the limit waits for a socket" 'served' "$(python3 -I - "${port}" "${ca}" <<'PYTHON'
+import socket, ssl, sys
+port, ca = int(sys.argv[1]), sys.argv[2]
 held = [socket.create_connection(("127.0.0.1", port)) for _ in range(64)]
 extra = socket.create_connection(("127.0.0.1", port))
+held.pop().close()
 extra.settimeout(2)
 try:
-    print("closed" if extra.recv(1) == b"" else "answered")
-except (socket.timeout, ConnectionResetError) as failure:
-    print("closed" if isinstance(failure, ConnectionResetError) else "hung")
+    ssl.create_default_context(cafile=ca).wrap_socket(extra, server_hostname="127.0.0.1")
+    print("served")
+except (socket.timeout, ssl.SSLError, ConnectionResetError) as failure:
+    print(type(failure).__name__)
 PYTHON
 )"
 
 # The demo service: interceptors, every kind of stream, and error details.
-base="http://127.0.0.1:${port}/demo.v1.DemoService"
+base="https://127.0.0.1:${port}/demo.v1.DemoService"
 demo() {
     demo_protocol="$1"
     shift
-    timeout "${call_seconds}" "${buf}" curl --http2-prior-knowledge --schema examples/proto --protocol "${demo_protocol}" "$@" 2>&1 | tr -d ' \n'
+    timeout "${call_seconds}" "${buf}" curl --cacert "${ca}" --schema examples/proto --protocol "${demo_protocol}" "$@" 2>&1 | unlogged | tr -d ' \n'
 }
 for protocol in connect grpc grpcweb; do
     expect "${protocol} Whoami with a token" '{"name":"Ada"}' \
@@ -149,18 +159,18 @@ done
 # A gRPC error before any message is Trailers-Only: one header section holds the status and the
 # call's own trailers, here Counting's.
 expect "grpc Trailers-Only carries trailers" 'call-received: 1|call-sent: 0|' \
-    "$(timeout "${call_seconds}" "${buf}" curl --http2-prior-knowledge --schema examples/proto --protocol grpc -v \
+    "$(timeout "${call_seconds}" "${buf}" curl --cacert "${ca}" --schema examples/proto --protocol grpc -v \
         -d '{"dividend":7}' "${base}/Divide" 2>&1 | sed -n 's/^buf: < (#1) //p' | tr -d '\r' |
         grep -i -e '^call-received:' -e '^call-sent:' | tr 'A-Z' 'a-z' | tr '\n' '|')"
 # Logging's response header, and Whoami's trailer, which a Connect unary reply sends as a header.
 expect "Connect unary headers" 'demo-logged: yes|trailer-whoami-caller: Ada|' \
-    "$(curl -sS -m 5 -m 5 -H 'authorization: Bearer Ada' --json '{}' -D - -o /dev/null "${base}/Whoami" |
+    "$(curl -sS -m 5 --cacert "${ca}" -H 'authorization: Bearer Ada' --json '{}' -D - -o /dev/null "${base}/Whoami" |
         tr -d '\r' | grep -i -e '^demo-logged:' -e '^trailer-whoami-caller:' | tr '\n' '|')"
 # Full duplex: Chat's answer to the first message must arrive while the client still holds its
 # stream open, before it sends the second.
 fifo="${log}.fifo"
 mkfifo "${fifo}"
-timeout "${call_seconds}" "${buf}" curl --http2-prior-knowledge --schema examples/proto --protocol grpc -d @- "${base}/Chat" <"${fifo}" >"${log}.chat" 2>&1 &
+timeout "${call_seconds}" "${buf}" curl --cacert "${ca}" --schema examples/proto --protocol grpc -d @- "${base}/Chat" <"${fifo}" >"${log}.chat" 2>&1 &
 chat=$!
 exec 3>"${fifo}"
 echo '{"text":"first"}' >&3
@@ -173,7 +183,7 @@ echo '{"text":"second"}' >&3
 exec 3>&-
 wait "${chat}" || true
 expect "grpc Chat answers before the client ends" 'yes' "${answered}"
-expect "grpc Chat" '{"text":"echo:first"}{"text":"echo:second"}{"text":"byeafter2"}' "$(tr -d ' \n' <"${log}.chat")"
+expect "grpc Chat" '{"text":"echo:first"}{"text":"echo:second"}{"text":"byeafter2"}' "$(unlogged <"${log}.chat" | tr -d ' \n')"
 rm -f "${fifo}" "${log}.chat"
 [ "${failures}" -eq 0 ] || exit 1
 echo "every interop call answered as expected"

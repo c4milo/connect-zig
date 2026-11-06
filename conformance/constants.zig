@@ -25,12 +25,9 @@ pub const response_bytes = 640 * 1024;
 /// Octets of each call's request body memory: a whole unary body at the runner's limit, or the
 /// part of an envelope a stream has not read yet, up to `message_bytes`.
 pub const body_bytes = message_bytes + 1024;
-/// The sockets the server holds at once: as many as the socket loop names. The runner's client
-/// opens a connection for each test case and leaves it open once the case ends.
+/// The TCP connections the server holds at once. The runner's client opens a connection for each
+/// test case and leaves it open once the case ends.
 pub const sockets_max = 128;
-/// The octets one socket reads, and writes, before the endpoint takes them. It holds a whole h2
-/// frame of the largest size a peer may send by default, with its header (RFC 9113 §4.2).
-pub const socket_buffer_len = 64 * 1024;
 /// How long a connection waits for its first request, and then between requests, before the
 /// server closes it. The runner's client leaves each test case's connection open, so the server
 /// closes them soon to keep sockets free for the cases that follow.

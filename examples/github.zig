@@ -93,10 +93,7 @@ fn session(round_protocols: client.Protocols, round_protocol: client.Protocol) !
     try update_issues();
     try read_issues();
     try read_events();
-    // colibri's h3 client panics on a status its enum lacks, and Connect answers
-    // resource_exhausted with 429 (RFC 6585 §4). colibri fixes it; until then step 6 runs over
-    // TCP alone.
-    if (expected != .h3) try rate_limit();
+    try rate_limit();
     std.debug.print("github: over {s}, the whole session answered as expected\n", .{@tagName(expected)});
 }
 

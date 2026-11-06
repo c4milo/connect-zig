@@ -17,15 +17,17 @@ Clients written in other languages call connect-zig's server, the socket server 
 Each client is a directory with a `run.sh` that the check calls as:
 
 ```sh
-interop/<client>/run.sh <base-url> <cases-dir> <descriptors>
+interop/<client>/run.sh <base-url> <cases-dir> <descriptors> <ca>
 ```
 
-- `<base-url>` is the server's origin, such as `http://127.0.0.1:41234`. The server speaks h11 and
-  h2 with prior knowledge in cleartext.
+- `<base-url>` is the server's origin, such as `https://127.0.0.1:41234`. The server speaks h11
+  and h2 over TLS, and picks one by ALPN.
 - `<cases-dir>` holds one `<name>.binpb` file for each case of `examples/testdata/coverage`: a
   `coverage.v1.Everything`, the message that holds every protobuf type, in binary.
 - `<descriptors>` is a `FileDescriptorSet` of `examples/proto`, from `buf build
   --as-file-descriptor-set`, for a client whose build compiles the schema itself.
+- `<ca>` is the PEM of the CA that signed the server's certificate, the test identity of
+  `examples/testdata/tls`. The client trusts it, and no other.
 
 `run.sh` installs what the client needs, pinned by a lock file, into a cache outside the
 repository, generates or builds the client, and runs it. It prints one line for each scenario:

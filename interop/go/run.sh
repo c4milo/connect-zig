@@ -2,7 +2,7 @@
 # Runs the Go interop client: generates the schema's Go code with the plugins go.mod pins, then
 # runs connect-go and grpc-go against the server (interop/README.md).
 #
-#   interop/go/run.sh <base-url> <cases-dir> <descriptors>
+#   interop/go/run.sh <base-url> <cases-dir> <descriptors> <ca>
 set -eu
 cd "$(dirname "$0")"
 buf="${BUF:-buf}"
@@ -17,4 +17,4 @@ if [ ! -x "${bin}/protoc-gen-go-grpc" ]; then
 fi
 PATH="${bin}:${PATH}" "${buf}" generate
 go build -o "${bin}/interop" .
-"${bin}/interop" "$1" "$2"
+"${bin}/interop" "$1" "$2" "$4"

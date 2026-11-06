@@ -1,7 +1,7 @@
 // The connect-es interop client: it calls interop.v1.InteropService on connect-zig's socket server
 // in each protocol connect-es speaks, and prints one line per scenario (interop/README.md).
 //
-// Usage: node main.js <base-url> <cases-dir>
+// Usage: node main.js <base-url> <cases-dir> <ca>
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { createRegistry, fromBinary, fromJsonString, toBinary, toJsonString } from "@bufbuild/protobuf";
@@ -22,7 +22,7 @@ import {
   createGrpcWebTransport,
   Http2SessionManager,
 } from "@connectrpc/connect-node";
-import { Agent } from "node:http";
+import { Agent } from "node:https";
 import { EverythingSchema, file_coverage_v1_coverage } from "./gen/coverage/v1/coverage_pb.js";
 import {
   FailRequestSchema,
@@ -37,11 +37,14 @@ const inspectTimeoutMs = 5_000;
 const repeatCount = 3;
 const failCode = 5;
 
-const [baseUrl, casesDir] = process.argv.slice(2);
-if (!baseUrl || !casesDir) {
-  console.error("usage: node main.js <base-url> <cases-dir>");
+const [baseUrl, casesDir, caPath] = process.argv.slice(2);
+if (!baseUrl || !casesDir || !caPath) {
+  console.error("usage: node main.js <base-url> <cases-dir> <ca>");
   process.exit(2);
 }
+// The server's TLS identity is the test one: both transports trust its CA, and the server picks
+// h2 or h11 by ALPN.
+const ca = readFileSync(caPath);
 
 // The JSON codec needs every type an Any in the cases can hold.
 const registry = createRegistry(
@@ -202,8 +205,8 @@ for (const protocol of protocols) {
   codec = protocol.options.useBinaryFormat === false ? "json" : "binary";
   // All of a protocol's transports share one connection, closed when the protocol is done: the
   // server serves a few sockets at a time.
-  const agent = new Agent({ keepAlive: true, maxSockets: 1 });
-  const sessionManager = new Http2SessionManager(baseUrl);
+  const agent = new Agent({ keepAlive: true, maxSockets: 1, ca, ALPNProtocols: ["http/1.1"] });
+  const sessionManager = new Http2SessionManager(baseUrl, undefined, { ca });
   const connection = protocol.options.httpVersion === "1.1" ? { nodeOptions: { agent } } : { httpVersion: "2", sessionManager };
   const clientWith = (options) =>
     createClient(InteropService, protocol.make({ baseUrl, ...connection, ...protocol.options, ...options }));

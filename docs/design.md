@@ -214,6 +214,14 @@ ran on Linux x86-64 with Zig 0.16.0.
   `accept`'s `can_compress` becomes `encoders`, and `compression.compress_gzip` becomes
   `compression.compress` (decision 10). `tools/interop_check.sh` reads a zstd answer with curl.
 
+- **colibri v0.14.0 and `colibri.Server`.** Both socket servers run on `colibri.Server`; the
+  example server serves h11 and h2 over TLS and h3 under the test identity (decision 31).
+  `tools/interop_check.sh` calls it over https and passes; `tools/interop_languages_check.sh`
+  runs 507 scenarios across Go, TypeScript, Python and Rust over TLS, all passing.
+  `zig build example-github` runs the rate-limit step over h3 too, now that colibri's h3 client
+  reads 429. The server sets the endpoint's `ecn`, since colibri's server reads each datagram's
+  ECN codepoint and v0.14.0 leaves the endpoint's flag to the caller.
+
 ### What a later step owes
 
 - The connectrpc conformance suite against the client (step 7), once colibri's client exposes

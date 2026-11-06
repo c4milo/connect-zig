@@ -123,12 +123,12 @@ zig build run-eliza-server -- 8080
 Then, in a second terminal:
 
 ```sh
-curl --json '{"sentence":"I feel tired"}' \
-  http://127.0.0.1:8080/connectrpc.eliza.v1.ElizaService/Say
-buf curl --http2-prior-knowledge --protocol grpc --schema examples/proto \
-  -H 'authorization: Bearer Ada' http://127.0.0.1:8080/demo.v1.DemoService/Whoami
-buf curl --http2-prior-knowledge --protocol grpc --schema examples/proto \
-  -d @- http://127.0.0.1:8080/demo.v1.DemoService/Chat
+curl --cacert examples/testdata/tls/ca.pem --json '{"sentence":"I feel tired"}' \
+  https://localhost:8080/connectrpc.eliza.v1.ElizaService/Say
+buf curl --cacert examples/testdata/tls/ca.pem --protocol grpc --schema examples/proto \
+  -H 'authorization: Bearer Ada' https://localhost:8080/demo.v1.DemoService/Whoami
+buf curl --cacert examples/testdata/tls/ca.pem --http3 --protocol grpc --schema examples/proto \
+  -d @- https://localhost:8080/demo.v1.DemoService/Chat
 ```
 
 The last command reads one JSON message per line from stdin, and prints each answer as it

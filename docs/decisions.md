@@ -186,8 +186,8 @@ first. Cite an entry by number in code and commits ("decision 6").
 
 26. **The conformance suite runs against a server of its own.** `conformance/` holds a program
     that serves connectrpc's ConformanceService on a socket the kernel picks, as the runner's
-    server mode asks. It shares the socket loop of `examples/services/socket_loop.zig` with the
-    example socket server. `tools/conformance_check.sh` downloads runner v1.0.4, pinned by
+    server mode asks. It runs on `colibri.Server` in cleartext, as the example socket server
+    runs on it over TLS (decision 31). `tools/conformance_check.sh` downloads runner v1.0.4, pinned by
     SHA-256, and `conformance/known_failing.txt` names each case that fails on purpose, with the
     reason; the runner fails when a listed case passes. The client half waits on colibri's
     client (decision 11). Beaten: the runner's reference server against our client alone, which
@@ -210,6 +210,7 @@ first. Cite an entry by number in code and commits ("decision 6").
     and draws its keys and each TLS session's secrets from `std.Io`'s entropy. The conformance
     server stays in cleartext. Beaten: a second loop for UDP, which splits one clock in two; and
     waiting for colibri's `colibri.Server` (colibri decision 150), which colibri had not built.
+    Decision 31 moves both servers onto `colibri.Server`, which colibri v0.14.0 ships.
 
 29. **Clients in other languages call the server, across the protocol and every type.**
     `interop.v1.InteropService` has each RPC shape once, and each message is a
@@ -226,6 +227,16 @@ first. Cite an entry by number in code and commits ("decision 6").
     `bench/instructions.txt`. Counts repeat exactly on one build, so a shared runner judges them as
     a quiet machine would. Beaten: wall time on shared runners, which moved 2x between runs here;
     and a dedicated machine, which this project does not have.
+
+31. **Both socket servers run on `colibri.Server`, and the example one is TLS everywhere.**
+    colibri v0.14.0 ships `colibri.Server` (colibri decision 150), so `socket_loop.zig` and
+    `socket_datagram.zig` go. With an identity, colibri puts TLS on TCP, picks h2 or h11 by ALPN,
+    serves h3 on the UDP socket of the same port, and advertises it in Alt-Svc. The example server
+    keeps the test identity of decision 25, so curl, buf curl and the clients of `interop/` trust
+    its CA. The conformance server holds no identity and stays in cleartext, as the runner asks.
+    A connection past the socket limit waits in the kernel's backlog until a socket frees, as
+    colibri rules. Beaten: a server with no identity, which drops h3; and keeping our loop, a copy
+    of colibri's.
 
 ## Tooling
 
