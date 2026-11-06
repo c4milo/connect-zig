@@ -52,7 +52,8 @@ confirm a test fails. Report `CAUGHT` or `NOT CAUGHT` per mutation in the commit
 - Functions stay at cognitive complexity 15 or less, `test` blocks included. Split the function;
   never raise the threshold.
 - A file stays at or under 500 lines, its tests included. Generated `.pb.zig` code is one file per
-  .proto file, whatever its length (decision 17).
+  .proto file, whatever its length, and keeps every other limit, cognitive complexity included
+  (decision 17).
 - Every number beyond 0 and 1 has a name: a constant in its module's `constants.zig`, a `const`
   of its own, or a member of an enum such as a message's `FieldNumber`.
 - Write prose in active voice with plain words: short sentences, one idea each, no metaphors.

@@ -109,7 +109,7 @@ first. Cite an entry by number in code and commits ("decision 6").
       relative-import rule asks. Its header names the modules the build gives it: the module of
       `kitchen/v1/shared.proto` is `kitchen_v1_shared`.
     Each .proto file becomes one `<file>.pb.zig`, whatever its length, and the file-length rule
-    skips `.pb.zig`. protoc-gen-go writes one file per .proto file, and prost-build one per
+    skips `.pb.zig`. The cognitive-complexity score still reads it, with the same limit of 15. protoc-gen-go writes one file per .proto file, and prost-build one per
     package, with no limit. Beaten: exempting `.pb.zig` from every rule, as colibri exempts its
     generated tables from magic-numbers, which would leave a project's own lint failing on the
     code it generates; and, first chosen and then dropped, a file for each declaration of a long
