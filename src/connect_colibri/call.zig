@@ -133,7 +133,7 @@ pub const Call = struct {
 
     /// Adds a response header. It goes out with the reply's head, so a handler adds it before it
     /// sends its first message.
-    pub fn set_header(call: *Call, name: []const u8, value: []const u8) error{ TooManyHeaders, HeadSent, InvalidField }!void {
+    pub fn add_header(call: *Call, name: []const u8, value: []const u8) error{ TooManyHeaders, HeadSent, InvalidField }!void {
         if (call.head_written) return error.HeadSent;
         // A name that is not a token, or a value with CR, LF or NUL, would forge header lines.
         if (!connect.trailers.valid_field(.{ .name = name, .value = value })) return error.InvalidField;
@@ -169,7 +169,7 @@ pub fn Sender(comptime T: type) type {
 
         pub fn send(sender: *@This(), message: *const T) !void {
             const call = sender.call;
-            try write_head_once(call, false);
+            try write_head_once(call, .plain);
             const body = call.response.body();
             try write_message(T, call, message, body);
             // The writer hands what it holds to the endpoint now, rather than at the end.
@@ -204,9 +204,9 @@ fn apply_head(call: *Call, head: *const connect.server.Head) !void {
     for (call.room.response_headers[0..call.room.response_header_count]) |header| try call.response.header(header.name, header.value);
 }
 
-fn write_head_once(call: *Call, compressed: bool) !void {
+fn write_head_once(call: *Call, body: connect.server.Body) !void {
     if (call.head_written) return;
-    const head = call.reply.head(compressed);
+    const head = call.reply.head(body);
     try apply_head(call, &head);
     call.head_written = true;
 }
@@ -231,7 +231,7 @@ fn write_prefixed_trailers(call: *Call) !void {
 pub fn finish(call: *Call, failure: ?connect.RpcError) !void {
     if (failure) |rpc_failure| {
         if (call.reply.error_only() and !call.head_written and !call.headers_kept()) {
-            const head = try call.reply.error_head(rpc_failure, &call.room.storage);
+            const head = try call.reply.error_head(&rpc_failure, &call.room.storage);
             try apply_head(call, &head);
             call.head_written = true;
             switch (call.reply.accepted.speaks.protocol) {
@@ -247,7 +247,7 @@ pub fn finish(call: *Call, failure: ?connect.RpcError) !void {
     }
     // A Connect unary reply wrote its head and its one message already.
     if (!call.reply.accepted.speaks.enveloped) return call.response.end();
-    try write_head_once(call, false);
+    try write_head_once(call, .plain);
     const metadata = call.room.metadata[0..call.room.metadata_count];
     const trailers = try call.reply.finish(failure, metadata, call.response.body(), &call.room.storage, &call.room.headers);
     if (trailers.len == 0) return call.response.end();
@@ -269,22 +269,22 @@ pub fn send_one(comptime T: type, call: *Call, message: *const T) !void {
     if (call.reply.writes_direct()) {
         // The head does not depend on the message, so it goes first and the message after it.
         if (!call.reply.accepted.speaks.enveloped) {
-            const head = call.reply.head(false);
+            const head = call.reply.head(.plain);
             try apply_head(call, &head);
             call.head_written = true;
             try write_prefixed_trailers(call);
-        } else try write_head_once(call, false);
+        } else try write_head_once(call, .plain);
         try write_message(T, call, message, call.response.body());
         call.sent += 1;
         return;
     }
     const prepared = try call.reply.prepare(T, message);
     if (!call.reply.accepted.speaks.enveloped) {
-        const head = call.reply.head(prepared.compressed);
+        const head = call.reply.head(prepared.body());
         try apply_head(call, &head);
         call.head_written = true;
         try write_prefixed_trailers(call);
-    } else try write_head_once(call, prepared.compressed);
+    } else try write_head_once(call, prepared.body());
     try call.reply.write_message(prepared, call.response.body());
     call.sent += 1;
 }
@@ -307,7 +307,7 @@ pub fn read_one(comptime T: type, call: *Call, messages: *connect.server.Message
 
 /// Answers a request the route refused before it read the body.
 pub fn answer_refusal(refused: connect.server.Refused, scratch: connect.Scratch, room: *Room, headers: *const RequestHeaders, response: *server.ResponseWriter) !void {
-    const reply = connect.server.refusal_reply(refused, scratch) orelse {
+    const reply = connect.server.refusal_reply(&refused, &scratch) orelse {
         response.status = refused.http_status;
         return response.end();
     };
@@ -385,13 +385,13 @@ test "a response header is refused once the head went out, or once the room is f
     var room: Room = .{};
     const headers: RequestHeaders = .{};
     var call: Call = .{ .reply = undefined, .response = undefined, .room = &room, .headers = &headers, .path = "" };
-    for (0..constants.fields_max) |_| try call.set_header("a", "b");
-    try testing.expectError(error.TooManyHeaders, call.set_header("a", "b"));
+    for (0..constants.fields_max) |_| try call.add_header("a", "b");
+    try testing.expectError(error.TooManyHeaders, call.add_header("a", "b"));
     call.head_written = true;
-    try testing.expectError(error.HeadSent, call.set_header("a", "b"));
+    try testing.expectError(error.HeadSent, call.add_header("a", "b"));
     call.head_written = false;
     call.room.response_header_count = 0;
-    try testing.expectError(error.InvalidField, call.set_header("a", "b\r\nset-cookie: x"));
+    try testing.expectError(error.InvalidField, call.add_header("a", "b\r\nset-cookie: x"));
     try testing.expectError(error.InvalidField, call.add_trailer("a:b", "c"));
     for (0..constants.fields_max) |_| try call.add_trailer("t", "v");
     try testing.expectError(error.TooManyTrailers, call.add_trailer("t", "v"));

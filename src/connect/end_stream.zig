@@ -16,13 +16,16 @@ pub const EndStream = struct {
     metadata: []const Header = &.{},
 };
 
-pub fn encode(end: EndStream, buffer: []u8) error_json.EncodeError![]const u8 {
+pub const EncodeError = error_json.EncodeError;
+pub const DecodeError = error_json.DecodeError;
+
+pub fn encode(end: *const EndStream, buffer: []u8) EncodeError![]const u8 {
     std.debug.assert(end.metadata.len <= constants.limits.metadata_max);
     var text = json.TextWriter.init(buffer, .text, codec.Features.target());
     try text.begin_object();
     if (end.failure) |failure| {
         try text.name("error");
-        try error_json.write(failure, &text);
+        try error_json.write(&failure, &text);
     }
     if (end.metadata.len != 0) {
         try text.name("metadata");
@@ -61,7 +64,7 @@ pub const Storage = struct {
     metadata: []Header,
 };
 
-pub fn decode(payload: []const u8, storage: Storage) json_read.Error!EndStream {
+pub fn decode(payload: []const u8, storage: *const Storage) DecodeError!EndStream {
     var tokens = json_read.Tokens.init(payload, storage.tokens, storage.octets);
     try tokens.start();
     try tokens.expect(.begin_object);
@@ -115,15 +118,15 @@ test "an end-stream message holds the error and the trailers, grouped by name" {
         .failure = .{ .code = .aborted },
         .metadata = &.{ .{ .name = "x-a", .value = "1" }, .{ .name = "x-b", .value = "2" }, .{ .name = "x-a", .value = "3" } },
     };
-    const text = try encode(end, &buffer);
+    const text = try encode(&end, &buffer);
     try testing.expectEqualStrings("{\"error\":{\"code\":\"aborted\"},\"metadata\":{\"x-a\":[\"1\",\"3\"],\"x-b\":[\"2\"]}}", text);
     var tokens: [32]u8 = undefined;
     var octets: [64]u8 = undefined;
     var details: [1]rpc_error.Detail = undefined;
     var metadata: [4]Header = undefined;
-    const back = try decode(text, .{ .tokens = &tokens, .octets = &octets, .details = &details, .metadata = &metadata });
+    const back = try decode(text, &.{ .tokens = &tokens, .octets = &octets, .details = &details, .metadata = &metadata });
     try testing.expectEqual(@import("code.zig").Code.aborted, back.failure.?.code);
     try testing.expectEqual(@as(usize, 3), back.metadata.len);
     try testing.expectEqualStrings("3", back.metadata[1].value);
-    try testing.expectEqualStrings("{}", try encode(.{}, &buffer));
+    try testing.expectEqualStrings("{}", try encode(&.{}, &buffer));
 }

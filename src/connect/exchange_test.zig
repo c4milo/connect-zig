@@ -79,7 +79,7 @@ const Server = struct {
         const query = if (question) |at| target[at + 1 ..] else null;
         const decoders: connect.Decoders = .{ .gzip = &server.decoder, .zstd = &server.zstd_decoder };
         const encoders: connect.Encoders = .{ .gzip = &server.encoder, .zstd = &server.zstd_encoder };
-        const decision = server_head.accept(request.http_method, query, list.lookup(), .{
+        const decision = server_head.accept(request.http_method, query, list.lookup(), &.{
             .stream_type = method.stream_type,
             .idempotency = method.idempotency,
             .decoders = decoders,
@@ -90,7 +90,7 @@ const Server = struct {
         const accepted = switch (decision) {
             .accepted => |accepted| accepted,
             .refused => |refused| {
-                var reply = server_reply.refusal_reply(refused, server.scratch()) orelse {
+                var reply = server_reply.refusal_reply(&refused, &server.scratch()) orelse {
                     server.head = .{ .status = refused.http_status };
                     return;
                 };
@@ -99,13 +99,13 @@ const Server = struct {
         };
         var reply: server_reply.Reply = .{ .accepted = accepted, .scratch = server.scratch(), .encoders = encoders };
         if (failure) |rpc_failure| return server.fail(&reply, rpc_failure, &body);
-        var messages = server_request.Messages.init(accepted, request.body, .{ .message = &server.request_message, .work = &server.work, .tokens = &server.tokens }, decoders);
-        server.head = reply.head(false);
+        var messages = server_request.Messages.init(&accepted, request.body, &.{ .message = &server.request_message, .work = &server.work, .tokens = &server.tokens }, &decoders);
+        server.head = reply.head(.plain);
         for (0..notes_max) |_| {
             const note = try messages.next(method.Request) orelse break;
             for (0..@intCast(@max(note.count, 1))) |index| {
                 const prepared = try reply.prepare(Note, &.{ .text = note.text, .count = @intCast(index) });
-                if (!accepted.speaks.enveloped) server.head = reply.head(prepared.compressed);
+                if (!accepted.speaks.enveloped) server.head = reply.head(prepared.body());
                 try reply.write_message(prepared, &body);
             }
         }
@@ -114,10 +114,10 @@ const Server = struct {
 
     fn fail(server: *Server, reply: *server_reply.Reply, failure: connect.RpcError, body: *std.Io.Writer) !void {
         if (reply.error_only()) {
-            server.head = try reply.error_head(failure, &server.trailers_storage);
+            server.head = try reply.error_head(&failure, &server.trailers_storage);
             return reply.write_error_body(failure, body);
         }
-        server.head = reply.head(false);
+        server.head = reply.head(.plain);
         server.trailers = try reply.finish(failure, &.{}, body, &server.trailers_storage, &server.trailer_out);
     }
 };
@@ -153,12 +153,12 @@ const Client = struct {
             .details = &client.details,
             .metadata = &client.metadata,
         };
-        return client_response.read(speaks, .{
+        return client_response.Response.init(speaks, &.{
             .status = server.head.status,
             .headers = client.head_list.lookup(),
             .body = server.body[0..server.body_len],
             .trailers = client.trailer_list.lookup(),
-        }, storage, .{ .gzip = &client.decoder, .zstd = &client.zstd_decoder });
+        }, &storage, &.{ .gzip = &client.decoder, .zstd = &client.zstd_decoder });
     }
 };
 
@@ -176,7 +176,7 @@ fn round_trip(comptime method: connect.Method, options: client_call.Options, mes
     const named = options.decoders.gzip != null or options.decoders.zstd != null;
     if (!named) with_codings.decoders = .{ .gzip = &client_state.decoder, .zstd = &client_state.zstd_decoder };
     with_codings.encoders = .{ .gzip = &client_state.encoder, .zstd = &client_state.zstd_encoder };
-    const request = try client_call.request(method, with_codings, messages, client_state.call_buffers());
+    const request = try client_call.request(method, &with_codings, messages, &client_state.call_buffers());
     try server_state.serve(method, &request, failure);
     return client_state.response(speaks_of(method, options), &server_state);
 }

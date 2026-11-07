@@ -6,7 +6,7 @@
 //! - `Logging` counts every call and adds a response header, and sees each call's outcome;
 //! - `Auth` refuses a call with no bearer token as unauthenticated, before the handler runs.
 //!
-//! On the client, an `ClientCallWith` takes interceptors of its own:
+//! On the client, a `ClientCall` takes interceptors of its own, in its options:
 //!
 //! - `BearerToken` adds the authorization header to each request it builds;
 //! - `Tally` sees each response before the program reads it, and counts them.
@@ -49,8 +49,8 @@ const Tally = struct {
 
 const http_ok_status = 200;
 
-const Signed = rpc.ClientCallWith(Service.whoami, &.{ BearerToken, Tally });
-const Anonymous = rpc.ClientCallWith(Service.whoami, &.{Tally});
+const Signed = rpc.ClientCall(Service.whoami, .{ .interceptors = &.{ BearerToken, Tally } });
+const Anonymous = rpc.ClientCall(Service.whoami, .{ .interceptors = &.{Tally} });
 
 var signed_post: Signed align(@alignOf(Signed)) = undefined;
 var signed_get: Signed align(@alignOf(Signed)) = undefined;
@@ -74,9 +74,9 @@ fn round(protocols: client.Protocols, expected: client.Protocol) !void {
     const read_before = Tally.read;
     const http_ok_before = Tally.http_ok;
     try harness.begin(protocols);
-    try signed_post.init(.{}, &.{.{}}, harness.buffers(&buffers[0]));
-    try signed_get.init(.{ .codec = .json, .use_get = true }, &.{.{}}, harness.buffers(&buffers[1]));
-    try anonymous.init(.{ .protocol = .grpc_web }, &.{.{}}, harness.buffers(&buffers[2]));
+    try signed_post.init(&.{}, &.{.{}}, &harness.buffers(&buffers[0]));
+    try signed_get.init(&.{ .codec = .json, .use_get = true }, &.{.{}}, &harness.buffers(&buffers[1]));
+    try anonymous.init(&.{ .protocol = .grpc_web }, &.{.{}}, &harness.buffers(&buffers[2]));
     try harness.request(&signed_post.request, &signed_post.response);
     try harness.request(&signed_get.request, &signed_get.response);
     try harness.request(&anonymous.request, &anonymous.response);

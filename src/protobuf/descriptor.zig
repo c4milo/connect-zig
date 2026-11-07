@@ -134,7 +134,7 @@ pub const EnumDescriptor = struct {
     }
 
     /// Whether `number` is one the enum names.
-    pub fn names(comptime descriptor: EnumDescriptor, number: i32) bool {
+    pub fn contains(comptime descriptor: EnumDescriptor, number: i32) bool {
         return descriptor.name_of(number) != null;
     }
 

@@ -29,6 +29,8 @@ const files = struct {
 
 /// A field's type in the .proto file.
 pub const Kind = files.descriptor.Kind;
+/// The wire type a field's tag carries (protobuf encoding guide, "Message Structure").
+pub const WireType = files.wire.WireType;
 pub const Field = files.descriptor.Field;
 pub const FieldOptions = files.descriptor.FieldOptions;
 /// A hand-written message's field, numbered by a member of its `FieldNumber` enum.
@@ -85,11 +87,11 @@ pub fn encode_json(comptime T: type, message: *const T, buffer: []u8) JsonEncode
 }
 
 /// `encode_json`, with an Any naming its type from the well-known types and `any_types`.
-pub fn encode_json_with(comptime T: type, message: *const T, buffer: []u8, comptime any_types: anytype) JsonEncodeError![]const u8 {
+pub fn encode_json_with(comptime T: type, message: *const T, buffer: []u8, comptime any_types: []const type) JsonEncodeError![]const u8 {
     return encode_json_registry(T, message, buffer, files.any.with(any_types));
 }
 
-fn encode_json_registry(comptime T: type, message: *const T, buffer: []u8, comptime registry: anytype) JsonEncodeError![]const u8 {
+fn encode_json_registry(comptime T: type, message: *const T, buffer: []u8, comptime registry: []const type) JsonEncodeError![]const u8 {
     var text = json.TextWriter.init(buffer, .text, codec.Features.target());
     try files.json_encode.write_message(T, message, &text, registry);
     return text.written();
@@ -103,7 +105,7 @@ pub fn decode_json(comptime T: type, text: []const u8, binary: []u8, tokens: []u
 }
 
 /// `decode_json`, with an Any naming its type from the well-known types and `any_types`.
-pub fn decode_json_with(comptime T: type, text: []const u8, binary: []u8, tokens: []u8, comptime any_types: anytype) JsonDecodeError!T {
+pub fn decode_json_with(comptime T: type, text: []const u8, binary: []u8, tokens: []u8, comptime any_types: []const type) JsonDecodeError!T {
     return decode(T, try files.json_decode.transcode(T, text, binary, tokens, files.any.with(any_types)));
 }
 
@@ -138,7 +140,7 @@ test "the root exports the names a program calls" {
         "View",            "Unknown",     "Repeated",         "Lazy",        "Error",            "EncodeError",
         "decode",          "merge",       "encoded_len",      "encode",      "map_get",          "JsonEncodeError",
         "JsonDecodeError", "encode_json", "encode_json_with", "decode_json", "decode_json_with", "wkt",
-        "FieldOptions",    "field_of",
+        "FieldOptions",    "field_of",    "WireType",
     });
 }
 

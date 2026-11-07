@@ -21,23 +21,25 @@ pub const Buffers = struct {
     body: []u8,
 };
 
+/// What a client call is built with.
+pub const Options = struct {
+    /// The interceptors that see each request before it goes and each response once it is
+    /// read. A client interceptor is a type with any of:
+    ///
+    /// - `on_request(*connect.client.Request) !void`, which may add headers with `add_header`;
+    /// - `on_response(*connect.client.Response) void`, which sees each response before the
+    ///   program reads its messages: its HTTP status and headers. A stream's outcome follows its
+    ///   messages, so `failure` is set here only when the head alone carries it.
+    ///
+    /// `on_request` runs in the order the list names the interceptors, and `on_response` in the
+    /// reverse.
+    interceptors: []const type = &.{},
+};
+
 /// One call of `method`. The program keeps it in place from `init` until colibri's `finished`
 /// event for its request, since colibri reads `request` and writes `response` until then.
-pub fn ClientCall(comptime method: connect.Method) type {
-    return ClientCallWith(method, &.{});
-}
-
-/// An `ClientCall` whose interceptors see each request before it goes and each response once it
-/// is read. A client interceptor is a type with any of:
-///
-/// - `on_request(*connect.client.Request) !void`, which may add headers with `add_header`;
-/// - `on_response(*connect.client.Response) void`, which sees each response before the program
-///   reads its messages: its HTTP status and headers. A stream's outcome follows its messages,
-///   so `failure` is set here only when the head alone carries it.
-///
-/// `on_request` runs in the order the list names the interceptors, and `on_response` in the
-/// reverse.
-pub fn ClientCallWith(comptime method: connect.Method, comptime interceptors: []const type) type {
+pub fn ClientCall(comptime method: connect.Method, comptime call_options: Options) type {
+    const interceptors = call_options.interceptors;
     return struct {
         const Self = @This();
 
@@ -48,9 +50,9 @@ pub fn ClientCallWith(comptime method: connect.Method, comptime interceptors: []
         response: client.Response,
 
         /// Builds the request of a call that sends `messages`.
-        pub fn init(self: *Self, options: connect.client.Options, messages: []const method.Request, buffers: Buffers) connect.client.RequestError!void {
-            self.options = options;
-            self.call = try connect.client.request(method, options, messages, buffers.request);
+        pub fn init(self: *Self, options: *const connect.client.Options, messages: []const method.Request, buffers: *const Buffers) connect.client.RequestError!void {
+            self.options = options.*;
+            self.call = try connect.client.request(method, options, messages, &buffers.request);
             try run_on_request(interceptors, &self.call);
             const headers = self.call.headers();
             for (headers, 0..) |header, index| self.fields[index] = .{ .name = header.name, .value = header.value };
@@ -105,7 +107,7 @@ fn read_response(self: anytype, storage: connect.client.Storage) connect.client.
     const speaks = self.call.speaks;
     const lookup: connect.Lookup = .{ .context = self, .find_fn = Self.find };
     if (self.response.result != .response) {
-        var response = connect.client.read(speaks, .{ .status = connect.constants.protocol.status.ok, .headers = lookup, .body = "" }, storage, self.options.decoders);
+        var response = connect.client.Response.init(speaks, &.{ .status = connect.constants.protocol.status.ok, .headers = lookup, .body = "" }, &storage, &self.options.decoders);
         response.done = true;
         response.failure = failure_of(self.response.result);
         return response;
@@ -118,7 +120,7 @@ fn read_response(self: anytype, storage: connect.client.Storage) connect.client.
         // (PROTOCOL-HTTP2.md, "Responses"). Connect and gRPC-Web carry theirs in the body.
         .trailers = if (speaks.protocol == .grpc) .{ .context = self, .find_fn = Self.find_trailer } else null,
     };
-    return connect.client.read(speaks, incoming, storage, self.options.decoders);
+    return connect.client.Response.init(speaks, &incoming, &storage, &self.options.decoders);
 }
 
 /// The error a client gives a call that ended with no whole response.

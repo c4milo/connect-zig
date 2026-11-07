@@ -26,7 +26,7 @@ comptime {
     std.debug.assert(time_text_len == time_text.text_len_max);
 }
 
-pub fn write_message(comptime T: type, message: *const T, text: *json.TextWriter, comptime registry: anytype) Error!void {
+pub fn write_message(comptime T: type, message: *const T, text: *json.TextWriter, comptime registry: []const type) Error!void {
     comptime descriptor.check(T);
     switch (comptime wkt.form(T)) {
         .message => {},
@@ -45,7 +45,7 @@ pub fn write_message(comptime T: type, message: *const T, text: *json.TextWriter
 }
 
 /// Writes a message's fields as members of an object already open.
-fn write_fields(comptime T: type, message: *const T, text: *json.TextWriter, comptime registry: anytype) Error!void {
+fn write_fields(comptime T: type, message: *const T, text: *json.TextWriter, comptime registry: []const type) Error!void {
     inline for (T.protobuf.fields) |field| {
         if (field.oneof) |oneof| {
             try write_member(T, field, oneof, message, text, registry);
@@ -102,7 +102,7 @@ fn write_list(list: *const wkt.ListValue, text: *json.TextWriter, depth_left: u3
 
 /// "JSON Mapping", Any: an object of "@type" and the message's JSON, under "value" for a
 /// well-known type and beside "@type" otherwise. An empty Any is an empty object.
-fn write_any(message: *const wkt.Any, text: *json.TextWriter, comptime registry: anytype) Error!void {
+fn write_any(message: *const wkt.Any, text: *json.TextWriter, comptime registry: []const type) Error!void {
     if (message.type_url.len == 0 and message.value.len == 0) {
         try text.begin_object();
         return text.end_object();
@@ -114,7 +114,7 @@ fn write_any(message: *const wkt.Any, text: *json.TextWriter, comptime registry:
     return error.UnknownAnyType;
 }
 
-fn write_any_as(comptime A: type, message: *const wkt.Any, text: *json.TextWriter, comptime registry: anytype) Error!void {
+fn write_any_as(comptime A: type, message: *const wkt.Any, text: *json.TextWriter, comptime registry: []const type) Error!void {
     const inner = try decode.decode_depth(A, message.value, constants.limits.depth_max);
     try text.begin_object();
     try text.name("@type");
@@ -167,7 +167,7 @@ fn write_camel_path(path: []const u8, text: *json.TextWriter) Error!void {
     if (upper_next) return error.InvalidFieldMask;
 }
 
-fn write_field(comptime field: Field, item: anytype, text: *json.TextWriter, comptime registry: anytype) Error!void {
+fn write_field(comptime field: Field, item: anytype, text: *json.TextWriter, comptime registry: []const type) Error!void {
     const F = @TypeOf(item);
     if (comptime repeated.is_repeated(F)) {
         if (item.is_empty()) return;
@@ -196,12 +196,12 @@ fn write_field(comptime field: Field, item: anytype, text: *json.TextWriter, com
     }
 }
 
-fn write_value(comptime field: Field, comptime V: type, item: V, text: *json.TextWriter, comptime registry: anytype) Error!void {
+fn write_value(comptime field: Field, comptime V: type, item: V, text: *json.TextWriter, comptime registry: []const type) Error!void {
     if (comptime field.kind.holds_message()) return write_message(V, &item, text, registry);
     try json_scalar.write(field.kind, V, item, text);
 }
 
-fn write_member(comptime T: type, comptime field: Field, comptime oneof: []const u8, message: *const T, text: *json.TextWriter, comptime registry: anytype) Error!void {
+fn write_member(comptime T: type, comptime field: Field, comptime oneof: []const u8, message: *const T, text: *json.TextWriter, comptime registry: []const type) Error!void {
     const U = @typeInfo(@FieldType(T, oneof)).optional.child;
     const active = @field(message, oneof) orelse return;
     if (active != @field(std.meta.Tag(U), field.name)) return;
@@ -215,7 +215,7 @@ fn write_member(comptime T: type, comptime field: Field, comptime oneof: []const
     try write_value(field, V, item, text, registry);
 }
 
-fn write_array(comptime field: Field, comptime F: type, item: *const F, text: *json.TextWriter, comptime registry: anytype) Error!void {
+fn write_array(comptime field: Field, comptime F: type, item: *const F, text: *json.TextWriter, comptime registry: []const type) Error!void {
     try text.begin_array();
     var elements = item.iterator();
     for (0..constants.limits.elements_max) |_| {
@@ -225,7 +225,7 @@ fn write_array(comptime field: Field, comptime F: type, item: *const F, text: *j
     try text.end_array();
 }
 
-fn write_map(comptime F: type, item: *const F, text: *json.TextWriter, comptime registry: anytype) Error!void {
+fn write_map(comptime F: type, item: *const F, text: *json.TextWriter, comptime registry: []const type) Error!void {
     const Entry = F.Element;
     const key_field = Entry.protobuf.fields[0];
     const value_field = Entry.protobuf.fields[1];

@@ -231,6 +231,16 @@ ran on Linux x86-64 with Zig 0.16.0.
   `<file>.pb.zig`, and the file-length rule skips `.pb.zig` (decision 17). `coverage.proto`'s 28
   files become one of 814 lines. `zig build test` passes, and `tools/generate_check.sh` matches.
 
+- **The public API audit.** The owner ruled a TigerStyle-first audit of the public API on
+  2026-11-07. `connect` exports the error sets its functions return (`get.Error`,
+  `timeout.Error`, `protocol.Error`, `error_json` and `end_stream`'s `EncodeError` and
+  `DecodeError`, `trailers.Error`) and `BrotliDecoder`; `protobuf` exports `WireType`.
+  `client.read` becomes `client.Response.init`. `Reply.head` takes a `server.Body`, `.plain` or
+  `.compressed`, which `Prepared.body()` gives. `Call.set_header` becomes `add_header`, and
+  `EnumDescriptor.names` becomes `contains`. `ClientCall(method, options)` replaces
+  `ClientCallWith`, with `ClientCallOptions` (decision 19). The Any types are a `[]const type`
+  (decision 21). A struct argument past 16 bytes goes by `*const`. `trailers_max` stays.
+
 ### What a later step owes
 
 - The connectrpc conformance suite against the client (step 7), once colibri's client exposes

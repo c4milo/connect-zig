@@ -126,7 +126,7 @@ fn begin(comptime spec: RouteSpec, comptime handler: anytype, app: anytype, stat
         response.status = constants.status_uri_too_long;
         return response.end();
     };
-    const decision = connect.server.accept(request.method, query, state.headers.lookup(), .{
+    const decision = connect.server.accept(request.method, query, state.headers.lookup(), &.{
         .stream_type = spec.method.stream_type,
         .idempotency = spec.method.idempotency,
         .decoders = codings.decoders,
@@ -157,7 +157,7 @@ fn serve_whole(comptime spec: RouteSpec, comptime handler: anytype, app: anytype
     if (read_in_place(state.call.reply.accepted) and body.len > state.limit) {
         return stop(dispatch.Interceptors(spec.options.interceptors), app, state, too_large);
     }
-    var messages = connect.server.Messages.init(state.call.reply.accepted, body, scratch_of(spec.options, handler, state, .request), codings_of(app).decoders);
+    var messages = connect.server.Messages.init(&state.call.reply.accepted, body, &scratch_of(spec.options, handler, state, .request), &codings_of(app).decoders);
     return dispatch.whole(spec.method, handler, dispatch.Interceptors(spec.options.interceptors), app, &state.call, &messages);
 }
 
@@ -172,7 +172,7 @@ fn serve_streaming(comptime spec: RouteSpec, comptime handler: anytype, app: any
     const buffered = body.buffered();
     const whole_len = dispatch.whole_envelopes_len(buffered, state.limit) catch |failure|
         return stop(I, app, state, connect.server.failure_of(failure));
-    var messages = connect.server.Messages.init(state.call.reply.accepted, buffered[0..whole_len], scratch_of(spec.options, handler, state, .request), codings_of(app).decoders);
+    var messages = connect.server.Messages.init(&state.call.reply.accepted, buffered[0..whole_len], &scratch_of(spec.options, handler, state, .request), &codings_of(app).decoders);
     if (dispatch.each_message(spec.method, handler, app, call, &state.handler_state, &messages)) |failure| return stop(I, app, state, failure);
     body.toss(whole_len);
     // A read past the octets that arrived says whether the body ended or more will come.

@@ -30,13 +30,13 @@ const calls_count = 7;
 pub const Error = error{CallWrong};
 
 // colibri reads and writes each call until the round ends, so they live outside the stack.
-var say_proto: rpc.ClientCall(Service.say) align(@alignOf(rpc.ClientCall(Service.say))) = undefined;
-var say_get: rpc.ClientCall(Service.say) align(@alignOf(rpc.ClientCall(Service.say))) = undefined;
-var introduce: rpc.ClientCall(Service.introduce) align(@alignOf(rpc.ClientCall(Service.introduce))) = undefined;
-var converse: rpc.ClientCall(Service.converse) align(@alignOf(rpc.ClientCall(Service.converse))) = undefined;
-var say_empty: rpc.ClientCall(Service.say) align(@alignOf(rpc.ClientCall(Service.say))) = undefined;
-var say_grpc: rpc.ClientCall(Service.say) align(@alignOf(rpc.ClientCall(Service.say))) = undefined;
-var introduce_grpc: rpc.ClientCall(Service.introduce) align(@alignOf(rpc.ClientCall(Service.introduce))) = undefined;
+var say_proto: rpc.ClientCall(Service.say, .{}) align(@alignOf(rpc.ClientCall(Service.say, .{}))) = undefined;
+var say_get: rpc.ClientCall(Service.say, .{}) align(@alignOf(rpc.ClientCall(Service.say, .{}))) = undefined;
+var introduce: rpc.ClientCall(Service.introduce, .{}) align(@alignOf(rpc.ClientCall(Service.introduce, .{}))) = undefined;
+var converse: rpc.ClientCall(Service.converse, .{}) align(@alignOf(rpc.ClientCall(Service.converse, .{}))) = undefined;
+var say_empty: rpc.ClientCall(Service.say, .{}) align(@alignOf(rpc.ClientCall(Service.say, .{}))) = undefined;
+var say_grpc: rpc.ClientCall(Service.say, .{}) align(@alignOf(rpc.ClientCall(Service.say, .{}))) = undefined;
+var introduce_grpc: rpc.ClientCall(Service.introduce, .{}) align(@alignOf(rpc.ClientCall(Service.introduce, .{}))) = undefined;
 var buffers: [calls_count]harness.CallBuffers align(@alignOf(harness.CallBuffers)) = undefined;
 
 pub fn main() !void {
@@ -50,18 +50,18 @@ pub fn main() !void {
 
 fn round(protocols: client.Protocols, expected: client.Protocol) !void {
     try harness.begin(protocols);
-    try say_proto.init(.{}, &.{.{ .sentence = service.said }}, harness.buffers(&buffers[0]));
-    try say_get.init(.{ .codec = .json, .use_get = true }, &.{.{ .sentence = service.said }}, harness.buffers(&buffers[1]));
-    try introduce.init(.{ .protocol = .grpc_web }, &.{.{ .name = service.name }}, harness.buffers(&buffers[2]));
-    try converse.init(.{ .codec = .json }, &.{ .{ .sentence = service.conversation[0] }, .{ .sentence = service.conversation[1] } }, harness.buffers(&buffers[3]));
-    try say_empty.init(.{ .protocol = .grpc }, &.{.{}}, harness.buffers(&buffers[4]));
+    try say_proto.init(&.{}, &.{.{ .sentence = service.said }}, &harness.buffers(&buffers[0]));
+    try say_get.init(&.{ .codec = .json, .use_get = true }, &.{.{ .sentence = service.said }}, &harness.buffers(&buffers[1]));
+    try introduce.init(&.{ .protocol = .grpc_web }, &.{.{ .name = service.name }}, &harness.buffers(&buffers[2]));
+    try converse.init(&.{ .codec = .json }, &.{ .{ .sentence = service.conversation[0] }, .{ .sentence = service.conversation[1] } }, &harness.buffers(&buffers[3]));
+    try say_empty.init(&.{ .protocol = .grpc }, &.{.{}}, &harness.buffers(&buffers[4]));
     try harness.request(&say_proto.request, &say_proto.response);
     try harness.request(&say_get.request, &say_get.response);
     try harness.request(&introduce.request, &introduce.response);
     try harness.request(&converse.request, &converse.response);
     try harness.request(&say_empty.request, &say_empty.response);
-    try say_grpc.init(.{ .protocol = .grpc }, &.{.{ .sentence = service.said }}, harness.buffers(&buffers[5]));
-    try introduce_grpc.init(.{ .protocol = .grpc }, &.{.{ .name = service.name }}, harness.buffers(&buffers[6]));
+    try say_grpc.init(&.{ .protocol = .grpc }, &.{.{ .sentence = service.said }}, &harness.buffers(&buffers[5]));
+    try introduce_grpc.init(&.{ .protocol = .grpc }, &.{.{ .name = service.name }}, &harness.buffers(&buffers[6]));
     try harness.request(&say_grpc.request, &say_grpc.response);
     try harness.request(&introduce_grpc.request, &introduce_grpc.response);
     try harness.finish(expected);

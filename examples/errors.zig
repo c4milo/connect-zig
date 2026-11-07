@@ -31,10 +31,10 @@ const missing: connect.Method = .{
     .stream_type = .unary,
 };
 
-const Divide = rpc.ClientCall(Service.divide);
+const Divide = rpc.ClientCall(Service.divide, .{});
 var by_zero: [3]Divide align(@alignOf(Divide)) = undefined;
 var by_two: Divide align(@alignOf(Divide)) = undefined;
-var multiply: rpc.ClientCall(missing) align(@alignOf(rpc.ClientCall(missing))) = undefined;
+var multiply: rpc.ClientCall(missing, .{}) align(@alignOf(rpc.ClientCall(missing, .{}))) = undefined;
 var buffers: [calls_count]harness.CallBuffers align(@alignOf(harness.CallBuffers)) = undefined;
 
 /// The protocol and codec of each call that divides by zero.
@@ -55,12 +55,12 @@ pub fn main() !void {
 fn round(protocols: client.Protocols, expected: client.Protocol) !void {
     try harness.begin(protocols);
     for (&by_zero, zero_options, 0..) |*client_call, options, index| {
-        try client_call.init(options, &.{.{ .dividend = dividend, .divisor = 0 }}, harness.buffers(&buffers[index]));
+        try client_call.init(&options, &.{.{ .dividend = dividend, .divisor = 0 }}, &harness.buffers(&buffers[index]));
         try harness.request(&client_call.request, &client_call.response);
     }
-    try by_two.init(.{ .codec = .json }, &.{.{ .dividend = dividend, .divisor = divisor }}, harness.buffers(&buffers[3]));
+    try by_two.init(&.{ .codec = .json }, &.{.{ .dividend = dividend, .divisor = divisor }}, &harness.buffers(&buffers[3]));
     try harness.request(&by_two.request, &by_two.response);
-    try multiply.init(.{}, &.{.{}}, harness.buffers(&buffers[4]));
+    try multiply.init(&.{}, &.{.{}}, &harness.buffers(&buffers[4]));
     try harness.request(&multiply.request, &multiply.response);
     try harness.finish(expected);
 

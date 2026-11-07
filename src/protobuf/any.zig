@@ -3,25 +3,25 @@
 //! well-known types are always known. A program adds its own by declaring, in its root file:
 //!
 //! ```zig
-//! pub const protobuf_any_types = .{ my.v1.Order, my.v1.Refund };
+//! pub const protobuf_any_types: []const type = &.{ my.v1.Order, my.v1.Refund };
 //! ```
 const std = @import("std");
 const root = @import("root");
 const wkt = @import("wkt.zig");
 
-pub const well_known = .{
+pub const well_known: []const type = &.{
     wkt.Timestamp,  wkt.Duration,    wkt.Empty,       wkt.FieldMask,   wkt.Any,        wkt.Struct,
     wkt.Value,      wkt.ListValue,   wkt.DoubleValue, wkt.FloatValue,  wkt.Int64Value, wkt.UInt64Value,
     wkt.Int32Value, wkt.UInt32Value, wkt.BoolValue,   wkt.StringValue, wkt.BytesValue,
 };
 
-const program_types = if (@hasDecl(root, "protobuf_any_types")) root.protobuf_any_types else .{};
+const program_types: []const type = if (@hasDecl(root, "protobuf_any_types")) root.protobuf_any_types else &.{};
 
 /// Every type an Any's JSON can name by default: the well-known types, then the program's.
-pub const types = well_known ++ program_types;
+pub const types: []const type = well_known ++ program_types;
 
 /// The well-known types, then `extra`: the registry of `encode_json_with` and `decode_json_with`.
-pub fn with(comptime extra: anytype) @TypeOf(well_known ++ extra) {
+pub fn with(comptime extra: []const type) []const type {
     return well_known ++ extra;
 }
 

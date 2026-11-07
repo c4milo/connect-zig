@@ -29,14 +29,14 @@ const echoes = [_][]const u8{ "echo: hello", "echo: how are you", "echo: goodbye
 const numbers = [_]demo.SumRequest{ .{ .number = 1 }, .{ .number = 2 }, .{ .number = 3 }, .{ .number = 4 } };
 const numbers_sum = 10;
 
-var chat: rpc.ClientCall(Service.chat) align(@alignOf(rpc.ClientCall(Service.chat))) = undefined;
-var chat_refused: rpc.ClientCall(Service.chat) align(@alignOf(rpc.ClientCall(Service.chat))) = undefined;
-var chat_cut: rpc.ClientCall(Service.chat) align(@alignOf(rpc.ClientCall(Service.chat))) = undefined;
-var chat_silent: rpc.ClientCall(Service.chat) align(@alignOf(rpc.ClientCall(Service.chat))) = undefined;
-var sum: rpc.ClientCall(Service.sum) align(@alignOf(rpc.ClientCall(Service.sum))) = undefined;
-var sum_web: rpc.ClientCall(Service.sum) align(@alignOf(rpc.ClientCall(Service.sum))) = undefined;
-var countdown: rpc.ClientCall(Service.countdown) align(@alignOf(rpc.ClientCall(Service.countdown))) = undefined;
-var countdown_far: rpc.ClientCall(Service.countdown) align(@alignOf(rpc.ClientCall(Service.countdown))) = undefined;
+var chat: rpc.ClientCall(Service.chat, .{}) align(@alignOf(rpc.ClientCall(Service.chat, .{}))) = undefined;
+var chat_refused: rpc.ClientCall(Service.chat, .{}) align(@alignOf(rpc.ClientCall(Service.chat, .{}))) = undefined;
+var chat_cut: rpc.ClientCall(Service.chat, .{}) align(@alignOf(rpc.ClientCall(Service.chat, .{}))) = undefined;
+var chat_silent: rpc.ClientCall(Service.chat, .{}) align(@alignOf(rpc.ClientCall(Service.chat, .{}))) = undefined;
+var sum: rpc.ClientCall(Service.sum, .{}) align(@alignOf(rpc.ClientCall(Service.sum, .{}))) = undefined;
+var sum_web: rpc.ClientCall(Service.sum, .{}) align(@alignOf(rpc.ClientCall(Service.sum, .{}))) = undefined;
+var countdown: rpc.ClientCall(Service.countdown, .{}) align(@alignOf(rpc.ClientCall(Service.countdown, .{}))) = undefined;
+var countdown_far: rpc.ClientCall(Service.countdown, .{}) align(@alignOf(rpc.ClientCall(Service.countdown, .{}))) = undefined;
 var buffers: [calls_count]harness.CallBuffers align(@alignOf(harness.CallBuffers)) = undefined;
 
 pub fn main() !void {
@@ -50,18 +50,18 @@ pub fn main() !void {
 
 fn round(protocols: client.Protocols, expected: client.Protocol) !void {
     try harness.begin(protocols);
-    try chat.init(.{ .codec = .json }, &lines, harness.buffers(&buffers[0]));
-    try chat_silent.init(.{ .protocol = .grpc_web }, &.{}, harness.buffers(&buffers[1]));
-    try chat_refused.init(.{}, &.{ .{ .text = "x" }, .{ .text = "" }, .{ .text = "never read" } }, harness.buffers(&buffers[6]));
-    try sum.init(.{}, &numbers, harness.buffers(&buffers[2]));
-    try sum_web.init(.{ .protocol = .grpc_web, .codec = .json }, &numbers, harness.buffers(&buffers[3]));
-    try countdown.init(.{}, &.{.{ .from = countdown_from }}, harness.buffers(&buffers[4]));
-    try countdown_far.init(.{ .protocol = .grpc_web }, &.{.{ .from = service.countdown_max + 1 }}, harness.buffers(&buffers[5]));
+    try chat.init(&.{ .codec = .json }, &lines, &harness.buffers(&buffers[0]));
+    try chat_silent.init(&.{ .protocol = .grpc_web }, &.{}, &harness.buffers(&buffers[1]));
+    try chat_refused.init(&.{}, &.{ .{ .text = "x" }, .{ .text = "" }, .{ .text = "never read" } }, &harness.buffers(&buffers[6]));
+    try sum.init(&.{}, &numbers, &harness.buffers(&buffers[2]));
+    try sum_web.init(&.{ .protocol = .grpc_web, .codec = .json }, &numbers, &harness.buffers(&buffers[3]));
+    try countdown.init(&.{}, &.{.{ .from = countdown_from }}, &harness.buffers(&buffers[4]));
+    try countdown_far.init(&.{ .protocol = .grpc_web }, &.{.{ .from = service.countdown_max + 1 }}, &harness.buffers(&buffers[5]));
     try harness.request(&chat.request, &chat.response);
     try harness.request(&chat_silent.request, &chat_silent.response);
     try harness.request(&chat_refused.request, &chat_refused.response);
     // A body that stops inside an envelope fails the call, after the answers already sent.
-    try chat_cut.init(.{}, &lines, harness.buffers(&buffers[7]));
+    try chat_cut.init(&.{}, &lines, &harness.buffers(&buffers[7]));
     chat_cut.request.body = chat_cut.request.body[0 .. chat_cut.request.body.len - 1];
     try harness.request(&chat_cut.request, &chat_cut.response);
     try harness.request(&sum.request, &sum.response);
@@ -122,7 +122,7 @@ fn check_cut() !void {
     try harness.expect_trailer(cut.metadata, service.received_trailer, "2");
 }
 
-fn check_sum(client_call: *const rpc.ClientCall(Service.sum)) !void {
+fn check_sum(client_call: *const rpc.ClientCall(Service.sum, .{})) !void {
     var summed = client_call.read(harness.storage());
     const answer = try summed.next(demo.SumResponse) orelse return error.CallWrong;
     if (answer.sum != numbers_sum or answer.count != numbers.len) return error.CallWrong;

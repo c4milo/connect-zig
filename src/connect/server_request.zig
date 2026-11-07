@@ -30,12 +30,12 @@ pub const Messages = struct {
     /// Whether the one message of a unary Connect body was read.
     unary_read: bool = false,
 
-    pub fn init(accepted: server_head.Accepted, body: []const u8, scratch: message_codec.Scratch, decoders: compression.Decoders) Messages {
+    pub fn init(accepted: *const server_head.Accepted, body: []const u8, scratch: *const message_codec.Scratch, decoders: *const compression.Decoders) Messages {
         return .{
-            .accepted = accepted,
+            .accepted = accepted.*,
             .body = body,
-            .scratch = scratch,
-            .decoders = decoders,
+            .scratch = scratch.*,
+            .decoders = decoders.*,
             .reader = .{ .body = body, .payload_len_max = scratch.message.len },
         };
     }
@@ -105,11 +105,11 @@ fn accepted_for(protocol: @import("protocol.zig").Protocol, enveloped: bool) ser
 test "a unary body is one message, and envelopes are read in order" {
     var buffers: [3][64]u8 = undefined;
     const scratch: message_codec.Scratch = .{ .message = &buffers[0], .work = &buffers[1], .tokens = &buffers[2] };
-    var unary = Messages.init(accepted_for(.connect, false), &.{ 0x0a, 1, 'a' }, scratch, .{});
+    var unary = Messages.init(&accepted_for(.connect, false), &.{ 0x0a, 1, 'a' }, &scratch, &.{});
     try testing.expectEqualStrings("a", (try unary.next(Note)).?.text);
     try testing.expectEqual(@as(?Note, null), try unary.next(Note));
     const body = [_]u8{ 0, 0, 0, 0, 3, 0x0a, 1, 'b', 0, 0, 0, 0, 0 };
-    var stream = Messages.init(accepted_for(.grpc, true), &body, scratch, .{});
+    var stream = Messages.init(&accepted_for(.grpc, true), &body, &scratch, &.{});
     try testing.expectEqualStrings("b", (try stream.next(Note)).?.text);
     try testing.expectEqualStrings("", (try stream.next(Note)).?.text);
     try testing.expectEqual(@as(?Note, null), try stream.next(Note));
@@ -120,7 +120,7 @@ test "a JSON token larger than the server's token buffer is resource_exhausted, 
     var tokens: [4]u8 = undefined;
     const scratch: message_codec.Scratch = .{ .message = &buffers[0], .work = &buffers[1], .tokens = &tokens };
     const accepted: server_head.Accepted = .{ .speaks = .{ .protocol = .connect, .codec = .json, .enveloped = false }, .request_coding = .identity, .response_coding = .identity, .timeout_ns = null };
-    var messages = Messages.init(accepted, "{\"text\":\"a long sentence\"}", scratch, .{});
+    var messages = Messages.init(&accepted, "{\"text\":\"a long sentence\"}", &scratch, &.{});
     if (messages.next(Note)) |_| return error.TestExpectedError else |failure| {
         try testing.expectEqual(Code.resource_exhausted, failure_of(failure).code);
     }
@@ -129,14 +129,14 @@ test "a JSON token larger than the server's token buffer is resource_exhausted, 
 test "a request envelope flagged end-stream, or compressed with no coding, is refused" {
     var buffers: [3][64]u8 = undefined;
     const scratch: message_codec.Scratch = .{ .message = &buffers[0], .work = &buffers[1], .tokens = &buffers[2] };
-    var ended = Messages.init(accepted_for(.connect, true), &.{ 0x02, 0, 0, 0, 0 }, scratch, .{});
+    var ended = Messages.init(&accepted_for(.connect, true), &.{ 0x02, 0, 0, 0, 0 }, &scratch, &.{});
     try testing.expectError(error.InvalidEnvelope, ended.next(Note));
-    var compressed = Messages.init(accepted_for(.grpc, true), &.{ 0x01, 0, 0, 0, 0 }, scratch, .{});
+    var compressed = Messages.init(&accepted_for(.grpc, true), &.{ 0x01, 0, 0, 0, 0 }, &scratch, &.{});
     if (compressed.next(Note)) |_| return error.TestExpectedError else |failure| {
         try testing.expectEqual(error.CompressedWithoutCoding, failure);
         try testing.expectEqual(Code.internal, failure_of(failure).code);
     }
-    var large = Messages.init(accepted_for(.grpc, true), &.{ 0, 0, 0, 1, 0 }, scratch, .{});
+    var large = Messages.init(&accepted_for(.grpc, true), &.{ 0, 0, 0, 1, 0 }, &scratch, &.{});
     if (large.next(Note)) |_| return error.TestExpectedError else |failure| {
         try testing.expectEqual(Code.resource_exhausted, failure_of(failure).code);
     }
@@ -159,7 +159,7 @@ test "a GET's JSON message decodes in full, though its binary form is longer tha
     accepted.speaks.codec = .json;
     // -1 takes ten octets as an int32 varint, more than the JSON text that holds it.
     accepted.query = .{ .codec = .json, .message = "%7B%22n%22%3A-1%2C%22text%22%3A%22hello%22%7D" };
-    var messages = Messages.init(accepted, "", scratch, .{});
+    var messages = Messages.init(&accepted, "", &scratch, &.{});
     const counter = (try messages.next(Counter)).?;
     try testing.expectEqual(@as(i32, -1), counter.n);
     try testing.expectEqualStrings("hello", counter.text);

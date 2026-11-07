@@ -12,13 +12,13 @@ const Detail = rpc_error.Detail;
 
 pub const EncodeError = json.EncodeError || error{NoSpaceLeft};
 
-pub fn encode(failure: RpcError, buffer: []u8) EncodeError![]const u8 {
+pub fn encode(failure: *const RpcError, buffer: []u8) EncodeError![]const u8 {
     var text = json.TextWriter.init(buffer, .text, codec.Features.target());
     try write(failure, &text);
     return text.written();
 }
 
-pub fn write(failure: RpcError, text: *json.TextWriter) EncodeError!void {
+pub fn write(failure: *const RpcError, text: *json.TextWriter) EncodeError!void {
     std.debug.assert(failure.code != .ok);
     try text.begin_object();
     try text.name("code");
@@ -54,7 +54,10 @@ pub const Storage = struct {
 
 /// Reads an error body. A code the body does not name, or names wrongly, reads as `unknown`
 /// (Connect protocol, "Error Codes").
-pub fn decode(body: []const u8, storage: Storage) json_read.Error!RpcError {
+/// What `decode` and `read_object` return on a body they cannot read.
+pub const DecodeError = json_read.Error;
+
+pub fn decode(body: []const u8, storage: *const Storage) DecodeError!RpcError {
     var tokens = json_read.Tokens.init(body, storage.tokens, storage.octets);
     try tokens.start();
     try tokens.expect(.begin_object);
@@ -64,7 +67,7 @@ pub fn decode(body: []const u8, storage: Storage) json_read.Error!RpcError {
 }
 
 /// Reads the members of an error object whose `{` was read.
-pub fn read_object(tokens: *json_read.Tokens, details: []Detail) json_read.Error!RpcError {
+pub fn read_object(tokens: *json_read.Tokens, details: []Detail) DecodeError!RpcError {
     var failure: RpcError = .{ .code = .unknown };
     for (0..tokens.reader.input.len + 1) |_| {
         const member = switch (try tokens.next()) {
@@ -133,7 +136,7 @@ test "an error body is written with its code's name and unpadded details" {
     const failure: RpcError = .{ .code = .unavailable, .message = "busy", .details = &.{.{ .type_name = "a.B", .value = &.{0xff} }} };
     try testing.expectEqualStrings(
         "{\"code\":\"unavailable\",\"message\":\"busy\",\"details\":[{\"type\":\"a.B\",\"value\":\"/w\"}]}",
-        try encode(failure, &buffer),
+        try encode(&failure, &buffer),
     );
 }
 
@@ -143,10 +146,10 @@ test "an error body reads back, with padding, unknown members and an unknown cod
     var details: [2]Detail = undefined;
     const storage: Storage = .{ .tokens = &tokens, .octets = &octets, .details = &details };
     const body = "{\"code\":\"not_found\",\"debug\":{\"x\":[1]},\"details\":[{\"type\":\"a.B\",\"value\":\"/w==\",\"debug\":1}]}";
-    const failure = try decode(body, storage);
+    const failure = try decode(body, &storage);
     try testing.expectEqual(Code.not_found, failure.code);
     try testing.expectEqualSlices(u8, &.{0xff}, failure.details[0].value);
-    try testing.expectEqual(Code.unknown, (try decode("{\"code\":\"teapot\"}", storage)).code);
-    try testing.expectEqual(Code.unknown, (try decode("{\"code\":\"ok\"}", storage)).code);
-    try testing.expectError(error.TooManyDetails, decode("{\"details\":[{},{},{}]}", storage));
+    try testing.expectEqual(Code.unknown, (try decode("{\"code\":\"teapot\"}", &storage)).code);
+    try testing.expectEqual(Code.unknown, (try decode("{\"code\":\"ok\"}", &storage)).code);
+    try testing.expectError(error.TooManyDetails, decode("{\"details\":[{},{},{}]}", &storage));
 }

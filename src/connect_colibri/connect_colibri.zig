@@ -28,7 +28,7 @@ pub const Sender = files.call.Sender;
 pub const Receiver = files.call.Receiver;
 /// A client call over colibri's pool.
 pub const ClientCall = files.client_call.ClientCall;
-pub const ClientCallWith = files.client_call.ClientCallWith;
+pub const ClientCallOptions = files.client_call.Options;
 pub const ClientCallBuffers = files.client_call.Buffers;
 pub const failure_of = files.client_call.failure_of;
 
@@ -45,7 +45,7 @@ comptime {
 test "the root exports the names a program calls" {
     try @import("public_names").expect(@This(), &.{
         "constants",         "Route",      "RouteOptions", "Codings",  "post",       "get",
-        "Refusals",          "Call",       "Sender",       "Receiver", "ClientCall", "ClientCallWith",
+        "Refusals",          "Call",       "Sender",       "Receiver", "ClientCall", "ClientCallOptions",
         "ClientCallBuffers", "failure_of",
     });
 }

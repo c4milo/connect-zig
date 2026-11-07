@@ -34,7 +34,7 @@ const port_default = 8080;
 
 /// The types an Any in a JSON message may name: the coverage cases' (decision 21), which the
 /// interop service echoes.
-pub const protobuf_any_types = .{ coverage.Everything, coverage.Nested, coverage.Scalars };
+pub const protobuf_any_types: []const type = &.{ coverage.Everything, coverage.Nested, coverage.Scalars };
 
 /// 64 TCP connections and 8 QUIC connections at once. A connection past them is accepted and
 /// closed, so its client learns it at once.

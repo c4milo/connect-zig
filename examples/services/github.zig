@@ -37,7 +37,7 @@ const token_len = 20;
 const resource_name_len = 256;
 const detail_len = 512;
 
-/// The decimal text of each count up to `limit_user`. `Call.set_header` keeps the value's slice
+/// The decimal text of each count up to `limit_user`. `Call.add_header` keeps the value's slice
 /// until the head goes out, so each value lives as long as the program.
 const decimals = table: {
     @setEvalBranchQuota(100_000);
@@ -79,14 +79,14 @@ pub const RateLimit = struct {
         const who: usize = if (caller(call)) |user| user + 1 else store_file.anonymous;
         const limit: u32 = if (who == store_file.anonymous) limit_anonymous else limit_user;
         const used = room.store.calls[who];
-        call.set_header("x-ratelimit-limit", decimals[limit]) catch {};
+        call.add_header("x-ratelimit-limit", decimals[limit]) catch {};
         if (used >= limit) {
-            call.set_header("x-ratelimit-remaining", decimals[0]) catch {};
+            call.add_header("x-ratelimit-remaining", decimals[0]) catch {};
             const detail: github.RateLimited = .{ .limit = @intCast(limit), .used = @intCast(used) };
             return detailed(room, .resource_exhausted, "API rate limit exceeded", github.RateLimited, &detail);
         }
         room.store.calls[who] = used + 1;
-        call.set_header("x-ratelimit-remaining", decimals[limit - used - 1]) catch {};
+        call.add_header("x-ratelimit-remaining", decimals[limit - used - 1]) catch {};
         return null;
     }
 };

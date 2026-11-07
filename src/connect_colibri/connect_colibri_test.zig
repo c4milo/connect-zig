@@ -82,10 +82,10 @@ test "a route table holds a route of each stream type, and a GET beside a POST" 
 }
 
 test "a client call writes its request for colibri and reads what colibri filled in" {
-    const Call = rpc.ClientCall(say);
+    const Call = rpc.ClientCall(say, .{});
     var call: Call = undefined;
     var buffers: [7][512]u8 = undefined;
-    try call.init(.{ .protocol = .grpc_web }, &.{.{ .text = "hi" }}, .{
+    try call.init(&.{ .protocol = .grpc_web }, &.{.{ .text = "hi" }}, &.{
         .request = .{ .body = &buffers[0], .scratch = .{ .message = &buffers[1], .work = &buffers[2], .tokens = &.{} }, .values = &buffers[3] },
         .headers = &buffers[4],
         .trailers = &buffers[5],
@@ -133,10 +133,10 @@ fn write_lines(section: anytype, lines: []const connect.Header) void {
 }
 
 test "a gRPC client call reads its status from the response's trailers (PROTOCOL-HTTP2.md, Responses)" {
-    const Call = rpc.ClientCall(say);
+    const Call = rpc.ClientCall(say, .{});
     var call: Call = undefined;
     var buffers: [7][512]u8 = undefined;
-    try call.init(.{ .protocol = .grpc }, &.{.{ .text = "hi" }}, .{
+    try call.init(&.{ .protocol = .grpc }, &.{.{ .text = "hi" }}, &.{
         .request = .{ .body = &buffers[0], .scratch = .{ .message = &buffers[1], .work = &buffers[2], .tokens = &.{} }, .values = &buffers[3] },
         .headers = &buffers[4],
         .trailers = &buffers[5],

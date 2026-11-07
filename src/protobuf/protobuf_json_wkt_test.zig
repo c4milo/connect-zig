@@ -16,7 +16,7 @@ const Buffers = struct {
 };
 
 /// Reads `text` as a `T`, writes it back, and checks the text comes back the same.
-fn round_trip(comptime T: type, text: []const u8, comptime any_types: anytype) !void {
+fn round_trip(comptime T: type, text: []const u8, comptime any_types: []const type) !void {
     var buffers: Buffers = .{};
     const message = try proto.decode_json_with(T, text, &buffers.binary, &buffers.tokens, any_types);
     try testing.expectEqualStrings(text, try proto.encode_json_with(T, &message, &buffers.text, any_types));
@@ -35,10 +35,10 @@ const Document = struct {
 };
 
 test "Struct, Value and ListValue read and write any JSON value" {
-    try round_trip(wkt.Struct, "{\"a\":[1,\"x\",true,null,{\"b\":{}},[]],\"c\":-2.5}", .{});
-    try round_trip(wkt.Value, "\"text\"", .{});
-    try round_trip(wkt.Value, "null", .{});
-    try round_trip(wkt.ListValue, "[{},[[]],0,false]", .{});
+    try round_trip(wkt.Struct, "{\"a\":[1,\"x\",true,null,{\"b\":{}},[]],\"c\":-2.5}", &.{});
+    try round_trip(wkt.Value, "\"text\"", &.{});
+    try round_trip(wkt.Value, "null", &.{});
+    try round_trip(wkt.ListValue, "[{},[[]],0,false]", &.{});
 }
 
 test "a Value field holds null, where any other field reads null as absent" {
@@ -56,12 +56,12 @@ test "a Value with no kind, or a number JSON cannot hold, is refused" {
 }
 
 test "an Any holds a well-known type under value, and another type beside @type" {
-    try round_trip(wkt.Any, "{\"@type\":\"type.googleapis.com/google.protobuf.Duration\",\"value\":\"1.500s\"}", .{});
-    try round_trip(wkt.Any, "{\"@type\":\"type.googleapis.com/google.protobuf.Empty\"}", .{});
-    try round_trip(wkt.Any, "{\"@type\":\"type.googleapis.com/test.Inner\",\"a\":7,\"tags\":[\"x\"]}", .{Inner});
-    try round_trip(wkt.Any, "{}", .{});
+    try round_trip(wkt.Any, "{\"@type\":\"type.googleapis.com/google.protobuf.Duration\",\"value\":\"1.500s\"}", &.{});
+    try round_trip(wkt.Any, "{\"@type\":\"type.googleapis.com/google.protobuf.Empty\"}", &.{});
+    try round_trip(wkt.Any, "{\"@type\":\"type.googleapis.com/test.Inner\",\"a\":7,\"tags\":[\"x\"]}", &.{Inner});
+    try round_trip(wkt.Any, "{}", &.{});
     // An Any inside an Any.
-    try round_trip(wkt.Any, "{\"@type\":\"type.googleapis.com/google.protobuf.Any\",\"value\":{\"@type\":\"type.googleapis.com/test.Inner\",\"a\":1}}", .{Inner});
+    try round_trip(wkt.Any, "{\"@type\":\"type.googleapis.com/google.protobuf.Any\",\"value\":{\"@type\":\"type.googleapis.com/test.Inner\",\"a\":1}}", &.{Inner});
 }
 
 test "an Any's @type may follow its members" {
@@ -70,7 +70,7 @@ test "an Any's @type may follow its members" {
     const empty = try proto.decode_json(wkt.Any, "{\"value\":{},\"@type\":\"type.googleapis.com/google.protobuf.Empty\"}", &buffers.binary, &buffers.tokens);
     try testing.expectEqualStrings("type.googleapis.com/google.protobuf.Empty", empty.type_url);
     const late = "{\"a\":7,\"tags\":[\"x\"],\"@type\":\"type.googleapis.com/test.Inner\"}";
-    const message = try proto.decode_json_with(wkt.Any, late, &buffers.binary, &buffers.tokens, .{Inner});
+    const message = try proto.decode_json_with(wkt.Any, late, &buffers.binary, &buffers.tokens, &.{Inner});
     const inner = try proto.decode(Inner, message.value);
     try testing.expectEqual(@as(i32, 7), inner.a);
     try testing.expectEqualStrings("type.googleapis.com/test.Inner", message.type_url);

@@ -169,7 +169,7 @@ fn add_each(call: *rpc.Call, list: *const proto.Repeated(Header, .message), sect
         for (0..rpc.constants.fields_max + 1) |_| {
             const value = (values.next() catch return internal) orelse break;
             switch (section) {
-                .header => call.set_header(field.name, value) catch return internal,
+                .header => call.add_header(field.name, value) catch return internal,
                 .trailer => call.add_trailer(field.name, value) catch return internal,
             }
         }

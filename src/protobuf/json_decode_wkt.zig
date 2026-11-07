@@ -92,7 +92,7 @@ pub fn list_body(transcoder: *Transcoder, first: json.Item, depth_left: u32) Err
 
 /// Any: an object of "@type" and the message's JSON. "@type" may stand after the members it
 /// types, so a copy of the reader looks for it first; the members are read after it.
-pub fn any_body(transcoder: *Transcoder, first: json.Item, depth_left: u32, comptime registry: anytype) Error!void {
+pub fn any_body(transcoder: *Transcoder, first: json.Item, depth_left: u32, comptime registry: []const type) Error!void {
     if (first != .begin_object) return error.UnexpectedToken;
     var ahead = transcoder.reader;
     const index = try find_type(&ahead, &transcoder.writer, registry) orelse {
@@ -106,7 +106,7 @@ pub fn any_body(transcoder: *Transcoder, first: json.Item, depth_left: u32, comp
     unreachable;
 }
 
-fn any_value_of(comptime A: type, transcoder: *Transcoder, depth_left: u32, comptime registry: anytype) Error!void {
+fn any_value_of(comptime A: type, transcoder: *Transcoder, depth_left: u32, comptime registry: []const type) Error!void {
     const writer = &transcoder.writer;
     try writer.tag(any_value, .len);
     const at = try writer.padded_varint();
@@ -119,7 +119,7 @@ fn any_value_of(comptime A: type, transcoder: *Transcoder, depth_left: u32, comp
 }
 
 /// Reads an Any's members for a well-known type: "@type", and the type's JSON under "value".
-fn value_member(comptime A: type, transcoder: *Transcoder, depth_left: u32, comptime registry: anytype) Error!void {
+fn value_member(comptime A: type, transcoder: *Transcoder, depth_left: u32, comptime registry: []const type) Error!void {
     var seen = false;
     for (0..transcoder.reader.input.len + 1) |_| {
         const name = switch (try transcoder.next()) {
@@ -141,7 +141,7 @@ fn value_member(comptime A: type, transcoder: *Transcoder, depth_left: u32, comp
 
 /// Finds the "@type" member of the object `ahead` stands in, writes it as the Any's type URL,
 /// and returns the index of its type in `registry`, or null when the object has none.
-fn find_type(ahead: *json.TextReader, writer: *wire.Writer, comptime registry: anytype) Error!?usize {
+fn find_type(ahead: *json.TextReader, writer: *wire.Writer, comptime registry: []const type) Error!?usize {
     for (0..ahead.input.len + 1) |_| {
         const name = switch (try next_item(ahead)) {
             .end_object => return null,

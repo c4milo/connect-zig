@@ -39,7 +39,7 @@ pub const Logging = struct {
     pub fn on_call(app: *App, call: *rpc.Call) ?connect.RpcError {
         app.logged += 1;
         if (call.request_query().len != 0) app.queried += 1;
-        call.set_header(logged_header, logged_value) catch return .{ .code = .internal, .message = "no room for a header" };
+        call.add_header(logged_header, logged_value) catch return .{ .code = .internal, .message = "no room for a header" };
         return null;
     }
 

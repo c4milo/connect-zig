@@ -127,10 +127,13 @@ first. Cite an entry by number in code and commits ("decision 6").
 19. **Interceptors are types, chosen at compile time.** A route lists its interceptors in its
     options. Each may define `on_call`, which runs in list order and may refuse the call, and
     `on_finish`, which runs in reverse and returns the outcome the client reads. A client's
-    `ClientCallWith` lists `on_request` and `on_response` interceptors the same way. A handler and
+    `ClientCall` lists `on_request` and `on_response` interceptors the same way, in its options:
+    `ClientCall(method, .{ .interceptors = ... })`, as a route takes `RouteOptions`. A handler and
     an interceptor read the call through `Call`: its protocol, codec, timeout and request
     headers, and the response headers and trailers they add. Beaten: a runtime list of function
-    pointers, which costs an indirect call and loses the `app` type.
+    pointers, which costs an indirect call and loses the `app` type; and, amended 2026-11-07, a
+    `ClientCallWith(method, interceptors)` beside `ClientCall(method)`, which named two types for
+    one and left no room for a client option but interceptors.
 
 20. **Examples share their services.** The programs in `examples/` import the ELIZA and demo
     services, the in-memory link and its client loop from `examples/services/`, so each program
@@ -139,9 +142,11 @@ first. Cite an entry by number in code and commits ("decision 6").
 
 21. **An Any's JSON names its type from a comptime list.** Writing or reading an Any in JSON
     needs the type its URL names. The well-known types are always in the list. A program adds
-    its own with `pub const protobuf_any_types = .{ ... };` in its root file, or passes them to
+    its own with `pub const protobuf_any_types: []const type = &.{ ... };` in its root file, or
+    passes them to
     `encode_json_with` and `decode_json_with`, which a test needs since a test's root is the
-    test runner. A type outside the list fails with `UnknownAnyType`. Beaten: a runtime registry,
+    test runner. The list is a `[]const type`, as std passes a list of types, not a tuple
+    (amended 2026-11-07). A type outside the list fails with `UnknownAnyType`. Beaten: a runtime registry,
     which needs an allocator or a fixed table of function pointers, and loses comptime decoding.
 
 22. **A message is encoded into the body it goes out in.** The server encodes each reply message

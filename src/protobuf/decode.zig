@@ -79,7 +79,7 @@ fn read_known(comptime T: type, message: *T, field_start: usize, bytes: []const 
 pub fn unknown_to_closed(comptime kind: Kind, comptime V: type, value: V) bool {
     if (comptime kind != .@"enum") return false;
     if (comptime !V.protobuf.closed) return false;
-    return !V.protobuf.names(@intFromEnum(value));
+    return !V.protobuf.contains(@intFromEnum(value));
 }
 
 fn read_field(comptime T: type, comptime field: Field, message: *T, field_start: usize, bytes: []const u8, tag: wire.Tag, reader: *wire.Reader, depth_left: u32, comptime mode: Mode) Error!Read {

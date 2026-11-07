@@ -45,6 +45,37 @@ pub const Error = message_codec.DecodeError || compression.Error || envelope.Err
 };
 
 pub const Response = struct {
+    /// Starts reading the response of a call that spoke `speaks`.
+    pub fn init(speaks: protocol.Speaks, incoming: *const Incoming, storage: *const Storage, decoders: *const compression.Decoders) Response {
+        var response: Response = .{
+            .speaks = speaks,
+            .incoming = incoming.*,
+            .storage = storage.*,
+            .decoders = decoders.*,
+            .coding = .identity,
+            .reader = .{ .body = incoming.body, .payload_len_max = storage.scratch.message.len },
+        };
+        if (incoming.status != constants.protocol.status.ok) {
+            response.done = true;
+            response.failure = http_failure(speaks, incoming.*, storage.*);
+            return response;
+        }
+        const coding_name = coding_header(speaks);
+        if (incoming.headers.find(coding_name)) |name| {
+            response.coding = compression.Coding.from_name(name) orelse {
+                response.done = true;
+                response.failure = .{ .code = .internal, .message = "unknown response compression" };
+                return response;
+            };
+        }
+        // PROTOCOL-HTTP2.md, "Responses": Trailers-Only puts the status in the head.
+        if (speaks.protocol != .connect and incoming.headers.find("grpc-status") != null) {
+            response.done = true;
+            response.failure = trailers.read(incoming.headers, find_lookup, status_storage(storage.*));
+        }
+        return response;
+    }
+
     speaks: protocol.Speaks,
     incoming: Incoming,
     storage: Storage,
@@ -83,7 +114,7 @@ pub const Response = struct {
         switch (response.speaks.protocol) {
             .connect => {
                 if (!last.flags.end_stream) return error.InvalidEnvelope;
-                const end = end_stream.decode(last.payload, .{
+                const end = end_stream.decode(last.payload, &.{
                     .tokens = response.storage.scratch.tokens,
                     .octets = response.storage.octets,
                     .details = response.storage.details,
@@ -132,37 +163,6 @@ fn find_lookup(lookup: Lookup, name: []const u8) ?[]const u8 {
     return lookup.find(name);
 }
 
-/// Starts reading the response of a call that spoke `speaks`.
-pub fn read(speaks: protocol.Speaks, incoming: Incoming, storage: Storage, decoders: compression.Decoders) Response {
-    var response: Response = .{
-        .speaks = speaks,
-        .incoming = incoming,
-        .storage = storage,
-        .decoders = decoders,
-        .coding = .identity,
-        .reader = .{ .body = incoming.body, .payload_len_max = storage.scratch.message.len },
-    };
-    if (incoming.status != constants.protocol.status.ok) {
-        response.done = true;
-        response.failure = http_failure(speaks, incoming, storage);
-        return response;
-    }
-    const coding_name = coding_header(speaks);
-    if (incoming.headers.find(coding_name)) |name| {
-        response.coding = compression.Coding.from_name(name) orelse {
-            response.done = true;
-            response.failure = .{ .code = .internal, .message = "unknown response compression" };
-            return response;
-        };
-    }
-    // PROTOCOL-HTTP2.md, "Responses": Trailers-Only puts the status in the head.
-    if (speaks.protocol != .connect and incoming.headers.find("grpc-status") != null) {
-        response.done = true;
-        response.failure = trailers.read(incoming.headers, find_lookup, status_storage(storage));
-    }
-    return response;
-}
-
 fn coding_header(speaks: protocol.Speaks) []const u8 {
     return switch (speaks.protocol) {
         .connect => if (speaks.enveloped) "connect-content-encoding" else "content-encoding",
@@ -177,7 +177,7 @@ fn http_failure(speaks: protocol.Speaks, incoming: Incoming, storage: Storage) R
     if (speaks.protocol != .connect) return fallback;
     const content_type = incoming.headers.find("content-type") orelse return fallback;
     if (!std.mem.startsWith(u8, content_type, "application/json")) return fallback;
-    const failure = error_json.decode(incoming.body, .{ .tokens = storage.scratch.tokens, .octets = storage.octets, .details = storage.details }) catch return fallback;
+    const failure = error_json.decode(incoming.body, &.{ .tokens = storage.scratch.tokens, .octets = storage.octets, .details = storage.details }) catch return fallback;
     return failure;
 }
 
@@ -203,7 +203,7 @@ test "a non-200 Connect response without a JSON body maps its status to a code" 
         .metadata = &metadata,
     };
     const lookup: Lookup = .{ .context = &buffers, .find_fn = Empty.find };
-    const response = read(.{ .protocol = .connect, .codec = .proto, .enveloped = false }, .{ .status = 503, .headers = lookup, .body = "busy" }, storage, .{});
+    const response = Response.init(.{ .protocol = .connect, .codec = .proto, .enveloped = false }, &.{ .status = 503, .headers = lookup, .body = "busy" }, &storage, &.{});
     try std.testing.expectEqual(Code.unavailable, response.failure.?.code);
     try std.testing.expect(response.done);
 }

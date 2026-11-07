@@ -62,8 +62,8 @@ pub const Options = struct {
 };
 
 /// Reads the head of a request for a method of `options.stream_type`.
-pub fn accept(http_method: []const u8, query: ?[]const u8, headers: Lookup, options: Options) Decision {
-    if (std.mem.eql(u8, http_method, "GET")) return accept_get(query orelse "", headers, options);
+pub fn accept(http_method: []const u8, query: ?[]const u8, headers: Lookup, options: *const Options) Decision {
+    if (std.mem.eql(u8, http_method, "GET")) return accept_get(query orelse "", headers, options.*);
     // Connect protocol, "Unary-Request": a request is a POST, or a GET of a NO_SIDE_EFFECTS method.
     if (!std.mem.eql(u8, http_method, "POST")) return .{ .refused = .{ .http_status = status.method_not_allowed } };
     const content_type = headers.find("content-type") orelse return .{ .refused = .{ .http_status = status.unsupported_media_type } };
@@ -72,7 +72,7 @@ pub fn accept(http_method: []const u8, query: ?[]const u8, headers: Lookup, opti
     if (speaks.protocol == .connect and speaks.enveloped != options.stream_type.enveloped()) {
         return .{ .refused = .{ .http_status = status.unsupported_media_type } };
     }
-    return accept_post(speaks, headers, options);
+    return accept_post(speaks, headers, options.*);
 }
 
 const Names = struct { encoding: []const u8, accept: []const u8, timeout: []const u8 };
@@ -157,7 +157,7 @@ test "a Connect unary POST is accepted with its codings and timeout" {
         .{ .name = "Connect-Timeout-Ms", .value = "250" },
     } };
     var encoder: compression.GzipEncoder = undefined;
-    const decision = accept("POST", null, headers.lookup(), .{ .stream_type = .unary, .encoders = .{ .gzip = &encoder } });
+    const decision = accept("POST", null, headers.lookup(), &.{ .stream_type = .unary, .encoders = .{ .gzip = &encoder } });
     const accepted = decision.accepted;
     try testing.expectEqual(protocol.Codec.json, accepted.speaks.codec);
     try testing.expectEqual(Coding.gzip, accepted.response_coding);
@@ -166,11 +166,11 @@ test "a Connect unary POST is accepted with its codings and timeout" {
 
 test "a stream with a unary content type, an unknown type and a GET of a mutation are refused" {
     const unary_type: TestHeaders = .{ .entries = &.{.{ .name = "content-type", .value = "application/proto" }} };
-    try testing.expectEqual(@as(u16, 415), accept("POST", null, unary_type.lookup(), .{ .stream_type = .server_stream }).refused.http_status);
+    try testing.expectEqual(@as(u16, 415), accept("POST", null, unary_type.lookup(), &.{ .stream_type = .server_stream }).refused.http_status);
     const unknown: TestHeaders = .{ .entries = &.{.{ .name = "content-type", .value = "text/html" }} };
-    try testing.expectEqual(@as(u16, 415), accept("POST", null, unknown.lookup(), .{ .stream_type = .unary }).refused.http_status);
-    try testing.expectEqual(@as(u16, 405), accept("GET", "encoding=proto&message=", unary_type.lookup(), .{ .stream_type = .unary }).refused.http_status);
-    try testing.expectEqual(@as(u16, 405), accept("PUT", null, unary_type.lookup(), .{ .stream_type = .unary }).refused.http_status);
+    try testing.expectEqual(@as(u16, 415), accept("POST", null, unknown.lookup(), &.{ .stream_type = .unary }).refused.http_status);
+    try testing.expectEqual(@as(u16, 405), accept("GET", "encoding=proto&message=", unary_type.lookup(), &.{ .stream_type = .unary }).refused.http_status);
+    try testing.expectEqual(@as(u16, 405), accept("PUT", null, unary_type.lookup(), &.{ .stream_type = .unary }).refused.http_status);
 }
 
 test "an unsupported coding is unimplemented, in the request's own protocol" {
@@ -178,18 +178,18 @@ test "an unsupported coding is unimplemented, in the request's own protocol" {
         .{ .name = "content-type", .value = "application/grpc" },
         .{ .name = "grpc-encoding", .value = "snappy" },
     } };
-    const refused = accept("POST", null, headers.lookup(), .{ .stream_type = .unary }).refused;
+    const refused = accept("POST", null, headers.lookup(), &.{ .stream_type = .unary }).refused;
     try testing.expectEqual(@as(u16, 200), refused.http_status);
     try testing.expectEqual(@import("code.zig").Code.unimplemented, refused.failure.?.code);
     const gzipped: TestHeaders = .{ .entries = &.{
         .{ .name = "content-type", .value = "application/proto" },
         .{ .name = "content-encoding", .value = "gzip" },
     } };
-    try testing.expectEqual(@as(u16, 501), accept("POST", null, gzipped.lookup(), .{ .stream_type = .unary }).refused.http_status);
+    try testing.expectEqual(@as(u16, 501), accept("POST", null, gzipped.lookup(), &.{ .stream_type = .unary }).refused.http_status);
 }
 
 test "a GET of a method with no side effects is accepted with its query" {
     const headers: TestHeaders = .{ .entries = &.{} };
-    const decision = accept("GET", "encoding=json&message=e30", headers.lookup(), .{ .stream_type = .unary, .idempotency = .no_side_effects });
+    const decision = accept("GET", "encoding=json&message=e30", headers.lookup(), &.{ .stream_type = .unary, .idempotency = .no_side_effects });
     try testing.expectEqual(protocol.Codec.json, decision.accepted.query.?.codec);
 }

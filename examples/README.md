@@ -94,7 +94,7 @@ pub const Auth = struct {
 const guarded: rpc.RouteOptions = .{ .interceptors = &.{ Logging, Auth } };
 ```
 
-A client interceptor is a type an `ClientCallWith` lists, with `on_request` and `on_response`.
+A client interceptor is a type a `ClientCall`'s options list, with `on_request` and `on_response`.
 
 ## Generated code
 

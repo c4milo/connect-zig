@@ -35,7 +35,7 @@ pub const Transcoder = struct {
 
 /// Writes the binary encoding of the one JSON text `text` holds, read as a `T`, into `binary`,
 /// with `tokens` as the reader's storage for one token's octets.
-pub fn transcode(comptime T: type, text: []const u8, binary: []u8, tokens: []u8, comptime registry: anytype) Error![]const u8 {
+pub fn transcode(comptime T: type, text: []const u8, binary: []u8, tokens: []u8, comptime registry: []const type) Error![]const u8 {
     var transcoder: Transcoder = .{
         .reader = json.TextReader.init(text, tokens, .text, codec.Features.target()),
         .writer = .{ .buffer = binary },
@@ -47,7 +47,7 @@ pub fn transcode(comptime T: type, text: []const u8, binary: []u8, tokens: []u8,
     return transcoder.writer.written();
 }
 
-pub fn message_body(comptime T: type, transcoder: *Transcoder, first: json.Item, depth_left: u32, comptime registry: anytype) Error!void {
+pub fn message_body(comptime T: type, transcoder: *Transcoder, first: json.Item, depth_left: u32, comptime registry: []const type) Error!void {
     comptime descriptor.check(T);
     if (depth_left == 0) return error.DepthExceeded;
     switch (comptime wkt.form(T)) {
@@ -70,7 +70,7 @@ pub fn message_body(comptime T: type, transcoder: *Transcoder, first: json.Item,
 pub const Members = enum { fields_only, with_type };
 
 /// Reads the members of an object whose "{" was read, up to its "}".
-pub fn members(comptime T: type, transcoder: *Transcoder, depth_left: u32, comptime extra: Members, comptime registry: anytype) Error!void {
+pub fn members(comptime T: type, transcoder: *Transcoder, depth_left: u32, comptime extra: Members, comptime registry: []const type) Error!void {
     // Each member takes at least one token, and the text bounds the tokens.
     for (0..transcoder.reader.input.len + 1) |_| {
         const member = try transcoder.next();
@@ -98,7 +98,7 @@ fn field_index(comptime T: type, name: []const u8) ?usize {
     return null;
 }
 
-fn read_member(comptime T: type, transcoder: *Transcoder, index: usize, depth_left: u32, comptime registry: anytype) Error!void {
+fn read_member(comptime T: type, transcoder: *Transcoder, index: usize, depth_left: u32, comptime registry: []const type) Error!void {
     const value = try transcoder.next();
     inline for (T.protobuf.fields, 0..) |field, each| {
         if (each == index) return read_field(T, field, transcoder, value, depth_left, registry);
@@ -106,7 +106,7 @@ fn read_member(comptime T: type, transcoder: *Transcoder, index: usize, depth_le
     unreachable;
 }
 
-fn read_field(comptime T: type, comptime field: Field, transcoder: *Transcoder, value: json.Item, depth_left: u32, comptime registry: anytype) Error!void {
+fn read_field(comptime T: type, comptime field: Field, transcoder: *Transcoder, value: json.Item, depth_left: u32, comptime registry: []const type) Error!void {
     const F = if (field.oneof) |oneof| @FieldType(@typeInfo(@FieldType(T, oneof)).optional.child, field.name) else @FieldType(T, field.name);
     // "JSON Mapping": null is the default of every field, but NullValue's and Value's.
     if (value == .null and !comptime takes_null(F)) return;
@@ -135,7 +135,7 @@ fn takes_null(comptime V: type) bool {
     return std.mem.eql(u8, inner.protobuf.full_name, "google.protobuf.NullValue");
 }
 
-fn read_array(comptime field: Field, comptime E: type, transcoder: *Transcoder, value: json.Item, depth_left: u32, comptime registry: anytype) Error!void {
+fn read_array(comptime field: Field, comptime E: type, transcoder: *Transcoder, value: json.Item, depth_left: u32, comptime registry: []const type) Error!void {
     if (value != .begin_array) return error.UnexpectedToken;
     for (0..transcoder.reader.input.len + 1) |_| {
         const element = try transcoder.next();
@@ -147,7 +147,7 @@ fn read_array(comptime field: Field, comptime E: type, transcoder: *Transcoder, 
     unreachable;
 }
 
-fn read_map(comptime field: Field, comptime Entry: type, transcoder: *Transcoder, value: json.Item, depth_left: u32, comptime registry: anytype) Error!void {
+fn read_map(comptime field: Field, comptime Entry: type, transcoder: *Transcoder, value: json.Item, depth_left: u32, comptime registry: []const type) Error!void {
     if (value != .begin_object) return error.UnexpectedToken;
     const key_field = Entry.protobuf.fields[0];
     const value_field = Entry.protobuf.fields[1];
@@ -201,7 +201,7 @@ fn parse_bool_key(key: []const u8) Error!bool {
 }
 
 /// Writes one value of `field`, with its tag, from the token `value`.
-fn write_single(comptime field: Field, comptime V: type, transcoder: *Transcoder, value: json.Item, depth_left: u32, comptime registry: anytype) Error!void {
+fn write_single(comptime field: Field, comptime V: type, transcoder: *Transcoder, value: json.Item, depth_left: u32, comptime registry: []const type) Error!void {
     const writer = &transcoder.writer;
     if (comptime field.kind == .group) {
         // "Groups": the fields sit between a start and an end tag, with no length before them.
@@ -269,7 +269,7 @@ fn enum_of(comptime V: type, value: json.Item) Error!V {
 /// takes them: its field has no room for another (editions, "enum_type").
 fn number_of_enum(comptime V: type, number: i32) Error!V {
     if (comptime V.protobuf.closed) {
-        if (!V.protobuf.names(number)) return error.InvalidEnum;
+        if (!V.protobuf.contains(number)) return error.InvalidEnum;
     }
     return @enumFromInt(number);
 }
@@ -333,9 +333,9 @@ test "the transcoder itself refuses nesting past its bound, before decode reads 
     const deep = "{\"next\":" ** constants.limits.json_depth_max ++ "{}" ++ "}" ** constants.limits.json_depth_max;
     var binary: [4096]u8 = undefined;
     var tokens: [64]u8 = undefined;
-    try testing.expectError(error.DepthExceeded, transcode(Chain, deep, &binary, &tokens, .{}));
+    try testing.expectError(error.DepthExceeded, transcode(Chain, deep, &binary, &tokens, &.{}));
     const fits = "{\"next\":" ** 3 ++ "{}" ++ "}" ** 3;
-    const bytes = try transcode(Chain, fits, &binary, &tokens, .{});
+    const bytes = try transcode(Chain, fits, &binary, &tokens, &.{});
     // Each level is a tag and a one-octet length: the placeholders shrank to fit.
     try testing.expectEqual(@as(usize, 3 * 2), bytes.len);
 }

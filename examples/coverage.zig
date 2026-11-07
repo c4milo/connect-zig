@@ -21,7 +21,7 @@ const coverage = @import("coverage");
 const editions = @import("editions");
 const legacy = @import("legacy");
 
-pub const protobuf_any_types = .{ coverage.Everything, coverage.Nested, coverage.Scalars };
+pub const protobuf_any_types: []const type = &.{ coverage.Everything, coverage.Nested, coverage.Scalars };
 
 pub const Error = error{ UsageWrong, InputTooLarge };
 

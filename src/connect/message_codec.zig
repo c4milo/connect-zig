@@ -51,7 +51,15 @@ pub const compress_len_min = 1024;
 pub const Prepared = struct {
     octets: []const u8,
     compressed: bool,
+
+    /// Whether the octets went out compressed, as `Reply.head` takes it.
+    pub fn body(prepared: Prepared) Body {
+        return if (prepared.compressed) .compressed else .plain;
+    }
 };
+
+/// Whether a response body is compressed in the reply's coding, or plain.
+pub const Body = enum { plain, compressed };
 
 /// Encodes `message` into `scratch.message`, then compresses it into `scratch.work` as `compress`
 /// decides.

@@ -55,16 +55,16 @@ const events_count = 11;
 /// router pool's 8 requests.
 const burst_len = 6;
 
-var create_repository: rpc.ClientCall(Repositories.create_repository) align(@alignOf(rpc.ClientCall(Repositories.create_repository))) = undefined;
-var get_repository: rpc.ClientCall(Repositories.get_repository) align(@alignOf(rpc.ClientCall(Repositories.get_repository))) = undefined;
-var list_repositories: rpc.ClientCall(Repositories.list_repositories) align(@alignOf(rpc.ClientCall(Repositories.list_repositories))) = undefined;
-var create_issue: rpc.ClientCall(Issues.create_issue) align(@alignOf(rpc.ClientCall(Issues.create_issue))) = undefined;
-var get_issue: rpc.ClientCall(Issues.get_issue) align(@alignOf(rpc.ClientCall(Issues.get_issue))) = undefined;
-var list_issues: rpc.ClientCall(Issues.list_issues) align(@alignOf(rpc.ClientCall(Issues.list_issues))) = undefined;
-var update_issue: rpc.ClientCall(Issues.update_issue) align(@alignOf(rpc.ClientCall(Issues.update_issue))) = undefined;
-var import_issues: rpc.ClientCall(Issues.import_issues) align(@alignOf(rpc.ClientCall(Issues.import_issues))) = undefined;
-var watch_events: rpc.ClientCall(Issues.watch_events) align(@alignOf(rpc.ClientCall(Issues.watch_events))) = undefined;
-var burst: [burst_len]rpc.ClientCall(Repositories.get_repository) align(@alignOf(rpc.ClientCall(Repositories.get_repository))) = undefined;
+var create_repository: rpc.ClientCall(Repositories.create_repository, .{}) align(@alignOf(rpc.ClientCall(Repositories.create_repository, .{}))) = undefined;
+var get_repository: rpc.ClientCall(Repositories.get_repository, .{}) align(@alignOf(rpc.ClientCall(Repositories.get_repository, .{}))) = undefined;
+var list_repositories: rpc.ClientCall(Repositories.list_repositories, .{}) align(@alignOf(rpc.ClientCall(Repositories.list_repositories, .{}))) = undefined;
+var create_issue: rpc.ClientCall(Issues.create_issue, .{}) align(@alignOf(rpc.ClientCall(Issues.create_issue, .{}))) = undefined;
+var get_issue: rpc.ClientCall(Issues.get_issue, .{}) align(@alignOf(rpc.ClientCall(Issues.get_issue, .{}))) = undefined;
+var list_issues: rpc.ClientCall(Issues.list_issues, .{}) align(@alignOf(rpc.ClientCall(Issues.list_issues, .{}))) = undefined;
+var update_issue: rpc.ClientCall(Issues.update_issue, .{}) align(@alignOf(rpc.ClientCall(Issues.update_issue, .{}))) = undefined;
+var import_issues: rpc.ClientCall(Issues.import_issues, .{}) align(@alignOf(rpc.ClientCall(Issues.import_issues, .{}))) = undefined;
+var watch_events: rpc.ClientCall(Issues.watch_events, .{}) align(@alignOf(rpc.ClientCall(Issues.watch_events, .{}))) = undefined;
+var burst: [burst_len]rpc.ClientCall(Repositories.get_repository, .{}) align(@alignOf(rpc.ClientCall(Repositories.get_repository, .{}))) = undefined;
 var buffers: [burst_len]harness.CallBuffers align(@alignOf(harness.CallBuffers)) = undefined;
 
 /// The token of the next page of a list, which the client sends back.
@@ -100,7 +100,7 @@ fn session(round_protocols: client.Protocols, round_protocol: client.Protocol) !
 /// Runs one call alone, so each step sees what the steps before it changed.
 fn call(client_call: anytype, options: connect.client.Options, messages: MessagesOf(@TypeOf(client_call))) !void {
     try harness.begin(protocols);
-    try client_call.init(options, messages, harness.buffers(&buffers[0]));
+    try client_call.init(&options, messages, &harness.buffers(&buffers[0]));
     try harness.request(&client_call.request, &client_call.response);
     try harness.finish(expected);
 }
@@ -279,7 +279,7 @@ fn rate_limit() !void {
     try expect(left < burst_len);
     try harness.begin(protocols);
     for (&burst, 0..) |*client_call, index| {
-        try client_call.init(.{}, &.{.{ .owner = "octocat", .name = "hello-world" }}, harness.buffers(&buffers[index]));
+        try client_call.init(&.{}, &.{.{ .owner = "octocat", .name = "hello-world" }}, &harness.buffers(&buffers[index]));
         try harness.request(&client_call.request, &client_call.response);
     }
     try harness.finish(expected);

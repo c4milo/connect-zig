@@ -19,7 +19,7 @@ const Router = @import("service.zig").Router;
 
 /// The types an Any in a JSON message may name (decision 21): every message the service reads
 /// and writes, since a request echoes in a response's `requests`, and an error's details.
-pub const protobuf_any_types = .{
+pub const protobuf_any_types: []const type = &.{
     service.UnaryRequest,                      service.UnaryResponse,
     service.IdempotentUnaryRequest,            service.IdempotentUnaryResponse,
     service.ServerStreamRequest,               service.ServerStreamResponse,

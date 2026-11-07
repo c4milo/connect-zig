@@ -109,7 +109,7 @@ fn inspect(app: *App, call: *rpc.Call, _: *const interop.InspectRequest, respons
         room.lines[count] = line;
         count += 1;
         used += line.len;
-        call.set_header(header.name, header.value) catch return .{ .code = .internal, .message = "no room for a header" };
+        call.add_header(header.name, header.value) catch return .{ .code = .internal, .message = "no room for a header" };
         call.add_trailer(header.name, header.value) catch return .{ .code = .internal, .message = "no room for a trailer" };
     }
     const timeout_ms: i64 = if (call.timeout_ns()) |timeout| @intCast(timeout / nanoseconds_per_millisecond) else 0;

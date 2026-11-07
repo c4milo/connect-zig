@@ -86,7 +86,7 @@ pub fn main() !void {
 
 fn say() !void {
     const options: connect.client.Options = .{ .protocol = .connect, .codec = .json };
-    const request = try connect.client.request(Service.say, options, &.{.{ .sentence = "I feel tired" }}, request_buffers());
+    const request = try connect.client.request(Service.say, &options, &.{.{ .sentence = "I feel tired" }}, &request_buffers());
     std.debug.print("client: {s} {s} {s}\n", .{ request.http_method, request.target, request.body });
     try serve_say(&request);
     var response = read(.{ .protocol = .connect, .codec = .json, .enveloped = false });
@@ -98,7 +98,7 @@ fn say() !void {
 
 fn introduce() !void {
     const options: connect.client.Options = .{ .protocol = .grpc_web };
-    const request = try connect.client.request(Service.introduce, options, &.{.{ .name = "Ada" }}, request_buffers());
+    const request = try connect.client.request(Service.introduce, &options, &.{.{ .name = "Ada" }}, &request_buffers());
     std.debug.print("client: {s} {s}, {d} body bytes in envelopes\n", .{ request.http_method, request.target, request.body.len });
     try serve_introduce(&request);
     var response = read(.{ .protocol = .grpc_web, .codec = .proto, .enveloped = true });
@@ -123,7 +123,7 @@ fn request_buffers() connect.client.Buffers {
 /// The server's first steps for any call: read the head, then start the reply.
 fn accept(method: connect.Method, request: *const connect.client.Request) !connect.server.Messages {
     const headers: Headers = .{ .entries = request.headers() };
-    const decision = connect.server.accept(request.http_method, null, headers.lookup(), .{
+    const decision = connect.server.accept(request.http_method, null, headers.lookup(), &.{
         .stream_type = method.stream_type,
         .idempotency = method.idempotency,
     });
@@ -133,7 +133,7 @@ fn accept(method: connect.Method, request: *const connect.client.Request) !conne
     };
     std.debug.print("server: {s} over {s}\n", .{ method.name, @tagName(accepted.speaks.protocol) });
     const scratch: connect.Scratch = .{ .message = &server_message, .work = &server_work, .tokens = &server_tokens };
-    return connect.server.Messages.init(accepted, request.body, scratch, .{});
+    return connect.server.Messages.init(&accepted, request.body, &scratch, &.{});
 }
 
 fn reply_of(accepted: connect.server.Accepted) connect.server.Reply {
@@ -147,7 +147,7 @@ fn serve_say(request: *const connect.client.Request) !void {
     const answer: eliza.SayResponse = .{ .sentence = try std.fmt.bufPrint(&sentence, "You said \"{s}\". How does that make you feel?", .{said.sentence}) };
     const prepared = try reply.prepare(eliza.SayResponse, &answer);
     var body: std.Io.Writer = .fixed(&wire.body);
-    wire.head = reply.head(prepared.compressed);
+    wire.head = reply.head(prepared.body());
     try reply.write_message(prepared, &body);
     wire.status = wire.head.status;
     wire.body_len = body.end;
@@ -158,7 +158,7 @@ fn serve_introduce(request: *const connect.client.Request) !void {
     const introduced = try messages.next(eliza.IntroduceRequest) orelse return error.ExampleWrong;
     var reply = reply_of(messages.accepted);
     var body: std.Io.Writer = .fixed(&wire.body);
-    wire.head = reply.head(false);
+    wire.head = reply.head(.plain);
     const lines = [_][]const u8{ "Hi {s}, I am Eliza.", "Before we begin, {s}, tell me how you came here.", "How are you feeling today, {s}?" };
     inline for (lines) |line| {
         const answer: eliza.IntroduceResponse = .{ .sentence = try std.fmt.bufPrint(&sentence, line, .{introduced.name}) };
@@ -180,5 +180,5 @@ fn read(speaks: connect.Speaks) connect.client.Response {
         .metadata = &metadata,
     };
     const incoming: connect.client.Incoming = .{ .status = wire.status, .headers = response_headers.lookup(), .body = wire.body[0..wire.body_len] };
-    return connect.client.read(speaks, incoming, storage, .{});
+    return connect.client.Response.init(speaks, &incoming, &storage, &.{});
 }

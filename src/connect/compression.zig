@@ -62,11 +62,14 @@ pub const GzipDecoder = gzip.Decoder;
 /// The zstd decoder a caller places, with HTTP's window limit (RFC 9659 §3).
 pub const ZstdDecoder = zstd.HttpDecoder;
 
+/// The brotli decoder a caller places.
+pub const BrotliDecoder = brotli.HttpDecoder;
+
 /// The decoders a caller placed. A coding whose decoder is null is not accepted.
 pub const Decoders = struct {
-    gzip: ?*gzip.Decoder = null,
-    zstd: ?*zstd.HttpDecoder = null,
-    brotli: ?*brotli.HttpDecoder = null,
+    gzip: ?*GzipDecoder = null,
+    zstd: ?*ZstdDecoder = null,
+    brotli: ?*BrotliDecoder = null,
 
     pub fn accepts(decoders: Decoders, coding: Coding) bool {
         return switch (coding) {

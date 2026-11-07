@@ -49,6 +49,7 @@ pub const Head = struct {
 pub const Error = message_codec.EncodeError || error{ WriteFailed, TooManyDetails, InvalidTrailer };
 
 pub const Prepared = message_codec.Prepared;
+pub const Body = message_codec.Body;
 
 pub const Reply = struct {
     accepted: server_head.Accepted,
@@ -64,16 +65,16 @@ pub const Reply = struct {
         return message_codec.prepare(T, reply.accepted.speaks.codec, reply.accepted.response_coding, reply.encoders, message, reply.scratch);
     }
 
-    /// The head of a response that carries messages. `compressed` says whether a unary
-    /// Connect body is compressed; a stream announces its coding whatever each message does.
-    pub fn head(reply: *const Reply, compressed: bool) Head {
+    /// The head of a response that carries messages. `body` says whether a unary Connect body is
+    /// compressed; a stream announces its coding whatever each message does.
+    pub fn head(reply: *const Reply, body: message_codec.Body) Head {
         const speaks = reply.accepted.speaks;
         var result: Head = .{ .status = constants.protocol.status.ok };
         result.add("content-type", protocol.content_type(speaks));
         const coding = reply.accepted.response_coding;
         switch (speaks.protocol) {
             .connect => if (!speaks.enveloped) {
-                if (compressed) result.add("content-encoding", coding.name());
+                if (body == .compressed) result.add("content-encoding", coding.name());
             } else if (coding != .identity) result.add("connect-content-encoding", coding.name()),
             .grpc, .grpc_web => if (coding != .identity) result.add("grpc-encoding", coding.name()),
         }
@@ -136,7 +137,7 @@ pub const Reply = struct {
 
     /// The head of an error answered by `error_only`. For gRPC it holds the status trailers,
     /// whose values are written into `storage`.
-    pub fn error_head(reply: *const Reply, failure: RpcError, storage: []u8) Error!Head {
+    pub fn error_head(reply: *const Reply, failure: *const RpcError, storage: []u8) Error!Head {
         assert(reply.error_only());
         const speaks = reply.accepted.speaks;
         if (speaks.protocol == .connect) {
@@ -147,7 +148,7 @@ pub const Reply = struct {
         var result: Head = .{ .status = constants.protocol.status.ok };
         result.add("content-type", protocol.content_type(speaks));
         // The status trailers go in the head's own storage, after the content type.
-        const written = try trailers.write(failure, storage, result.storage[result.count..]);
+        const written = try trailers.write(failure.*, storage, result.storage[result.count..]);
         result.count += written.len;
         return result;
     }
@@ -155,7 +156,7 @@ pub const Reply = struct {
     /// Writes a Connect unary error's JSON body. A gRPC Trailers-Only error has no body.
     pub fn write_error_body(reply: *const Reply, failure: RpcError, body: *std.Io.Writer) Error!void {
         if (reply.accepted.speaks.protocol != .connect) return;
-        try body.writeAll(error_json.encode(failure, reply.scratch.work) catch return error.NoSpaceLeft);
+        try body.writeAll(error_json.encode(&failure, reply.scratch.work) catch return error.NoSpaceLeft);
     }
 
     /// Ends a response that carried messages. A Connect stream and gRPC-Web write their end into
@@ -165,7 +166,7 @@ pub const Reply = struct {
         assert(speaks.enveloped);
         switch (speaks.protocol) {
             .connect => {
-                const text = end_stream.encode(.{ .failure = failure, .metadata = metadata }, storage) catch return error.NoSpaceLeft;
+                const text = end_stream.encode(&.{ .failure = failure, .metadata = metadata }, storage) catch return error.NoSpaceLeft;
                 envelope.write_prefix(.{ .end_stream = true }, text.len, try body.writableArray(constants.protocol.envelope_prefix_len));
                 try body.writeAll(text);
                 return out[0..0];
@@ -188,12 +189,12 @@ pub const Reply = struct {
 
 /// The reply that carries the error of a request `server_head.accept` refused, or null when the
 /// refusal names no protocol: the server then answers `refusal.http_status` with no body.
-pub fn refusal_reply(refusal: server_head.Refused, scratch: message_codec.Scratch) ?Reply {
+pub fn refusal_reply(refusal: *const server_head.Refused, scratch: *const message_codec.Scratch) ?Reply {
     _ = refusal.failure orelse return null;
     const speaks = refusal.speaks.?;
     return .{
         .accepted = .{ .speaks = speaks, .request_coding = .identity, .response_coding = .identity, .timeout_ns = null },
-        .scratch = scratch,
+        .scratch = scratch.*,
     };
 }
 
@@ -228,12 +229,12 @@ test "a Connect unary reply is the bare message, and its error a JSON body with 
     var out: [64]u8 = undefined;
     var body: std.Io.Writer = .fixed(&out);
     const prepared = try reply.prepare(Greeting, &.{ .text = "hi" });
-    try testing.expectEqualStrings("application/json", reply.head(prepared.compressed).headers()[0].value);
+    try testing.expectEqualStrings("application/json", reply.head(prepared.body()).headers()[0].value);
     try reply.write_message(prepared, &body);
     try testing.expectEqualStrings("{\"text\":\"hi\"}", body.buffered());
     var storage: [64]u8 = undefined;
     const failure: RpcError = .{ .code = .not_found };
-    try testing.expectEqual(@as(u16, 404), (try reply.error_head(failure, &storage)).status);
+    try testing.expectEqual(@as(u16, 404), (try reply.error_head(&failure, &storage)).status);
 }
 
 test "a gRPC reply ends in status trailers, and an early error is Trailers-Only" {
@@ -241,7 +242,7 @@ test "a gRPC reply ends in status trailers, and an early error is Trailers-Only"
     var reply = reply_for(.{ .protocol = .grpc, .codec = .proto, .enveloped = true }, &buffers);
     try testing.expect(reply.error_only());
     var storage: [64]u8 = undefined;
-    const early = try reply.error_head(.{ .code = .unavailable, .message = "x" }, &storage);
+    const early = try reply.error_head(&.{ .code = .unavailable, .message = "x" }, &storage);
     try testing.expectEqualStrings("grpc-status", early.headers()[1].name);
     try testing.expectEqualStrings("14", early.headers()[1].value);
     var out: [64]u8 = undefined;
@@ -277,13 +278,13 @@ test "a Connect stream ends with an end-stream envelope, and gRPC-Web with a tra
 test "a refusal with a protocol becomes a reply, and one without has none" {
     var buffers: TestBuffers = .{};
     const scratch: message_codec.Scratch = .{ .message = &buffers.message, .work = &buffers.work, .tokens = &buffers.tokens };
-    try testing.expectEqual(@as(?Reply, null), refusal_reply(.{ .http_status = 415 }, scratch));
+    try testing.expectEqual(@as(?Reply, null), refusal_reply(&.{ .http_status = 415 }, &scratch));
     const refused: server_head.Refused = .{
         .http_status = 200,
         .failure = .{ .code = .unimplemented },
         .speaks = .{ .protocol = .grpc_web, .codec = .proto, .enveloped = true },
     };
-    const reply = refusal_reply(refused, scratch).?;
+    const reply = refusal_reply(&refused, &scratch).?;
     try testing.expect(!reply.error_only());
 }
 

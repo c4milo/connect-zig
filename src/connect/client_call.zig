@@ -83,23 +83,23 @@ fn speaks_of(comptime method: method_file.Method, options: Options) protocol.Spe
 
 /// Builds the request of a call of `method` that sends `messages`: one for a unary or a server
 /// stream, any number for a client or bidirectional stream (decision 12).
-pub fn request(comptime method: method_file.Method, options: Options, messages: []const method.Request, buffers: Buffers) Error!Request {
+pub fn request(comptime method: method_file.Method, options: *const Options, messages: []const method.Request, buffers: *const Buffers) Error!Request {
     const single = method.stream_type == .unary or method.stream_type == .server_stream;
     assert(!single or messages.len == 1);
-    const speaks = speaks_of(method, options);
+    const speaks = speaks_of(method, options.*);
     const get_allowed = method.stream_type == .unary and method.idempotency == .no_side_effects;
-    if (options.use_get and options.protocol == .connect and get_allowed) return request_get(method, options, &messages[0], buffers);
+    if (options.use_get and options.protocol == .connect and get_allowed) return request_get(method, options.*, &messages[0], buffers.*);
     var result: Request = .{ .speaks = speaks, .http_method = "POST", .target = comptime method.path(), .body = "" };
     var compressed_any = false;
     var len: usize = 0;
     for (messages) |*message| {
-        const placed = try place(method.Request, speaks, options, message, buffers.body[len..], buffers.scratch.work);
+        const placed = try place(method.Request, speaks, options.*, message, buffers.body[len..], buffers.scratch.work);
         compressed_any = compressed_any or placed.compressed;
         len += placed.len;
     }
     result.body = buffers.body[0..len];
     result.add("content-type", protocol.content_type(speaks));
-    try add_protocol_headers(&result, speaks, options, compressed_any, buffers.values);
+    try add_protocol_headers(&result, speaks, options.*, compressed_any, buffers.values);
     try add_extra_headers(&result, options.headers);
     return result;
 }
@@ -190,7 +190,7 @@ const find = @import("rpc_error.zig").find_header;
 
 test "a Connect unary request is the bare message with the protocol's headers" {
     var buffers: [4][128]u8 = undefined;
-    const call = try request(say, .{ .timeout_ns = 1_500_000 }, &.{.{ .text = "hi" }}, .{
+    const call = try request(say, &.{ .timeout_ns = 1_500_000 }, &.{.{ .text = "hi" }}, &.{
         .body = &buffers[0],
         .scratch = .{ .message = &buffers[1], .work = &buffers[2], .tokens = &.{} },
         .values = &buffers[3],
@@ -199,7 +199,7 @@ test "a Connect unary request is the bare message with the protocol's headers" {
     try testing.expectEqualSlices(u8, &.{ 0x0a, 2, 'h', 'i' }, call.body);
     try testing.expectEqualStrings("application/proto", find(call.headers(), "content-type").?);
     try testing.expectEqualStrings("2", find(call.headers(), "connect-timeout-ms").?);
-    const with_token = try request(say, .{ .headers = &.{.{ .name = "authorization", .value = "Bearer t" }} }, &.{.{}}, .{
+    const with_token = try request(say, &.{ .headers = &.{.{ .name = "authorization", .value = "Bearer t" }} }, &.{.{}}, &.{
         .body = &buffers[0],
         .scratch = .{ .message = &buffers[1], .work = &buffers[2], .tokens = &.{} },
         .values = &buffers[3],
@@ -210,10 +210,10 @@ test "a Connect unary request is the bare message with the protocol's headers" {
 test "a client stream over gRPC-Web is envelopes, and a GET carries its message in the query" {
     var buffers: [4][128]u8 = undefined;
     const scratch: message_codec.Scratch = .{ .message = &buffers[1], .work = &buffers[2], .tokens = &.{} };
-    const stream = try request(upload, .{ .protocol = .grpc_web }, &.{ .{ .text = "a" }, .{} }, .{ .body = &buffers[0], .scratch = scratch, .values = &buffers[3] });
+    const stream = try request(upload, &.{ .protocol = .grpc_web }, &.{ .{ .text = "a" }, .{} }, &.{ .body = &buffers[0], .scratch = scratch, .values = &buffers[3] });
     try testing.expectEqualSlices(u8, &.{ 0, 0, 0, 0, 3, 0x0a, 1, 'a', 0, 0, 0, 0, 0 }, stream.body);
     try testing.expectEqualStrings("1", find(stream.headers(), "x-grpc-web").?);
-    const fetch = try request(say, .{ .use_get = true, .codec = .json }, &.{.{ .text = "x" }}, .{ .body = &buffers[0], .scratch = scratch, .values = &buffers[3] });
+    const fetch = try request(say, &.{ .use_get = true, .codec = .json }, &.{.{ .text = "x" }}, &.{ .body = &buffers[0], .scratch = scratch, .values = &buffers[3] });
     try testing.expectEqualStrings("GET", fetch.http_method);
     try testing.expectEqualStrings("/test.Svc/Say?connect=v1&encoding=json&base64=1&message=eyJ0ZXh0IjoieCJ9", fetch.target);
 }

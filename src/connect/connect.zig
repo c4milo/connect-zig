@@ -47,6 +47,7 @@ pub const Encoders = files.compression.Encoders;
 /// The gzip decoder a caller places for `Decoders.gzip`.
 pub const GzipDecoder = files.compression.GzipDecoder;
 pub const ZstdDecoder = files.compression.ZstdDecoder;
+pub const BrotliDecoder = files.compression.BrotliDecoder;
 pub const Envelope = files.envelope.Envelope;
 pub const EnvelopeFlags = files.envelope.Flags;
 pub const EnvelopeReader = files.envelope.Reader;
@@ -70,6 +71,7 @@ pub const server = struct {
     pub const ReplyError = files.server_reply.Error;
     pub const Head = files.server_reply.Head;
     pub const Prepared = files.server_reply.Prepared;
+    pub const Body = files.server_reply.Body;
     pub const refusal_reply = files.server_reply.refusal_reply;
 };
 
@@ -81,7 +83,6 @@ pub const client = struct {
     pub const Request = files.client_call.Request;
     pub const RequestError = files.client_call.Error;
     pub const request_headers_max = files.client_call.request_headers_max;
-    pub const read = files.client_response.read;
     pub const Incoming = files.client_response.Incoming;
     pub const Storage = files.client_response.Storage;
     pub const Response = files.client_response.Response;
@@ -100,6 +101,7 @@ pub const envelope = struct {
 pub const protocol = struct {
     pub const of_content_type = files.protocol.of_content_type;
     pub const content_type = files.protocol.content_type;
+    pub const Error = files.protocol.Error;
 };
 
 pub const timeout = struct {
@@ -107,6 +109,7 @@ pub const timeout = struct {
     pub const format_connect = files.timeout.format_connect;
     pub const parse_grpc = files.timeout.parse_grpc;
     pub const format_grpc = files.timeout.format_grpc;
+    pub const Error = files.timeout.Error;
 };
 
 pub const compression = struct {
@@ -122,6 +125,8 @@ pub const error_json = struct {
     pub const encode = files.error_json.encode;
     pub const decode = files.error_json.decode;
     pub const Storage = files.error_json.Storage;
+    pub const EncodeError = files.error_json.EncodeError;
+    pub const DecodeError = files.error_json.DecodeError;
 };
 
 /// Connect's end-stream message.
@@ -129,6 +134,8 @@ pub const end_stream = struct {
     pub const encode = files.end_stream.encode;
     pub const decode = files.end_stream.decode;
     pub const Storage = files.end_stream.Storage;
+    pub const EncodeError = files.end_stream.EncodeError;
+    pub const DecodeError = files.end_stream.DecodeError;
 };
 
 /// gRPC's status trailers and gRPC-Web's trailers frame.
@@ -142,6 +149,7 @@ pub const trailers = struct {
     pub const write_web_frame = files.trailers.write_web_frame;
     pub const read_web_frame = files.trailers.read_web_frame;
     pub const valid_field = files.trailers.valid_field;
+    pub const Error = files.trailers.Error;
 };
 
 /// The unary GET of a method with no side effects.
@@ -150,6 +158,7 @@ pub const get = struct {
     pub const read_query = files.get.read_query;
     pub const message_octets = files.get.message_octets;
     pub const Query = files.get.Query;
+    pub const Error = files.get.Error;
 };
 
 /// google.rpc.Status in binary.
@@ -160,12 +169,13 @@ pub const status = struct {
 
 test "the root exports the names a program calls" {
     try @import("public_names").expect(@This(), &.{
-        "constants",   "Code",        "Protocol",      "Codec",          "Speaks",     "Method",
-        "StreamType",  "Idempotency", "Header",        "Detail",         "RpcError",   "Status",
-        "Coding",      "Decoders",    "GzipEncoder",   "ZstdEncoder",    "Encoders",   "GzipDecoder",
-        "ZstdDecoder", "Envelope",    "EnvelopeFlags", "EnvelopeReader", "EndStream",  "envelope",
-        "protocol",    "timeout",     "compression",   "error_json",     "end_stream", "trailers",
-        "get",         "status",      "Scratch",       "Lookup",         "server",     "client",
+        "constants",   "Code",          "Protocol",    "Codec",         "Speaks",         "Method",
+        "StreamType",  "Idempotency",   "Header",      "Detail",        "RpcError",       "Status",
+        "Coding",      "Decoders",      "GzipEncoder", "ZstdEncoder",   "Encoders",       "GzipDecoder",
+        "ZstdDecoder", "BrotliDecoder", "Envelope",    "EnvelopeFlags", "EnvelopeReader", "EndStream",
+        "envelope",    "protocol",      "timeout",     "compression",   "error_json",     "end_stream",
+        "trailers",    "get",           "status",      "Scratch",       "Lookup",         "server",
+        "client",
     });
 }
 
