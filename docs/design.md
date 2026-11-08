@@ -241,6 +241,11 @@ ran on Linux x86-64 with Zig 0.16.0.
   `ClientCallWith`, with `ClientCallOptions` (decision 19). The Any types are a `[]const type`
   (decision 21). A struct argument past 16 bytes goes by `*const`. `trailers_max` stays.
 
+- **The library runs on any event loop.** The owner ruled on 2026-11-08 that connect-zig's library
+  names neither Rotor nor colibri's `colibri` module (decision 32). The `layering` lint rule
+  reports a reference to either in `src/`. A `rotor.Loop` and a `colibri.Server` planted in
+  `refusal.zig` each failed the lint.
+
 ### What a later step owes
 
 - The connectrpc conformance suite against the client (step 7), once colibri's client exposes

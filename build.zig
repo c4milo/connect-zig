@@ -82,6 +82,8 @@ fn modules(b: *std.Build, stdx: *std.Build.Dependency, colibri: *std.Build.Depen
             .{ .name = "public_names", .module = public_names },
         },
     });
+    // Decision 32: the library takes colibri's protocol modules alone, never `rotor` or the
+    // `colibri` module, so any event loop can drive it. Rotor reaches the example programs only.
     const connect_colibri = b.addModule("connect_colibri", .{
         .root_source_file = b.path("src/connect_colibri/connect_colibri.zig"),
         .target = target,

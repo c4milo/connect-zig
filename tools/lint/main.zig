@@ -31,6 +31,16 @@ pub const io = rules.forbidden_references.Rule(.{
     .reason = "the library owns no I/O (docs/decisions.md entry 3)",
 });
 
+/// Decision 32: the library runs on any event loop, so it names neither Rotor nor colibri's
+/// `colibri` module, whose `Server` and `Client` own a Rotor loop.
+pub const layering = rules.forbidden_references.Rule(.{
+    .name = "layering",
+    .scope = .{ .extensions = &.{lint.paths.zig_extension}, .include_directories = &.{"src"} },
+    .prefixes = &.{ "rotor", "colibri" },
+    .resolve_file_aliases = true,
+    .reason = "the library runs on any event loop (docs/decisions.md entry 32)",
+});
+
 /// CLAUDE.md, Conventions: no clock and no randomness, anywhere in `src/`.
 pub const determinism = rules.forbidden_references.Rule(.{
     .name = "determinism",
@@ -134,9 +144,9 @@ pub const denied_words = rules.denied_words.Rule(.{
 });
 
 const Linter = lint.Linter(.{
-    heap,            io,                      determinism,   unbounded_loop, file_length,      markdown,
-    relative_import, relative_import_outside, magic_numbers, global_state,   static_alignment, defer_order,
-    undefined_fill,  unreleased_acquire,      denied_words,
+    heap,        io,              determinism,             unbounded_loop, file_length,  markdown,
+    layering,    relative_import, relative_import_outside, magic_numbers,  global_state, static_alignment,
+    defer_order, undefined_fill,  unreleased_acquire,      denied_words,
 });
 
 pub fn main(init: std.process.Init) !void {

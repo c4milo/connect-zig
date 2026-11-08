@@ -245,6 +245,15 @@ first. Cite an entry by number in code and commits ("decision 6").
     colibri rules. Beaten: a server with no identity, which drops h3; and keeping our loop, a copy
     of colibri's.
 
+32. **The library runs on any event loop.** Ruled by the owner on 2026-11-08. `connect_colibri`
+    builds on colibri's protocol modules alone: `server`, `client` and `http`, which take octets
+    and give octets back. No file in `src/` names `rotor` or colibri's `colibri` module, whose
+    `Server` and `Client` own a Rotor loop. `build.zig` gives the library no such module, and the
+    `layering` lint rule reports a reference to either. So `rpc.ClientCall` stays on
+    `client.ConnectionPool` when `colibri.Client` ships, and the example programs show Rotor as
+    one way to run the library. Beaten: building on `colibri.Client` and `colibri.Server`, which
+    is shorter for a Rotor program and makes every program adopt Rotor and its task model.
+
 ## Tooling
 
 15. **pepegrillo is lazy.** `build.zig` requests it only when `b.pkg_hash.len == 0`, so a project

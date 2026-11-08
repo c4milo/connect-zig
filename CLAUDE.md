@@ -22,12 +22,15 @@ code. The same holds for colibri's and stdx's `docs/decisions.md`.
    `src/protoc_gen/`, which is a program (decision 4). The `io` lint rule enforces it.
 2. **No allocator in the library.** The caller owns every buffer. The plugin uses `init.arena`.
    The `heap` lint rule enforces it.
-3. **Time is a value.** No clock read and no randomness anywhere in `src/`. A deadline is an
+3. **Any event loop drives the library.** `src/` builds on colibri's protocol modules alone and
+   never names Rotor or colibri's `colibri` module; Rotor reaches the examples only
+   (decision 32). The `layering` lint rule enforces it.
+4. **Time is a value.** No clock read and no randomness anywhere in `src/`. A deadline is an
    instant the caller passes. The `determinism` lint rule enforces it.
-4. **TigerStyle.** Every loop bounded. Every limit a named constant in its module's
+5. **TigerStyle.** Every loop bounded. Every limit a named constant in its module's
    `constants.zig`, with a doc comment. About two assertions per function, for programmer error
    only. Hostile input returns an error value and fails closed.
-5. **Every spec rule cited, in the code.** A check that exists because a spec demands it names
+6. **Every spec rule cited, in the code.** A check that exists because a spec demands it names
    the spec and the section in a comment on the line that does the checking: the Connect
    protocol, gRPC's HTTP/2 and gRPC-Web documents, the protobuf encoding guide, and the proto3
    JSON mapping (design §1).
@@ -76,8 +79,8 @@ confirm a test fails. Report `CAUGHT` or `NOT CAUGHT` per mutation in the commit
 - Test: `zig build test` runs the lint, every module's tests, the examples and the check of the
   generated code. `zig build test-<module>` runs one module's tests alone.
 - Lint: `zig build lint`: the cognitive-complexity score, then the rules of `tools/lint/main.zig`:
-  heap, io, determinism, unbounded-loop, file-length, markdown, relative-import, magic-numbers,
-  global-state, static-alignment, defer-order, undefined-fill, unreleased-acquire and
+  heap, io, determinism, layering, unbounded-loop, file-length, markdown, relative-import,
+  magic-numbers, global-state, static-alignment, defer-order, undefined-fill, unreleased-acquire and
   denied-words, all from pepegrillo. `zig build test` also requires `.githooks/pre-push` to equal
   pepegrillo's hook (`zig build hook-check`).
 - Hooks: `zig build hooks` once after cloning points `core.hooksPath` at `.githooks`, whose
