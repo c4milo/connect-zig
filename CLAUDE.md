@@ -12,6 +12,8 @@ It follows the conventions of the libraries it builds on: colibri, stdx and pepe
 - `docs/design.md`: the module graph, the formats, and the numbered build plan (§8). Cite
   sections by number in commits and comments ("§8 step 4").
 - `docs/decisions.md`: numbered decisions, each with what it beat.
+- `docs/performance.md`, before a change to a hot path: the instruments, the admission rule and
+  the pitfalls, beside pepegrillo's method, which `zig build guide` installs to `zig-out/docs`.
 
 If you are about to do something a document rejected, say so and stop. Do not reverse it in
 code. The same holds for colibri's and stdx's `docs/decisions.md`.
@@ -115,6 +117,8 @@ confirm a test fails. Report `CAUGHT` or `NOT CAUGHT` per mutation in the commit
 - Interop across languages: `tools/interop_languages_check.sh [client...]` runs the clients of
   `interop/` (Go, TypeScript, Python, Rust) against the socket server; `interop/README.md` holds
   their contract. It needs buf, go, node with npm, python3 with venv, and cargo.
+- Guide: `zig build guide` installs pepegrillo's performance method and API guide to
+  `zig-out/docs`, at the commit `build.zig.zon` pins.
 - Performance: `tools/perf_check.sh` counts each benchmark operation's instructions under
   callgrind against `bench/instructions.txt` and fails past 2%; `--write` records a new baseline,
   which the commit that pays for it explains. It needs valgrind.

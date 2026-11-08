@@ -8,7 +8,7 @@ const rules = lint.rules;
 
 /// The plugin is an executable that reads stdin, writes stdout and uses `init.arena`
 /// (docs/decisions.md entry 4), so the heap and I/O rules skip it.
-const library_scope: lint.scope.Scope = .{
+const library_scope: lint.Scope = .{
     .extensions = &.{lint.paths.zig_extension},
     .include_directories = &.{"src"},
     .exclude_directories = &.{"src/protoc_gen"},
@@ -112,7 +112,7 @@ pub const markdown = rules.markdown.Rule(.{
 });
 
 /// The Zig code this tree writes by hand or generates, which the remaining rules read.
-const zig_tree: lint.scope.Scope = .{ .extensions = &.{lint.paths.zig_extension}, .include_directories = &.{ "src", "examples", "tools", "build", "bench" } };
+const zig_tree: lint.Scope = .{ .extensions = &.{lint.paths.zig_extension}, .include_directories = &.{ "src", "examples", "tools", "build", "bench" } };
 
 /// A `defer` goes above any statement that can fail, so what the block acquired is released.
 pub const defer_order = rules.defer_order.Rule(.{ .scope = zig_tree });

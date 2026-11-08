@@ -246,6 +246,12 @@ ran on Linux x86-64 with Zig 0.16.0.
   reports a reference to either in `src/`. A `rotor.Loop` and a `colibri.Server` planted in
   `refusal.zig` each failed the lint.
 
+- **pepegrillo 9ae244b and the performance appendix.** connect-zig moves to the pepegrillo commit
+  colibri pins, whose API follows its 2026-11-07 audit: `lint.Scope` replaces `lint.scope.Scope`,
+  and no lint verdict changes. `zig build guide` installs pepegrillo's performance method, and
+  `docs/performance.md` holds connect-zig's appendix to it. `zig build lint` and the commit lint
+  pass.
+
 ### What a later step owes
 
 - The connectrpc conformance suite against the client (step 7), once colibri's client exposes

@@ -61,6 +61,10 @@ pub fn add(b: *std.Build) ?*std.Build.Step {
     commits_run.setCwd(b.path("."));
     commits_run.has_side_effects = true;
     b.step("lint-commits", "Check the commit messages of " ++ commit_lint_range).dependOn(&commits_run.step);
+    // `zig build guide` installs pepegrillo's performance method and API guide to zig-out/docs,
+    // at the commit build.zig.zon pins (docs/performance.md).
+    const pepegrillo_build = b.lazyImport(@This(), "pepegrillo") orelse return step;
+    pepegrillo_build.add_guide_step(b, dependency);
     return step;
 }
 
