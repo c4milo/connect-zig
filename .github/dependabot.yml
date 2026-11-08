@@ -1,0 +1,40 @@
+# Dependabot watches the code this repository runs but did not write: the GitHub Actions in
+# .github/workflows, which run with the repository token, and the pinned clients and tools of the
+# interop, coverage and benchmark checks. None of them ships in the library.
+#
+# The Zig packages in build.zig.zon are not here: Dependabot does not read them, and a person moves
+# each pin and checks it. Each update is weekly and grouped into one pull request per directory.
+# The prefixes keep the commit subjects conventional (`ci: ...`, `build: ...`).
+version: 2
+
+updates:
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule: { interval: weekly, day: monday, time: "04:00", timezone: Etc/UTC }
+    open-pull-requests-limit: 2
+    groups: { github-actions: { patterns: ["*"] } }
+    commit-message: { prefix: ci }
+  - package-ecosystem: gomod
+    directories: ["/interop/go", "/bench/go"]
+    schedule: { interval: weekly, day: monday, time: "04:00", timezone: Etc/UTC }
+    open-pull-requests-limit: 2
+    groups: { go: { patterns: ["*"] } }
+    commit-message: { prefix: build }
+  - package-ecosystem: npm
+    directory: "/interop/typescript"
+    schedule: { interval: weekly, day: monday, time: "04:00", timezone: Etc/UTC }
+    open-pull-requests-limit: 2
+    groups: { npm: { patterns: ["*"] } }
+    commit-message: { prefix: build }
+  - package-ecosystem: cargo
+    directory: "/interop/rust"
+    schedule: { interval: weekly, day: monday, time: "04:00", timezone: Etc/UTC }
+    open-pull-requests-limit: 2
+    groups: { cargo: { patterns: ["*"] } }
+    commit-message: { prefix: build }
+  - package-ecosystem: pip
+    directories: ["/interop/python", "/tools"]
+    schedule: { interval: weekly, day: monday, time: "04:00", timezone: Etc/UTC }
+    open-pull-requests-limit: 2
+    groups: { pip: { patterns: ["*"] } }
+    commit-message: { prefix: build }

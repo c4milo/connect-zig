@@ -274,7 +274,8 @@ Still to come:
 
 ## Contributing
 
-The rules of the tree are in [CLAUDE.md](CLAUDE.md), the design and its build plan are in
+[CONTRIBUTING.md](CONTRIBUTING.md) is the summary, and [SECURITY.md](SECURITY.md) says where to
+report a vulnerability. The rules of the tree are in [CLAUDE.md](CLAUDE.md), the design and its build plan are in
 [docs/design.md](docs/design.md), and each choice with what it beat is in
 [docs/decisions.md](docs/decisions.md). Before you send a change, run the same checks CI runs:
 

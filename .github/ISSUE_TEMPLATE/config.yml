@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Report a vulnerability
+    url: https://github.com/c4milo/connect-zig/security/advisories/new
+    about: Report it in private, as SECURITY.md describes. Do not open a public issue.
+  - name: Read the guide
+    url: https://github.com/c4milo/connect-zig#use-it-in-your-project
+    about: How to generate code, write a handler, route it and call it.
