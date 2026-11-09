@@ -147,3 +147,12 @@ test "an error body's missing, null or unknown code is the HTTP status's" {
     const null_end = try end_stream.decode("{\"error\":{\"code\":null,\"message\":\"oops\"}}", &storage);
     try testing.expectEqual(Code.unknown, null_end.failure.?.code);
 }
+
+test "a response message past the client's limit fails resource_exhausted" {
+    try testing.expectEqual(Code.resource_exhausted, client_response.failure_of(error.MessageTooLarge).code);
+    var room: Room = .{};
+    const head: Lines = .{ .lines = &.{.{ .name = "content-type", .value = "application/proto" }} };
+    const long: [buffer_len + 1]u8 = @splat(0);
+    var response = read(connect_unary, ok, &head, &long, &room);
+    try testing.expectError(error.MessageTooLarge, response.next(Note));
+}

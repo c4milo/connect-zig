@@ -141,6 +141,9 @@ pub const Response = struct {
     fn next_octets(response: *Response) Error!?[]const u8 {
         if (!response.speaks.enveloped) {
             response.done = true;
+            // The bare message of a Connect unary response is bounded as an envelope's payload
+            // is, whether it arrived compressed or not.
+            if (response.coding == .identity and response.incoming.body.len > response.storage.scratch.message.len) return error.MessageTooLarge;
             return try compression.decompress(response.coding, response.decoders, response.incoming.body, response.storage.scratch.message);
         }
         const next_one = try response.reader.next() orelse {
@@ -250,6 +253,9 @@ fn http_failure(speaks: protocol.Speaks, incoming: Incoming, storage: Storage, d
 /// The error a client gives a response it could not read.
 pub fn failure_of(failure: Error) RpcError {
     return switch (failure) {
+        // A message larger than the client's buffers is a limit the client set, not a fault of
+        // the message (statuscodes.md, RESOURCE_EXHAUSTED), as `server.failure_of` reads it.
+        error.MessageTooLarge => .{ .code = .resource_exhausted, .message = "message larger than the client reads" },
         else => .{ .code = .internal, .message = "malformed response" },
     };
 }
