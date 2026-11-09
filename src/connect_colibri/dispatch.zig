@@ -3,7 +3,7 @@
 //! A handler is a function, which takes its request whole, or, for a client or bidirectional
 //! stream, a type whose `on_message` takes each message as it arrives and whose `on_end` runs
 //! once the client ends its stream. A type handler answers while the client still sends, which
-//! over h2 is a full-duplex stream (Connect protocol, "Streaming-RPC"; decision 18).
+//! over h2 is a full-duplex stream (Connect protocol, "Streaming RPCs"; decision 18).
 //!
 //! An interceptor is a type with any of:
 //!

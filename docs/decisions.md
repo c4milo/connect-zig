@@ -140,8 +140,10 @@ first. Cite an entry by number in code and commits ("decision 6").
       response piece is copied after the octets not read yet and given back at once, so an
       envelope two pieces split is read whole, and the call's `reader` reads each message.
     - `rpc.full_duplex(protocol)` decides the mode: full-duplex over h2 and h3, half-duplex over
-      h11, where the whole request goes before the response is read (Connect protocol,
-      "Streaming-RPC"). The library sends and reads the same way over each; the program follows
+      h11, where the whole request goes before the response is read. The Connect protocol
+      ("Streaming RPCs") leaves the duplex a call can use to the HTTP version; the owner ruled
+      h11 half-duplex on 2026-11-09, since proxies that buffer an HTTP/1.1 body would stall an
+      interleaved one. The library sends and reads the same way over each; the program follows
       the mode.
     - Interceptors see a streamed call as they see any: `on_request` before the first message,
       with an empty body, and `on_response` once, at the response's head.

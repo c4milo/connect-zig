@@ -10,10 +10,12 @@ const client = @import("client");
 const client_call = @import("client_call.zig");
 
 /// Whether a stream over `protocol` is full-duplex: the client reads answers while it still
-/// sends. Connect protocol, "Streaming-RPC": a bidirectional stream is full-duplex over HTTP/2
-/// alone, and over HTTP/1.1 the whole request goes before the response is read. gRPC runs over
-/// HTTP/2 alone (PROTOCOL-HTTP2.md, "Overview"). An h3 request stream carries both directions at
-/// once, as an h2 stream does (RFC 9114 §4.1).
+/// sends. Connect protocol, "Streaming RPCs": a stream is half- or full-duplex, and which kinds
+/// a call can use depends on the HTTP version. gRPC runs over HTTP/2 alone (PROTOCOL-HTTP2.md,
+/// "Overview"). An h3 request stream carries both directions at once, as an h2 stream does
+/// (RFC 9114 §4.1). Over h11 the whole request goes before the response is read: proxies that
+/// buffer an HTTP/1.1 body would stall an interleaved one (decision 18, the owner's ruling of
+/// 2026-11-09).
 pub fn full_duplex(protocol: client.Protocol) bool {
     return switch (protocol) {
         .h2, .h3 => true,
@@ -200,7 +202,7 @@ pub const Incoming = struct {
 
 const testing = std.testing;
 
-test "a stream is full-duplex over h2 and h3, and half-duplex over h11 (Connect, Streaming-RPC)" {
+test "a stream is full-duplex over h2 and h3, and half-duplex over h11 (decision 18)" {
     try testing.expect(full_duplex(.h2));
     try testing.expect(full_duplex(.h3));
     try testing.expect(!full_duplex(.h11));

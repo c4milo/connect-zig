@@ -73,7 +73,8 @@ buf curl --cacert examples/testdata/tls/ca.pem --protocol grpc --schema examples
 [^get]: The Connect protocol defines Unary-Get. gRPC's HTTP/2 spec requires `:method POST`, and
     gRPC-Web keeps that request shape.
 [^duplex]: Over h11 a stream is half-duplex, on the client as on the server: the whole request
-    goes before the response is read. The Connect protocol promises full-duplex over HTTP/2.
+    goes before the response is read. The Connect protocol leaves the duplex a stream can use to
+    the HTTP version, and proxies that buffer an HTTP/1.1 body would stall an interleaved one.
 
 The protobuf runtime covers every scalar type, `optional`, packed and unpacked repeated fields,
 maps with every key type, oneofs, enums, recursive messages and every well-known type with its

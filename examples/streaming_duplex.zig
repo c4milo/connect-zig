@@ -4,7 +4,7 @@
 //! - Chat, over Connect, gRPC and gRPC-Web. Over h2 and h3 it is full-duplex: the client sends one line, reads its
 //!   answer, and only then sends the next, so each answer arrives before the next line goes.
 //!   Over h11 it is half-duplex: the client sends every line and ends its stream before it reads
-//!   any answer (Connect protocol, "Streaming-RPC"; `rpc.full_duplex`).
+//!   any answer (decision 18; `rpc.full_duplex`).
 //! - Sum, over gRPC. The client hands each number as a piece of its own, once the pool took the
 //!   one before, and reads the sum and the status from the trailers.
 const std = @import("std");
