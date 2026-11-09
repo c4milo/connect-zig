@@ -104,6 +104,17 @@ pub fn request(comptime method: method_file.Method, options: *const Options, mes
     return result;
 }
 
+/// Writes one message of a streamed request into `room`, in its envelope, and returns its octets
+/// (Connect protocol, "Streaming-Request"; PROTOCOL-HTTP2.md, "Length-Prefixed-Message"). The
+/// request `request` built with no message holds the headers; each message then goes out as it
+/// is written. gzip compresses through `work`.
+pub fn write_message(comptime T: type, built: *const Request, options: *const Options, message: *const T, room: []u8, work: []u8) Error!usize {
+    assert(built.speaks.enveloped);
+    assert(built.body.len == 0);
+    const placed = try place(T, built.speaks, options.*, message, room, work);
+    return placed.len;
+}
+
 fn add_extra_headers(result: *Request, headers: []const Header) error{TooManyHeaders}!void {
     if (headers.len > extra_headers_max) return error.TooManyHeaders;
     for (headers) |header| try result.add_header(header.name, header.value);

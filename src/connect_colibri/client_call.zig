@@ -1,13 +1,18 @@
 //! A client call over colibri's `client.ConnectionPool`: a `connect.client.Request` written as a
 //! `client.Request`, and the `client.Response` colibri fills read as a `connect.client.Response`
 //! (design §7). colibri's client holds the response's headers and trailers apart (colibri decision
-//! 152), so a client call speaks Connect, gRPC-Web and gRPC (decision 11). It sends each request
-//! body whole, so a client stream is half-duplex.
+//! 152), so a client call speaks Connect, gRPC-Web and gRPC (decision 11).
+//!
+//! A call `init` builds sends its messages in one body. A client or bidirectional stream that
+//! `init_stream` builds streams both bodies through the pool (colibri decision 153): its `Sender`
+//! writes each message as a piece, and the program reads each answer as its piece arrives, over
+//! h2 and h3 while it still sends (decision 18 as amended).
 const std = @import("std");
 const assert = std.debug.assert;
 const connect = @import("connect");
 const client = @import("client");
 const http = @import("http");
+const client_stream = @import("client_stream.zig");
 
 pub const Buffers = struct {
     /// The request: its body, the encoding work and the header values.
@@ -17,8 +22,12 @@ pub const Buffers = struct {
     /// resource_exhausted. gRPC sends its status in the trailers (PROTOCOL-HTTP2.md, "Responses").
     headers: []u8,
     trailers: []u8,
-    /// The response body.
+    /// The response body. A streamed call gathers its response's pieces here: it holds the
+    /// longest envelope the call reads and one piece more.
     body: []u8,
+    /// Where colibri writes each piece of a streamed response, which the call copies into `body`
+    /// and gives back at once. Empty for a call whose response comes whole.
+    piece: []u8 = &.{},
 };
 
 /// What a client call is built with.
@@ -32,9 +41,18 @@ pub const Options = struct {
     ///   messages, so `failure` is set here only when the head alone carries it.
     ///
     /// `on_request` runs in the order the list names the interceptors, and `on_response` in the
-    /// reverse.
+    /// reverse. A streamed call runs `on_request` in `init_stream`, before any message, so the
+    /// request it sees has an empty body. It runs `on_response` once, in `on_headers`, or in
+    /// `read` when the call ended before its response's head.
     interceptors: []const type = &.{},
+    /// The pool a call's `start` hands it to, which a streamed call hands its pieces to.
+    pool: type = client.ConnectionPool(.{}),
 };
+
+/// What a streamed call's `send`, `close_send` and `on_body_taken` return: an encoding that
+/// failed, or a piece the pool refused. `PieceHeld` says the message did not fit after the piece
+/// the pool holds; it fits once the `body_taken` event arrives. `BodyEnded` says `close_send` ran.
+pub const SendError = connect.client.RequestError || client.WriteBodyError;
 
 /// One call of `method`. The program keeps it in place from `init` until colibri's `finished`
 /// event for its request, since colibri reads `request` and writes `response` until then.
@@ -48,9 +66,36 @@ pub fn ClientCall(comptime method: connect.Method, comptime call_options: Option
         fields: [connect.client.request_headers_max]http.Field,
         request: client.Request,
         response: client.Response,
+        /// The pool `start` handed the call to, and the id it gave.
+        pool: *call_options.pool = undefined,
+        id: client.RequestId = undefined,
+        /// A streamed call's bodies, and the reader of its response from its head on.
+        streamed: bool = false,
+        outgoing: client_stream.Outgoing = .{},
+        incoming: client_stream.Incoming = .{},
+        work: []u8 = &.{},
+        reader: connect.client.Response = undefined,
+
+        /// Writes the messages of a streamed call's request, as the server's `Sender` writes a
+        /// stream's replies. Each one goes to the pool at once, or with the next `body_taken`
+        /// event while the pool still holds the piece before it.
+        pub const Sender = struct {
+            call: *Self,
+
+            pub fn send(stream: *Sender, message: *const method.Request) SendError!void {
+                return client_stream.send(method.Request, stream.call, message);
+            }
+
+            /// Ends the request stream: the last piece says so, at once or with the next
+            /// `body_taken` event.
+            pub fn close_send(stream: *Sender) SendError!void {
+                return client_stream.close_send(stream.call);
+            }
+        };
 
         /// Builds the request of a call that sends `messages`.
         pub fn init(self: *Self, options: *const connect.client.Options, messages: []const method.Request, buffers: *const Buffers) connect.client.RequestError!void {
+            self.streamed = false;
             self.options = options.*;
             self.call = try connect.client.request(method, options, messages, &buffers.request);
             try run_on_request(interceptors, &self.call);
@@ -69,8 +114,62 @@ pub fn ClientCall(comptime method: connect.Method, comptime call_options: Option
             };
         }
 
-        /// Reads the response once colibri reported the call `finished`.
+        /// Builds the request of a client or bidirectional stream whose messages its `Sender`
+        /// writes, and whose response arrives in pieces in `buffers.piece`.
+        pub fn init_stream(self: *Self, options: *const connect.client.Options, buffers: *const Buffers) connect.client.RequestError!void {
+            comptime assert(method.stream_type == .client_stream or method.stream_type == .bidi_stream);
+            assert(buffers.piece.len > 0);
+            try self.init(options, &.{}, buffers);
+            self.streamed = true;
+            // Colibri decision 153 ruling 7: both bodies go in pieces, and with no length stated
+            // h2 and h3 end the request with its stream (RFC 9113 §8.1, RFC 9114 §4.1).
+            self.request.streamed = .{ .request = true, .response = true };
+            self.response.body = buffers.piece;
+            self.outgoing = .{ .room = buffers.request.body };
+            self.incoming = .{ .body = buffers.body };
+            self.work = buffers.request.scratch.work;
+        }
+
+        /// Hands the call to `pool`, and keeps the id it gives. The call stays in place until
+        /// the pool reports it `finished`.
+        pub fn start(self: *Self, pool: *call_options.pool) client.RequestError!void {
+            self.id = try pool.request(&self.request, &self.response);
+            self.pool = pool;
+        }
+
+        /// The writer of a streamed call's request messages.
+        pub fn sender(self: *Self) Sender {
+            assert(self.streamed);
+            return .{ .call = self };
+        }
+
+        /// The pool's `body_taken` event for the call: the next piece goes.
+        pub fn on_body_taken(self: *Self) SendError!void {
+            return client_stream.on_body_taken(self);
+        }
+
+        /// The pool's `headers` event for a streamed call: the response's status and headers
+        /// arrived. The interceptors' `on_response` runs, and `reader` then reads each message
+        /// as its piece arrives, with `storage`, which the call keeps until it ends.
+        pub fn on_headers(self: *Self, storage: connect.client.Storage) void {
+            assert(self.streamed and !self.incoming.headers_seen);
+            self.incoming.headers_seen = true;
+            self.reader = connect.client.Response.init(self.call.speaks, &incoming_of(self, ""), &storage, &self.options.decoders);
+            run_on_response(interceptors, &self.reader);
+        }
+
+        /// The pool's `body` event for a streamed call: the piece of `len` octets is copied after
+        /// what `reader` has not read, and goes back to the pool. A message `reader.next`
+        /// returned before it stays valid until the next `on_body`. An envelope longer than
+        /// `Buffers.body` holds fails the call `resource_exhausted`, and the rest is dropped.
+        pub fn on_body(self: *Self, len: usize) void {
+            client_stream.on_body(self, len);
+        }
+
+        /// Reads the response once colibri reported the call `finished`. A streamed call's
+        /// reader goes on from the messages `on_body` passed, and reads the outcome.
         pub fn read(self: *const Self, storage: connect.client.Storage) connect.client.Response {
+            if (self.streamed and self.incoming.headers_seen) return client_stream.read(self);
             var response = read_response(self, storage);
             run_on_response(interceptors, &response);
             return response;
@@ -106,21 +205,31 @@ fn read_response(self: anytype, storage: connect.client.Storage) connect.client.
     const Self = @TypeOf(self.*);
     const speaks = self.call.speaks;
     const lookup: connect.Lookup = .{ .context = self, .find_fn = Self.find };
+    // A streamed call whose response arrived passed its head to `on_headers` first, as colibri
+    // reports it (colibri decision 153 ruling 7).
+    assert(!self.streamed or self.response.result != .response);
     if (self.response.result != .response) {
         var response = connect.client.Response.init(speaks, &.{ .status = connect.constants.protocol.status.ok, .headers = lookup, .body = "" }, &storage, &self.options.decoders);
         response.done = true;
         response.failure = failure_of(self.response.result);
         return response;
     }
-    const incoming: connect.client.Incoming = .{
+    return connect.client.Response.init(speaks, &incoming_of(self, self.response.body[0..self.response.body_len]), &storage, &self.options.decoders);
+}
+
+/// What `connect.client.Response` reads of a call's response: its status, its headers, and its
+/// body or none, for a streamed body that arrives in pieces.
+fn incoming_of(self: anytype, body: []const u8) connect.client.Incoming {
+    const Self = @TypeOf(self.*);
+    return .{
         .status = @intFromEnum(self.response.status),
-        .headers = lookup,
-        .body = self.response.body[0..self.response.body_len],
+        .headers = .{ .context = self, .find_fn = Self.find },
+        .body = body,
         // gRPC's status and its call's trailers come in HTTP trailers after the last message
         // (PROTOCOL-HTTP2.md, "Responses"). Connect and gRPC-Web carry theirs in the body.
-        .trailers = if (speaks.protocol == .grpc) .{ .context = self, .find_fn = Self.find_trailer } else null,
+        .trailers = if (self.call.speaks.protocol == .grpc) .{ .context = self, .find_fn = Self.find_trailer } else null,
+        .streamed = self.streamed,
     };
-    return connect.client.Response.init(speaks, &incoming, &storage, &self.options.decoders);
 }
 
 /// The error a client gives a call that ended with no whole response.

@@ -27,6 +27,8 @@ pub const Incoming = struct {
     body: []const u8,
     /// The HTTP trailers, when the HTTP library exposes them.
     trailers: ?Lookup = null,
+    /// The body arrives in pieces, which `Response.feed` passes on, and `body` is empty.
+    streamed: bool = false,
 };
 
 pub const Storage = struct {
@@ -54,7 +56,10 @@ pub const Response = struct {
             .decoders = decoders.*,
             .coding = .identity,
             .reader = .{ .body = incoming.body, .payload_len_max = storage.scratch.message.len },
+            .streaming = incoming.streamed,
         };
+        // Only an enveloped stream arrives in pieces: a bare message is the whole body.
+        assert(!incoming.streamed or (speaks.enveloped and incoming.body.len == 0));
         if (incoming.status != constants.protocol.status.ok) {
             response.done = true;
             response.failure = http_failure(speaks, incoming.*, storage.*);
@@ -86,6 +91,44 @@ pub const Response = struct {
     failure: ?RpcError = null,
     metadata: []const Header = &.{},
     done: bool = false,
+    /// More of a streamed body may follow what `feed` gave, so `next` returns null between pieces
+    /// with `done` still false.
+    streaming: bool = false,
+
+    /// Gives a streamed response the octets of its body that `next` has not read, from the first
+    /// one it has not read: the envelopes left, and the start of one that a later piece ends.
+    /// Returns the octets of whole envelopes, which `next` reads. The caller keeps the rest and
+    /// passes it again, with the next piece after it.
+    pub fn feed(response: *Response, body: []const u8) Error!usize {
+        assert(response.streaming or response.done);
+        if (response.done) return body.len;
+        const payload_len_max = response.reader.payload_len_max;
+        var reader: envelope.Reader = .{ .body = body, .payload_len_max = payload_len_max };
+        // Each envelope takes at least its prefix, so the loop ends.
+        const whole_len = for (0..body.len / flag_prefix_len + 1) |_| {
+            const next_one = reader.next() catch |failure| switch (failure) {
+                // Connect protocol, "Streaming-Response", and PROTOCOL-HTTP2.md,
+                // "Length-Prefixed-Message": an envelope may end in a later piece.
+                error.Truncated => break reader.position,
+                else => |other| return other,
+            };
+            if (next_one == null) break reader.position;
+        } else unreachable;
+        response.reader = .{ .body = body[0..whole_len], .payload_len_max = payload_len_max };
+        return whole_len;
+    }
+
+    /// A streamed body ended. `rest` is what `feed` left of it, the start of an envelope or
+    /// nothing; `next` then reads the outcome.
+    pub fn end_body(response: *Response, rest: []const u8) void {
+        assert(response.streaming or response.done);
+        response.streaming = false;
+        if (response.done or rest.len == 0) return;
+        // Connect protocol, "Streaming-Response", and PROTOCOL-HTTP2.md,
+        // "Length-Prefixed-Message": a body ends between envelopes.
+        response.done = true;
+        response.failure = .{ .code = .internal, .message = "truncated message" };
+    }
 
     /// The next message, or null once the response holds no more. `failure` is then set when
     /// the call failed.
@@ -100,7 +143,11 @@ pub const Response = struct {
             response.done = true;
             return try compression.decompress(response.coding, response.decoders, response.incoming.body, response.storage.scratch.message);
         }
-        const next_one = try response.reader.next() orelse return response.end_without_status();
+        const next_one = try response.reader.next() orelse {
+            // A streamed body waits for its next piece.
+            if (response.streaming) return null;
+            return response.end_without_status();
+        };
         if (next_one.flags.end_stream or next_one.flags.trailers) {
             try response.read_end(next_one);
             return null;
@@ -154,6 +201,9 @@ pub const Response = struct {
     }
 };
 
+/// The octets of an envelope's prefix: its flags and its length.
+const flag_prefix_len = constants.protocol.envelope_prefix_len;
+
 fn status_storage(storage: Storage) trailers.Storage {
     const half = storage.octets.len / constants.storage_halves;
     return .{ .message = storage.octets[0..half], .status = storage.octets[half..], .details = storage.details };
@@ -183,8 +233,9 @@ fn http_failure(speaks: protocol.Speaks, incoming: Incoming, storage: Storage) R
 
 /// The error a client gives a response it could not read.
 pub fn failure_of(failure: Error) RpcError {
-    _ = failure;
-    return .{ .code = .internal, .message = "malformed response" };
+    return switch (failure) {
+        else => .{ .code = .internal, .message = "malformed response" },
+    };
 }
 
 test "a non-200 Connect response without a JSON body maps its status to a code" {
@@ -206,4 +257,85 @@ test "a non-200 Connect response without a JSON body maps its status to a code" 
     const response = Response.init(.{ .protocol = .connect, .codec = .proto, .enveloped = false }, &.{ .status = 503, .headers = lookup, .body = "busy" }, &storage, &.{});
     try std.testing.expectEqual(Code.unavailable, response.failure.?.code);
     try std.testing.expect(response.done);
+}
+
+const proto = @import("protobuf");
+
+const Note = struct {
+    text: []const u8 = "",
+    pub const FieldNumber = enum(u29) { text = 1 };
+    pub const protobuf: proto.Descriptor = .{ .full_name = "test.Note", .fields = &.{
+        proto.field_of(FieldNumber.text, .string, .{}),
+    } };
+};
+
+const TestEmpty = struct {
+    fn find(_: *const anyopaque, _: []const u8) ?[]const u8 {
+        return null;
+    }
+};
+
+/// The octets of each buffer a test's reading takes.
+const test_buffer_len = 64;
+
+/// The storage of a test's reading.
+const TestRoom = struct {
+    message: [test_buffer_len]u8 = undefined,
+    work: [test_buffer_len]u8 = undefined,
+    tokens: [test_buffer_len]u8 = undefined,
+    octets: [test_buffer_len]u8 = undefined,
+};
+
+/// A streamed Connect response's storage and its start, for the tests below.
+fn streamed_response(room: *TestRoom, details: []rpc_error.Detail, metadata: []Header) Response {
+    const storage: Storage = .{
+        .scratch = .{ .message = &room.message, .work = &room.work, .tokens = &room.tokens },
+        .octets = &room.octets,
+        .details = details,
+        .metadata = metadata,
+    };
+    const lookup: Lookup = .{ .context = room, .find_fn = TestEmpty.find };
+    const speaks: protocol.Speaks = .{ .protocol = .connect, .codec = .proto, .enveloped = true };
+    return Response.init(speaks, &.{ .status = constants.protocol.status.ok, .headers = lookup, .body = "", .streamed = true }, &storage, &.{});
+}
+
+test "a streamed response reads each whole envelope as it arrives, and keeps a partial one" {
+    var buffers: TestRoom = .{};
+    var details: [1]rpc_error.Detail = undefined;
+    var metadata: [1]Header = undefined;
+    var response = streamed_response(&buffers, &details, &metadata);
+    // "a", then "bc", whose envelope the first piece cuts, then the end-stream message "{}".
+    const body = [_]u8{ 0, 0, 0, 0, 3, 0x0a, 1, 'a', 0, 0, 0, 0, 4, 0x0a, 2, 'b', 'c', 2, 0, 0, 0, 2, '{', '}' };
+    const cut = 11;
+    try std.testing.expectEqual(@as(?Note, null), try response.next(Note));
+    try std.testing.expect(!response.done);
+    try std.testing.expectEqual(@as(usize, 8), try response.feed(body[0..cut]));
+    try std.testing.expectEqualStrings("a", (try response.next(Note)).?.text);
+    // The rest of the second envelope has not arrived: no message, and the stream goes on.
+    try std.testing.expectEqual(@as(?Note, null), try response.next(Note));
+    try std.testing.expect(!response.done);
+    try std.testing.expectEqual(body.len - 8, try response.feed(body[8..]));
+    try std.testing.expectEqualStrings("bc", (try response.next(Note)).?.text);
+    try std.testing.expectEqual(@as(?Note, null), try response.next(Note));
+    try std.testing.expect(response.done);
+    try std.testing.expectEqual(@as(?RpcError, null), response.failure);
+}
+
+test "a streamed body that ends inside an envelope, or with no end-stream message, fails" {
+    var buffers: TestRoom = .{};
+    var details: [1]rpc_error.Detail = undefined;
+    var metadata: [1]Header = undefined;
+    var cut = streamed_response(&buffers, &details, &metadata);
+    const partial = [_]u8{ 0, 0, 0, 0, 3, 0x0a };
+    try std.testing.expectEqual(@as(usize, 0), try cut.feed(&partial));
+    cut.end_body(&partial);
+    try std.testing.expectEqual(@as(?Note, null), try cut.next(Note));
+    try std.testing.expectEqualStrings("truncated message", cut.failure.?.message);
+    var bare = streamed_response(&buffers, &details, &metadata);
+    bare.end_body("");
+    try std.testing.expectEqual(@as(?Note, null), try bare.next(Note));
+    try std.testing.expectEqualStrings("missing end-stream message", bare.failure.?.message);
+    // A prefix that announces more than the reader holds fails before the payload arrives.
+    var long = streamed_response(&buffers, &details, &metadata);
+    try std.testing.expectError(error.MessageTooLarge, long.feed(&.{ 0, 0, 0, 1, 0 }));
 }

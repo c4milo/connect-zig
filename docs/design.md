@@ -85,8 +85,10 @@ Empty, FieldMask, Struct, Value, ListValue and Any. An Any names its type from a
 `connect_colibri` maps a `connect.Method` onto a route of `server.Router`, and onto
 `client.Request` and `client.Response`. A function handler's route sets `.whole_body` and takes
 its stream whole (decision 12). A type handler's route reads the body as it arrives and answers
-each message at once, full-duplex over h2 (decision 18). Interceptors wrap a route's handler and
-a client's exchange (decision 19). The client speaks Connect, gRPC-Web and gRPC (decision 11).
+each message at once, full-duplex over h2 (decision 18). A client's streamed call writes each
+message with its `Sender` and reads each answer as its piece arrives, full-duplex over h2 and h3
+(decision 18 as amended). Interceptors wrap a route's handler and a client's exchange (decision
+19). The client speaks Connect, gRPC-Web and gRPC (decision 11).
 
 ## 8. Build plan
 
@@ -276,9 +278,26 @@ ran on Linux x86-64 with Zig 0.16.0.
   13,135,358 to 10,832,454 (-17.53%). JSON encode moved by +0.81% at most. `zig build test`,
   `tools/coverage_check.sh` and `tools/bench_check.sh` pass.
 
+- **Client-side full-duplex.** The owner approved on 2026-11-09 the first of three client
+  commits: a streamed `ClientCall` over colibri v0.15.0's pieces (colibri decision 153; decision
+  18 as amended). New public names:
+  - `connect_colibri`: `ClientSendError` and `full_duplex` at the root; `ClientCall`'s
+    `init_stream`, `start`, `sender`, `Sender` with `send` and `close_send`, `on_headers`,
+    `on_body` and `on_body_taken`, and its fields `id` and `reader`; `ClientCallOptions.pool`;
+    `ClientCallBuffers.piece`.
+  - `connect`: `client.write_message`; `client.Response.feed` and `end_body`;
+    `client.Incoming.streamed`.
+
+  No existing name changed. `zig build example-streaming` gains a streamed round over each of
+  h2, h11 and h3. Chat runs in Connect, gRPC and gRPC-Web: over h2 and h3 each answer arrives
+  before the next line goes, and over h11 every line goes first. Sum hands each number as a
+  piece of its own.
+  `zig build test`, `zig build -Drelease`, `tools/generate_check.sh` and `tools/perf_check.sh`
+  pass, with no instruction count moved. `tools/interop_check.sh` printed 48 calls answered,
+  conformance 2714 of 2714, and `tools/interop_languages_check.sh` 507 calls passed.
+
 ### What a later step owes
 
-- The connectrpc conformance suite against the client (step 7), once colibri's client exposes
-  trailers and streams a request body.
+- The connectrpc conformance suite against the client (step 7). colibri's client now exposes
+  trailers and streams a request body, so nothing below connect-zig blocks it.
 - Long server streams written at `on_writable` (decision 12).
-- Client-side full-duplex, once colibri's client streams a request body.

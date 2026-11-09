@@ -11,6 +11,7 @@ const files = struct {
     pub const refusal = @import("refusal.zig");
     pub const call = @import("call.zig");
     pub const client_call = @import("client_call.zig");
+    pub const client_stream = @import("client_stream.zig");
     pub const dispatch = @import("dispatch.zig");
 };
 
@@ -31,6 +32,9 @@ pub const ClientCall = files.client_call.ClientCall;
 pub const ClientCallOptions = files.client_call.Options;
 pub const ClientCallBuffers = files.client_call.Buffers;
 pub const failure_of = files.client_call.failure_of;
+/// What a streamed call's `Sender` returns, and whether a stream over a protocol is full-duplex.
+pub const ClientSendError = files.client_call.SendError;
+pub const full_duplex = files.client_stream.full_duplex;
 
 /// chapulin's one hook, which a program that links colibri's `tls` defines (colibri decision
 /// 94). The module's own test binary defines it here; a program defines its own.
@@ -46,11 +50,12 @@ test "the root exports the names a program calls" {
     try @import("public_names").expect(@This(), &.{
         "constants",         "Route",      "RouteOptions", "Codings",  "post",       "get",
         "Refusals",          "Call",       "Sender",       "Receiver", "ClientCall", "ClientCallOptions",
-        "ClientCallBuffers", "failure_of",
+        "ClientCallBuffers", "failure_of", "ClientSendError", "full_duplex",
     });
 }
 
 test {
     std.testing.refAllDecls(files);
     _ = @import("connect_colibri_test.zig");
+    _ = @import("client_stream_test.zig");
 }

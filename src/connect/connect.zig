@@ -78,6 +78,8 @@ pub const server = struct {
 /// A client's side of a call: the request, and the reading of the response.
 pub const client = struct {
     pub const request = files.client_call.request;
+    /// One message of a streamed request, in its envelope.
+    pub const write_message = files.client_call.write_message;
     pub const Options = files.client_call.Options;
     pub const Buffers = files.client_call.Buffers;
     pub const Request = files.client_call.Request;

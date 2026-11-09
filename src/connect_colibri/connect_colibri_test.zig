@@ -120,7 +120,7 @@ test "a client call writes its request for colibri and reads what colibri filled
 
 /// Writes field lines into a section's buffer as colibri's client does: each name's and value's
 /// length in two octets, big-endian, then the name and the value (colibri decision 152).
-fn write_lines(section: anytype, lines: []const connect.Header) void {
+pub fn write_lines(section: anytype, lines: []const connect.Header) void {
     const length_len = @sizeOf(u16);
     var used: usize = 0;
     for (lines) |line| {

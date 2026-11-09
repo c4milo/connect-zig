@@ -82,12 +82,20 @@ first. Cite an entry by number in code and commits ("decision 6").
     whose trailers are a body frame. Beaten: reading trailers below colibri's API, which colibri's
     rules forbid to a dependent. Lifted on 2026-11-05: colibri `2cf693b1` holds a response's
     trailers apart (colibri decision 152), and the client reads gRPC's status from them.
+    Amended on 2026-11-09: `connect` still writes `te: trailers` for a gRPC request
+    (PROTOCOL-HTTP2.md, "Requests"), since it serves any HTTP library. colibri adds its own only
+    when the request names no TE (colibri decision 152), so the header goes once. A gRPC request
+    sends no trailers. Beaten: leaving the header to colibri, which a `connect` caller on another
+    HTTP library would then lose.
 
 12. **Streams are whole bodies in v0.** colibri's router hands a route the whole request body,
     and a route writes its response into the response memory the router pool holds. A server
     stream is therefore bounded by `response_bytes`, and a bidirectional stream is half-duplex.
     Beaten: waiting for flow control in colibri before shipping any stream. A later step writes
     long streams at `on_writable`. Decision 18 lifts the half-duplex part for type handlers.
+    Amended on 2026-11-09: a client's streamed call sends its request and reads its response in
+    pieces, through colibri's pool (colibri decision 153), so the client side of a stream is no
+    whole body. The server side keeps this decision's bounds.
 
 13. **Examples run in cleartext.** The ELIZA programs speak h2 with prior knowledge and h11, and
     hold no TLS identity, so they need no certificate to run. colibri's `tls` module still links
@@ -123,6 +131,26 @@ first. Cite an entry by number in code and commits ("decision 6").
     client reads answers while it still sends; `tools/interop_check.sh` checks it with buf curl.
     A function handler still takes its stream whole. Beaten: a handler that blocks on a
     `Receiver`, which needs a thread or a coroutine the library does not have.
+    Amended by the owner on 2026-11-09: a client streams full-duplex too, over h2 and h3.
+    - `ClientCall.init_stream` builds a client or bidirectional stream whose two bodies go in
+      pieces (colibri decision 153 ruling 7). Its `Sender` writes each message, as the server's
+      does, and `close_send` ends the request. The pool holds one piece at a time, so a message
+      written meanwhile waits and goes at the next `body_taken` event.
+    - The program passes the pool's `headers`, `body` and `body_taken` events to the call. Each
+      response piece is copied after the octets not read yet and given back at once, so an
+      envelope two pieces split is read whole, and the call's `reader` reads each message.
+    - `rpc.full_duplex(protocol)` decides the mode: full-duplex over h2 and h3, half-duplex over
+      h11, where the whole request goes before the response is read (Connect protocol,
+      "Streaming-RPC"). The library sends and reads the same way over each; the program follows
+      the mode.
+    - Interceptors see a streamed call as they see any: `on_request` before the first message,
+      with an empty body, and `on_response` once, at the response's head.
+    - Unary and server-stream calls keep `init` with every message.
+    Beaten: pointing colibri's `Response.body` at the free end of the gathering buffer, which
+    changes a slice the pool reads during the exchange (colibri decision 124); a pool behind
+    function pointers, which decision 19 beat for interceptors, where `ClientCallOptions.pool`
+    names its type; and a `Sender` that refuses a message while the pool holds a piece, which
+    makes every program keep its own queue.
 
 19. **Interceptors are types, chosen at compile time.** A route lists its interceptors in its
     options. Each may define `on_call`, which runs in list order and may refuse the call, and
