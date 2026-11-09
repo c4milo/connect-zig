@@ -2,10 +2,11 @@
 //! beside protobuf_fast_path_test.zig's harness of the binary values. Each path gives what a
 //! reference gives, and the references share no code with the paths they check.
 //!
-//! - Integers: each 32- and 64-bit type reads every text as the standard library's parsers read
-//!   it, the code `parse_integer` ran before its decimal path. The sweeps cover each type's
-//!   bounds and one on each side, every length to 21 digits, signs, leading zeros, separators,
-//!   exponents and fractions.
+//! - Integers: each 32- and 64-bit type reads every text as a reference of the proto3 JSON mapping
+//!   reads it: a JSON number (RFC 8259 §6) whose digits, the point moved by the exponent, make an
+//!   integer, read exactly, as Go's protojson reads it. The sweeps cover each type's bounds and
+//!   one on each side, every length to 21 digits, signs, leading zeros, separators, exponents and
+//!   fractions.
 //! - Floats: each float and double writes the text the standard library's Ryu writes, the code
 //!   `write_float` ran before its exact-decimal path. The sweeps cover every binary fraction of
 //!   up to 24 bits with each numerator to 1024, the bounds of the digits the path takes and one
@@ -16,6 +17,7 @@
 //!   with signs, leading zeros and malformed points.
 //! - A fuzz property over every check, which `zig build test` runs over its corpus.
 const std = @import("std");
+const assert = std.debug.assert;
 const testing = std.testing;
 const json = @import("json");
 const codec = @import("codec");
@@ -32,6 +34,11 @@ const integer_text_len_max = 32;
 const digits_len_max = 21;
 /// The most octets one fuzz input holds.
 const fuzz_input_len_max = 32;
+/// The digits the integer reference reads: any text a sweep or a fuzz input holds, and the zeros
+/// an exponent adds up to `reference_u128_digits_max`.
+const reference_digits_len_max = 64;
+/// The most decimal digits a u128 holds whatever they are: maxInt(u128) has 39.
+const reference_u128_digits_max = 38;
 const decimal_base = 10;
 /// Room for any float's JSON text.
 const float_room_len = 64;
@@ -53,20 +60,97 @@ const binary_to_decimal = 5;
 /// The most digits after the point the float text sweep writes, past a double's 22.
 const fraction_len_max = 24;
 
-/// Reads an integer as `parse_integer` read it before its decimal path: the standard library's
-/// integer parser, then its float parser for an integral value with an exponent or a fraction.
+/// Reads an integer as the proto3 JSON mapping and Go's protojson read it, with no code of
+/// `parse_integer`'s: the text must be a JSON number (RFC 8259 §6), and its digits, the point
+/// moved by the exponent, may leave none but 0 after the point. The value is read exactly
+/// through a u128, which holds each digit string the sweeps and the fuzz inputs build.
 fn reference_integer(comptime V: type, octets: []const u8) json_scalar.DecodeError!V {
-    if (std.fmt.parseInt(V, octets, decimal_base)) |value| return value else |failure| switch (failure) {
-        error.Overflow => return error.NumberOutOfRange,
-        error.InvalidCharacter => {},
+    assert(octets.len <= reference_digits_len_max);
+    if (!reference_is_number(octets)) return error.InvalidNumber;
+    const exponent_at = std.mem.indexOfAny(u8, octets, "eE") orelse octets.len;
+    const negative = octets[0] == '-';
+    const mantissa = octets[@intFromBool(negative)..exponent_at];
+    const point = std.mem.indexOfScalar(u8, mantissa, '.') orelse mantissa.len;
+    const fraction = if (point == mantissa.len) "" else mantissa[point + 1 ..];
+    var digits_room: [reference_digits_len_max]u8 = @splat('0');
+    @memcpy(digits_room[0..point], mantissa[0..point]);
+    @memcpy(digits_room[point..][0..fraction.len], fraction);
+    const shift = reference_exponent(octets, exponent_at) - @as(i64, @intCast(fraction.len));
+    const magnitude = try reference_magnitude(&digits_room, point + fraction.len, shift);
+    if (magnitude > @as(u128, std.math.maxInt(u64)) + 1) return error.NumberOutOfRange;
+    const value: i128 = if (negative) -@as(i128, @intCast(magnitude)) else @intCast(magnitude);
+    return std.math.cast(V, value) orelse error.NumberOutOfRange;
+}
+
+/// The exponent after the "e" at `exponent_at`, or 0 with none. One past an i32 leaves no
+/// integer in range but 0, as an i32's bound does.
+fn reference_exponent(octets: []const u8, exponent_at: usize) i64 {
+    if (exponent_at == octets.len) return 0;
+    const text = octets[exponent_at + 1 ..];
+    return std.fmt.parseInt(i32, text, decimal_base) catch |failure| switch (failure) {
+        error.Overflow => if (text[0] == '-') std.math.minInt(i32) else std.math.maxInt(i32),
+        error.InvalidCharacter => unreachable,
+    };
+}
+
+/// The value of the first `len` digits of `room` with `shift` places of the point applied:
+/// dropped digits must be 0, and added ones are 0.
+fn reference_magnitude(room: *[reference_digits_len_max]u8, len: usize, shift: i64) json_scalar.DecodeError!u128 {
+    const dropped: usize = if (shift < 0) @intCast(@min(-shift, @as(i64, @intCast(len)))) else 0;
+    const kept = room[0 .. len - dropped];
+    if (std.mem.indexOfNone(u8, room[kept.len..len], "0") != null) return error.InvalidNumber;
+    if (std.mem.indexOfNone(u8, kept, "0") == null) return 0;
+    const zeros: usize = if (shift > 0) @intCast(@min(shift, reference_digits_len_max)) else 0;
+    // A u128 holds 38 digits, far past any 64-bit value.
+    if (kept.len + zeros > reference_u128_digits_max) return error.NumberOutOfRange;
+    @memset(room[kept.len..][0..zeros], '0');
+    return std.fmt.parseInt(u128, room[0 .. kept.len + zeros], decimal_base) catch unreachable;
+}
+
+/// The states of a walk through RFC 8259 §6's number grammar, and the classes of octet it reads.
+const Grammar = enum { start, sign, zero, integer, point, fraction, e, exponent_sign, exponent };
+const Octet = enum { minus, plus, zero, digit, point, e, other };
+
+/// The state each class of octet leads to from each state, or null where the grammar stops.
+const transitions = table: {
+    var next: [@typeInfo(Grammar).@"enum".fields.len][@typeInfo(Octet).@"enum".fields.len]?Grammar = @splat(@splat(null));
+    next[@intFromEnum(Grammar.start)][@intFromEnum(Octet.minus)] = .sign;
+    for ([_]Grammar{ .start, .sign }) |from| {
+        next[@intFromEnum(from)][@intFromEnum(Octet.zero)] = .zero;
+        next[@intFromEnum(from)][@intFromEnum(Octet.digit)] = .integer;
     }
-    const float = std.fmt.parseFloat(f64, octets) catch return error.InvalidNumber;
-    if (@trunc(float) != float) return error.InvalidNumber;
-    const low: f64 = @floatFromInt(std.math.minInt(V));
-    const bits_below: i32 = @bitSizeOf(V) - @as(i32, @intFromBool(@typeInfo(V).int.signedness == .signed));
-    const high_exclusive = std.math.ldexp(@as(f64, 1), bits_below);
-    if (float < low or float >= high_exclusive) return error.NumberOutOfRange;
-    return @intFromFloat(float);
+    for ([_]Octet{ .zero, .digit }) |octet| {
+        next[@intFromEnum(Grammar.integer)][@intFromEnum(octet)] = .integer;
+        next[@intFromEnum(Grammar.point)][@intFromEnum(octet)] = .fraction;
+        next[@intFromEnum(Grammar.fraction)][@intFromEnum(octet)] = .fraction;
+        for ([_]Grammar{ .e, .exponent_sign, .exponent }) |from| next[@intFromEnum(from)][@intFromEnum(octet)] = .exponent;
+    }
+    for ([_]Grammar{ .zero, .integer }) |from| next[@intFromEnum(from)][@intFromEnum(Octet.point)] = .point;
+    for ([_]Grammar{ .zero, .integer, .fraction }) |from| next[@intFromEnum(from)][@intFromEnum(Octet.e)] = .e;
+    next[@intFromEnum(Grammar.e)][@intFromEnum(Octet.minus)] = .exponent_sign;
+    next[@intFromEnum(Grammar.e)][@intFromEnum(Octet.plus)] = .exponent_sign;
+    break :table next;
+};
+
+fn class_of(octet: u8) Octet {
+    return switch (octet) {
+        '-' => .minus,
+        '+' => .plus,
+        '0' => .zero,
+        '1'...'9' => .digit,
+        '.' => .point,
+        'e', 'E' => .e,
+        else => .other,
+    };
+}
+
+/// Whether `octets` is a JSON number (RFC 8259 §6), as a walk through its grammar's states.
+fn reference_is_number(octets: []const u8) bool {
+    var state: Grammar = .start;
+    for (octets) |octet| {
+        state = transitions[@intFromEnum(state)][@intFromEnum(class_of(octet))] orelse return false;
+    }
+    return state == .zero or state == .integer or state == .fraction or state == .exponent;
 }
 
 fn check_integer_as(comptime V: type, octets: []const u8) !void {
@@ -112,14 +196,18 @@ test "integers read as the reference reads them, at each type's bounds and on ea
 /// Texts beside a number that a JSON writer does not give, which the general path reads or
 /// refuses: signs, separators, exponents, fractions, bases and spaces.
 const unusual_integers = [_][]const u8{
-    "",      "-",    "+",            "--1",          "-+1",           "+1",
-    "+0",    "-0",   "00",           "-00",          "007",           "1_000",
-    "_1",    "1_",   "1e2",          "-1e2",         "1E2",           "1e-2",
-    "1.0",   "1.5",  "-0.0",         ".5",           "1.",            "0x10",
-    "0b1",   "inf",  "-inf",         "nan",          "Infinity",      " 1",
-    "1 ",    "1a",   "a1",           "9e18",         "-9.3e18",       "1.8e19",
+    "",                         "-",                       "+",                        "--1",                      "-+1",                     "+1",
+    "+0",                       "-0",                      "00",                       "-00",                      "007",                     "1_000",
+    "_1",                       "1_",                      "1e2",                      "-1e2",                     "1E2",                     "1e-2",
+    "1.0",                      "1.5",                     "-0.0",                     ".5",                       "1.",                      "0x10",
+    "0b1",                      "inf",                     "-inf",                     "nan",                      "Infinity",                " 1",
+    "1 ",                       "1a",                      "a1",                       "9e18",                     "-9.3e18",                 "1.8e19",
     "٣",
-    "1\x00", "\xff", "4294967295.0", "2147483647e0", "-2147483648e0",
+    "1\x00",                    "\xff",                    "4294967295.0",             "2147483647e0",             "-2147483648e0",           "01.0",
+    "00.5",                     "1e",                      "1e+",                      "1ee2",                     "e2",                      "1.e2",
+    "-.5",                      "1e+2",                    "10e-1",                    "100e-2",                   "0e5",                     "1.00e2",
+    "-0.5",                     "0e99999999999",           "1e99999999999",            "1e-99999999999",           "9007199254740993e0",      "1.8446744073709551615e19",
+    "1.8446744073709551616e19", "9.223372036854775807e18", "-9.223372036854775808e18", "-9.223372036854775809e18", "18446744073709551616e-1",
 };
 
 test "integers read as the reference reads them, from texts a JSON writer does not give" {

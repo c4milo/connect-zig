@@ -271,12 +271,12 @@ Buffa's times, and the four one-kind messages.
   languages](interop): connect-go and grpc-go, connect-es on Node, Python's grpcio, and Rust's
   tonic and connect-rust. Each echoes every coverage case, in every protocol, codec and
   compression its library speaks, and runs every stream shape, a typed error, a timeout, headers
-  and trailers: 713 calls.
+  and trailers: 758 calls.
 - `tools/interop_servers_check.sh` runs the mirror: connect-zig's client calls [servers in other
   languages](interop#the-server-side), connect-go and grpc-go, connect-node, grpcio and
   connect-rust, with every coverage case in Connect proto and JSON with GET, gRPC and gRPC-Web,
   over h2 and HTTP/1.1, with gzip, every stream shape, a typed error, a timeout, headers and
-  trailers: 782 calls.
+  trailers: 831 calls.
 - `tools/perf_check.sh` counts the instructions of each benchmark operation under callgrind and
   fails when one takes more than 2% above `bench/instructions.txt`. Counts do not move with a
   shared runner's load, so CI catches a regression that wall time would hide.

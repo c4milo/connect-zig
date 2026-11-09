@@ -63,6 +63,12 @@ pub const limits = struct {
     /// general path: a check of a 20th digit cost large JSON decode 1.7% more instructions than
     /// it saved (`tools/perf_check.sh`, 2026-11-09).
     pub const json_integer_digits_len_max = 19;
+    /// The magnitude a JSON integer's exponent saturates at. Past it every number is 0, out of
+    /// range or no integer, as at it, while the text is at most `json_number_len_max` long.
+    pub const json_exponent_magnitude_max = std.math.maxInt(i32);
+    /// The longest number text the JSON integer reader takes: half the exponent's saturation,
+    /// so the count of digits never meets it. A longer one is refused.
+    pub const json_number_len_max = json_exponent_magnitude_max / 2;
     /// The most significant digits of a double the JSON writer's fast path writes, and of a
     /// float: a decimal of at most that many digits that equals the value is its shortest text,
     /// as 10^-15 > 2^-52 and 10^-6 > 2^-23 (json_float.zig says why).

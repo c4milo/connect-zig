@@ -376,6 +376,20 @@ ran on Linux x86-64 with Zig 0.16.0.
   `tools/interop_check.sh` 48 and `tools/interop_languages_check.sh` 713, and no instruction count
   moved.
 
+- **JSON integers as the mapping reads them.** The owner ruled on 2026-11-09 that
+  `json_scalar.parse_integer` refuses what the proto3 JSON mapping and Go's protojson refuse. Its
+  general path read a string's text with the standard library's parsers, which took "+1",
+  "1_000", "0x10" and "007". It now takes a JSON number alone (RFC 8259 §6), in a string or not,
+  and reads its digits exactly once the exponent moves the point, as Go does: "1e2", "1.0",
+  "10e-1" and "-0" are integers, and "9.223372036854775807e18" is maxInt(i64), which the old path
+  rounded through an f64 to 2^63 and refused. The fast path refuses a leading zero, and the proof
+  harness's reference follows the new rules with code of its own. Go 1.24 with protobuf v1.36.12
+  gave each verdict. No public name changed. `tools/coverage_check.sh` printed 123 checks passed,
+  with the case `coverage/integer_forms`, which the clients of `interop/` echo too:
+  `tools/interop_languages_check.sh` prints 758 calls passed and `tools/interop_servers_check.sh`
+  831. Conformance printed 2714 of 2714 and 8252 of 8264. The general path stays out of line; the
+  varints JSON decode takes 1.39% more instructions, inside the gate, so the baseline stays.
+
 ### What a later step owes
 
 - The client cases of `conformance/client_known_failing.txt`: a status outside 100 to 599,

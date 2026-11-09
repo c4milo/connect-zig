@@ -142,7 +142,8 @@ pub fn write_key(comptime kind: Kind, comptime V: type, key: V, text: *json.Text
 }
 
 /// Reads an integer from a number or a string token. A number with an exponent or a fraction is
-/// accepted when its value is integral ("JSON Mapping": "1e2" is accepted for an int32).
+/// accepted when its value is integral ("JSON Mapping": "1e2" is accepted for an int32). Either
+/// token must hold a JSON number (RFC 8259 §6), as Go's protojson reads it.
 pub fn parse_integer(comptime V: type, octets: []const u8) DecodeError!V {
     if (parse_decimal(V, octets)) |value| return value;
     return parse_integer_general(V, octets);
@@ -156,6 +157,8 @@ inline fn parse_decimal(comptime V: type, octets: []const u8) ?V {
     const negative = octets.len != 0 and octets[0] == '-';
     const digits = octets[@intFromBool(negative)..];
     if (digits.len == 0 or digits.len > constants.limits.json_integer_digits_len_max) return null;
+    // RFC 8259 §6: a leading zero is no number's, and the general path refuses it.
+    if (digits[0] == '0' and digits.len > 1) return null;
     var magnitude: u64 = 0;
     for (digits) |character| {
         const digit = character -% '0';
@@ -170,22 +173,127 @@ inline fn parse_decimal(comptime V: type, octets: []const u8) ?V {
     return @intCast(value);
 }
 
-/// Reads any integer text the fast path leaves: a "+" sign, a digit separator, an exponent or a
-/// fraction, too many digits, or a value out of range.
-fn parse_integer_general(comptime V: type, octets: []const u8) DecodeError!V {
-    if (std.fmt.parseInt(V, octets, decimal_base)) |value| return value else |failure| switch (failure) {
-        error.Overflow => return error.NumberOutOfRange,
-        error.InvalidCharacter => {},
+/// Reads any integer text the fast path leaves, as the proto3 JSON mapping and Go's protojson
+/// read it: a JSON number, in a string or not, whose value is an integer once its fraction and
+/// exponent apply. The digits are read exactly, with no float between. It stays out of line: a
+/// JSON writer gives the fast path's form, and inlined, this path cost the varints JSON decode
+/// 3% more instructions (`tools/perf_check.sh`, 2026-11-09).
+noinline fn parse_integer_general(comptime V: type, octets: []const u8) DecodeError!V {
+    // A number longer than any buffer could make the exponent's saturation inexact.
+    if (octets.len > constants.limits.json_number_len_max) return error.InvalidNumber;
+    // proto3 JSON mapping, "JSON Mapping": an integer field takes a number, or a string that
+    // holds one, with exponent notation allowed. RFC 8259 §6 gives a number's form, which
+    // refuses "+1", "1_000", "0x10" and "007", as Go does.
+    const parts = number_parts(octets) orelse return error.InvalidNumber;
+    const magnitude = try magnitude_of(parts);
+    return signed_value(V, parts.negative, magnitude) orelse error.NumberOutOfRange;
+}
+
+/// A JSON number's parts (RFC 8259 §6): its sign, the digits before and after its point, and
+/// its exponent, saturated at `json_exponent_magnitude_max` either way.
+const NumberParts = struct {
+    negative: bool,
+    integer: []const u8,
+    fraction: []const u8,
+    exponent: i64,
+};
+
+/// Splits `octets` into a JSON number's parts, or gives null when they are none (RFC 8259 §6:
+/// number = [ minus ] int [ frac ] [ exp ]).
+fn number_parts(octets: []const u8) ?NumberParts {
+    const negative = octets.len != 0 and octets[0] == '-';
+    const integer_start: usize = @intFromBool(negative);
+    const integer_end = digits_end(octets, integer_start);
+    const integer = octets[integer_start..integer_end];
+    // RFC 8259 §6: int = zero / ( digit1-9 *DIGIT ), so "Leading zeros are not allowed."
+    if (integer.len == 0 or (integer.len > 1 and integer[0] == '0')) return null;
+    var parts: NumberParts = .{ .negative = negative, .integer = integer, .fraction = "", .exponent = 0 };
+    var index = integer_end;
+    if (index < octets.len and octets[index] == '.') {
+        const fraction_end = digits_end(octets, index + 1);
+        parts.fraction = octets[index + 1 .. fraction_end];
+        // RFC 8259 §6: frac = decimal-point 1*DIGIT.
+        if (parts.fraction.len == 0) return null;
+        index = fraction_end;
     }
-    const float = std.fmt.parseFloat(f64, octets) catch return error.InvalidNumber;
-    if (@trunc(float) != float) return error.InvalidNumber;
-    const low: f64 = @floatFromInt(std.math.minInt(V));
-    // maxInt of a 64-bit type rounds up to a power of two as an f64, so the bound is that power,
-    // exclusive: 2^63 itself must be refused, or the conversion below overflows.
-    const bits_below: i32 = @bitSizeOf(V) - @as(i32, @intFromBool(@typeInfo(V).int.signedness == .signed));
-    const high_exclusive = std.math.ldexp(@as(f64, 1), bits_below);
-    if (float < low or float >= high_exclusive) return error.NumberOutOfRange;
-    return @intFromFloat(float);
+    if (index == octets.len) return parts;
+    // RFC 8259 §6: exp = e [ minus / plus ] 1*DIGIT, and e is "e" or "E".
+    if (octets[index] != 'e' and octets[index] != 'E') return null;
+    parts.exponent = exponent_of(octets[index + 1 ..]) orelse return null;
+    return parts;
+}
+
+/// The index of the first octet from `start` on that is no decimal digit, or the length.
+fn digits_end(octets: []const u8, start: usize) usize {
+    for (octets[start..], start..) |octet, index| {
+        if (!std.ascii.isDigit(octet)) return index;
+    }
+    return octets.len;
+}
+
+/// The exponent after "e": a sign and one digit at least (RFC 8259 §6), saturated at
+/// `json_exponent_magnitude_max`, past which every value it gives is out of range or not an
+/// integer alike.
+fn exponent_of(text: []const u8) ?i64 {
+    const signed = text.len != 0 and (text[0] == '-' or text[0] == '+');
+    const digits = text[@intFromBool(signed)..];
+    if (digits.len == 0) return null;
+    var magnitude: i64 = 0;
+    for (digits) |octet| {
+        if (!std.ascii.isDigit(octet)) return null;
+        magnitude = @min(magnitude * decimal_base + (octet - '0'), constants.limits.json_exponent_magnitude_max);
+    }
+    return if (text[0] == '-') -magnitude else magnitude;
+}
+
+/// The value of a number's digits once its exponent moves the point, exactly. A digit the point
+/// leaves after it must be 0, or the number is no integer; a value past a u64 is out of range.
+fn magnitude_of(parts: NumberParts) DecodeError!u64 {
+    const digits_len: i64 = @intCast(parts.integer.len + parts.fraction.len);
+    // The digits left of the point once the exponent moved it.
+    const kept_len = @as(i64, @intCast(parts.integer.len)) + parts.exponent;
+    var magnitude: u64 = 0;
+    var overflow = false;
+    var position: i64 = 0;
+    for ([_][]const u8{ parts.integer, parts.fraction }) |digits| {
+        for (digits) |octet| {
+            const digit = octet - '0';
+            if (position >= kept_len and digit != 0) return error.InvalidNumber;
+            if (position < kept_len) overflow = overflow or !append_digit(&magnitude, digit);
+            position += 1;
+        }
+    }
+    if (overflow) return error.NumberOutOfRange;
+    return scaled(magnitude, kept_len - digits_len);
+}
+
+/// `magnitude` with `zeros` zeros after its digits, or out of range past a u64.
+fn scaled(magnitude: u64, zeros: i64) DecodeError!u64 {
+    if (magnitude == 0 or zeros <= 0) return magnitude;
+    var result = magnitude;
+    // maxInt(u64) has 20 digits, so a 20th zero after a digit passes it and the loop ends.
+    for (0..@intCast(zeros)) |_| {
+        if (!append_digit(&result, 0)) return error.NumberOutOfRange;
+    }
+    return result;
+}
+
+/// Appends one decimal digit to `magnitude`, and says whether the value still fits a u64.
+fn append_digit(magnitude: *u64, digit: u8) bool {
+    const shifted = @mulWithOverflow(magnitude.*, decimal_base);
+    const sum = @addWithOverflow(shifted[0], digit);
+    magnitude.* = sum[0];
+    return shifted[1] == 0 and sum[1] == 0;
+}
+
+/// The value of `V` that a sign and a magnitude give, or null out of its range.
+fn signed_value(comptime V: type, negative: bool, magnitude: u64) ?V {
+    if (!negative or magnitude == 0) return std.math.cast(V, magnitude);
+    if (comptime @typeInfo(V).int.signedness == .unsigned) return null;
+    // The magnitude of minInt(V) is maxInt(V) + 1, the most a negative value takes.
+    if (magnitude > @as(u64, std.math.maxInt(V)) + 1) return null;
+    const value: i64 = @bitCast(0 -% magnitude);
+    return @intCast(value);
 }
 
 pub fn parse_float(comptime V: type, octets: []const u8, from_string: bool) DecodeError!V {
@@ -252,10 +360,12 @@ test "integers parse from exponents when integral, and refuse fractions and over
     try testing.expectEqual(@as(i32, 100), try parse_integer(i32, "1e2"));
     try testing.expectError(error.InvalidNumber, parse_integer(i32, "1.5"));
     try testing.expectError(error.NumberOutOfRange, parse_integer(i32, "2147483648"));
-    // Each text is integral and rounds to 2^63 or 2^64 as an f64: one past the type's range.
-    try testing.expectError(error.NumberOutOfRange, parse_integer(i64, "9.223372036854775807e18"));
-    try testing.expectError(error.NumberOutOfRange, parse_integer(i64, "9223372036854775807.5"));
-    try testing.expectError(error.NumberOutOfRange, parse_integer(u64, "1.8446744073709551615e19"));
+    // The digits are read exactly, as Go reads them: no f64 rounds them to 2^63 or 2^64.
+    try testing.expectEqual(@as(i64, std.math.maxInt(i64)), try parse_integer(i64, "9.223372036854775807e18"));
+    try testing.expectError(error.InvalidNumber, parse_integer(i64, "9223372036854775807.5"));
+    try testing.expectEqual(@as(u64, std.math.maxInt(u64)), try parse_integer(u64, "1.8446744073709551615e19"));
+    try testing.expectError(error.NumberOutOfRange, parse_integer(u64, "1.8446744073709551616e19"));
+    try testing.expectEqual(@as(i64, 9007199254740993), try parse_integer(i64, "9007199254740993e0"));
     try testing.expectEqual(@as(i64, std.math.minInt(i64)), try parse_integer(i64, "-9.223372036854775808e18"));
     try testing.expectError(error.NumberOutOfRange, parse_float(f32, "1e39", false));
     // float's maximum as Go and Java write it rounds to floatMax(f32), so it is in range.
@@ -264,6 +374,32 @@ test "integers parse from exponents when integral, and refuse fractions and over
     // text first rounds to the midpoint itself, which then rounds to even, down to 1.
     try testing.expectEqual(@as(f32, 1.00000011920928955078125), try parse_float(f32, "1.0000000596046447753906251", false));
     try testing.expect(std.math.isNan(try parse_float(f64, "NaN", true)));
+}
+
+test "an integer text that is no JSON number is refused, as Go's protojson refuses it" {
+    // RFC 8259 §6: no "+" before a number, no separator, no base but ten, no leading zero, a
+    // digit on each side of a point, and one in an exponent. Go 1.24's protojson, with
+    // google.golang.org/protobuf v1.36.12, refused each in a string and as a number.
+    const refused = [_][]const u8{ "+1", "1_000", "0x10", "007", "00", "-00", "01.0", "00.5", "1.", ".5", "1e", "1e+", "-", "", " 1", "1a", "0b1", "Infinity", "NaN" };
+    for (refused) |text| try testing.expectError(error.InvalidNumber, parse_integer(i32, text));
+    // Go accepted each of these, and gives the same value.
+    try testing.expectEqual(@as(i32, 0), try parse_integer(i32, "-0"));
+    try testing.expectEqual(@as(u64, 0), try parse_integer(u64, "-0.0"));
+    try testing.expectEqual(@as(i32, 1), try parse_integer(i32, "1.0"));
+    try testing.expectEqual(@as(i32, 1), try parse_integer(i32, "10e-1"));
+    try testing.expectEqual(@as(i32, 1), try parse_integer(i32, "100e-2"));
+    try testing.expectEqual(@as(i32, 100), try parse_integer(i32, "1E+2"));
+    try testing.expectEqual(@as(i32, 100), try parse_integer(i32, "1.00e2"));
+    try testing.expectEqual(@as(i32, 0), try parse_integer(i32, "0e5"));
+    try testing.expectError(error.InvalidNumber, parse_integer(i32, "1e-2"));
+    try testing.expectError(error.InvalidNumber, parse_integer(i32, "-0.5"));
+    try testing.expectError(error.NumberOutOfRange, parse_integer(u64, "-1e2"));
+    // An exponent past any buffer saturates, and the value stays exact: 0, or out of range.
+    try testing.expectEqual(@as(i32, 0), try parse_integer(i32, "0e99999999999"));
+    try testing.expectError(error.NumberOutOfRange, parse_integer(i32, "1e99999999999"));
+    try testing.expectError(error.InvalidNumber, parse_integer(i32, "1e-99999999999"));
+    try testing.expectError(error.NumberOutOfRange, parse_integer(i32, "1e99999999999999999999999"));
+    try testing.expectError(error.InvalidNumber, parse_integer(i32, "1e-99999999999999999999999"));
 }
 
 test "base64 decodes in either alphabet, padded or not" {
