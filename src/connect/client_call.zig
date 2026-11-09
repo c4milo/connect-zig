@@ -23,8 +23,12 @@ pub const Options = struct {
     timeout_ns: ?u64 = null,
     /// Send a unary call of a NO_SIDE_EFFECTS method as a GET (Connect protocol, "Unary-Get-Request").
     use_get: bool = false,
-    /// gzip compresses requests when `encoder` is set; identity sends them as they are.
+    /// The coding each request message goes in, which `encoders` must write; identity sends
+    /// them as they are.
     request_coding: Coding = .identity,
+    /// The shortest request message that goes in `request_coding`; a shorter one goes as it is.
+    /// 0 compresses every message, as connect-go does (decision 22).
+    compress_len_min: usize = 0,
     encoders: compression.Encoders = .{},
     /// What the client decompresses, which it names in its accept header.
     decoders: compression.Decoders = .{},
@@ -87,6 +91,7 @@ fn speaks_of(comptime method: method_file.Method, options: Options) protocol.Spe
 pub fn request(comptime method: method_file.Method, options: *const Options, messages: []const method.Request, buffers: *const Buffers) Error!Request {
     const single = method.stream_type == .unary or method.stream_type == .server_stream;
     assert(!single or messages.len == 1);
+    assert(options.encoders.writes(options.request_coding));
     const speaks = speaks_of(method, options.*);
     const get_allowed = method.stream_type == .unary and method.idempotency == .no_side_effects;
     if (options.use_get and options.protocol == .connect and get_allowed) return request_get(method, options.*, &messages[0], buffers.*);
@@ -122,13 +127,15 @@ fn add_extra_headers(result: *Request, headers: []const Header) error{TooManyHea
 }
 
 /// Writes one message into the body: bare for Connect unary, else in an envelope. It is encoded
-/// in place, after room for its prefix, so it is not copied from scratch storage; gzip, when it
-/// shrinks the message, compresses into `work` and the shorter result is copied back.
+/// in place, after room for its prefix, so it is not copied from scratch storage; a compressed
+/// message goes into `work` and is copied back.
 fn place(comptime T: type, speaks: protocol.Speaks, options: Options, message: *const T, room: []u8, work: []u8) Error!struct { len: usize, compressed: bool } {
     const prefix_len: usize = if (speaks.enveloped) flag_prefix_len else 0;
     if (room.len < prefix_len) return error.NoSpaceLeft;
     const encoded = try message_codec.encode(T, options.codec, message, room[prefix_len..]);
-    const result = message_codec.compress(options.request_coding, options.encoders, encoded, work);
+    const result = try message_codec.compress_request(options.request_coding, options.encoders, encoded, work, options.compress_len_min);
+    // A coding that cannot shrink the message makes it longer than the room it was encoded in.
+    if (result.octets.len > room.len - prefix_len) return error.NoSpaceLeft;
     if (result.compressed) @memcpy(room[prefix_len..][0..result.octets.len], result.octets);
     if (speaks.enveloped) envelope.write_prefix(.{ .compressed = result.compressed }, result.octets.len, room[0..flag_prefix_len]);
     return .{ .len = prefix_len + result.octets.len, .compressed = result.compressed };
@@ -169,7 +176,8 @@ fn add_grpc_headers(result: *Request, speaks: protocol.Speaks, options: Options,
 }
 
 fn request_get(comptime method: method_file.Method, options: Options, message: *const method.Request, buffers: Buffers) Error!Request {
-    const packed_message = try message_codec.prepare(method.Request, options.codec, options.request_coding, options.encoders, message, buffers.scratch);
+    const encoded = try message_codec.encode(method.Request, options.codec, message, buffers.scratch.message);
+    const packed_message = try message_codec.compress_request(options.request_coding, options.encoders, encoded, buffers.scratch.work, options.compress_len_min);
     const path = comptime method.path();
     if (buffers.body.len < path.len + 1) return error.NoSpaceLeft;
     @memcpy(buffers.body[0..path.len], path);
@@ -245,4 +253,33 @@ test "a request carries the conformance runner's seven headers and a case's besi
         .values = &buffers[3],
     });
     try testing.expectEqualStrings("Value2", call.headers()[call.headers().len - 1].value);
+}
+
+/// The encoder the tests below place: too large for a test's stack.
+threadlocal var test_gzip: compression.GzipEncoder align(@alignOf(compression.GzipEncoder)) = undefined;
+
+test "a client asked for a coding compresses even a short message, and names the coding" {
+    var buffers: [4][128]u8 = undefined;
+    const encoders: compression.Encoders = .{ .gzip = &test_gzip };
+    const call_buffers: Buffers = .{
+        .body = &buffers[0],
+        .scratch = .{ .message = &buffers[1], .work = &buffers[2], .tokens = &.{} },
+        .values = &buffers[3],
+    };
+    const unary = try request(say, &.{ .request_coding = .gzip, .encoders = encoders }, &.{.{ .text = "hi" }}, &call_buffers);
+    try testing.expectEqualStrings("gzip", find(unary.headers(), "content-encoding").?);
+    // RFC 1952 §2.3.1: a gzip member starts with ID1 and ID2.
+    try testing.expectEqualSlices(u8, &.{ 0x1f, 0x8b }, unary.body[0..2]);
+    const stream = try request(upload, &.{ .protocol = .grpc, .request_coding = .gzip, .encoders = encoders }, &.{.{ .text = "hi" }}, &call_buffers);
+    try testing.expectEqual(@as(u8, 1), stream.body[0]);
+    // Below the program's floor the message goes as it is, and a Connect unary names no coding.
+    const floored = try request(say, &.{ .request_coding = .gzip, .encoders = encoders, .compress_len_min = 5 }, &.{.{ .text = "hi" }}, &call_buffers);
+    try testing.expectEqual(@as(?[]const u8, null), find(floored.headers(), "content-encoding"));
+    try testing.expectEqualSlices(u8, &.{ 0x0a, 2, 'h', 'i' }, floored.body);
+    // Connect protocol, "Unary-Get-Request": a GET names its message's coding in its query.
+    const fetch = try request(say, &.{ .use_get = true, .request_coding = .gzip, .encoders = encoders }, &.{.{ .text = "hi" }}, &call_buffers);
+    try testing.expect(std.mem.indexOf(u8, fetch.target, "compression=gzip") != null);
+    // gzip makes the message longer than the body's room, which then refuses it.
+    const short_room: Buffers = .{ .body = buffers[0][0..8], .scratch = call_buffers.scratch, .values = &buffers[3] };
+    try testing.expectError(error.NoSpaceLeft, request(say, &.{ .request_coding = .gzip, .encoders = encoders }, &.{.{ .text = "hi" }}, &short_room));
 }

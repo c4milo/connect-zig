@@ -1,5 +1,6 @@
 //! A message's octets in either codec, and the compression of a message as a protocol sends it.
 const std = @import("std");
+const assert = std.debug.assert;
 const proto = @import("protobuf");
 const protocol = @import("protocol.zig");
 const compression = @import("compression.zig");
@@ -43,8 +44,8 @@ pub fn open(compressed: bool, coding: compression.Coding, decoders: compression.
     return compression.decompress(coding, decoders, payload, output);
 }
 
-/// The smallest message a sender compresses. Below it, gzip's header and trailer outweigh what
-/// compression saves.
+/// The smallest reply message a server compresses. Below it, gzip's header and trailer outweigh
+/// what compression saves. A client compresses from `client.Options.compress_len_min` on.
 pub const compress_len_min = 1024;
 
 /// A message encoded, and compressed when that saves octets, ready for an envelope or a body.
@@ -68,8 +69,8 @@ pub fn prepare(comptime T: type, codec: Codec, coding: compression.Coding, encod
     return compress(coding, encoders, octets, scratch.work);
 }
 
-/// Compresses `octets` into `buffer` when `encoders` writes `coding`, the message is long enough,
-/// and the coding makes it shorter, and says whether it did.
+/// Compresses a reply's `octets` into `buffer` when `encoders` writes `coding`, the message is
+/// long enough, and the coding makes it shorter, and says whether it did.
 pub fn compress(coding: compression.Coding, encoders: compression.Encoders, octets: []const u8, buffer: []u8) Prepared {
     if (coding == .identity or octets.len < compress_len_min) return .{ .octets = octets, .compressed = false };
     if (!encoders.writes(coding)) return .{ .octets = octets, .compressed = false };
@@ -77,6 +78,16 @@ pub fn compress(coding: compression.Coding, encoders: compression.Encoders, octe
     // A message the coding cannot shrink goes out as it is: the peer would pay to inflate it for nothing.
     if (packed_octets.len >= octets.len) return .{ .octets = octets, .compressed = false };
     return .{ .octets = packed_octets, .compressed = true };
+}
+
+/// Compresses a request's `octets` into `buffer` in the coding the client asked for, when the
+/// message holds `len_min` octets or more, whether or not the coding shrinks it: the request's
+/// head names the coding its message is in, as connect-go sends it (decision 22). A shorter
+/// message goes as it is. `encoders` must write `coding`.
+pub fn compress_request(coding: compression.Coding, encoders: compression.Encoders, octets: []const u8, buffer: []u8, len_min: usize) error{NoSpaceLeft}!Prepared {
+    assert(encoders.writes(coding));
+    if (coding == .identity or octets.len < len_min) return .{ .octets = octets, .compressed = false };
+    return .{ .octets = try compression.compress(coding, encoders, octets, buffer), .compressed = true };
 }
 
 const testing = std.testing;
@@ -97,4 +108,20 @@ test "gzip is used only when it shrinks the message" {
     const kept = compress(.gzip, .{ .gzip = &encoder }, &noise, &buffer);
     try testing.expect(!kept.compressed);
     try testing.expectEqual(@as(usize, compress_len_min), kept.octets.len);
+}
+
+test "a request is compressed from its floor on, even when the coding cannot shrink it" {
+    var encoder: compression.GzipEncoder = undefined;
+    var buffer: [compress_len_min]u8 = undefined;
+    const encoders: compression.Encoders = .{ .gzip = &encoder };
+    // gzip's header and trailer make a two-octet message longer, and it goes compressed all the same.
+    const tiny = try compress_request(.gzip, encoders, "hi", &buffer, 0);
+    try testing.expect(tiny.compressed);
+    try testing.expect(tiny.octets.len > "hi".len);
+    try testing.expect((try compress_request(.gzip, encoders, "hi", &buffer, "hi".len)).compressed);
+    const below = try compress_request(.gzip, encoders, "hi", &buffer, "hi".len + 1);
+    try testing.expect(!below.compressed);
+    try testing.expectEqualStrings("hi", below.octets);
+    try testing.expect(!(try compress_request(.identity, encoders, "hi", &buffer, 0)).compressed);
+    try testing.expectError(error.NoSpaceLeft, compress_request(.gzip, encoders, "hi", buffer[0..1], 0));
 }

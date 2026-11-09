@@ -337,11 +337,19 @@ ran on Linux x86-64 with Zig 0.16.0.
   `tools/interop_languages_check.sh` still prints 713 calls passed, and `tools/interop_check.sh`
   passes.
 
+- **Compress when asked.** The owner ruled on 2026-11-09 that a client compresses each request
+  message in the coding it asked for, as connect-go does (decision 22 as amended).
+  `connect.client.Options` gains `compress_len_min`, default 0; no name changed. A server's
+  replies keep their floor of 1 KiB. Conformance's client half printed 8204 of 8264 passed, the
+  rest known failing: the 855 cases of a Connect unary request in gzip or zstd now pass. The
+  server passes 2714 of 2714, `tools/interop_check.sh` 48 calls,
+  `tools/interop_languages_check.sh` 713, and no instruction count moved, since no benchmark
+  compresses.
+
 ### What a later step owes
 
 - The client cases of `conformance/client_known_failing.txt`. Each needs a ruling or a change
-  below the program: a Connect unary request under 1 KiB that goes uncompressed whatever coding
-  the client names (decision 22); a cardinality check on a unary or client-stream response,
+  below the program: a cardinality check on a unary or client-stream response,
   which needs `connect.client.Response` to know its method's stream type; and a status outside
   100 to 599, which colibri reads as malformed.
 - Long server streams written at `on_writable` (decision 12).

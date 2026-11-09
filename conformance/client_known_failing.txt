@@ -2,31 +2,6 @@
 # when a case listed here passes, so the list cannot go stale (decision 26). `*` stands for one
 # part of a case's name.
 #
-# A Connect unary request under 1 KiB goes uncompressed, and with no Content-Encoding, whatever
-# coding the client was asked for: message_codec.compress sends a message below compress_len_min,
-# or one the coding does not shrink, as it is (decision 22). The reference server checks that the
-# request names the case's coding, so each Connect unary case in gzip or zstd fails. A stream
-# names its coding in its head, and flags each message, so streams pass.
-Basic/*/Protocol:PROTOCOL_CONNECT/*/Compression:COMPRESSION_GZIP/*/unary/success
-Basic/*/Protocol:PROTOCOL_CONNECT/*/Compression:COMPRESSION_GZIP/*/unimplemented
-Basic/*/Protocol:PROTOCOL_CONNECT/*/Compression:COMPRESSION_ZSTD/*/unary/success
-Basic/*/Protocol:PROTOCOL_CONNECT/*/Compression:COMPRESSION_ZSTD/*/unimplemented
-Connect Compressed Error and End-Stream/*/*/error/compressed
-Connect Error and End-Stream/*/Compression:COMPRESSION_GZIP/*/error/*
-Connect Error and End-Stream/*/Compression:COMPRESSION_ZSTD/*/error/*
-Deadline Propagation/*/Protocol:PROTOCOL_CONNECT/*/Compression:COMPRESSION_GZIP/*/unary/success
-Deadline Propagation/*/Protocol:PROTOCOL_CONNECT/*/Compression:COMPRESSION_ZSTD/*/unary/success
-Duplicate Metadata/*/Protocol:PROTOCOL_CONNECT/*/Compression:COMPRESSION_GZIP/*/unary/error
-Duplicate Metadata/*/Protocol:PROTOCOL_CONNECT/*/Compression:COMPRESSION_GZIP/*/unary/success
-Duplicate Metadata/*/Protocol:PROTOCOL_CONNECT/*/Compression:COMPRESSION_ZSTD/*/unary/error
-Duplicate Metadata/*/Protocol:PROTOCOL_CONNECT/*/Compression:COMPRESSION_ZSTD/*/unary/success
-Errors/*/Protocol:PROTOCOL_CONNECT/*/Compression:COMPRESSION_GZIP/*/unary/*
-Errors/*/Protocol:PROTOCOL_CONNECT/*/Compression:COMPRESSION_ZSTD/*/unary/*
-HTTP to RPC Code Mapping/*/Protocol:PROTOCOL_CONNECT/*/Compression:COMPRESSION_GZIP/*/*
-HTTP to RPC Code Mapping/*/Protocol:PROTOCOL_CONNECT/*/Compression:COMPRESSION_ZSTD/*/*
-Timeouts/*/Protocol:PROTOCOL_CONNECT/*/Compression:COMPRESSION_GZIP/*/unary
-Timeouts/*/Protocol:PROTOCOL_CONNECT/*/Compression:COMPRESSION_ZSTD/*/unary
-#
 # A unary or client-stream response must carry exactly one message (gRPC's statuscodes.md:
 # UNIMPLEMENTED for a cardinality violation). connect-zig's client reads each message with
 # `Response.next` and checks no count, so a response with none, or with two, reads as a success.

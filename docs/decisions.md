@@ -187,6 +187,16 @@ first. Cite an entry by number in code and commits ("decision 6").
     compressed, whose head names its coding, go through scratch storage as before. A 16 KB
     stream message takes 0.38 us against 3.3 us. Beaten: always encoding into scratch, one copy
     per message more.
+    Amended by the owner on 2026-11-09: a client compresses each request message in the coding
+    it asked for, as connect-go does, whether or not the coding shrinks it. Its head names the
+    coding: Content-Encoding for a Connect unary request, connect-content-encoding or
+    grpc-encoding for a stream, and each envelope is flagged compressed. `client.Options`
+    gains `compress_len_min`, default 0, below which a message goes as it is, so a program may
+    still skip tiny messages. A server's replies keep the floor of 1 KiB and the shrink test: the
+    Connect protocol ("Compression") and PROTOCOL-HTTP2.md ("Message-Encoding") let a sender
+    send any message uncompressed, and the reply's head names the coding it chose. Beaten: the
+    shrink test on requests, which sent a Connect unary request under 1 KiB with no
+    Content-Encoding, so a server that checks the coding it was promised refused it.
 
 23. **The plugin reads editions 2023 and 2024, and the runtime writes groups.** The plugin
     resolves three features for each field, from its file down through its messages: presence,
