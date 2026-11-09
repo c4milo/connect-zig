@@ -41,6 +41,15 @@ pub const limits = struct {
     /// The most elements an iterator over a `Repeated` field yields. An element takes at least
     /// one byte, so a message of `message_len_max` bytes holds no more.
     pub const elements_max: usize = message_len_max;
+    /// The octets `encode` sets aside for a nested message's length before it writes the
+    /// message: 2 hold any length below 2^14, which most children have. A child whose length
+    /// takes another count of octets moves once, when its length is known.
+    pub const child_length_guess_len = 2;
+    /// The octets a short child moves as one chunk when the buffer holds that many past it: one
+    /// AVX2 register, two SSE ones. A store past the child's end lands in room no one has written
+    /// yet. 32 moved Medium's 40-octet addresses with no call; 64 saved 1% more there
+    /// (`tools/perf_check.sh`, 2026-11-09).
+    pub const child_move_chunk_len = 32;
     /// The length a nested message's prefix takes when the JSON transcoder writes it before it
     /// knows the length: 5 bytes hold any length below 2^35, padded with continuation bits.
     pub const padded_length_len = 5;

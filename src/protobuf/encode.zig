@@ -190,8 +190,8 @@ fn encode_child(comptime M: type, comptime kind: Kind, number: u32, child: *cons
     const tag_end = writer.len;
     const tag_sink_len = sink.len;
     write_child_once(M, child, sink, writer) catch |failure| switch (failure) {
-        // The placeholder took up to four octets more than the length will. In a buffer sized
-        // to the message, measure first, then write.
+        // The guess took an octet more than the length will, or a longer length found no room
+        // past the child. In a buffer sized to the message, measure first, then write.
         error.NoSpaceLeft => {
             writer.len = tag_end;
             sink.len = tag_sink_len;
@@ -207,22 +207,44 @@ fn write_child_measured(comptime M: type, child: *const M, sink: *Sink) Error!vo
     try encode_message(M, child, sink);
 }
 
-/// Writes a child once, behind a placeholder for its length, then writes the length and moves the
-/// child up to meet it. Measuring the child first would walk its subtree at every level of
-/// nesting, and a deep message would cost its depth times its size.
+/// Writes a child once, behind `child_length_guess_len` octets set aside for its length, then
+/// writes the length there. Only a child whose length takes another count of octets moves, to
+/// meet it. Measuring the child first would walk its subtree at every level of nesting, and a
+/// deep message would cost its depth times its size.
 fn write_child_once(comptime M: type, child: *const M, sink: *Sink, writer: *wire.Writer) Error!void {
-    const at = try writer.padded_varint();
+    const guess_len = constants.limits.child_length_guess_len;
+    if (guess_len > writer.buffer.len - writer.len) return error.NoSpaceLeft;
+    const at = writer.len;
+    writer.len += guess_len;
     const start = writer.len;
     const sink_start = sink.len;
     try encode_message(M, child, sink);
     const child_len = writer.len - start;
     assert(sink.len - sink_start == child_len);
     const prefix_len = wire.varint_len(child_len);
-    @memmove(writer.buffer[at + prefix_len ..][0..child_len], writer.buffer[start..writer.len]);
+    if (prefix_len != guess_len) {
+        // A longer length moves the child forward, past the octets it has written.
+        if (prefix_len > guess_len and prefix_len - guess_len > writer.buffer.len - writer.len) return error.NoSpaceLeft;
+        move_child(writer, at + prefix_len, start, child_len);
+    }
     writer.len = at;
     try writer.varint(child_len);
+    assert(writer.len == at + prefix_len);
     writer.len += child_len;
     sink.len += prefix_len;
+}
+
+/// Moves a child's `len` octets from `from` to `to`. A short one moves as one chunk, without a
+/// call, when the buffer holds a chunk past `from`; the chunk's tail lands past the child, in
+/// room the writer has not handed out.
+fn move_child(writer: *wire.Writer, to: usize, from: usize, len: usize) void {
+    const chunk_len = constants.limits.child_move_chunk_len;
+    if (len <= chunk_len and @max(to, from) + chunk_len <= writer.buffer.len) {
+        const chunk: [chunk_len]u8 = writer.buffer[from..][0..chunk_len].*;
+        writer.buffer[to..][0..chunk_len].* = chunk;
+        return;
+    }
+    @memmove(writer.buffer[to..][0..len], writer.buffer[from..][0..len]);
 }
 
 fn encode_repeated(comptime field: Field, comptime F: type, item: *const F, sink: *Sink) Error!void {
