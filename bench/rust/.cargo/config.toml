@@ -1,0 +1,3 @@
+# Builds for this machine's CPU, as `zig build bench` does by default.
+[build]
+rustflags = ["-C", "target-cpu=native"]

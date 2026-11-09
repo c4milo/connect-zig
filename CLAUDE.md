@@ -104,8 +104,10 @@ confirm a test fails. Report `CAUGHT` or `NOT CAUGHT` per mutation in the commit
   gRPC-Web, over h2 and h3, and with curl over h11 and h2, all over TLS with the test CA, and
   checks that Chat answers full-duplex. It needs buf, curl and python3.
 - Benchmark: `zig build bench` times binary and JSON encode and decode, ReleaseFast;
-  `tools/bench_check.sh` runs the Go benchmark in `bench/go` beside it and checks both write the
-  same bytes. `tools/ci.sh` runs `zig build bench -- --quick`.
+  `tools/bench_check.sh` runs the Go benchmark in `bench/go` and, when cargo is on the path, the
+  Rust one on Buffa in `bench/rust` beside it, and checks each writes the same bytes as Zig. The
+  Rust build needs buf, or `BUF` naming it. `tools/ci.sh` runs `zig build bench -- --quick`, and
+  its `bench-compare` check runs `tools/bench_check.sh`.
 - Coverage: `tools/coverage_check.sh` compares every protobuf type with Go's runtime through
   `buf convert`, over the JSON cases in `examples/testdata/`, and the binary cases with upb's,
   Python's protobuf pinned in `tools/upb_requirements.txt`, for closed enums and unchecked

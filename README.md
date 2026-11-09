@@ -226,13 +226,15 @@ and a server on a socket. Each checks itself, and
 
 ## Performance
 
-`zig build bench` times eight messages, and `tools/bench_check.sh` runs Go's
-`google.golang.org/protobuf` v1.36.12 beside it on the same inputs and checks both write the same
-bytes. Each cell is Go's time over connect-zig's: above 1 means connect-zig is faster. The numbers
-come from CI's `go-bench` job of commit `7a1d092`
+`zig build bench` times eight messages. `tools/bench_check.sh` runs two baselines beside it on
+the same inputs: Go's `google.golang.org/protobuf` v1.36.12, and Buffa, the Rust runtime of
+connect-rust. It checks that each writes the same bytes as connect-zig. Each cell is Go's time
+over connect-zig's: above 1 means connect-zig is faster. The numbers come from CI's `go-bench`
+job of commit `7a1d092`
 ([run 48](https://github.com/c4milo/connect-zig/actions/runs/42553593664)), on GitHub's
-`ubuntu-24.04` runner, a Zen 4 core. Both programs ran in the same job. Every run of the job
-publishes the full table, with the four one-kind messages, in its summary.
+`ubuntu-24.04` runner, a Zen 4 core, before the job ran Buffa. Both programs ran in the same job.
+The job is now `bench-compare`, and each run publishes the full table in its summary: Go's and
+Buffa's times, and the four one-kind messages.
 
 ![connect-zig is 2.2 to 6.5 times faster than Go's protobuf runtime, in binary and JSON, encode and decode](docs/images/speed-vs-go.svg)
 

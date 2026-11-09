@@ -14,11 +14,12 @@ paid for.
   `perf` job of CI runs it on each push and pull request (decision 30). A count repeats exactly
   on one build, so a shared runner judges as a quiet machine would.
 - **Time is a filter.** `zig build bench` times each operation in ReleaseFast.
-  `tools/bench_check.sh` runs Go's `google.golang.org/protobuf` on the same inputs beside it, and
-  checks that both write the same octets. A time orders candidates and never lands in a document
-  unless both programs ran in the same job on the same machine. CI's `go-bench` job runs it and
-  adds the table to the job's summary; it fails only when the octets differ, never on a time. The
-  README's table comes from one named run of that job.
+  `tools/bench_check.sh` runs Go's `google.golang.org/protobuf` and Rust's Buffa on the same
+  inputs beside it, and checks that each writes the same octets and the same walk sum as Zig. A
+  time orders candidates and never lands in a document unless every program ran in the same job
+  on the same machine. CI's `bench-compare` job runs it and adds the table to the job's summary;
+  it fails only when the octets differ, never on a time. The README's table comes from one named
+  run of that job.
 - **The smoke run.** `zig build bench -- --quick` runs every operation on every message in a few
   short batches. CI's `bench` job runs it, so a broken operation fails before anyone times it.
 - **A profile shows where the cost goes, and is never a measurement.** Run callgrind on
@@ -55,6 +56,14 @@ benchmark builds stdx's modules in ReleaseFast too, so no count includes a safet
 - **Go's `google.golang.org/protobuf`**, at the version `bench/go/go.mod` pins, on the same
   inputs. It is the runtime most Connect services use. The comparison reads only its output and
   its time, never its source.
+- **Rust's Buffa**, the protobuf runtime of connect-rust, at the version `bench/rust/Cargo.lock`
+  pins, on the same inputs. `bench/rust` builds with link-time optimization and for the
+  machine's CPU, as `zig build bench` does. A map field is a `BTreeMap`, so Buffa writes map
+  entries in key order, as Go's deterministic marshaling does. Binary decoding builds Buffa's
+  zero-copy view, whose strings point into the input, as connect-zig's do. JSON decoding builds
+  the owned message, the only form Buffa's serde code decodes JSON to. The bench reads only its
+  output and its time, never its source. `tools/bench_check.sh` runs it when `cargo` is on the
+  path, and leaves its columns `absent` otherwise.
 - **upb**, through Python's protobuf pinned in `tools/upb_requirements.txt`, checks closed enums
   and unchecked strings for correctness. It is not a speed baseline.
 
@@ -121,7 +130,7 @@ tools/perf_check.sh --write      # write a new baseline, in the commit that pays
 zig build bench                  # time every operation, ReleaseFast
 zig build bench -- --quick       # the smoke run CI runs
 zig build costs                  # time the costs table on this machine
-tools/bench_check.sh             # time connect-zig beside Go's runtime, and compare the octets
+tools/bench_check.sh             # time connect-zig beside Go's and Rust's runtimes, compare octets
 zig build install-bench -Dcpu=x86_64_v3
 valgrind --tool=callgrind --collect-atstart=no zig-out/bin/bench --instructions
 callgrind_annotate callgrind.out.<pid>   # the profile, by function and by line

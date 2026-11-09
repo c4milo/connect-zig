@@ -12,7 +12,7 @@
 # apart in GitHub.
 set -eu
 cd "$(dirname "$0")/.."
-checks="format commits test release bench costs go-bench perf generated interop interop-languages coverage conformance"
+checks="format commits test release bench costs bench-compare perf generated interop interop-languages coverage conformance"
 only=""
 case "${1:-}" in
     --list)
@@ -62,11 +62,12 @@ check() {
         # The costs table of docs/performance.md, timed on this runner: the table goes to the report.
         # It reports and never gates, since a shared runner can time any row badly.
         costs) report_only costs "$(zig build costs 2>&1)" ;;
-        # Go's runtime beside connect-zig's on the same inputs: the README's table comes from one
-        # such run. The times report and never gate; the octets of both runtimes must match.
-        go-bench) go_bench="$(tools/bench_check.sh 2>&1)" && go_status=0 || go_status=$?
-            report_only go-bench "${go_bench}"
-            return "${go_status}" ;;
+        # Go's runtime and Rust's Buffa beside connect-zig's on the same inputs: the README's
+        # table comes from one such run. The times report and never gate; the octets of every
+        # runtime must match.
+        bench-compare) compare="$(tools/bench_check.sh 2>&1)" && compare_status=0 || compare_status=$?
+            report_only bench-compare "${compare}"
+            return "${compare_status}" ;;
         perf) tools/perf_check.sh ;;
         generated) tools/generate_check.sh ;;
         interop) tools/interop_check.sh ;;
