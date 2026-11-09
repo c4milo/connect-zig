@@ -184,4 +184,5 @@ test "the root exports the names a program calls" {
 test {
     std.testing.refAllDecls(files);
     _ = @import("exchange_test.zig");
+    _ = @import("client_response_test.zig");
 }

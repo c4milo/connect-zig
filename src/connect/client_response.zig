@@ -62,7 +62,7 @@ pub const Response = struct {
         assert(!incoming.streamed or (speaks.enveloped and incoming.body.len == 0));
         if (incoming.status != constants.protocol.status.ok) {
             response.done = true;
-            response.failure = http_failure(speaks, incoming.*, storage.*);
+            response.failure = http_failure(speaks, incoming.*, storage.*, decoders.*);
             return response;
         }
         const coding_name = coding_header(speaks);
@@ -158,10 +158,11 @@ pub const Response = struct {
     fn read_end(response: *Response, last: envelope.Envelope) Error!void {
         response.done = true;
         if (!response.reader.at_end()) return error.InvalidEnvelope;
+        const payload = try response.inflated(last);
         switch (response.speaks.protocol) {
             .connect => {
                 if (!last.flags.end_stream) return error.InvalidEnvelope;
-                const end = end_stream.decode(last.payload, &.{
+                const end = end_stream.decode(payload, &.{
                     .tokens = response.storage.scratch.tokens,
                     .octets = response.storage.octets,
                     .details = response.storage.details,
@@ -175,7 +176,7 @@ pub const Response = struct {
             },
             .grpc_web => {
                 if (!last.flags.trailers) return error.InvalidEnvelope;
-                const lines = trailers.read_web_frame(last.payload, response.storage.metadata) catch {
+                const lines = trailers.read_web_frame(payload, response.storage.metadata) catch {
                     response.failure = .{ .code = .internal, .message = "malformed trailers frame" };
                     return;
                 };
@@ -184,6 +185,14 @@ pub const Response = struct {
             },
             .grpc => return error.InvalidEnvelope,
         }
+    }
+
+    /// The payload of the last envelope, inflated when its flags say it is compressed. Connect
+    /// protocol, "Streaming-Response": the end-stream message is compressed like any message.
+    /// PROTOCOL-WEB.md, "Protocol differences vs gRPC over HTTP/2": the trailers frame is a
+    /// message, so its compressed flag means the same.
+    fn inflated(response: *const Response, last: envelope.Envelope) Error![]const u8 {
+        return message_codec.open(last.flags.compressed, response.coding, response.decoders, last.payload, response.storage.scratch.message);
     }
 
     fn end_without_status(response: *Response) ?[]const u8 {
@@ -222,12 +231,17 @@ fn coding_header(speaks: protocol.Speaks) []const u8 {
 
 /// The error of a response whose HTTP status is not 200: a Connect error body when there is one,
 /// else the code the status maps to (Connect protocol, "HTTP to Error Code").
-fn http_failure(speaks: protocol.Speaks, incoming: Incoming, storage: Storage) RpcError {
+fn http_failure(speaks: protocol.Speaks, incoming: Incoming, storage: Storage, decoders: compression.Decoders) RpcError {
     const fallback: RpcError = .{ .code = Code.from_http_status(incoming.status) };
     if (speaks.protocol != .connect) return fallback;
     const content_type = incoming.headers.find("content-type") orelse return fallback;
     if (!std.mem.startsWith(u8, content_type, "application/json")) return fallback;
-    const failure = error_json.decode(incoming.body, &.{ .tokens = storage.scratch.tokens, .octets = storage.octets, .details = storage.details }) catch return fallback;
+    // Connect protocol, "Unary-Response": Content-Encoding names the coding of the body, an
+    // error's JSON included.
+    const coding_name = incoming.headers.find("content-encoding") orelse "identity";
+    const coding = compression.Coding.from_name(coding_name) orelse return fallback;
+    const body = compression.decompress(coding, decoders, incoming.body, storage.scratch.message) catch return fallback;
+    const failure = error_json.decode(body, &.{ .tokens = storage.scratch.tokens, .octets = storage.octets, .details = storage.details }) catch return fallback;
     return failure;
 }
 
