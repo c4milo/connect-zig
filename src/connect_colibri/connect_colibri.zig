@@ -48,8 +48,8 @@ comptime {
 
 test "the root exports the names a program calls" {
     try @import("public_names").expect(@This(), &.{
-        "constants",         "Route",      "RouteOptions", "Codings",  "post",       "get",
-        "Refusals",          "Call",       "Sender",       "Receiver", "ClientCall", "ClientCallOptions",
+        "constants",         "Route",      "RouteOptions",    "Codings",     "post",       "get",
+        "Refusals",          "Call",       "Sender",          "Receiver",    "ClientCall", "ClientCallOptions",
         "ClientCallBuffers", "failure_of", "ClientSendError", "full_duplex",
     });
 }
