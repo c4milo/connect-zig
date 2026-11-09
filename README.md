@@ -259,7 +259,9 @@ Buffa's times, and the four one-kind messages.
 - `tools/conformance_check.sh` runs the [connectrpc conformance
   suite](https://github.com/connectrpc/conformance) v1.0.4 against a conformance server: 2714
   cases in Connect, gRPC and gRPC-Web, over h11 and h2, in proto and JSON, with gzip and zstd.
-  All 2714 pass.
+  All 2714 pass. It then runs the suite's reference server against the conformance client:
+  8264 cases, over h11, h2 and h3, in cleartext and over TLS. 7349 pass, and
+  `conformance/client_known_failing.txt` lists the rest with their reasons.
 - `tools/interop_languages_check.sh` calls the server from [clients in other
   languages](interop): connect-go and grpc-go, connect-es on Node, Python's grpcio, and Rust's
   tonic and connect-rust. Each echoes every coverage case, in every protocol, codec and
@@ -291,7 +293,7 @@ Still to come:
 
 - [x] The [connectrpc conformance suite](https://github.com/connectrpc/conformance) against the
   server
-- [ ] The conformance suite against the client
+- [x] The conformance suite against the client, with its known failures listed
 - [x] HTTP/3 on the socket server, over a UDP socket
 - [x] zstd compression of messages, both ways
 - [ ] brotli compression of messages, once stdx ships its encoder
@@ -317,7 +319,7 @@ zig build test            # the lint, every module's tests and the examples
 tools/generate_check.sh   # buf generate still writes examples/gen and bench/gen
 tools/interop_check.sh    # buf curl and curl against the example server
 tools/coverage_check.sh   # every protobuf type against Go's runtime
-tools/conformance_check.sh  # the connectrpc conformance suite against the server
+tools/conformance_check.sh  # the connectrpc conformance suite against the server and client
 tools/interop_languages_check.sh  # Go, TypeScript, Python and Rust clients against the server
 tools/perf_check.sh       # instructions of each benchmark operation against the baseline
 tools/bench_check.sh      # the benchmark beside Go's

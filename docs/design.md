@@ -111,7 +111,7 @@ Each step names the check that proves it. A step is done when its check passes i
    one `<file>.pb.zig` for each file. Check: CI runs `buf generate` with a pinned buf over
    `examples/`, and the output equals the committed code.
 7. **Conformance.** The connectrpc conformance suite against the client and the server. Check:
-   the suite's report, pinned to a release.
+   the suite's report, pinned to a release, for both halves.
 8. **Calls, interceptors and full-duplex streams.** `Call` exposes the protocol, codec,
    timeout and request headers, and takes response headers and trailers. Interceptors run on
    both sides, and type handlers stream (decisions 18 and 19). New public names:
@@ -296,8 +296,27 @@ ran on Linux x86-64 with Zig 0.16.0.
   pass, with no instruction count moved. `tools/interop_check.sh` printed 48 calls answered,
   conformance 2714 of 2714, and `tools/interop_languages_check.sh` 507 calls passed.
 
+- **Step 7, the client half.** `tools/conformance_check.sh` runs runner v1.0.4 in client mode
+  against `zig build conformance-client` (decision 26 as amended): 8264 cases in Connect, gRPC and
+  gRPC-Web, over h11, h2 and h3, in cleartext and over TLS, proto and JSON, identity, gzip and
+  zstd, every stream type, Connect GET, timeouts, cancels and the 1 MiB receive limit. 7349
+  pass, and the rest fail on purpose, listed with their reasons in
+  `conformance/client_known_failing.txt` and `client_known_flaky.txt`. The server still passes
+  2714 of 2714. The suite found these faults in `connect`'s client, now fixed:
+  - a program could add 8 headers, and the runner sends 9; `extra_headers_max` is 16;
+  - a compressed end-stream message, trailers frame or Connect error body was read compressed;
+  - an error body's null, missing or unknown code read `unknown`, not the HTTP status's code,
+    and an end-stream's `"error": null` failed the stream;
+  - a message past the client's receive limit failed `internal`, not `resource_exhausted`, and a
+    Connect unary body was not bounded at all;
+  - a 200 response of another media type or codec was read as the protocol's;
+  - a head's `grpc-status` counted even when a body or trailers followed it.
+
 ### What a later step owes
 
-- The connectrpc conformance suite against the client (step 7). colibri's client now exposes
-  trailers and streams a request body, so nothing below connect-zig blocks it.
+- The client cases of `conformance/client_known_failing.txt`. Each needs a ruling or a change
+  below the program: a Connect unary request under 1 KiB that goes uncompressed whatever coding
+  the client names (decision 22); a cardinality check on a unary or client-stream response,
+  which needs `connect.client.Response` to know its method's stream type; and a status outside
+  100 to 599, which colibri reads as malformed.
 - Long server streams written at `on_writable` (decision 12).

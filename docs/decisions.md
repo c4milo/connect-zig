@@ -229,6 +229,14 @@ first. Cite an entry by number in code and commits ("decision 6").
     reason; the runner fails when a listed case passes. The client half waits on colibri's
     client (decision 11). Beaten: the runner's reference server against our client alone, which
     leaves the server untested; and a copy of the loop in each program.
+    Amended on 2026-11-09: the client half no longer waits. `conformance/client.zig` runs the
+    runner's client mode against its reference server, over h11, h2 and h3, in cleartext and
+    over TLS, with the features of `conformance/client_config.yaml`. It drives one
+    `client.ConnectionPool` with `poll` over a TCP and a UDP socket, one case at a time
+    (decision 32): `colibri.Client` takes no streamed exchange and no cancel. Each case it fails
+    on purpose is in `conformance/client_known_failing.txt` with its reason, and each it may fail
+    in `client_known_flaky.txt`. Beaten: a Rotor loop of the program's own, which needs the
+    socket bookkeeping of colibri's `client_tcp.zig` for one connection at a time.
 
 27. **A method Connect does not serve gets 405.** colibri's router answers 501 for a method no
     route of the table names, and 405 with an Allow header for one that a route names on another

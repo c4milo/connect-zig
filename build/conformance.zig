@@ -1,6 +1,7 @@
-//! `zig build conformance-server` builds the conformance server of conformance/ and installs it
-//! to zig-out/bin, where `tools/conformance_check.sh` runs it under the connectrpc conformance
-//! runner (design §8 step 7). `zig build test-conformance` runs its unit tests.
+//! `zig build conformance-server` and `zig build conformance-client` build the conformance server
+//! and client of conformance/ and install them to zig-out/bin, where `tools/conformance_check.sh`
+//! runs each under the connectrpc conformance runner (design §8 step 7). `zig build
+//! test-conformance` runs their unit tests.
 const std = @import("std");
 
 const Graph = @import("graph.zig").Graph;
@@ -14,6 +15,8 @@ pub fn add(b: *std.Build, graph: Graph) *std.Build.Step {
     const config_import: std.Build.Module.Import = .{ .name = "connectrpc_conformance_v1_config", .module = config };
     const service = generated(b, graph, "service", &.{config_import});
     const server_compat = generated(b, graph, "server_compat", &.{config_import});
+    const service_import: std.Build.Module.Import = .{ .name = "connectrpc_conformance_v1_service", .module = service };
+    const client_compat = generated(b, graph, "client_compat", &.{ config_import, service_import });
     const imports = [_]std.Build.Module.Import{
         .{ .name = "protobuf", .module = graph.protobuf },
         .{ .name = "connect", .module = graph.connect },
@@ -23,8 +26,10 @@ pub fn add(b: *std.Build, graph: Graph) *std.Build.Step {
         .{ .name = "colibri", .module = graph.colibri.module("colibri") },
         .{ .name = "tls", .module = graph.colibri.module("tls") },
         config_import,
-        .{ .name = "connectrpc_conformance_v1_service", .module = service },
+        service_import,
         .{ .name = "connectrpc_conformance_v1_server_compat", .module = server_compat },
+        .{ .name = "connectrpc_conformance_v1_client_compat", .module = client_compat },
+        .{ .name = "client", .module = graph.colibri.module("client") },
     };
     const exe = b.addExecutable(.{ .name = "conformance-server", .root_module = b.createModule(.{
         .root_source_file = b.path("conformance/server.zig"),
@@ -35,6 +40,18 @@ pub fn add(b: *std.Build, graph: Graph) *std.Build.Step {
     const install = b.addInstallArtifact(exe, .{});
     b.getInstallStep().dependOn(&install.step);
     b.step("conformance-server", "Build the conformance server into zig-out/bin").dependOn(&install.step);
+
+    // The client half (design §8 step 7): connect-zig's client against the runner's reference
+    // server.
+    const client_exe = b.addExecutable(.{ .name = "conformance-client", .root_module = b.createModule(.{
+        .root_source_file = b.path("conformance/client.zig"),
+        .target = graph.target,
+        .optimize = graph.optimize,
+        .imports = &imports,
+    }) });
+    const client_install = b.addInstallArtifact(client_exe, .{});
+    b.getInstallStep().dependOn(&client_install.step);
+    b.step("conformance-client", "Build the conformance client into zig-out/bin").dependOn(&client_install.step);
 
     const unit = b.addTest(.{ .name = "conformance", .root_module = b.createModule(.{
         .root_source_file = b.path("conformance/conformance_test.zig"),
@@ -47,6 +64,7 @@ pub fn add(b: *std.Build, graph: Graph) *std.Build.Step {
     step.dependOn(&run.step);
     // The test step also builds the server, so a change that breaks it fails `zig build test`.
     step.dependOn(&install.step);
+    step.dependOn(&client_install.step);
     return step;
 }
 

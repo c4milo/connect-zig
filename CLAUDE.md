@@ -113,9 +113,11 @@ confirm a test fails. Report `CAUGHT` or `NOT CAUGHT` per mutation in the commit
   Python's protobuf pinned in `tools/upb_requirements.txt`, for closed enums and unchecked
   strings. It needs buf, jq and python3 with venv.
 - Conformance: `tools/conformance_check.sh` runs connectrpc's conformance runner v1.0.4 against
-  `zig build conformance-server`, with the features of `conformance/config.yaml`. It downloads
-  the runner pinned by SHA-256, unless `CONNECTCONFORMANCE` names one. A case that fails on
-  purpose goes in `conformance/known_failing.txt`, with its reason.
+  `zig build conformance-server`, with the features of `conformance/config.yaml`, then in client
+  mode against `zig build conformance-client`, with those of `conformance/client_config.yaml`.
+  It downloads the runner pinned by SHA-256, unless `CONNECTCONFORMANCE` names one. A case that
+  fails on purpose goes in `conformance/known_failing.txt` or `client_known_failing.txt`, with
+  its reason; one that may fail goes in `client_known_flaky.txt`.
 - Interop across languages: `tools/interop_languages_check.sh [client...]` runs the clients of
   `interop/` (Go, TypeScript, Python, and Rust's tonic and connect-rust) against the socket
   server; `interop/README.md` holds their contract. It needs buf, go, node with npm, python3 with venv, and cargo.

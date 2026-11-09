@@ -1,0 +1,36 @@
+# The features of connect-zig's client that the connectrpc conformance runner tests (design §8
+# step 7, the client half). tools/conformance_check.sh passes this file with --conf in client
+# mode. Each feature states what the client does, and nothing more.
+features:
+  versions:
+    - HTTP_VERSION_1
+    - HTTP_VERSION_2
+    # h3 over QUIC, which runs TLS alone.
+    - HTTP_VERSION_3
+  protocols:
+    - PROTOCOL_CONNECT
+    - PROTOCOL_GRPC
+    - PROTOCOL_GRPC_WEB
+  codecs:
+    - CODEC_PROTO
+    - CODEC_JSON
+  # The client reads br too, but writes identity, gzip and zstd alone (decision 10).
+  compressions:
+    - COMPRESSION_IDENTITY
+    - COMPRESSION_GZIP
+    - COMPRESSION_ZSTD
+  stream_types:
+    - STREAM_TYPE_UNARY
+    - STREAM_TYPE_CLIENT_STREAM
+    - STREAM_TYPE_SERVER_STREAM
+    - STREAM_TYPE_HALF_DUPLEX_BIDI_STREAM
+    - STREAM_TYPE_FULL_DUPLEX_BIDI_STREAM
+  supports_h2c: true
+  # TLS with the runner's server certificate as the root the client trusts. The client presents
+  # no certificate of its own.
+  supports_tls: true
+  supports_tls_client_certs: false
+  supports_trailers: true
+  supports_half_duplex_bidi_over_http1: true
+  supports_connect_get: true
+  supports_message_receive_limit: true

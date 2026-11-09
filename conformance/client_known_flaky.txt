@@ -1,0 +1,8 @@
+# The conformance cases the client may fail or pass, each group with its reason (decision 26).
+# `*` stands for one part of a case's name.
+#
+# A Connect unary request in gzip or zstd fails as client_known_failing.txt says, when the
+# reference server reads its head: a request under 1 KiB goes uncompressed. A cancel 5 ms after
+# the send can land first, and then the server checks no coding and the case passes.
+Client Cancellation/*/Protocol:PROTOCOL_CONNECT/*/Compression:COMPRESSION_GZIP/*/unary/cancel-after-close-send
+Client Cancellation/*/Protocol:PROTOCOL_CONNECT/*/Compression:COMPRESSION_ZSTD/*/unary/cancel-after-close-send
