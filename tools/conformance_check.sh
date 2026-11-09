@@ -31,7 +31,8 @@ client_log="$(mktemp)"
 trap 'rm -f "${server_log}" "${client_log}"' EXIT
 status=0
 "${runner}" --mode server --conf conformance/config.yaml \
-    --known-failing @conformance/known_failing.txt -- zig-out/bin/conformance-server >"${server_log}" 2>&1 || status=$?
+    --known-failing @conformance/known_failing.txt --known-flaky @conformance/known_flaky.txt \
+    -- zig-out/bin/conformance-server >"${server_log}" 2>&1 || status=$?
 cat "${server_log}"
 "${runner}" --mode client --conf conformance/client_config.yaml \
     --known-failing @conformance/client_known_failing.txt --known-flaky @conformance/client_known_flaky.txt \

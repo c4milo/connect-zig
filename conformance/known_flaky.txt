@@ -1,0 +1,9 @@
+# The conformance cases the server may fail, each with its reason. The runner passes them either
+# way, so a timing that colibri does not control fails no run (decision 26).
+#
+# Over h11, the runner's client sends a body with a method the server does not serve. colibri's
+# router answers 405 before it reads the body, then closes the connection, so a client still
+# writing the body sees a broken pipe and reports unavailable. RFC 9112 section 9.6 asks a server
+# to keep reading a while before it closes ("lingering close"), as Go's net/http does; that is
+# colibri's connection handling, asked of colibri on 2026-11-09.
+*/HTTPVersion:1/*/unexpected-verb
