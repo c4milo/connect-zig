@@ -166,16 +166,19 @@ pub fn parse_float(comptime V: type, octets: []const u8, from_string: bool) Deco
 /// The octets base64 text decodes to, written into `writer` after their length, in standard or
 /// URL-safe base64, with or without padding ("JSON Mapping", bytes).
 pub fn write_base64_field(octets: []const u8, writer: *wire.Writer) DecodeError!void {
-    const url_safe = std.mem.indexOfAny(u8, octets, "-_") != null;
     const padded = octets.len % base64_chars == 0 and octets.len != 0 and octets[octets.len - 1] == '=';
-    const decoder = if (url_safe)
-        (if (padded) std.base64.url_safe.Decoder else std.base64.url_safe_no_pad.Decoder)
-    else
-        (if (padded) std.base64.standard.Decoder else std.base64.standard_no_pad.Decoder);
-    const len = decoder.calcSizeForSlice(octets) catch return error.InvalidBase64;
+    const standard = if (padded) std.base64.standard.Decoder else std.base64.standard_no_pad.Decoder;
+    const url_safe = if (padded) std.base64.url_safe.Decoder else std.base64.url_safe_no_pad.Decoder;
+    // The alphabets differ in two letters alone (RFC 4648 §5), so a text has one size in both.
+    const len = standard.calcSizeForSlice(octets) catch return error.InvalidBase64;
     try writer.varint(len);
     if (len > writer.buffer.len - writer.len) return error.NoSpaceLeft;
-    decoder.decode(writer.buffer[writer.len..][0..len], octets) catch return error.InvalidBase64;
+    const room = writer.buffer[writer.len..][0..len];
+    // "JSON Mapping", bytes: a parser accepts either alphabet. A text the standard one refuses is
+    // read again as URL-safe into the same room, and a text that mixes the two fails both.
+    standard.decode(room, octets) catch {
+        url_safe.decode(room, octets) catch return error.InvalidBase64;
+    };
     writer.len += len;
 }
 
@@ -232,4 +235,7 @@ test "base64 decodes in either alphabet, padded or not" {
     }
     var writer: wire.Writer = .{ .buffer = &buffer };
     try testing.expectError(error.InvalidBase64, write_base64_field("A!", &writer));
+    // A text that mixes the alphabets is neither.
+    var mixed: wire.Writer = .{ .buffer = &buffer };
+    try testing.expectError(error.InvalidBase64, write_base64_field("+_8=", &mixed));
 }

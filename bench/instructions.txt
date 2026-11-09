@@ -5,8 +5,8 @@ deep JSON encode|120360
 deep binary decode+walk|39481
 deep binary decode|19113
 deep binary encode|17578
-large JSON decode+walk|15805941
-large JSON decode|13056219
+large JSON decode+walk|14854942
+large JSON decode|12105220
 large JSON encode|11404354
 large binary decode+walk|3014057
 large binary decode|1134335
