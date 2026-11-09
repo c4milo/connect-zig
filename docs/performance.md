@@ -66,16 +66,17 @@ them with `bench/costs.zig`, in ReleaseFast, and prints each median of five runs
 spread. CI's `costs` job runs it through `tools/ci.sh --only costs` and adds the table to the
 job's summary. It reports and never fails CI: a shared runner can time any row badly, and a row
 below the floor a real measurement gives, such as a mispredict under 1 ns, is marked suspect and
-raises a warning. No run is recorded here yet: the table below takes the numbers of one CI run,
-with the run's link, the runner's CPU and the commit.
+raises a warning. The table below holds one CI run: the `costs` job of commit `dc3f24a`, on
+GitHub's `ubuntu-24.04` runner, a Zen 4 core (`znver4`), in ReleaseFast. Each median is of five
+runs. The mispredict's spread is wide, so a claim that turns on it measures it again.
 
 | Cost | Median | Spread | Run |
 | --- | ---: | ---: | --- |
-| First-level cache hit, ns per load | not measured | | |
-| Main-memory read, ns per load | not measured | | |
-| Branch mispredict, ns | not measured | | |
-| Copy of 64 KiB, ns | not measured | | |
-| System call (`getpid`), ns | not measured | | |
+| First-level cache hit, ns per load | 1.37 | 0.6% | [42546253012](https://github.com/c4milo/connect-zig/actions/runs/42546253012) |
+| Main-memory read, ns per load | 152.73 | 0.8% | [42546253012](https://github.com/c4milo/connect-zig/actions/runs/42546253012) |
+| Branch mispredict, ns | 3.18 | 16.4% | [42546253012](https://github.com/c4milo/connect-zig/actions/runs/42546253012) |
+| Copy of 64 KiB, ns | 1148.59 | 0.6% | [42546253012](https://github.com/c4milo/connect-zig/actions/runs/42546253012) |
+| System call (`getpid`), ns | 144.39 | 0.4% | [42546253012](https://github.com/c4milo/connect-zig/actions/runs/42546253012) |
 
 ## The fast paths the judge guards
 
