@@ -1,7 +1,7 @@
 // The service tools/interop_languages_check.sh calls from clients in other languages: Go's
-// connect-go and grpc-go, TypeScript's connect-es, Python's grpcio and Rust's tonic. Each RPC
-// shape is here once, and each message carries coverage.v1.Everything, which holds every protobuf
-// type, so a client checks the protocol and the data types together.
+// connect-go and grpc-go, TypeScript's connect-es, Python's grpcio, and Rust's tonic and
+// connect-rust. Each RPC shape is here once, and each message carries coverage.v1.Everything,
+// which holds every protobuf type, so a client checks the protocol and the data types together.
 syntax = "proto3";
 
 package interop.v1;

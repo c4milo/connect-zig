@@ -11,6 +11,7 @@ Clients written in other languages call connect-zig's server, the socket server 
 | [typescript](typescript) | connect-es on Node | Connect, gRPC and gRPC-Web |
 | [python](python) | grpcio | gRPC |
 | [rust](rust) | tonic | gRPC |
+| [connect-rust](connect-rust) | connect-rust's `connectrpc` on Buffa | Connect in proto and JSON, over h2 and HTTP/1.1, with GET; gRPC and gRPC-Web |
 
 ## The contract
 
@@ -56,3 +57,21 @@ deterministic option where it has one; NaN rules out equality checks that compar
 | `chat` | `Chat` answers each case before the client sends the next, over h2. |
 | `fail` | `Fail` with code 5 and message "gone" fails with not_found, "gone", and one detail of type `interop.v1.FailRequest` that holds the request. |
 | `inspect` | `Inspect` with a 5 s timeout and the header `x-interop-client: <client>` answers with a timeout between 1 and 5010 ms and the header, and sends the header back as a response header and as a trailer. grpc-core rounds a deadline up to the next 10 ms, hence 5010. |
+
+## What connect-rust leaves out
+
+The connect-rust client runs Connect in proto over h2 (`connect-proto`), in JSON over h2
+(`connect-json`) and in proto over HTTP/1.1 (`connect-h1`), then gRPC and gRPC-Web over h2. It
+leaves out these scenarios, which its library cannot express:
+
+- `chat` over HTTP/1.1. No response arrives until the upload completes, so a bidirectional stream
+  is not full duplex there. connect-go's `connect-h1` run leaves it out too.
+- `echo-get` in gRPC and gRPC-Web, which send every call as a POST.
+
+Two notes on how it compares messages:
+
+- Buffa's `google.protobuf.Struct` holds its fields in a `HashMap`, and no option writes them in
+  key order. Where two messages write different octets, the client compares their proto3 JSON as
+  a JSON value, whose objects ignore key order.
+- JSON's `"NaN"` holds no payload, so a NaN comes back from a JSON echo with Rust's bits, not the
+  case's. In `connect-json`, the client expects each case as Buffa's own JSON round trip gives it.

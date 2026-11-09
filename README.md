@@ -261,9 +261,10 @@ Buffa's times, and the four one-kind messages.
   cases in Connect, gRPC and gRPC-Web, over h11 and h2, in proto and JSON, with gzip and zstd.
   All 2714 pass.
 - `tools/interop_languages_check.sh` calls the server from [clients in other
-  languages](interop): connect-go and grpc-go, connect-es on Node, Python's grpcio and Rust's
-  tonic. Each echoes every coverage case, in every protocol, codec and compression its library
-  speaks, and runs every stream shape, a typed error, a timeout, headers and trailers: 507 calls.
+  languages](interop): connect-go and grpc-go, connect-es on Node, Python's grpcio, and Rust's
+  tonic and connect-rust. Each echoes every coverage case, in every protocol, codec and
+  compression its library speaks, and runs every stream shape, a typed error, a timeout, headers
+  and trailers: 713 calls.
 - `tools/perf_check.sh` counts the instructions of each benchmark operation under callgrind and
   fails when one takes more than 2% above `bench/instructions.txt`. Counts do not move with a
   shared runner's load, so CI catches a regression that wall time would hide.

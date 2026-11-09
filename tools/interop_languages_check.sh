@@ -1,12 +1,13 @@
 #!/bin/sh
 # Runs clients written in other languages against connect-zig's server: Go's connect-go and
-# grpc-go, TypeScript's connect-es, Python's grpcio and Rust's tonic (interop/README.md). Each
+# grpc-go, TypeScript's connect-es, Python's grpcio, and Rust's tonic and connect-rust
+# (interop/README.md). Each
 # calls interop.v1.InteropService in every protocol, codec and compression its library speaks,
 # with every case of examples/testdata/coverage, the cases that hold every protobuf type.
 #
 #   tools/interop_languages_check.sh [client...]
 #
-# With no client named, it runs all four. It needs buf, or BUF naming it, and each client's
+# With no client named, it runs all five. It needs buf, or BUF naming it, and each client's
 # toolchain: go, node with npm, python3 with venv, and cargo. With INTEROP_REPORT naming a file,
 # it appends a Markdown table of the results there, and under GitHub Actions it marks each
 # failure as an error annotation.
@@ -14,7 +15,7 @@ set -eu
 cd "$(dirname "$0")/.."
 buf="${BUF:-buf}"
 export BUF="${buf}"
-clients="${*:-go typescript python rust}"
+clients="${*:-go typescript python rust connect-rust}"
 report="${INTEROP_REPORT:-/dev/null}"
 # Each client runs at most this many seconds, toolchain installs on a cold cache included.
 client_seconds=1800
