@@ -112,13 +112,14 @@ test "integers read as the reference reads them, at each type's bounds and on ea
 /// Texts beside a number that a JSON writer does not give, which the general path reads or
 /// refuses: signs, separators, exponents, fractions, bases and spaces.
 const unusual_integers = [_][]const u8{
-    "",             "-",           "+",         "--1",       "-+1",          "+1",
-    "+0",           "-0",          "00",        "-00",       "007",          "1_000",
-    "_1",           "1_",          "1e2",       "-1e2",      "1E2",          "1e-2",
-    "1.0",          "1.5",         "-0.0",      ".5",        "1.",           "0x10",
-    "0b1",          "inf",         "-inf",      "nan",       "Infinity",     " 1",
-    "1 ",           "1a",          "a1",        "9e18",      "-9.3e18",      "1.8e19",
-    "٣",            "1\x00",       "\xff",      "4294967295.0", "2147483647e0", "-2147483648e0",
+    "",      "-",    "+",            "--1",          "-+1",           "+1",
+    "+0",    "-0",   "00",           "-00",          "007",           "1_000",
+    "_1",    "1_",   "1e2",          "-1e2",         "1E2",           "1e-2",
+    "1.0",   "1.5",  "-0.0",         ".5",           "1.",            "0x10",
+    "0b1",   "inf",  "-inf",         "nan",          "Infinity",      " 1",
+    "1 ",    "1a",   "a1",           "9e18",         "-9.3e18",       "1.8e19",
+    "٣",
+    "1\x00", "\xff", "4294967295.0", "2147483647e0", "-2147483648e0",
 };
 
 test "integers read as the reference reads them, from texts a JSON writer does not give" {
@@ -308,11 +309,10 @@ test "float texts read as the reference reads them, with a point at each place" 
 /// Float texts beside the short decimals a JSON writer gives, which the general path reads or
 /// refuses.
 const unusual_floats = [_][]const u8{
-    "",    "-",    ".",   "-.",     ".5",   "-.5",     "1.",       "-1.",     "1.2.3",     "1..2",
-    "+1",  "+1.5", "1e5", "1.5e-3", "1E+2", "0x1p3",   "inf",      "nan",     "1_0.5",     "1.5_0",
-    "1-",  "1.-5", "--1", "-0",     "-0.0", "00.250", "0.000000", " 1.5",    "1.5 ",      "1,5",
-    "1e400", "3.4028235e38", "3.4028236e38", "340282356779733661637539395458142568448",
-    "0.0000000000000000000001", "9007199254740993", "9007199254740993.0", "16777217.0",
+    "",      "-",            ".",            "-.",                                      ".5",                       "-.5",              "1.",                 "-1.",        "1.2.3",                "1..2",
+    "+1",    "+1.5",         "1e5",          "1.5e-3",                                  "1E+2",                     "0x1p3",            "inf",                "nan",        "1_0.5",                "1.5_0",
+    "1-",    "1.-5",         "--1",          "-0",                                      "-0.0",                     "00.250",           "0.000000",           " 1.5",       "1.5 ",                 "1,5",
+    "1e400", "3.4028235e38", "3.4028236e38", "340282356779733661637539395458142568448", "0.0000000000000000000001", "9007199254740993", "9007199254740993.0", "16777217.0",
     // Past maxInt(u64), where 20 digits wrap to 0 and 1.
     "18446744073709551616", "18446744073709551617",
 };
