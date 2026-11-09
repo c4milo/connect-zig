@@ -9,7 +9,7 @@ const cognitive_complexity_max = "15";
 const source_directories = [_][]const u8{ "src", "tools", "build", "examples", "bench", "conformance" };
 
 /// The Markdown files at the root, which the markdown rule reads beside `docs/`.
-const root_documents = [_][]const u8{ "README.md", "CLAUDE.md" };
+const root_documents = [_][]const u8{ "README.md", "CLAUDE.md", "CHANGELOG.md", "CONTRIBUTING.md", "SECURITY.md" };
 
 const commit_lint_range = "origin/main..HEAD";
 

@@ -304,7 +304,7 @@ Still to come:
 
 - [x] The [connectrpc conformance suite](https://github.com/connectrpc/conformance) against the
   server
-- [x] The conformance suite against the client, with its known failures listed
+- [x] The conformance suite against the client
 - [x] HTTP/3 on the socket server, over a UDP socket
 - [x] zstd compression of messages, both ways
 - [ ] brotli compression of messages, once stdx ships its encoder
@@ -337,6 +337,10 @@ tools/interop_servers_check.sh    # the client against Go, TypeScript, Python an
 tools/perf_check.sh       # instructions of each benchmark operation against the baseline
 tools/bench_check.sh      # the benchmark beside Go's
 ```
+
+## Changelog
+
+[CHANGELOG.md](CHANGELOG.md) lists what each release adds and changes.
 
 ## License
 
