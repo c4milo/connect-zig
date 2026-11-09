@@ -1,6 +1,7 @@
 //! The connect-rust interop client: it runs each scenario of interop/README.md through the
 //! `connectrpc` crate, in Connect with proto and JSON, Connect over HTTP/1.1, gRPC and gRPC-Web,
-//! over TLS that trusts the given CA, and prints one `ok:` or `FAIL:` line for each.
+//! over TLS that trusts the given CA, and prints one `ok:` or `FAIL:` line for each. With `serve`
+//! first, it runs the interop server of server.rs instead.
 
 use std::sync::Arc;
 use std::time::Duration;
@@ -15,6 +16,8 @@ use connectrpc::{ConnectError, ErrorCode, Protocol, SpecOrigin};
 use hyper_util::client::legacy::connect::HttpConnector;
 use hyper_util::client::legacy::Client as LegacyClient;
 use hyper_util::rt::TokioExecutor;
+
+mod server;
 
 #[allow(dead_code, clippy::all)]
 mod proto {
@@ -92,16 +95,23 @@ struct Run<T> {
 #[tokio::main]
 async fn main() {
     let args: Vec<String> = std::env::args().collect();
-    if args.len() != 4 {
-        eprintln!("usage: interop-connect-rust <base-url> <cases-dir> <ca>");
-        std::process::exit(2);
-    }
     // An Any in JSON writes its payload as JSON, which needs every type it may hold registered.
     let mut registry = buffa::type_registry::TypeRegistry::new();
     buffa_types::register_wkt_types(&mut registry);
     proto::coverage::v1::register_types(&mut registry);
     proto::interop::v1::register_types(&mut registry);
     buffa::type_registry::set_type_registry(registry);
+    if args.len() == 5 && args[1] == "serve" {
+        if let Err(error) = server::serve(&args[2], &args[3], &args[4]).await {
+            exit(&format!("serving: {error}"));
+        }
+        return;
+    }
+    if args.len() != 4 {
+        eprintln!("usage: interop-connect-rust <base-url> <cases-dir> <ca>");
+        eprintln!("       interop-connect-rust serve <port> <chain> <key>");
+        std::process::exit(2);
+    }
     let cases =
         read_cases(&args[2]).unwrap_or_else(|error| exit(&format!("reading cases: {error}")));
     let tls =
