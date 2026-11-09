@@ -7,12 +7,12 @@
 #   tools/ci.sh --list                      the checks' names, as a JSON array
 #
 # The report gets a line for each check, and the tables of the checks that write one: interop
-# across languages, the costs, the instruction counts and the conformance totals. CI publishes it as the
-# job's summary, and the workflow runs each check of `--list` as a job of its own, so each shows
-# apart in GitHub.
+# across languages in both directions, the costs, the instruction counts and the conformance
+# totals. CI publishes it as the job's summary, and the workflow runs each check of `--list` as a
+# job of its own, so each shows apart in GitHub.
 set -eu
 cd "$(dirname "$0")/.."
-checks="format commits test release bench costs bench-compare perf generated interop interop-languages coverage conformance"
+checks="format commits test release bench costs bench-compare perf generated interop interop-languages interop-servers coverage conformance"
 only=""
 case "${1:-}" in
     --list)
@@ -72,6 +72,7 @@ check() {
         generated) tools/generate_check.sh ;;
         interop) tools/interop_check.sh ;;
         interop-languages) tools/interop_languages_check.sh ;;
+        interop-servers) tools/interop_servers_check.sh ;;
         coverage) tools/coverage_check.sh ;;
         conformance) tools/conformance_check.sh ;;
         *)

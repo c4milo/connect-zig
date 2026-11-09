@@ -93,7 +93,33 @@ pub fn add(b: *std.Build, graph: Graph) *std.Build.Step {
     std_io_check.addArtifactArg(std_io_server);
     b.step("example-std-io", "Call the std.Io server over TCP, with no Rotor").dependOn(&std_io_check.step);
     step.dependOn(&std_io_check.step);
+    step.dependOn(add_interop_client(b, graph, services));
     return step;
+}
+
+/// `zig build interop-client` installs connect-zig's client against the servers of interop/, which
+/// `tools/interop_servers_check.sh` runs. It drives its pool with the conformance client's
+/// transport, over TCP with `poll` (decision 32). Returns the step that runs its unit tests,
+/// which also builds it.
+fn add_interop_client(b: *std.Build, graph: Graph, services: Services) *std.Build.Step {
+    const transport = b.createModule(.{
+        .root_source_file = b.path("conformance/client_transport.zig"),
+        .target = graph.target,
+        .optimize = graph.optimize,
+        .imports = &.{
+            .{ .name = "client", .module = graph.colibri.module("client") },
+            .{ .name = "tls", .module = graph.colibri.module("tls") },
+        },
+    });
+    const exe = program(b, graph, "interop-client", "examples/interop_client.zig", services);
+    exe.root_module.addImport("client_transport", transport);
+    const install = b.addInstallArtifact(exe, .{});
+    b.getInstallStep().dependOn(&install.step);
+    b.step("interop-client", "Build the client of tools/interop_servers_check.sh into zig-out/bin").dependOn(&install.step);
+    const unit = b.addTest(.{ .name = "interop-client", .root_module = exe.root_module });
+    const run = b.addRunArtifact(unit);
+    run.step.dependOn(&install.step);
+    return &run.step;
 }
 
 /// An example that needs no HTTP library: its name, which is its file's, and what it shows.
