@@ -129,3 +129,21 @@ test "a Connect error body is read in the coding its head names" {
     try testing.expectEqual(Code.out_of_range, response.failure.?.code);
     try testing.expectEqualStrings("oops", response.failure.?.message);
 }
+
+test "an error body's missing, null or unknown code is the HTTP status's" {
+    var room: Room = .{};
+    const head: Lines = .{ .lines = &.{.{ .name = "content-type", .value = "application/json" }} };
+    const unauthorized = constants.protocol.status.unauthorized;
+    const null_code = read(connect_unary, unauthorized, &head, "{\"code\":null,\"message\":\"oops\"}", &room);
+    try testing.expectEqual(Code.unauthenticated, null_code.failure.?.code);
+    try testing.expectEqualStrings("oops", null_code.failure.?.message);
+    const missing = read(connect_unary, unauthorized, &head, "{\"message\":\"oops\"}", &room);
+    try testing.expectEqual(Code.unauthenticated, missing.failure.?.code);
+    const unknown = read(connect_unary, constants.protocol.status.too_many_requests, &head, "{\"code\":\"foobar\"}", &room);
+    try testing.expectEqual(Code.unavailable, unknown.failure.?.code);
+    // An end-stream message's null error is none, and its null code is `unknown`.
+    const storage: end_stream.Storage = .{ .tokens = &room.tokens, .octets = &room.octets, .details = &room.details, .metadata = &room.metadata };
+    try testing.expectEqual(@as(?rpc_error.RpcError, null), (try end_stream.decode("{\"error\":null}", &storage)).failure);
+    const null_end = try end_stream.decode("{\"error\":{\"code\":null,\"message\":\"oops\"}}", &storage);
+    try testing.expectEqual(Code.unknown, null_end.failure.?.code);
+}

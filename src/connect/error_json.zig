@@ -52,23 +52,30 @@ pub const Storage = struct {
     details: []Detail,
 };
 
-/// Reads an error body. A code the body does not name, or names wrongly, reads as `unknown`
-/// (Connect protocol, "Error Codes").
 /// What `decode` and `read_object` return on a body they cannot read.
 pub const DecodeError = json_read.Error;
 
+/// Reads an error body. A code the body does not name, names as null, or names wrongly, reads
+/// as `unknown` (Connect protocol, "Error Codes").
 pub fn decode(body: []const u8, storage: *const Storage) DecodeError!RpcError {
+    return decode_or(body, storage, .unknown);
+}
+
+/// Reads an error body whose missing, null or unknown code reads as `fallback`: the code a
+/// client takes from the HTTP status (Connect protocol, "HTTP to Error Code").
+pub fn decode_or(body: []const u8, storage: *const Storage, fallback: Code) DecodeError!RpcError {
     var tokens = json_read.Tokens.init(body, storage.tokens, storage.octets);
     try tokens.start();
     try tokens.expect(.begin_object);
-    const failure = try read_object(&tokens, storage.details);
+    const failure = try read_object(&tokens, storage.details, fallback);
     try tokens.finish();
     return failure;
 }
 
-/// Reads the members of an error object whose `{` was read.
-pub fn read_object(tokens: *json_read.Tokens, details: []Detail) DecodeError!RpcError {
-    var failure: RpcError = .{ .code = .unknown };
+/// Reads the members of an error object whose `{` was read. A missing, null or unknown code
+/// reads as `fallback`.
+pub fn read_object(tokens: *json_read.Tokens, details: []Detail, fallback: Code) DecodeError!RpcError {
+    var failure: RpcError = .{ .code = fallback };
     for (0..tokens.reader.input.len + 1) |_| {
         const member = switch (try tokens.next()) {
             .end_object => return failure,
@@ -76,7 +83,7 @@ pub fn read_object(tokens: *json_read.Tokens, details: []Detail) DecodeError!Rpc
             else => return error.UnexpectedToken,
         };
         switch (member) {
-            .code => failure.code = code_of(try tokens.keep_string()),
+            .code => failure.code = try read_code(tokens, fallback),
             .message => failure.message = try tokens.keep_string(),
             .details => failure.details = try read_details(tokens, details),
             .other => try tokens.skip_value(),
@@ -85,15 +92,26 @@ pub fn read_object(tokens: *json_read.Tokens, details: []Detail) DecodeError!Rpc
     unreachable;
 }
 
+/// The code a `code` member names. Proto3 JSON mapping: a null value is the field's default,
+/// so a null code is no code, as a missing one is.
+fn read_code(tokens: *json_read.Tokens, fallback: Code) DecodeError!Code {
+    return switch (try tokens.next()) {
+        .null => fallback,
+        .string => |name| code_of(name, fallback),
+        else => error.UnexpectedToken,
+    };
+}
+
 const Member = enum { code, message, details, other };
 
 fn member_of(name: []const u8) Member {
     return std.meta.stringToEnum(Member, name) orelse .other;
 }
 
-fn code_of(name: []const u8) Code {
-    const code = Code.from_name(name) orelse return .unknown;
-    return if (code == .ok) .unknown else code;
+fn code_of(name: []const u8, fallback: Code) Code {
+    const code = Code.from_name(name) orelse return fallback;
+    // An error is never `ok`, so the name is as wrong as an unknown one.
+    return if (code == .ok) fallback else code;
 }
 
 fn read_details(tokens: *json_read.Tokens, details: []Detail) json_read.Error![]const Detail {

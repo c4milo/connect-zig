@@ -241,7 +241,9 @@ fn http_failure(speaks: protocol.Speaks, incoming: Incoming, storage: Storage, d
     const coding_name = incoming.headers.find("content-encoding") orelse "identity";
     const coding = compression.Coding.from_name(coding_name) orelse return fallback;
     const body = compression.decompress(coding, decoders, incoming.body, storage.scratch.message) catch return fallback;
-    const failure = error_json.decode(body, &.{ .tokens = storage.scratch.tokens, .octets = storage.octets, .details = storage.details }) catch return fallback;
+    // Connect protocol, "HTTP to Error Code": an error body whose code is missing or unknown
+    // takes the code of the HTTP status.
+    const failure = error_json.decode_or(body, &.{ .tokens = storage.scratch.tokens, .octets = storage.octets, .details = storage.details }, fallback.code) catch return fallback;
     return failure;
 }
 

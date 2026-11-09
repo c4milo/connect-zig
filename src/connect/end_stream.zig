@@ -76,14 +76,24 @@ pub fn decode(payload: []const u8, storage: *const Storage) DecodeError!EndStrea
             else => return error.UnexpectedToken,
         };
         if (std.mem.eql(u8, name, "error")) {
-            try tokens.expect(.begin_object);
-            end.failure = try error_json.read_object(&tokens, storage.details);
+            end.failure = try read_error(&tokens, storage.details);
         } else if (std.mem.eql(u8, name, "metadata")) {
             end.metadata = try read_metadata(&tokens, storage.metadata);
         } else try tokens.skip_value();
     }
     try tokens.finish();
     return end;
+}
+
+/// The `error` member's value: an error, or none when it is null (proto3 JSON mapping: null is
+/// the default, and Connect protocol, "Error End-Stream": an end-stream message with no error
+/// ends a stream that succeeded).
+fn read_error(tokens: *json_read.Tokens, details: []rpc_error.Detail) DecodeError!?rpc_error.RpcError {
+    return switch (try tokens.next()) {
+        .null => null,
+        .begin_object => try error_json.read_object(tokens, details, .unknown),
+        else => error.UnexpectedToken,
+    };
 }
 
 fn read_metadata(tokens: *json_read.Tokens, metadata: []Header) json_read.Error![]const Header {
