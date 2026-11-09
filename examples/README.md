@@ -10,7 +10,7 @@ Start at the top: each example adds one layer to the one before it.
 | [protobuf_messages.zig](protobuf_messages.zig) | Generated messages in binary and JSON, with no RPC | `zig build example-protobuf_messages` |
 | [sans_io_call.zig](sans_io_call.zig) | A whole call through `connect` alone: no socket, no HTTP library | `zig build example-sans_io_call` |
 | [eliza.zig](eliza.zig) | A client and a server over colibri's h2, h11 and h3, in memory | `zig build example-eliza` |
-| [streaming.zig](streaming.zig) | Bidirectional, client and server streams, and a stream that fails, over h2, h11 and h3 | `zig build example-streaming` |
+| [streaming.zig](streaming.zig) | Bidirectional, client and server streams, a stream that fails, and a client that streams full-duplex over h2 and h3 | `zig build example-streaming` |
 | [interceptors.zig](interceptors.zig) | Server interceptors that log and authenticate, and client interceptors, over h2 and h3 | `zig build example-interceptors` |
 | [errors.zig](errors.zig) | Errors with typed details in Connect, gRPC and gRPC-Web, over h2 and h3 | `zig build example-errors` |
 | [github.zig](github.zig) | A GitHub-style API used as a real client would: tokens, rate limits, pages, field masks, private resources, streams | `zig build example-github` |
@@ -52,10 +52,10 @@ Each program over the links runs its calls in rounds, one `client.ConnectionPool
   certificates at the fixed instant 1_800_000_000, which a real program reads from its clock.
 
 Over h3 every protocol answers as it does over h2: Connect POST and GET, gRPC-Web, and gRPC,
-whose status the client reads from the response's trailers (decision 11). colibri's client
-sends a request body whole, so
-these programs show the server's type handlers answer each message, not that the client reads an
-answer while it still sends.
+whose status the client reads from the response's trailers (decision 11). The streamed calls of
+`streaming`, in `streaming_duplex.zig`, send each message with a `Sender`. Over h2 and h3 Chat
+reads each answer before it sends the next line, in Connect, gRPC and gRPC-Web. Over h11 it sends
+every line first, since a stream there is half-duplex.
 
 ### A type handler
 

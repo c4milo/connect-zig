@@ -64,11 +64,16 @@ buf curl --cacert examples/testdata/tls/ca.pem --protocol grpc --schema examples
 | Client: unary, all streams | ✅ | ✅ | ✅ |
 | Proto and JSON codecs | ✅ | ✅ | ✅ |
 | gzip and zstd both ways, brotli read | ✅ | ✅ | ✅ |
-| Unary GET for `NO_SIDE_EFFECTS` | ✅ | | |
+| Unary GET for `NO_SIDE_EFFECTS` | ✅ | n/a[^get] | n/a[^get] |
 | Full-duplex bidirectional streams (server) | ✅ | ✅ | ✅ |
-| Full-duplex bidirectional streams (client) | | | |
+| Full-duplex bidirectional streams (client), over h2 and h3[^duplex] | ✅ | ✅ | ✅ |
 | Interceptors, server and client | ✅ | ✅ | ✅ |
 | Error details | ✅ | ✅ | ✅ |
+
+[^get]: The Connect protocol defines Unary-Get. gRPC's HTTP/2 spec requires `:method POST`, and
+    gRPC-Web keeps that request shape.
+[^duplex]: Over h11 a stream is half-duplex, on the client as on the server: the whole request
+    goes before the response is read. The Connect protocol promises full-duplex over HTTP/2.
 
 The protobuf runtime covers every scalar type, `optional`, packed and unpacked repeated fields,
 maps with every key type, oneofs, enums, recursive messages and every well-known type with its
@@ -196,6 +201,23 @@ if (response.failure) |failure| std.debug.print("{s}\n", .{failure.message});
 `.protocol` picks Connect, the default, gRPC or gRPC-Web, and the rest of the call stays the same.
 A gRPC call reads its status from the response's trailers.
 
+A client or bidirectional stream can also stream both ways. `init_stream` builds the call, and its
+`Sender` writes each message as the server's does. The program passes the pool's events for the
+call on, and reads each answer as it arrives:
+
+```zig
+try chat.init_stream(&.{}, &buffers);
+try chat.start(&pool);
+var sender = chat.sender();
+try sender.send(&.{ .text = "hello" });
+// On the pool's events for chat.id:
+//   .headers => chat.on_headers(storage),
+//   .body => |piece| chat.on_body(piece.len), then chat.reader.next(demo.ChatMessage),
+//   .body_taken => try chat.on_body_taken(),
+// and, once every line went, try sender.close_send(). When the pool reports it finished:
+var response = chat.read(storage);
+```
+
 [examples/](examples) holds eight programs, from generated messages alone to streaming,
 interceptors, error details, a GitHub-style API with tokens, rate limits, pages and field masks,
 and a server on a socket. Each checks itself, and
@@ -251,9 +273,9 @@ totals. A failure also shows as an annotation on the change.
 
 > [!IMPORTANT]
 > A server stream is written into the router's response memory, so a long one is bounded by it
-> (decision 12). A type handler streams full-duplex (decision 18); colibri's client sends its
-> request body whole, so the client side of a stream is half-duplex. brotli is read but not
-> written yet, since stdx has no brotli encoder (decision 10).
+> (decision 12). A type handler streams full-duplex, and so does a client's streamed call, over
+> h2 and h3 (decision 18). Over h11 both sides are half-duplex. brotli is read but not written
+> yet, since stdx has no brotli encoder (decision 10).
 
 Editions 2023 and 2024 follow [protobuf.dev's editions
 overview](https://protobuf.dev/editions/overview/): field presence, packed and expanded repeated
@@ -265,13 +287,13 @@ Still to come:
 
 - [x] The [connectrpc conformance suite](https://github.com/connectrpc/conformance) against the
   server
-- [ ] The conformance suite against the client, once colibri's client streams a request body
-  (colibri step 39)
+- [ ] The conformance suite against the client
 - [x] HTTP/3 on the socket server, over a UDP socket
 - [x] zstd compression of messages, both ways
 - [ ] brotli compression of messages, once stdx ships its encoder
 - [x] A gRPC client, over h11, h2 and h3
-- [ ] Long server streams, and full-duplex on the client side (colibri step 39)
+- [x] Full-duplex streams on the client side, over h2 and h3
+- [ ] Long server streams
 - [x] HTTP/3 in the in-memory examples, with a test-only TLS identity
 - [x] Full-duplex streams on the server, interceptors and error details
 - [x] `Any`, `Struct`, `Value` and `ListValue` in JSON
