@@ -45,6 +45,32 @@ report() {
     grep '^FAILED: ' "$2" | sed 's/^/- /' || true
     echo
 }
+# Writes each failure of a half as a GitHub error annotation: the case's name and its message's
+# first line. GitHub's runner reads `::error` lines from a step's output and shows them on the run,
+# where the full log may be out of reach. The message is escaped as GitHub's workflow commands ask:
+# "%" as %25.
+annotate() {
+    awk -v half="$1" '
+        pending != "" && /^\t/ {
+            line = substr($0, 2)
+            gsub(/%/, "%25", line)
+            print "::error title=conformance " half "::" pending ": " line
+            pending = ""
+            next
+        }
+        pending != "" { print "::error title=conformance " half "::" pending; pending = "" }
+        /^FAILED: / {
+            pending = substr($0, 9)
+            sub(/:$/, "", pending)
+            gsub(/%/, "%25", pending)
+        }
+        END { if (pending != "") print "::error title=conformance " half "::" pending }
+    ' "$2"
+}
+if [ -n "${GITHUB_ACTIONS:-}" ]; then
+    annotate server "${server_log}"
+    annotate client "${client_log}"
+fi
 # With CONFORMANCE_REPORT naming a file, the runner's totals and each failure go there too.
 if [ -n "${CONFORMANCE_REPORT:-}" ]; then
     {
