@@ -217,6 +217,12 @@ fn write_member(comptime T: type, comptime field: Field, comptime oneof: []const
 
 fn write_array(comptime field: Field, comptime F: type, item: *const F, text: *json.TextWriter, comptime registry: []const type) Error!void {
     try text.begin_array();
+    // A program's items are a slice: one loop over it, without an iterator call per element, as
+    // binary encode does.
+    if (item.items.len != 0) {
+        for (item.items) |*element| try write_element(field, F.Element, element, text, registry);
+        return text.end_array();
+    }
     var elements = item.iterator();
     for (0..constants.limits.elements_max) |_| {
         const element = try elements.next() orelse break;
@@ -231,15 +237,29 @@ fn write_map(comptime F: type, item: *const F, text: *json.TextWriter, comptime 
     const value_field = Entry.protobuf.fields[1];
     comptime assert(key_field.number == 1 and value_field.number == 2);
     try text.begin_object();
+    if (item.items.len != 0) {
+        for (item.items) |*entry| try write_entry(Entry, key_field, value_field, entry, text, registry);
+        return text.end_object();
+    }
     var entries = item.iterator();
     for (0..constants.limits.elements_max) |_| {
         const entry = try entries.next() orelse break;
-        try json_scalar.write_key(key_field.kind, @FieldType(Entry, "key"), entry.key, text);
-        const V = @FieldType(Entry, "value");
-        switch (@typeInfo(V)) {
-            .optional => |optional| try write_value(value_field, optional.child, entry.value orelse .{}, text, registry),
-            else => try write_value(value_field, V, entry.value, text, registry),
-        }
+        try write_entry(Entry, key_field, value_field, &entry, text, registry);
     }
     try text.end_object();
+}
+
+fn write_entry(comptime Entry: type, comptime key_field: Field, comptime value_field: Field, entry: *const Entry, text: *json.TextWriter, comptime registry: []const type) Error!void {
+    try json_scalar.write_key(key_field.kind, @FieldType(Entry, "key"), entry.key, text);
+    const V = @FieldType(Entry, "value");
+    switch (@typeInfo(V)) {
+        .optional => |optional| try write_value(value_field, optional.child, entry.value orelse .{}, text, registry),
+        else => try write_value(value_field, V, entry.value, text, registry),
+    }
+}
+
+/// One element of a program's items, read in place: a message is not copied to be written.
+fn write_element(comptime field: Field, comptime V: type, element: *const V, text: *json.TextWriter, comptime registry: []const type) Error!void {
+    if (comptime field.kind.holds_message()) return write_message(V, element, text, registry);
+    try json_scalar.write(field.kind, V, element.*, text);
 }
