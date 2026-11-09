@@ -211,7 +211,30 @@ pub const Writer = struct {
         writer.len += 1;
     }
 
-    pub fn varint(writer: *Writer, value: u64) WriteError!void {
+    /// Writes `value` as a varint, in exactly the octets it takes: a length written before octets
+    /// already in place must not store past itself.
+    pub inline fn varint(writer: *Writer, value: u64) WriteError!void {
+        // "Base 128 Varints": a value below 2^7 is one octet with no continuation bit, as most
+        // tags and short lengths are.
+        if (value < continuation) {
+            if (writer.len == writer.buffer.len) return error.NoSpaceLeft;
+            writer.buffer[writer.len] = @intCast(value);
+            writer.len += 1;
+            return;
+        }
+        // Two octets hold a value below 2^14: most lengths, and the tags of fields 16 to 2047.
+        if (value < 1 << (two_octets * group_bits)) {
+            if (two_octets > writer.buffer.len - writer.len) return error.NoSpaceLeft;
+            writer.buffer[writer.len..][0..two_octets].* = .{ @as(u8, @truncate(value)) | continuation, @intCast(value >> group_bits) };
+            writer.len += two_octets;
+            return;
+        }
+        return writer.varint_long(value);
+    }
+
+    /// A varint of three octets or more, out of line: inlined at every call, it made the callers
+    /// too large to inline in turn, and Small's encode took 21% more instructions.
+    noinline fn varint_long(writer: *Writer, value: u64) WriteError!void {
         const len = varint_len(value);
         if (len > writer.buffer.len - writer.len) return error.NoSpaceLeft;
         write_groups(writer.buffer[writer.len..][0..len], value);
@@ -249,6 +272,9 @@ pub const Writer = struct {
     }
 };
 
+/// The octets of the longest varint `Writer.varint` writes inline.
+const two_octets = 2;
+
 /// A padded varint of 0: every byte but the last carries the continuation bit alone.
 const padded_zero: [constants.limits.padded_length_len]u8 = .{continuation} ** (constants.limits.padded_length_len - 1) ++ .{0};
 
@@ -261,13 +287,13 @@ const testing = std.testing;
 /// Writes `value` as 7-bit groups into all of `octets`, low group first, with the continuation
 /// bit on every octet but the last ("Base 128 Varints"). `octets` holds every group of `value`.
 fn write_groups(octets: []u8, value: u64) void {
+    assert(octets.len != 0);
     var rest = value;
-    for (octets, 0..) |*octet, index| {
-        const more: u8 = if (index + 1 < octets.len) continuation else 0;
-        octet.* = @as(u8, @truncate(rest & payload_mask)) | more;
+    for (octets[0 .. octets.len - 1]) |*octet| {
+        octet.* = @as(u8, @truncate(rest)) | continuation;
         rest >>= group_bits;
     }
-    assert(rest == 0);
+    octets[octets.len - 1] = @intCast(rest);
 }
 
 test "varints round-trip at each length boundary" {
