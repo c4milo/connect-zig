@@ -223,3 +223,60 @@ test "a streamed response's head status is ignored once a message arrived" {
     // The trailers frame is missing, and the head's status does not stand in for it.
     try testing.expectEqualStrings("missing trailers frame", response.failure.?.message);
 }
+
+/// The tag of Note's field 1, a string: field number 1, wire type 2 (protobuf encoding guide,
+/// "Message Structure").
+const text_tag = 0x0a;
+
+/// A gRPC-Web body of `messages`, each a Note of one letter, then a trailers frame of `status`.
+fn web_body(comptime messages: []const u8, comptime status: []const u8, out: []u8) []const u8 {
+    var len: usize = 0;
+    inline for (messages) |letter| {
+        len += enveloped(0, &.{ text_tag, 1, letter }, out[len..]).len;
+    }
+    len += enveloped(flag_trailers, "grpc-status: " ++ status ++ "\r\n", out[len..]).len;
+    return out[0..len];
+}
+
+const plain_web_head: Lines = .{ .lines = &.{.{ .name = "content-type", .value = "application/grpc-web" }} };
+
+test "a unary or client-stream response with two messages or none fails unimplemented" {
+    var room: Room = .{};
+    var body_room: [buffer_len]u8 = undefined;
+    for ([_]@import("method.zig").StreamType{ .unary, .client_stream }) |stream_type| {
+        var speaks = grpc_web;
+        speaks.stream_type = stream_type;
+        // statuscodes.md: a response cardinality violation is UNIMPLEMENTED, at the client.
+        var two = read(speaks, ok, &plain_web_head, web_body("ab", "0", &body_room), &room);
+        try testing.expectEqualStrings("a", (try two.next(Note)).?.text);
+        try testing.expectEqual(@as(?Note, null), try two.next(Note));
+        try testing.expectEqual(Code.unimplemented, two.failure.?.code);
+        var none = read(speaks, ok, &plain_web_head, web_body("", "0", &body_room), &room);
+        try testing.expectEqual(@as(?Note, null), try none.next(Note));
+        try testing.expectEqual(Code.unimplemented, none.failure.?.code);
+        // An error with no message keeps its own code.
+        var failed = read(speaks, ok, &plain_web_head, web_body("", "9", &body_room), &room);
+        try testing.expectEqual(@as(?Note, null), try failed.next(Note));
+        try testing.expectEqual(Code.failed_precondition, failed.failure.?.code);
+        var one = read(speaks, ok, &plain_web_head, web_body("a", "0", &body_room), &room);
+        try testing.expectEqualStrings("a", (try one.next(Note)).?.text);
+        try testing.expectEqual(@as(?Note, null), try one.next(Note));
+        try testing.expectEqual(@as(?rpc_error.RpcError, null), one.failure);
+    }
+}
+
+test "a stream's response may hold any number of messages, and a Trailers-Only one none" {
+    var room: Room = .{};
+    var body_room: [buffer_len]u8 = undefined;
+    var speaks = grpc_web;
+    speaks.stream_type = .server_stream;
+    var none = read(speaks, ok, &plain_web_head, web_body("", "0", &body_room), &room);
+    try testing.expectEqual(@as(?Note, null), try none.next(Note));
+    try testing.expectEqual(@as(?rpc_error.RpcError, null), none.failure);
+    // PROTOCOL-HTTP2.md, "Responses": a Trailers-Only success of a unary call holds no message.
+    speaks.stream_type = .unary;
+    const only: Lines = .{ .lines = &.{ .{ .name = "content-type", .value = "application/grpc-web" }, .{ .name = "grpc-status", .value = "0" } } };
+    var trailers_only = read(speaks, ok, &only, "", &room);
+    try testing.expectEqual(@as(?Note, null), try trailers_only.next(Note));
+    try testing.expectEqual(Code.unimplemented, trailers_only.failure.?.code);
+}

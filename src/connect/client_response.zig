@@ -119,6 +119,8 @@ pub const Response = struct {
     /// the body arrived.
     head_status: bool = false,
     body_seen: bool = false,
+    /// The messages `next` returned.
+    messages_read: u64 = 0,
 
     /// Gives a streamed response the octets of its body that `next` has not read, from the first
     /// one it has not read: the envelopes left, and the start of one that a later piece ends.
@@ -159,9 +161,35 @@ pub const Response = struct {
     /// The next message, or null once the response holds no more. `failure` is then set when
     /// the call failed.
     pub fn next(response: *Response, comptime T: type) Error!?T {
-        if (response.done) return null;
-        const octets = try response.next_octets() orelse return null;
+        const octets = (if (response.done) null else try response.next_octets()) orelse {
+            response.check_none();
+            return null;
+        };
+        if (response.single() and response.messages_read == 1) {
+            // statuscodes.md: "Response cardinality violation (method requires exactly one
+            // response but server sent some other number of responses)" is UNIMPLEMENTED, at
+            // the client. connect-go reads a unary or client-stream response the same way.
+            response.done = true;
+            response.failure = .{ .code = .unimplemented, .message = "unary response has multiple messages" };
+            return null;
+        }
+        response.messages_read += 1;
         return try message_codec.decode(T, response.speaks.codec, octets, response.storage.scratch);
+    }
+
+    /// Whether the method answers with exactly one message: a unary call or a client stream.
+    fn single(response: *const Response) bool {
+        const stream_type = response.speaks.stream_type orelse return false;
+        return stream_type == .unary or stream_type == .client_stream;
+    }
+
+    /// Fails a response that ended in success with no message, where its method answers with
+    /// one (statuscodes.md, UNIMPLEMENTED: a response cardinality violation). A response that
+    /// ended in an error keeps it, as connect-go reads it.
+    fn check_none(response: *Response) void {
+        if (!response.done or response.failure != null) return;
+        if (!response.single() or response.messages_read != 0) return;
+        response.failure = .{ .code = .unimplemented, .message = "unary response has zero messages" };
     }
 
     fn next_octets(response: *Response) Error!?[]const u8 {

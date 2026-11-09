@@ -163,7 +163,7 @@ const Client = struct {
 };
 
 fn speaks_of(comptime method: connect.Method, options: client_call.Options) connect.Speaks {
-    return .{ .protocol = options.protocol, .codec = options.codec, .enveloped = options.protocol != .connect or method.stream_type.enveloped() };
+    return .{ .protocol = options.protocol, .codec = options.codec, .enveloped = options.protocol != .connect or method.stream_type.enveloped(), .stream_type = method.stream_type };
 }
 
 // Each test thread holds its own pair, which the test cases reuse.
@@ -203,11 +203,13 @@ test "a server stream returns each message, then success and the metadata" {
     }
 }
 
-test "a client stream sends every message in one body" {
+test "a client stream sends every message in one body, and its response holds one" {
     var response = try round_trip(gather, .{ .protocol = .connect, .codec = .json }, &.{ .{ .text = "a" }, .{ .text = "b" } }, null);
     try testing.expectEqualStrings("a", (try response.next(Note)).?.text);
-    try testing.expectEqualStrings("b", (try response.next(Note)).?.text);
+    // The test server answers each message, and a client stream answers with one: the second is
+    // a response cardinality violation (statuscodes.md, UNIMPLEMENTED).
     try testing.expectEqual(@as(?Note, null), try response.next(Note));
+    try testing.expectEqual(connect.Code.unimplemented, response.failure.?.code);
 }
 
 test "an error reaches the client with its code and message in every protocol" {

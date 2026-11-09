@@ -3,6 +3,7 @@
 //! "Streaming-Content-Type"; PROTOCOL-HTTP2.md, "Content-Type"; PROTOCOL-WEB.md).
 const std = @import("std");
 const assert = std.debug.assert;
+const StreamType = @import("method.zig").StreamType;
 
 pub const Protocol = enum { connect, grpc, grpc_web };
 
@@ -30,6 +31,10 @@ pub const Speaks = struct {
     codec: Codec,
     /// Whether the body holds envelopes: every protocol's streams, and every gRPC call.
     enveloped: bool,
+    /// The method's stream type, which a client's request names and its response is read with:
+    /// a unary or client-stream response then carries exactly one message. Null where it is not
+    /// known, as on a server's side.
+    stream_type: ?StreamType = null,
 };
 
 pub const Error = error{

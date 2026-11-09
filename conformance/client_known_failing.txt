@@ -2,23 +2,6 @@
 # when a case listed here passes, so the list cannot go stale (decision 26). `*` stands for one
 # part of a case's name.
 #
-# A unary or client-stream response must carry exactly one message (gRPC's statuscodes.md:
-# UNIMPLEMENTED for a cardinality violation). connect-zig's client reads each message with
-# `Response.next` and checks no count, so a response with none, or with two, reads as a success.
-# A check needs the response to know its method's stream type, a change to connect's API.
-Connect Unexpected Responses/*/*/client-stream/multiple-responses
-Connect Unexpected Responses/*/*/client-stream/ok-but-no-response
-gRPC Unexpected Responses/*/*/client-stream/multiple-responses
-gRPC Unexpected Responses/*/*/client-stream/ok-but-no-response
-gRPC Unexpected Responses/*/*/unary/multiple-responses
-gRPC Unexpected Responses/*/*/unary/ok-but-no-response
-gRPC-Web Unexpected Responses/*/*/trailers-in-body/client-stream/multiple-responses
-gRPC-Web Unexpected Responses/*/*/trailers-in-body/client-stream/ok-but-no-response
-gRPC-Web Unexpected Responses/*/*/trailers-in-body/unary/multiple-responses
-gRPC-Web Unexpected Responses/*/*/trailers-in-body/unary/ok-but-no-response
-gRPC-Web Unexpected Responses/*/*/trailers-only/client-stream/ok-but-no-response
-gRPC-Web Unexpected Responses/*/*/trailers-only/unary/ok-but-no-response
-#
 # The reference server answers status 800. colibri's client reads a status outside 100 to 599 as
 # a malformed response (colibri v0.15.0, src/http/status.zig:87, RFC 9110 §15), so the call fails
 # internal, where the case wants unknown, the code of a status the client does not know.

@@ -346,10 +346,19 @@ ran on Linux x86-64 with Zig 0.16.0.
   `tools/interop_languages_check.sh` 713, and no instruction count moved, since no benchmark
   compresses.
 
+- **Response cardinality.** The owner ruled on 2026-11-09 that a client checks the count of a
+  unary or client-stream response's messages. `connect.Speaks` gains the field
+  `stream_type: ?StreamType = null`, which `client.request` sets from the method, and
+  `client.Response.next` then fails a second message, or a success with none, `unimplemented`:
+  gRPC's statuscodes.md names a response cardinality violation so, at the client, and connect-go
+  reads it the same way. An error with no message keeps its own code. No name changed; a
+  server's `Speaks` leaves the field null. Conformance's client half printed 8252 of 8264
+  passed, 48 more; the 12 left are known failing. The server passes 2714 of 2714,
+  `tools/interop_check.sh` 48 calls, `tools/interop_languages_check.sh` 713, and no instruction
+  count moved.
+
 ### What a later step owes
 
-- The client cases of `conformance/client_known_failing.txt`. Each needs a ruling or a change
-  below the program: a cardinality check on a unary or client-stream response,
-  which needs `connect.client.Response` to know its method's stream type; and a status outside
-  100 to 599, which colibri reads as malformed.
+- The client cases of `conformance/client_known_failing.txt`: a status outside 100 to 599,
+  which colibri reads as malformed, needs a change in colibri.
 - Long server streams written at `on_writable` (decision 12).

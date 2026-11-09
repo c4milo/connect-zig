@@ -83,7 +83,7 @@ pub const Error = message_codec.EncodeError || error{ NoSpaceLeft, TooManyHeader
 
 fn speaks_of(comptime method: method_file.Method, options: Options) protocol.Speaks {
     const enveloped = options.protocol != .connect or method.stream_type.enveloped();
-    return .{ .protocol = options.protocol, .codec = options.codec, .enveloped = enveloped };
+    return .{ .protocol = options.protocol, .codec = options.codec, .enveloped = enveloped, .stream_type = method.stream_type };
 }
 
 /// Builds the request of a call of `method` that sends `messages`: one for a unary or a server
@@ -216,6 +216,8 @@ test "a Connect unary request is the bare message with the protocol's headers" {
         .values = &buffers[3],
     });
     try testing.expectEqualStrings("/test.Svc/Say", call.target);
+    // The response is read knowing it answers with one message.
+    try testing.expectEqual(@as(?method_file.StreamType, .unary), call.speaks.stream_type);
     try testing.expectEqualSlices(u8, &.{ 0x0a, 2, 'h', 'i' }, call.body);
     try testing.expectEqualStrings("application/proto", find(call.headers(), "content-type").?);
     try testing.expectEqualStrings("2", find(call.headers(), "connect-timeout-ms").?);
