@@ -112,8 +112,8 @@ pub fn decompress(coding: Coding, decoders: Decoders, input: []const u8, output:
     const whole = switch (coding) {
         .identity => return input,
         .gzip => whole: {
-            gzip.init(decoders.gzip.?, features);
-            break :whole gzip.decode_all(decoders.gzip.?, input, output);
+            decoders.gzip.?.init(features);
+            break :whole decoders.gzip.?.decode_all(input, output);
         },
         .zstd => whole: {
             decoders.zstd.?.init(features);

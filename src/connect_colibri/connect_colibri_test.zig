@@ -59,10 +59,13 @@ fn on_error(_: *App, _: *const server.Request, _: anyerror, response: *server.Re
 }
 
 const message_bytes = 1024;
+/// The router's calls at once, and its room for each one's response and body.
+const router_requests = 2;
+const router_bytes = 4096;
 const token_bytes = 256;
 const options: rpc.RouteOptions = .{ .message_bytes = message_bytes, .token_bytes = token_bytes };
 
-const routes = server.router(App, .{
+const Router = server.Router(App, .{
     .error_handler = on_error,
     .routes = .{
         rpc.post(App, say, on_say, options),
@@ -71,14 +74,13 @@ const routes = server.router(App, .{
         rpc.post(App, gather, on_gather, options),
         rpc.post(App, chat, on_chat, options),
     },
-});
+}, .{ .requests = router_requests, .response_bytes = router_bytes, .body_bytes = router_bytes });
 
 test "a route table holds a route of each stream type, and a GET beside a POST" {
-    const Router = @TypeOf(routes).Of(.{ .requests = 2, .response_bytes = 4096, .body_bytes = 4096 });
     try testing.expect(@sizeOf(Router) > 0);
     var parameters: server.PathParameters = undefined;
-    try testing.expect(routes.match("GET", "/test.Svc/Say", &parameters) == .found);
-    try testing.expect(routes.match("GET", "/test.Svc/Count", &parameters) != .found);
+    try testing.expect(Router.match("GET", "/test.Svc/Say", &parameters) == .found);
+    try testing.expect(Router.match("GET", "/test.Svc/Count", &parameters) != .found);
 }
 
 test "a client call writes its request for colibri and reads what colibri filled in" {
@@ -97,7 +99,7 @@ test "a client call writes its request for colibri and reads what colibri filled
     const body = [_]u8{ 0, 0, 0, 0, 4, 0x0a, 2, 'h', 'i', 0x80, 0, 0, 0, 16 } ++ "grpc-status: 0\r\n".*;
     @memcpy(call.response.body[0..body.len], &body);
     call.response.body_len = body.len;
-    call.response.status = 200;
+    call.response.status = .ok;
     call.response.result = .response;
     write_lines(&call.response.headers, &.{.{ .name = "content-type", .value = "application/grpc-web+proto" }});
     var storage_buffers: [4][256]u8 = undefined;
@@ -145,7 +147,7 @@ test "a gRPC client call reads its status from the response's trailers (PROTOCOL
     const body = [_]u8{ 0, 0, 0, 0, 4, 0x0a, 2, 'h', 'i' };
     @memcpy(call.response.body[0..body.len], &body);
     call.response.body_len = body.len;
-    call.response.status = 200;
+    call.response.status = .ok;
     call.response.result = .response;
     write_lines(&call.response.headers, &.{.{ .name = "content-type", .value = "application/grpc+proto" }});
     // A grpc-status among the headers is not the call's status: only the trailers carry it.

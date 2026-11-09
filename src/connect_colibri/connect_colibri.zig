@@ -1,5 +1,5 @@
 //! connect_colibri: Connect, gRPC and gRPC-Web servers and clients over colibri's h11, h2 and h3
-//! (design §7). A server serves each `connect.Method` as a route of `server.router`; a client
+//! (design §7). A server serves each `connect.Method` as a route of `server.Router`; a client
 //! writes each call as a `client.Request` for its `client.ConnectionPool`.
 const std = @import("std");
 const builtin = @import("builtin");

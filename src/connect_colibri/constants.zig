@@ -1,5 +1,7 @@
 //! The connect_colibri module's named sizes.
 
+const http = @import("http");
+
 /// The longest message a route reads or writes by default: 64 KiB.
 pub const message_bytes_default = 64 * 1024;
 /// The longest JSON token a route reads by default.
@@ -21,8 +23,9 @@ pub const request_query_bytes = 8192;
 /// envelope's 5-octet prefix, and a router entry holds far fewer octets than this many prefixes.
 pub const messages_per_read_max = 65_536;
 /// RFC 9110 §15.5.6: Method Not Allowed.
-pub const status_method_not_allowed: u16 = 405;
+pub const status_method_not_allowed: http.Status = .method_not_allowed;
 /// RFC 9110 §15.5.15: URI Too Long.
-pub const status_uri_too_long: u16 = 414;
+pub const status_uri_too_long: http.Status = .uri_too_long;
 /// RFC 6585 §5: Request Header Fields Too Large.
-pub const status_headers_too_large: u16 = 431;
+/// colibri's `http.Status` names no 431, so the value goes through its open end.
+pub const status_headers_too_large: http.Status = @enumFromInt(431);

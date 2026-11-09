@@ -113,7 +113,7 @@ fn read_response(self: anytype, storage: connect.client.Storage) connect.client.
         return response;
     }
     const incoming: connect.client.Incoming = .{
-        .status = self.response.status,
+        .status = @intFromEnum(self.response.status),
         .headers = lookup,
         .body = self.response.body[0..self.response.body_len],
         // gRPC's status and its call's trailers come in HTTP trailers after the last message

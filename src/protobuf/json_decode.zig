@@ -27,7 +27,7 @@ pub const Transcoder = struct {
     reader: json.TextReader,
     writer: wire.Writer,
 
-    pub fn next(transcoder: *Transcoder) Error!json.Item {
+    pub fn next(transcoder: *Transcoder) Error!json.TextReader.Item {
         const item = try transcoder.reader.next();
         return item orelse error.UnexpectedToken;
     }
@@ -47,7 +47,7 @@ pub fn transcode(comptime T: type, text: []const u8, binary: []u8, tokens: []u8,
     return transcoder.writer.written();
 }
 
-pub fn message_body(comptime T: type, transcoder: *Transcoder, first: json.Item, depth_left: u32, comptime registry: []const type) Error!void {
+pub fn message_body(comptime T: type, transcoder: *Transcoder, first: json.TextReader.Item, depth_left: u32, comptime registry: []const type) Error!void {
     comptime descriptor.check(T);
     if (depth_left == 0) return error.DepthExceeded;
     switch (comptime wkt.form(T)) {
@@ -106,7 +106,7 @@ fn read_member(comptime T: type, transcoder: *Transcoder, index: usize, depth_le
     unreachable;
 }
 
-fn read_field(comptime T: type, comptime field: Field, transcoder: *Transcoder, value: json.Item, depth_left: u32, comptime registry: []const type) Error!void {
+fn read_field(comptime T: type, comptime field: Field, transcoder: *Transcoder, value: json.TextReader.Item, depth_left: u32, comptime registry: []const type) Error!void {
     const F = if (field.oneof) |oneof| @FieldType(@typeInfo(@FieldType(T, oneof)).optional.child, field.name) else @FieldType(T, field.name);
     // "JSON Mapping": null is the default of every field, but NullValue's and Value's.
     if (value == .null and !comptime takes_null(F)) return;
@@ -135,7 +135,7 @@ fn takes_null(comptime V: type) bool {
     return std.mem.eql(u8, inner.protobuf.full_name, "google.protobuf.NullValue");
 }
 
-fn read_array(comptime field: Field, comptime E: type, transcoder: *Transcoder, value: json.Item, depth_left: u32, comptime registry: []const type) Error!void {
+fn read_array(comptime field: Field, comptime E: type, transcoder: *Transcoder, value: json.TextReader.Item, depth_left: u32, comptime registry: []const type) Error!void {
     if (value != .begin_array) return error.UnexpectedToken;
     for (0..transcoder.reader.input.len + 1) |_| {
         const element = try transcoder.next();
@@ -147,7 +147,7 @@ fn read_array(comptime field: Field, comptime E: type, transcoder: *Transcoder, 
     unreachable;
 }
 
-fn read_map(comptime field: Field, comptime Entry: type, transcoder: *Transcoder, value: json.Item, depth_left: u32, comptime registry: []const type) Error!void {
+fn read_map(comptime field: Field, comptime Entry: type, transcoder: *Transcoder, value: json.TextReader.Item, depth_left: u32, comptime registry: []const type) Error!void {
     if (value != .begin_object) return error.UnexpectedToken;
     const key_field = Entry.protobuf.fields[0];
     const value_field = Entry.protobuf.fields[1];
@@ -201,7 +201,7 @@ fn parse_bool_key(key: []const u8) Error!bool {
 }
 
 /// Writes one value of `field`, with its tag, from the token `value`.
-fn write_single(comptime field: Field, comptime V: type, transcoder: *Transcoder, value: json.Item, depth_left: u32, comptime registry: []const type) Error!void {
+fn write_single(comptime field: Field, comptime V: type, transcoder: *Transcoder, value: json.TextReader.Item, depth_left: u32, comptime registry: []const type) Error!void {
     const writer = &transcoder.writer;
     if (comptime field.kind == .group) {
         // "Groups": the fields sit between a start and an end tag, with no length before them.
@@ -226,14 +226,14 @@ fn write_single(comptime field: Field, comptime V: type, transcoder: *Transcoder
     }
 }
 
-fn string_of(value: json.Item) Error![]const u8 {
+fn string_of(value: json.TextReader.Item) Error![]const u8 {
     return switch (value) {
         .string => |octets| octets,
         else => error.UnexpectedToken,
     };
 }
 
-fn bool_of(value: json.Item) Error!bool {
+fn bool_of(value: json.TextReader.Item) Error!bool {
     return switch (value) {
         .true => true,
         .false => false,
@@ -241,14 +241,14 @@ fn bool_of(value: json.Item) Error!bool {
     };
 }
 
-fn integer_of(comptime V: type, value: json.Item) Error!V {
+fn integer_of(comptime V: type, value: json.TextReader.Item) Error!V {
     return switch (value) {
         .number, .string => |octets| json_scalar.parse_integer(V, octets),
         else => error.UnexpectedToken,
     };
 }
 
-fn float_of(comptime V: type, value: json.Item) Error!V {
+fn float_of(comptime V: type, value: json.TextReader.Item) Error!V {
     return switch (value) {
         .number => |octets| json_scalar.parse_float(V, octets, false),
         .string => |octets| json_scalar.parse_float(V, octets, true),
@@ -256,7 +256,7 @@ fn float_of(comptime V: type, value: json.Item) Error!V {
     };
 }
 
-fn enum_of(comptime V: type, value: json.Item) Error!V {
+fn enum_of(comptime V: type, value: json.TextReader.Item) Error!V {
     return switch (value) {
         .string => |name| @enumFromInt(V.protobuf.number_of(name) orelse return error.InvalidEnum),
         .number => |octets| try number_of_enum(V, try json_scalar.parse_integer(i32, octets)),
@@ -274,7 +274,7 @@ fn number_of_enum(comptime V: type, number: i32) Error!V {
     return @enumFromInt(number);
 }
 
-fn write_time(transcoder: *Transcoder, value: json.Item, comptime parse: anytype) Error!void {
+fn write_time(transcoder: *Transcoder, value: json.TextReader.Item, comptime parse: anytype) Error!void {
     const instant = parse(try string_of(value)) catch |failure| switch (failure) {
         error.NoSpaceLeft => unreachable,
         else => |refusal| return refusal,
@@ -291,7 +291,7 @@ fn write_time(transcoder: *Transcoder, value: json.Item, comptime parse: anytype
 }
 
 /// "JSON Mapping", FieldMask: lowerCamelCase paths joined by commas, each written in snake case.
-fn write_field_mask(transcoder: *Transcoder, value: json.Item) Error!void {
+fn write_field_mask(transcoder: *Transcoder, value: json.TextReader.Item) Error!void {
     const joined = try string_of(value);
     if (joined.len == 0) return;
     var paths = std.mem.splitScalar(u8, joined, ',');

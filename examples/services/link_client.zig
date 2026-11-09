@@ -74,15 +74,16 @@ comptime {
 var link: Link align(@alignOf(Link)) = undefined;
 var datagram_link: DatagramLink align(@alignOf(DatagramLink)) = undefined;
 var datagram_output: [datagram_module.datagram_len_max]u8 = undefined;
-const ReceivePool = client.ReceivePool(receive_pool_len);
+const ReceivePool = client.ReceivePool(.{ .capacity = receive_pool_len });
 var receive_pool: ReceivePool align(@alignOf(ReceivePool)) = undefined;
 var anchor_der: [anchor_der_len]u8 = undefined;
 var anchor_room: [anchors_max]tls.Anchor align(@alignOf(tls.Anchor)) = undefined;
 var anchors: []const tls.Anchor = &.{};
 var output: [client.constants.limits.stream_output_len_min]u8 = undefined;
 var client_config: client.Config align(@alignOf(client.Config)) = undefined;
-var pool: client.ConnectionPool align(@alignOf(client.ConnectionPool)) = undefined;
-var pool_memory: [client.ConnectionPool.memory_bytes(.{})]u8 align(client.ConnectionPool.memory_alignment) = undefined;
+const Pool = client.ConnectionPool(.{});
+var pool: Pool align(@alignOf(Pool)) = undefined;
+var pool_memory: [Pool.memory_bytes(.{})]u8 align(Pool.memory_alignment) = undefined;
 var prng: std.Random.DefaultPrng align(@alignOf(std.Random.DefaultPrng)) = .init(0x636c69656e74);
 var tcp: client.ConnectionHandle align(@alignOf(client.ConnectionHandle)) = .{ .slot = 0, .generation = 0 };
 /// Whether the round runs QUIC, which speaks h3, rather than TCP.
@@ -234,6 +235,9 @@ fn report(event: client.Event, now_ns: u64) !void {
         // connection told the server itself, with CONNECTION_CLOSE.
         .close => if (!quic) link_server.peer_closed(),
         .closed => pool_closed = true,
+        // A streamed exchange alone reports these (colibri decision 153), and each call here
+        // sends its body whole.
+        .headers, .body, .body_taken => unreachable,
         // The pool opens no second connection to resume, so it wipes the server's ticket.
         .ticket => |connection| if (pool.take_ticket(connection)) |ticket| {
             var held = ticket;

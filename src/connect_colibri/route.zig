@@ -1,4 +1,4 @@
-//! A `connect.Method` served as a struct route of colibri's `server.router` (design §7).
+//! A `connect.Method` served as a struct route of colibri's `server.Router` (design §7).
 //!
 //! A function handler's route reads the whole request body (`.whole_body`), decodes its messages,
 //! calls the handler, and writes the reply in the protocol the request spoke. A type handler's

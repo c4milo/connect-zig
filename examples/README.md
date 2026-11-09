@@ -34,7 +34,7 @@ Start at the top: each example adds one layer to the one before it.
   reads a bearer token, and `RateLimit`, which counts each caller's calls and sets GitHub's
   `x-ratelimit-*` headers. Failures carry `NotFound`, `AlreadyExists`, `BadField` and
   `RateLimited` details, and a private repository reads as not found to anyone but its owner.
-- [services/routes.zig](services/routes.zig) puts all three under one `server.router`, which
+- [services/routes.zig](services/routes.zig) puts all three under one `server.Router`, which
   [services/app.zig](services/app.zig)'s `App` runs.
 - [services/link.zig](services/link.zig) and [services/link_datagram.zig](services/link_datagram.zig)
   are colibri's in-memory links for octet streams and for datagrams, copied unchanged, which stand

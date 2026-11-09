@@ -46,7 +46,7 @@ pub const cpu: tls.Cpu = .{
 pub const Error = error{ CallWrong, SendUnfinished };
 
 /// One TCP connection and one QUIC connection at a time: each round opens one.
-const Endpoint = server.EndpointOf(.{ .tcp_connections = 1, .quic_connections = 1, .receive_pool_len = receive_pool_len });
+const Endpoint = server.Engine(.{ .tcp_connections = 1, .quic_connections = 1, .receive_pool_len = receive_pool_len });
 
 // The endpoint holds hundreds of kilobytes, so it lives outside the stack.
 var link: *Link align(@alignOf(*Link)) = undefined;
@@ -86,7 +86,7 @@ pub fn init(stream: *Link, datagrams: *DatagramLink) !void {
         .ticket_key = &ticket_key,
         .cpu = cpu,
     } };
-    try endpoint.init(&config, prng.random(), now_seconds, link.now_ns(.server));
+    try endpoint.init(&config, prng.random(), .{ .ns = link.now_ns(.server), .unix_seconds = now_seconds });
 }
 
 /// Wipes the key's scalar, which no session uses any more.

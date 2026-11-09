@@ -199,7 +199,7 @@ pub fn Receiver(comptime T: type) type {
 }
 
 fn apply_head(call: *Call, head: *const connect.server.Head) !void {
-    call.response.status = head.status;
+    call.response.status = @enumFromInt(head.status);
     for (head.headers()) |header| try call.response.header(header.name, header.value);
     for (call.room.response_headers[0..call.room.response_header_count]) |header| try call.response.header(header.name, header.value);
 }
@@ -308,7 +308,7 @@ pub fn read_one(comptime T: type, call: *Call, messages: *connect.server.Message
 /// Answers a request the route refused before it read the body.
 pub fn answer_refusal(refused: connect.server.Refused, scratch: connect.Scratch, room: *Room, headers: *const RequestHeaders, response: *server.ResponseWriter) !void {
     const reply = connect.server.refusal_reply(&refused, &scratch) orelse {
-        response.status = refused.http_status;
+        response.status = @enumFromInt(refused.http_status);
         return response.end();
     };
     var call: Call = .{ .reply = reply, .response = response, .room = room, .headers = headers, .path = "" };

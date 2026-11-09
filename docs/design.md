@@ -82,7 +82,7 @@ Empty, FieldMask, Struct, Value, ListValue and Any. An Any names its type from a
 
 ## 7. connect_colibri
 
-`connect_colibri` maps a `connect.Method` onto a route of `server.router`, and onto
+`connect_colibri` maps a `connect.Method` onto a route of `server.Router`, and onto
 `client.Request` and `client.Response`. A function handler's route sets `.whole_body` and takes
 its stream whole (decision 12). A type handler's route reads the body as it arrives and answers
 each message at once, full-duplex over h2 (decision 18). Interceptors wrap a route's handler and
@@ -251,6 +251,16 @@ ran on Linux x86-64 with Zig 0.16.0.
   and no lint verdict changes. `zig build guide` installs pepegrillo's performance method, and
   `docs/performance.md` holds connect-zig's appendix to it. `zig build lint` and the commit lint
   pass.
+
+- **colibri v0.15.0 and stdx 0c0ba95.** connect-zig pins colibri v0.15.0 (`de74e9c5`) and the
+  stdx commit it pins, so the build holds one stdx. colibri's step 45 renames reach the programs:
+  `server.Router(App, table, options)`, `server.Engine(.{})` with an `Instant`,
+  `client.ConnectionPool(.{})`, and `http.Status` as an enum. `connect` keeps the status as a
+  number, and `connect_colibri` converts it at colibri's edge. stdx's decoders take methods, and
+  `json.Item` is `json.TextReader.Item`. Every check passes, and no instruction count moved:
+  `zig build test`, conformance 2714/2714, the 507 scenarios across languages, coverage and
+  interop. Colibri's client tries TCP first now; the h3 rounds offer h3 alone and check the
+  protocol they spoke, so they still run h3.
 
 ### What a later step owes
 

@@ -157,7 +157,7 @@ its options, with `on_request`, which may add headers, and `on_response`.
 ### 4. Route it
 
 Each generated service has a `Routes` function. It lists every method as a route of colibri's
-`server.router`, with the handler of the same name, and a unary method with no side effects as a
+`server.Router`, with the handler of the same name, and a unary method with no side effects as a
 GET too. A method you have no handler for fails to compile. One route answers every protocol and
 codec:
 
@@ -166,11 +166,11 @@ pub fn say(app: *App, call: *rpc.Call, request: *const eliza.SayRequest, respons
 pub fn introduce(...) ?connect.RpcError { ... }
 pub fn converse(...) ?connect.RpcError { ... }
 
-pub const routes = server.router(App, .{
+pub const Router = server.Router(App, .{
     .error_handler = on_error,
     .routes = Service.Routes(rpc, App, @This(), route_options).routes ++
         rpc.Refusals(App, Service.say).routes,
-});
+}, .{ .requests = 8 });
 ```
 
 `rpc.Refusals` makes a method Connect does not serve, such as DELETE, get 405 with an Allow

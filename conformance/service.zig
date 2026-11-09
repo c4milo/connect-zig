@@ -18,13 +18,13 @@ const options: rpc.RouteOptions = .{ .message_bytes = constants.message_bytes, .
 /// A route's error that is not an RPC's: the router answers 500.
 fn on_error(_: *App, _: *const server.Request, failure: anyerror, response: *server.ResponseWriter) void {
     @import("std").debug.print("route error: {s}\n", .{@errorName(failure)});
-    response.status = @intFromEnum(@import("http").status.Code.internal_server_error);
+    response.status = .internal_server_error;
 }
 
 const unary_handler = unary.Unary(service.UnaryRequest, service.UnaryResponse).handle;
 const idempotent_handler = unary.Unary(service.IdempotentUnaryRequest, service.IdempotentUnaryResponse).handle;
 
-pub const routes = server.router(App, .{
+pub const Router = server.Router(App, .{
     .error_handler = on_error,
     .routes = .{
         rpc.post(App, Service.unary, unary_handler, options),
@@ -34,9 +34,7 @@ pub const routes = server.router(App, .{
         rpc.post(App, Service.client_stream, streams.ClientStream, options),
         rpc.post(App, Service.bidi_stream, streams.BidiStream, options),
     } ++ rpc.Refusals(App, Service.unary).routes,
-});
-
-pub const Router = @TypeOf(routes).Of(.{
+}, .{
     .requests = constants.requests_at_once,
     .response_bytes = constants.response_bytes,
     .body_bytes = constants.body_bytes,

@@ -20,7 +20,7 @@ const any_type_url: u32 = @intFromEnum(wkt.Any.FieldNumber.type_url);
 const any_value: u32 = @intFromEnum(wkt.Any.FieldNumber.value);
 
 /// Value: one JSON value of any kind, written as the member of `kind` it stands for.
-pub fn value_body(transcoder: *Transcoder, first: json.Item, depth_left: u32) Error!void {
+pub fn value_body(transcoder: *Transcoder, first: json.TextReader.Item, depth_left: u32) Error!void {
     if (depth_left == 0) return error.DepthExceeded;
     const writer = &transcoder.writer;
     switch (first) {
@@ -48,7 +48,7 @@ pub fn value_body(transcoder: *Transcoder, first: json.Item, depth_left: u32) Er
 }
 
 /// Writes field `number` as a message whose body `body` writes, behind a length it patches.
-fn nested(number: u32, comptime body: anytype, transcoder: *Transcoder, first: json.Item, depth_left: u32) Error!void {
+fn nested(number: u32, comptime body: anytype, transcoder: *Transcoder, first: json.TextReader.Item, depth_left: u32) Error!void {
     try transcoder.writer.tag(number, .len);
     const at = try transcoder.writer.padded_varint();
     try body(transcoder, first, depth_left);
@@ -56,7 +56,7 @@ fn nested(number: u32, comptime body: anytype, transcoder: *Transcoder, first: j
 }
 
 /// Struct: an object, each member an entry of its `fields` map.
-pub fn struct_body(transcoder: *Transcoder, first: json.Item, depth_left: u32) Error!void {
+pub fn struct_body(transcoder: *Transcoder, first: json.TextReader.Item, depth_left: u32) Error!void {
     if (depth_left == 0) return error.DepthExceeded;
     if (first != .begin_object) return error.UnexpectedToken;
     const writer = &transcoder.writer;
@@ -79,7 +79,7 @@ pub fn struct_body(transcoder: *Transcoder, first: json.Item, depth_left: u32) E
 }
 
 /// ListValue: an array, each element one of its `values`.
-pub fn list_body(transcoder: *Transcoder, first: json.Item, depth_left: u32) Error!void {
+pub fn list_body(transcoder: *Transcoder, first: json.TextReader.Item, depth_left: u32) Error!void {
     if (depth_left == 0) return error.DepthExceeded;
     if (first != .begin_array) return error.UnexpectedToken;
     for (0..transcoder.reader.input.len + 1) |_| {
@@ -92,7 +92,7 @@ pub fn list_body(transcoder: *Transcoder, first: json.Item, depth_left: u32) Err
 
 /// Any: an object of "@type" and the message's JSON. "@type" may stand after the members it
 /// types, so a copy of the reader looks for it first; the members are read after it.
-pub fn any_body(transcoder: *Transcoder, first: json.Item, depth_left: u32, comptime registry: []const type) Error!void {
+pub fn any_body(transcoder: *Transcoder, first: json.TextReader.Item, depth_left: u32, comptime registry: []const type) Error!void {
     if (first != .begin_object) return error.UnexpectedToken;
     var ahead = transcoder.reader;
     const index = try find_type(&ahead, &transcoder.writer, registry) orelse {
@@ -168,7 +168,7 @@ fn find_type(ahead: *json.TextReader, writer: *wire.Writer, comptime registry: [
     unreachable;
 }
 
-fn next_item(reader: *json.TextReader) Error!json.Item {
+fn next_item(reader: *json.TextReader) Error!json.TextReader.Item {
     return try reader.next() orelse error.UnexpectedToken;
 }
 

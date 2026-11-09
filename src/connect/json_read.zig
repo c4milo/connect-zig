@@ -32,7 +32,7 @@ pub const Tokens = struct {
         if (!self.reader.next_text()) return error.UnexpectedToken;
     }
 
-    pub fn next(self: *Tokens) Error!json.Item {
+    pub fn next(self: *Tokens) Error!json.TextReader.Item {
         const item = try self.reader.next();
         return item orelse error.UnexpectedToken;
     }
