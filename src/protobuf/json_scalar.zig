@@ -11,6 +11,7 @@ const assert = std.debug.assert;
 const json = @import("json");
 const wire = @import("wire.zig");
 const descriptor = @import("descriptor.zig");
+const constants = @import("constants.zig");
 const Kind = descriptor.Kind;
 
 /// What writing JSON fails with.
@@ -134,6 +135,35 @@ pub fn write_key(comptime kind: Kind, comptime V: type, key: V, text: *json.Text
 /// Reads an integer from a number or a string token. A number with an exponent or a fraction is
 /// accepted when its value is integral ("JSON Mapping": "1e2" is accepted for an int32).
 pub fn parse_integer(comptime V: type, octets: []const u8) DecodeError!V {
+    if (parse_decimal(V, octets)) |value| return value;
+    return parse_integer_general(V, octets);
+}
+
+/// The fast path of `parse_integer`: an optional "-" and 1 to `json_integer_digits_len_max`
+/// decimal digits whose value `V` holds, the form JSON writers give an integer. Any other text
+/// gives null, and `parse_integer_general` reads it, refusals included, so the two agree.
+inline fn parse_decimal(comptime V: type, octets: []const u8) ?V {
+    comptime assert(@bitSizeOf(V) <= @bitSizeOf(u64));
+    const negative = octets.len != 0 and octets[0] == '-';
+    const digits = octets[@intFromBool(negative)..];
+    if (digits.len == 0 or digits.len > constants.limits.json_integer_digits_len_max) return null;
+    var magnitude: u64 = 0;
+    for (digits) |character| {
+        const digit = character -% '0';
+        if (digit >= decimal_base) return null;
+        magnitude = magnitude * decimal_base + digit;
+    }
+    if (!negative) return std.math.cast(V, magnitude);
+    if (comptime @typeInfo(V).int.signedness == .unsigned) return null;
+    // The magnitude of minInt(V) is maxInt(V) + 1, the most a negative value takes.
+    if (magnitude > @as(u64, std.math.maxInt(V)) + 1) return null;
+    const value: i64 = @bitCast(0 -% magnitude);
+    return @intCast(value);
+}
+
+/// Reads any integer text the fast path leaves: a "+" sign, a digit separator, an exponent or a
+/// fraction, too many digits, or a value out of range.
+fn parse_integer_general(comptime V: type, octets: []const u8) DecodeError!V {
     if (std.fmt.parseInt(V, octets, decimal_base)) |value| return value else |failure| switch (failure) {
         error.Overflow => return error.NumberOutOfRange,
         error.InvalidCharacter => {},

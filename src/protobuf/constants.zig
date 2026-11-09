@@ -58,9 +58,15 @@ pub const limits = struct {
     pub const padded_length_len = 5;
     /// The deepest nesting of JSON values the transcoder follows.
     pub const json_depth_max = depth_max;
+    /// The most decimal digits the JSON integer fast path reads. Any 19 digits fit in a u64, as
+    /// 10^19 - 1 < 2^64, so it accumulates them with no overflow check. A longer text takes the
+    /// general path: a check of a 20th digit cost large JSON decode 1.7% more instructions than
+    /// it saved (`tools/perf_check.sh`, 2026-11-09).
+    pub const json_integer_digits_len_max = 19;
 };
 
 comptime {
     std.debug.assert(limits.padded_length_len * 7 >= 31);
     std.debug.assert(protocol.varint_len_max * 7 >= 64);
+    std.debug.assert(std.math.pow(u128, 10, limits.json_integer_digits_len_max) - 1 <= std.math.maxInt(u64));
 }

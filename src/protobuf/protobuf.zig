@@ -154,4 +154,5 @@ test {
     _ = @import("protobuf_closed_test.zig");
     _ = @import("protobuf_fast_path_test.zig");
     _ = @import("protobuf_fast_path_message_test.zig");
+    _ = @import("protobuf_fast_path_number_test.zig");
 }

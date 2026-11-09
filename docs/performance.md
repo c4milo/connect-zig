@@ -104,6 +104,7 @@ failed (the owner's ruling of 2026-11-09). A new fast path joins this list the s
 | The packed element inline | `repeated.zig` | failed; its commit names the operations |
 | A `Lazy` child through its pointer | `encode.zig` | failed; its commit names the operations |
 | A JSON member name against comptime names | `json_decode.zig`, `name_is` | deep JSON decode +11.09%, large JSON decode +4.71% |
+| A JSON integer of up to 19 decimal digits | `json_scalar.zig`, `parse_decimal` | packed JSON decode +8.66%, varints JSON decode +8.67%, medium JSON decode +7.10% |
 
 ## The pitfalls
 
