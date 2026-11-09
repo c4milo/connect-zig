@@ -5,6 +5,7 @@ package main
 
 import (
 	"fmt"
+	"math"
 	"strings"
 
 	benchv1 "github.com/c4milo/connect-zig/bench/go/gen/bench/v1"
@@ -32,6 +33,12 @@ const (
 	weightStep              = 0.5
 	statusCount             = 4
 	deepLevelsCount         = 50
+	treeFanout              = 4
+	treeLevelsCount         = 4
+	packedCount             = 64
+	realStep                = 0.25
+	// The text every ASCII string of newStrings is a prefix of, as in bench/inputs.zig.
+	asciiText = "abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ-_"
 	// The phrase the large message's description repeats, as bench/inputs.zig repeats it.
 	descriptionPhrase  = "A batch of records: données, 日本語のテキスト, ünïcode — end. "
 	descriptionRepeats = 100
@@ -117,4 +124,65 @@ func newDeep() *benchv1.Deep {
 		child = &benchv1.Deep{Level: int32(i + 1), Label: fmt.Sprintf("level-%02d", i), Child: child}
 	}
 	return child
+}
+
+// newVarints holds every varint kind at each length from 1 to 10 bytes, as bench/inputs.zig.
+func newVarints() *benchv1.Varints {
+	return &benchv1.Varints{
+		Int32One:      100,
+		Int32Two:      300,
+		Int32Negative: -1,
+		Int64Three:    100_000,
+		Int64Eight:    1 << 50,
+		Uint32Four:    1 << 22,
+		Uint32Five:    4_000_000_000,
+		Uint64Six:     1 << 36,
+		Uint64Ten:     math.MaxUint64,
+		Sint32One:     -5,
+		Sint32Three:   -50_000,
+		Sint64Seven:   -(1 << 44),
+		Sint64Nine:    1 << 60,
+		Flag:          true,
+		Status:        benchv1.Status_STATUS_CLOSED,
+		Uint64Two:     200,
+	}
+}
+
+func newStrings() *benchv1.Strings {
+	return &benchv1.Strings{
+		One:       asciiText[:1],
+		Three:     asciiText[:3],
+		Seven:     asciiText[:7],
+		Eight:     asciiText[:8],
+		Fifteen:   asciiText[:15],
+		Sixteen:   asciiText[:16],
+		ThirtyOne: asciiText[:31],
+		ThirtyTwo: asciiText[:32],
+		SixtyFour: asciiText[:64],
+		Latin:     "données, ünïcode",
+		Cjk:       "日本語のテキスト",
+	}
+}
+
+// newTree builds a node with treeFanout children on each level, treeLevelsCount levels deep.
+func newTree(levels int) *benchv1.Tree {
+	node := &benchv1.Tree{}
+	if levels == 0 {
+		return node
+	}
+	for i := 0; i < treeFanout; i++ {
+		node.Children = append(node.Children, newTree(levels-1))
+	}
+	return node
+}
+
+func newPacked() *benchv1.Packed {
+	message := &benchv1.Packed{}
+	for i := 0; i < packedCount; i++ {
+		message.Small = append(message.Small, int32(i))
+		message.Wide = append(message.Wide, uint64(1)<<i)
+		message.Zigzag = append(message.Zigzag, int32(i-packedCount/2))
+		message.Reals = append(message.Reals, float64(i)*realStep)
+	}
+	return message
 }

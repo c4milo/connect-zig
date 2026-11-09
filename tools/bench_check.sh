@@ -17,7 +17,7 @@ zig build bench -- ${quick} --write "${scratch}/zig" >"${scratch}/zig.md"
 (cd bench/go && "${go}" run . ${quick} --write "${scratch}/go") >"${scratch}/go.md"
 
 status=0
-for message in small medium large deep; do
+for message in small medium large deep varints strings tree packed; do
     for kind in bin sum; do
         if cmp -s "${scratch}/zig/${message}.${kind}" "${scratch}/go/${message}.${kind}"; then
             echo "${message}.${kind}: Zig and Go match"

@@ -1,6 +1,7 @@
-//! The protobuf runtime's benchmark: binary and JSON, encode and decode, on four messages from
-//! bench/proto. It prints one Markdown table: the bytes each operation reads or writes, the
-//! median nanoseconds of one operation, and MB/s (10^6 bytes a second).
+//! The protobuf runtime's benchmark: binary and JSON, encode and decode, on eight messages from
+//! bench/proto: four shaped as services send them, and four that each hold one kind of field. It
+//! prints one Markdown table: the bytes each operation reads or writes, the median nanoseconds of
+//! one operation, and MB/s (10^6 bytes a second).
 //!
 //! Run it with `zig build bench`, which builds it ReleaseFast. Flags:
 //!
@@ -60,6 +61,10 @@ pub fn main(init: std.process.Init) !void {
     try run_message(context, bench.Medium, walk.medium, "medium", &inputs.medium);
     try run_message(context, bench.Large, walk.large, "large", &inputs.large);
     try run_message(context, bench.Deep, walk.deep, "deep", inputs.deep());
+    try run_message(context, bench.Varints, walk.varints, "varints", &inputs.varints);
+    try run_message(context, bench.Strings, walk.strings, "strings", &inputs.strings);
+    try run_message(context, bench.Tree, walk.tree, "tree", &inputs.tree);
+    try run_message(context, bench.Packed, walk.packed_scalars, "packed", &inputs.packed_scalars);
     try writer.flush();
 }
 

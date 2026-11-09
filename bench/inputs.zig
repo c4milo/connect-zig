@@ -13,6 +13,10 @@ const Address = bench.Address;
 const Record = bench.Record;
 const Large = bench.Large;
 const Deep = bench.Deep;
+const Varints = bench.Varints;
+const Strings = bench.Strings;
+const Tree = bench.Tree;
+const Packed = bench.Packed;
 
 pub const small: Small = .{
     .id = 12_345,
@@ -92,6 +96,8 @@ pub fn build() void {
     build_medium();
     build_large();
     build_deep();
+    build_tree();
+    build_packed();
 }
 
 fn build_medium() void {
@@ -163,6 +169,96 @@ fn build_deep() void {
         if (i + 1 < deep_levels_count) node.child = .of(&deep_nodes[i + 1]);
     }
     assert(!deep_nodes[deep_levels_count - 1].child.present());
+}
+
+/// Every varint kind at each length from 1 to 10 bytes, as the comment of each value counts.
+pub const varints: Varints = .{
+    .int32_one = 100,
+    .int32_two = 300,
+    // A negative int32 is sign-extended to ten bytes ("Base 128 Varints").
+    .int32_negative = -1,
+    .int64_three = 100_000,
+    .int64_eight = 1 << 50,
+    .uint32_four = 1 << 22,
+    .uint32_five = 4_000_000_000,
+    .uint64_six = 1 << 36,
+    .uint64_ten = std.math.maxInt(u64),
+    // Zigzag: -5 is 9, one byte; -50,000 is 99,999, three bytes.
+    .sint32_one = -5,
+    .sint32_three = -50_000,
+    // Zigzag: -2^44 is 2^45 - 1, seven bytes; 2^60 is 2^61, nine bytes.
+    .sint64_seven = -(1 << 44),
+    .sint64_nine = 1 << 60,
+    .flag = true,
+    .status = .status_closed,
+    .uint64_two = 200,
+};
+
+/// The text every ASCII string of `strings` is a prefix of. bench/go/inputs.go uses the same.
+const ascii_text = "abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ-_";
+
+pub const strings: Strings = .{
+    .one = ascii_text[0..1],
+    .three = ascii_text[0..3],
+    .seven = ascii_text[0..7],
+    .eight = ascii_text[0..8],
+    .fifteen = ascii_text[0..15],
+    .sixteen = ascii_text[0..16],
+    .thirty_one = ascii_text[0..31],
+    .thirty_two = ascii_text[0..32],
+    .sixty_four = ascii_text[0..64],
+    .latin = "données, ünïcode",
+    .cjk = "日本語のテキスト",
+};
+
+/// The tree: each node above the last level holds `tree_fanout` children, `tree_levels_count`
+/// levels below the root, so 1 + 4 + 16 + 64 + 256 = 341 nodes.
+pub const tree_fanout = 4;
+pub const tree_levels_count = 4;
+var tree_level_1: [tree_fanout]Tree align(@alignOf(Tree)) = undefined;
+var tree_level_2: [tree_fanout * tree_fanout]Tree align(@alignOf(Tree)) = undefined;
+var tree_level_3: [tree_fanout * tree_fanout * tree_fanout]Tree align(@alignOf(Tree)) = undefined;
+/// The leaves, which hold no children.
+var tree_level_4: [tree_fanout * tree_fanout * tree_fanout * tree_fanout]Tree align(@alignOf(Tree)) = @splat(.{});
+pub var tree: Tree align(@alignOf(Tree)) = .{};
+
+fn build_tree() void {
+    link_level(&tree_level_3, &tree_level_4);
+    link_level(&tree_level_2, &tree_level_3);
+    link_level(&tree_level_1, &tree_level_2);
+    tree = .{ .children = .of(&tree_level_1) };
+}
+
+/// Gives node i of `parents` the `tree_fanout` children from `tree_fanout` * i.
+fn link_level(parents: []Tree, children: []const Tree) void {
+    assert(children.len == parents.len * tree_fanout);
+    for (parents, 0..) |*parent, i| parent.* = .{ .children = .of(children[i * tree_fanout ..][0..tree_fanout]) };
+}
+
+/// The packed message: `packed_count` elements in each field. Element i of `small` is i, of
+/// `wide` 2^i, of `zigzag` i - `packed_count` / 2, and of `reals` i * `real_step`.
+pub const packed_count = 64;
+const real_step = 0.25;
+var packed_small: [packed_count]i32 align(@alignOf(i32)) = undefined;
+var packed_wide: [packed_count]u64 align(@alignOf(u64)) = undefined;
+var packed_zigzag: [packed_count]i32 align(@alignOf(i32)) = undefined;
+var packed_reals: [packed_count]f64 align(@alignOf(f64)) = undefined;
+pub var packed_scalars: Packed align(@alignOf(Packed)) = .{};
+
+fn build_packed() void {
+    for (&packed_small, &packed_wide, &packed_zigzag, &packed_reals, 0..) |*small_value, *wide, *zigzag, *real, i| {
+        const index: i32 = @intCast(i);
+        small_value.* = index;
+        wide.* = @as(u64, 1) << @intCast(i);
+        zigzag.* = index - packed_count / 2;
+        real.* = @as(f64, @floatFromInt(i)) * real_step;
+    }
+    packed_scalars = .{
+        .small = .of(&packed_small),
+        .wide = .of(&packed_wide),
+        .zigzag = .of(&packed_zigzag),
+        .reals = .of(&packed_reals),
+    };
 }
 
 /// Formats into `text`, which the format fills exactly.

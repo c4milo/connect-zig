@@ -621,6 +621,411 @@ func (x *Deep) GetChild() *Deep {
 	return nil
 }
 
+// Varints alone: every varint kind, at each length from 1 to 10 bytes. Field 16's tag takes 2.
+type Varints struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Int32One      int32                  `protobuf:"varint,1,opt,name=int32_one,json=int32One,proto3" json:"int32_one,omitempty"`
+	Int32Two      int32                  `protobuf:"varint,2,opt,name=int32_two,json=int32Two,proto3" json:"int32_two,omitempty"`
+	Int32Negative int32                  `protobuf:"varint,3,opt,name=int32_negative,json=int32Negative,proto3" json:"int32_negative,omitempty"`
+	Int64Three    int64                  `protobuf:"varint,4,opt,name=int64_three,json=int64Three,proto3" json:"int64_three,omitempty"`
+	Int64Eight    int64                  `protobuf:"varint,5,opt,name=int64_eight,json=int64Eight,proto3" json:"int64_eight,omitempty"`
+	Uint32Four    uint32                 `protobuf:"varint,6,opt,name=uint32_four,json=uint32Four,proto3" json:"uint32_four,omitempty"`
+	Uint32Five    uint32                 `protobuf:"varint,7,opt,name=uint32_five,json=uint32Five,proto3" json:"uint32_five,omitempty"`
+	Uint64Six     uint64                 `protobuf:"varint,8,opt,name=uint64_six,json=uint64Six,proto3" json:"uint64_six,omitempty"`
+	Uint64Ten     uint64                 `protobuf:"varint,9,opt,name=uint64_ten,json=uint64Ten,proto3" json:"uint64_ten,omitempty"`
+	Sint32One     int32                  `protobuf:"zigzag32,10,opt,name=sint32_one,json=sint32One,proto3" json:"sint32_one,omitempty"`
+	Sint32Three   int32                  `protobuf:"zigzag32,11,opt,name=sint32_three,json=sint32Three,proto3" json:"sint32_three,omitempty"`
+	Sint64Seven   int64                  `protobuf:"zigzag64,12,opt,name=sint64_seven,json=sint64Seven,proto3" json:"sint64_seven,omitempty"`
+	Sint64Nine    int64                  `protobuf:"zigzag64,13,opt,name=sint64_nine,json=sint64Nine,proto3" json:"sint64_nine,omitempty"`
+	Flag          bool                   `protobuf:"varint,14,opt,name=flag,proto3" json:"flag,omitempty"`
+	Status        Status                 `protobuf:"varint,15,opt,name=status,proto3,enum=bench.v1.Status" json:"status,omitempty"`
+	Uint64Two     uint64                 `protobuf:"varint,16,opt,name=uint64_two,json=uint64Two,proto3" json:"uint64_two,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Varints) Reset() {
+	*x = Varints{}
+	mi := &file_bench_v1_bench_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Varints) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Varints) ProtoMessage() {}
+
+func (x *Varints) ProtoReflect() protoreflect.Message {
+	mi := &file_bench_v1_bench_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Varints.ProtoReflect.Descriptor instead.
+func (*Varints) Descriptor() ([]byte, []int) {
+	return file_bench_v1_bench_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *Varints) GetInt32One() int32 {
+	if x != nil {
+		return x.Int32One
+	}
+	return 0
+}
+
+func (x *Varints) GetInt32Two() int32 {
+	if x != nil {
+		return x.Int32Two
+	}
+	return 0
+}
+
+func (x *Varints) GetInt32Negative() int32 {
+	if x != nil {
+		return x.Int32Negative
+	}
+	return 0
+}
+
+func (x *Varints) GetInt64Three() int64 {
+	if x != nil {
+		return x.Int64Three
+	}
+	return 0
+}
+
+func (x *Varints) GetInt64Eight() int64 {
+	if x != nil {
+		return x.Int64Eight
+	}
+	return 0
+}
+
+func (x *Varints) GetUint32Four() uint32 {
+	if x != nil {
+		return x.Uint32Four
+	}
+	return 0
+}
+
+func (x *Varints) GetUint32Five() uint32 {
+	if x != nil {
+		return x.Uint32Five
+	}
+	return 0
+}
+
+func (x *Varints) GetUint64Six() uint64 {
+	if x != nil {
+		return x.Uint64Six
+	}
+	return 0
+}
+
+func (x *Varints) GetUint64Ten() uint64 {
+	if x != nil {
+		return x.Uint64Ten
+	}
+	return 0
+}
+
+func (x *Varints) GetSint32One() int32 {
+	if x != nil {
+		return x.Sint32One
+	}
+	return 0
+}
+
+func (x *Varints) GetSint32Three() int32 {
+	if x != nil {
+		return x.Sint32Three
+	}
+	return 0
+}
+
+func (x *Varints) GetSint64Seven() int64 {
+	if x != nil {
+		return x.Sint64Seven
+	}
+	return 0
+}
+
+func (x *Varints) GetSint64Nine() int64 {
+	if x != nil {
+		return x.Sint64Nine
+	}
+	return 0
+}
+
+func (x *Varints) GetFlag() bool {
+	if x != nil {
+		return x.Flag
+	}
+	return false
+}
+
+func (x *Varints) GetStatus() Status {
+	if x != nil {
+		return x.Status
+	}
+	return Status_STATUS_UNSPECIFIED
+}
+
+func (x *Varints) GetUint64Two() uint64 {
+	if x != nil {
+		return x.Uint64Two
+	}
+	return 0
+}
+
+// Strings alone: ASCII at lengths on each side of 8, 16 and 32 octets, where a UTF-8 check
+// changes its step, and two that hold Latin and CJK characters.
+type Strings struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	One           string                 `protobuf:"bytes,1,opt,name=one,proto3" json:"one,omitempty"`
+	Three         string                 `protobuf:"bytes,2,opt,name=three,proto3" json:"three,omitempty"`
+	Seven         string                 `protobuf:"bytes,3,opt,name=seven,proto3" json:"seven,omitempty"`
+	Eight         string                 `protobuf:"bytes,4,opt,name=eight,proto3" json:"eight,omitempty"`
+	Fifteen       string                 `protobuf:"bytes,5,opt,name=fifteen,proto3" json:"fifteen,omitempty"`
+	Sixteen       string                 `protobuf:"bytes,6,opt,name=sixteen,proto3" json:"sixteen,omitempty"`
+	ThirtyOne     string                 `protobuf:"bytes,7,opt,name=thirty_one,json=thirtyOne,proto3" json:"thirty_one,omitempty"`
+	ThirtyTwo     string                 `protobuf:"bytes,8,opt,name=thirty_two,json=thirtyTwo,proto3" json:"thirty_two,omitempty"`
+	SixtyFour     string                 `protobuf:"bytes,9,opt,name=sixty_four,json=sixtyFour,proto3" json:"sixty_four,omitempty"`
+	Latin         string                 `protobuf:"bytes,10,opt,name=latin,proto3" json:"latin,omitempty"`
+	Cjk           string                 `protobuf:"bytes,11,opt,name=cjk,proto3" json:"cjk,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Strings) Reset() {
+	*x = Strings{}
+	mi := &file_bench_v1_bench_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Strings) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Strings) ProtoMessage() {}
+
+func (x *Strings) ProtoReflect() protoreflect.Message {
+	mi := &file_bench_v1_bench_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Strings.ProtoReflect.Descriptor instead.
+func (*Strings) Descriptor() ([]byte, []int) {
+	return file_bench_v1_bench_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *Strings) GetOne() string {
+	if x != nil {
+		return x.One
+	}
+	return ""
+}
+
+func (x *Strings) GetThree() string {
+	if x != nil {
+		return x.Three
+	}
+	return ""
+}
+
+func (x *Strings) GetSeven() string {
+	if x != nil {
+		return x.Seven
+	}
+	return ""
+}
+
+func (x *Strings) GetEight() string {
+	if x != nil {
+		return x.Eight
+	}
+	return ""
+}
+
+func (x *Strings) GetFifteen() string {
+	if x != nil {
+		return x.Fifteen
+	}
+	return ""
+}
+
+func (x *Strings) GetSixteen() string {
+	if x != nil {
+		return x.Sixteen
+	}
+	return ""
+}
+
+func (x *Strings) GetThirtyOne() string {
+	if x != nil {
+		return x.ThirtyOne
+	}
+	return ""
+}
+
+func (x *Strings) GetThirtyTwo() string {
+	if x != nil {
+		return x.ThirtyTwo
+	}
+	return ""
+}
+
+func (x *Strings) GetSixtyFour() string {
+	if x != nil {
+		return x.SixtyFour
+	}
+	return ""
+}
+
+func (x *Strings) GetLatin() string {
+	if x != nil {
+		return x.Latin
+	}
+	return ""
+}
+
+func (x *Strings) GetCjk() string {
+	if x != nil {
+		return x.Cjk
+	}
+	return ""
+}
+
+// Nested messages alone: a tree whose nodes hold nothing but their children.
+type Tree struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Children      []*Tree                `protobuf:"bytes,1,rep,name=children,proto3" json:"children,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Tree) Reset() {
+	*x = Tree{}
+	mi := &file_bench_v1_bench_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Tree) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Tree) ProtoMessage() {}
+
+func (x *Tree) ProtoReflect() protoreflect.Message {
+	mi := &file_bench_v1_bench_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Tree.ProtoReflect.Descriptor instead.
+func (*Tree) Descriptor() ([]byte, []int) {
+	return file_bench_v1_bench_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *Tree) GetChildren() []*Tree {
+	if x != nil {
+		return x.Children
+	}
+	return nil
+}
+
+// Packed repeated scalars alone: small and wide varints, zigzag and doubles.
+type Packed struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Small         []int32                `protobuf:"varint,1,rep,packed,name=small,proto3" json:"small,omitempty"`
+	Wide          []uint64               `protobuf:"varint,2,rep,packed,name=wide,proto3" json:"wide,omitempty"`
+	Zigzag        []int32                `protobuf:"zigzag32,3,rep,packed,name=zigzag,proto3" json:"zigzag,omitempty"`
+	Reals         []float64              `protobuf:"fixed64,4,rep,packed,name=reals,proto3" json:"reals,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Packed) Reset() {
+	*x = Packed{}
+	mi := &file_bench_v1_bench_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Packed) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Packed) ProtoMessage() {}
+
+func (x *Packed) ProtoReflect() protoreflect.Message {
+	mi := &file_bench_v1_bench_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Packed.ProtoReflect.Descriptor instead.
+func (*Packed) Descriptor() ([]byte, []int) {
+	return file_bench_v1_bench_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *Packed) GetSmall() []int32 {
+	if x != nil {
+		return x.Small
+	}
+	return nil
+}
+
+func (x *Packed) GetWide() []uint64 {
+	if x != nil {
+		return x.Wide
+	}
+	return nil
+}
+
+func (x *Packed) GetZigzag() []int32 {
+	if x != nil {
+		return x.Zigzag
+	}
+	return nil
+}
+
+func (x *Packed) GetReals() []float64 {
+	if x != nil {
+		return x.Reals
+	}
+	return nil
+}
+
 var File_bench_v1_bench_proto protoreflect.FileDescriptor
 
 const file_bench_v1_bench_proto_rawDesc = "" +
@@ -672,7 +1077,57 @@ const file_bench_v1_bench_proto_rawDesc = "" +
 	"\x04Deep\x12\x14\n" +
 	"\x05level\x18\x01 \x01(\x05R\x05level\x12\x14\n" +
 	"\x05label\x18\x02 \x01(\tR\x05label\x12$\n" +
-	"\x05child\x18\x03 \x01(\v2\x0e.bench.v1.DeepR\x05child*\\\n" +
+	"\x05child\x18\x03 \x01(\v2\x0e.bench.v1.DeepR\x05child\"\x8f\x04\n" +
+	"\aVarints\x12\x1b\n" +
+	"\tint32_one\x18\x01 \x01(\x05R\bint32One\x12\x1b\n" +
+	"\tint32_two\x18\x02 \x01(\x05R\bint32Two\x12%\n" +
+	"\x0eint32_negative\x18\x03 \x01(\x05R\rint32Negative\x12\x1f\n" +
+	"\vint64_three\x18\x04 \x01(\x03R\n" +
+	"int64Three\x12\x1f\n" +
+	"\vint64_eight\x18\x05 \x01(\x03R\n" +
+	"int64Eight\x12\x1f\n" +
+	"\vuint32_four\x18\x06 \x01(\rR\n" +
+	"uint32Four\x12\x1f\n" +
+	"\vuint32_five\x18\a \x01(\rR\n" +
+	"uint32Five\x12\x1d\n" +
+	"\n" +
+	"uint64_six\x18\b \x01(\x04R\tuint64Six\x12\x1d\n" +
+	"\n" +
+	"uint64_ten\x18\t \x01(\x04R\tuint64Ten\x12\x1d\n" +
+	"\n" +
+	"sint32_one\x18\n" +
+	" \x01(\x11R\tsint32One\x12!\n" +
+	"\fsint32_three\x18\v \x01(\x11R\vsint32Three\x12!\n" +
+	"\fsint64_seven\x18\f \x01(\x12R\vsint64Seven\x12\x1f\n" +
+	"\vsint64_nine\x18\r \x01(\x12R\n" +
+	"sint64Nine\x12\x12\n" +
+	"\x04flag\x18\x0e \x01(\bR\x04flag\x12(\n" +
+	"\x06status\x18\x0f \x01(\x0e2\x10.bench.v1.StatusR\x06status\x12\x1d\n" +
+	"\n" +
+	"uint64_two\x18\x10 \x01(\x04R\tuint64Two\"\x96\x02\n" +
+	"\aStrings\x12\x10\n" +
+	"\x03one\x18\x01 \x01(\tR\x03one\x12\x14\n" +
+	"\x05three\x18\x02 \x01(\tR\x05three\x12\x14\n" +
+	"\x05seven\x18\x03 \x01(\tR\x05seven\x12\x14\n" +
+	"\x05eight\x18\x04 \x01(\tR\x05eight\x12\x18\n" +
+	"\afifteen\x18\x05 \x01(\tR\afifteen\x12\x18\n" +
+	"\asixteen\x18\x06 \x01(\tR\asixteen\x12\x1d\n" +
+	"\n" +
+	"thirty_one\x18\a \x01(\tR\tthirtyOne\x12\x1d\n" +
+	"\n" +
+	"thirty_two\x18\b \x01(\tR\tthirtyTwo\x12\x1d\n" +
+	"\n" +
+	"sixty_four\x18\t \x01(\tR\tsixtyFour\x12\x14\n" +
+	"\x05latin\x18\n" +
+	" \x01(\tR\x05latin\x12\x10\n" +
+	"\x03cjk\x18\v \x01(\tR\x03cjk\"2\n" +
+	"\x04Tree\x12*\n" +
+	"\bchildren\x18\x01 \x03(\v2\x0e.bench.v1.TreeR\bchildren\"`\n" +
+	"\x06Packed\x12\x14\n" +
+	"\x05small\x18\x01 \x03(\x05R\x05small\x12\x12\n" +
+	"\x04wide\x18\x02 \x03(\x04R\x04wide\x12\x16\n" +
+	"\x06zigzag\x18\x03 \x03(\x11R\x06zigzag\x12\x14\n" +
+	"\x05reals\x18\x04 \x03(\x01R\x05reals*\\\n" +
 	"\x06Status\x12\x16\n" +
 	"\x12STATUS_UNSPECIFIED\x10\x00\x12\x11\n" +
 	"\rSTATUS_ACTIVE\x10\x01\x12\x14\n" +
@@ -694,7 +1149,7 @@ func file_bench_v1_bench_proto_rawDescGZIP() []byte {
 }
 
 var file_bench_v1_bench_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_bench_v1_bench_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
+var file_bench_v1_bench_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
 var file_bench_v1_bench_proto_goTypes = []any{
 	(Status)(0),     // 0: bench.v1.Status
 	(*Small)(nil),   // 1: bench.v1.Small
@@ -703,22 +1158,28 @@ var file_bench_v1_bench_proto_goTypes = []any{
 	(*Record)(nil),  // 4: bench.v1.Record
 	(*Large)(nil),   // 5: bench.v1.Large
 	(*Deep)(nil),    // 6: bench.v1.Deep
-	nil,             // 7: bench.v1.Medium.CountersEntry
+	(*Varints)(nil), // 7: bench.v1.Varints
+	(*Strings)(nil), // 8: bench.v1.Strings
+	(*Tree)(nil),    // 9: bench.v1.Tree
+	(*Packed)(nil),  // 10: bench.v1.Packed
+	nil,             // 11: bench.v1.Medium.CountersEntry
 }
 var file_bench_v1_bench_proto_depIdxs = []int32{
-	0, // 0: bench.v1.Medium.status:type_name -> bench.v1.Status
-	2, // 1: bench.v1.Medium.home:type_name -> bench.v1.Address
-	7, // 2: bench.v1.Medium.counters:type_name -> bench.v1.Medium.CountersEntry
-	2, // 3: bench.v1.Medium.previous:type_name -> bench.v1.Address
-	2, // 4: bench.v1.Medium.office:type_name -> bench.v1.Address
-	0, // 5: bench.v1.Record.status:type_name -> bench.v1.Status
-	4, // 6: bench.v1.Large.records:type_name -> bench.v1.Record
-	6, // 7: bench.v1.Deep.child:type_name -> bench.v1.Deep
-	8, // [8:8] is the sub-list for method output_type
-	8, // [8:8] is the sub-list for method input_type
-	8, // [8:8] is the sub-list for extension type_name
-	8, // [8:8] is the sub-list for extension extendee
-	0, // [0:8] is the sub-list for field type_name
+	0,  // 0: bench.v1.Medium.status:type_name -> bench.v1.Status
+	2,  // 1: bench.v1.Medium.home:type_name -> bench.v1.Address
+	11, // 2: bench.v1.Medium.counters:type_name -> bench.v1.Medium.CountersEntry
+	2,  // 3: bench.v1.Medium.previous:type_name -> bench.v1.Address
+	2,  // 4: bench.v1.Medium.office:type_name -> bench.v1.Address
+	0,  // 5: bench.v1.Record.status:type_name -> bench.v1.Status
+	4,  // 6: bench.v1.Large.records:type_name -> bench.v1.Record
+	6,  // 7: bench.v1.Deep.child:type_name -> bench.v1.Deep
+	0,  // 8: bench.v1.Varints.status:type_name -> bench.v1.Status
+	9,  // 9: bench.v1.Tree.children:type_name -> bench.v1.Tree
+	10, // [10:10] is the sub-list for method output_type
+	10, // [10:10] is the sub-list for method input_type
+	10, // [10:10] is the sub-list for extension type_name
+	10, // [10:10] is the sub-list for extension extendee
+	0,  // [0:10] is the sub-list for field type_name
 }
 
 func init() { file_bench_v1_bench_proto_init() }
@@ -737,7 +1198,7 @@ func file_bench_v1_bench_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_bench_v1_bench_proto_rawDesc), len(file_bench_v1_bench_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   7,
+			NumMessages:   11,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

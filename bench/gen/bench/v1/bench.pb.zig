@@ -207,6 +207,154 @@ pub const Deep = struct {
     };
 };
 
+pub const Varints = struct {
+    int32_one: i32 = 0,
+    int32_two: i32 = 0,
+    int32_negative: i32 = 0,
+    int64_three: i64 = 0,
+    int64_eight: i64 = 0,
+    uint32_four: u32 = 0,
+    uint32_five: u32 = 0,
+    uint64_six: u64 = 0,
+    uint64_ten: u64 = 0,
+    sint32_one: i32 = 0,
+    sint32_three: i32 = 0,
+    sint64_seven: i64 = 0,
+    sint64_nine: i64 = 0,
+    flag: bool = false,
+    status: Status = @enumFromInt(0),
+    uint64_two: u64 = 0,
+    _unknown: proto.Unknown = .{},
+
+    pub const FieldNumber = enum(u29) {
+        int32_one = 1,
+        int32_two = 2,
+        int32_negative = 3,
+        int64_three = 4,
+        int64_eight = 5,
+        uint32_four = 6,
+        uint32_five = 7,
+        uint64_six = 8,
+        uint64_ten = 9,
+        sint32_one = 10,
+        sint32_three = 11,
+        sint64_seven = 12,
+        sint64_nine = 13,
+        flag = 14,
+        status = 15,
+        uint64_two = 16,
+    };
+
+    pub const protobuf: proto.Descriptor = .{
+        .full_name = "bench.v1.Varints",
+        .fields = &.{
+            .{ .name = "int32_one", .number = @intFromEnum(@This().FieldNumber.int32_one), .kind = .int32, .json_name = "int32One", .proto_name = "int32_one" },
+            .{ .name = "int32_two", .number = @intFromEnum(@This().FieldNumber.int32_two), .kind = .int32, .json_name = "int32Two", .proto_name = "int32_two" },
+            .{ .name = "int32_negative", .number = @intFromEnum(@This().FieldNumber.int32_negative), .kind = .int32, .json_name = "int32Negative", .proto_name = "int32_negative" },
+            .{ .name = "int64_three", .number = @intFromEnum(@This().FieldNumber.int64_three), .kind = .int64, .json_name = "int64Three", .proto_name = "int64_three" },
+            .{ .name = "int64_eight", .number = @intFromEnum(@This().FieldNumber.int64_eight), .kind = .int64, .json_name = "int64Eight", .proto_name = "int64_eight" },
+            .{ .name = "uint32_four", .number = @intFromEnum(@This().FieldNumber.uint32_four), .kind = .uint32, .json_name = "uint32Four", .proto_name = "uint32_four" },
+            .{ .name = "uint32_five", .number = @intFromEnum(@This().FieldNumber.uint32_five), .kind = .uint32, .json_name = "uint32Five", .proto_name = "uint32_five" },
+            .{ .name = "uint64_six", .number = @intFromEnum(@This().FieldNumber.uint64_six), .kind = .uint64, .json_name = "uint64Six", .proto_name = "uint64_six" },
+            .{ .name = "uint64_ten", .number = @intFromEnum(@This().FieldNumber.uint64_ten), .kind = .uint64, .json_name = "uint64Ten", .proto_name = "uint64_ten" },
+            .{ .name = "sint32_one", .number = @intFromEnum(@This().FieldNumber.sint32_one), .kind = .sint32, .json_name = "sint32One", .proto_name = "sint32_one" },
+            .{ .name = "sint32_three", .number = @intFromEnum(@This().FieldNumber.sint32_three), .kind = .sint32, .json_name = "sint32Three", .proto_name = "sint32_three" },
+            .{ .name = "sint64_seven", .number = @intFromEnum(@This().FieldNumber.sint64_seven), .kind = .sint64, .json_name = "sint64Seven", .proto_name = "sint64_seven" },
+            .{ .name = "sint64_nine", .number = @intFromEnum(@This().FieldNumber.sint64_nine), .kind = .sint64, .json_name = "sint64Nine", .proto_name = "sint64_nine" },
+            .{ .name = "flag", .number = @intFromEnum(@This().FieldNumber.flag), .kind = .bool, .json_name = "flag", .proto_name = "flag" },
+            .{ .name = "status", .number = @intFromEnum(@This().FieldNumber.status), .kind = .@"enum", .json_name = "status", .proto_name = "status" },
+            .{ .name = "uint64_two", .number = @intFromEnum(@This().FieldNumber.uint64_two), .kind = .uint64, .json_name = "uint64Two", .proto_name = "uint64_two" },
+        },
+    };
+};
+
+pub const Strings = struct {
+    one: []const u8 = "",
+    three: []const u8 = "",
+    seven: []const u8 = "",
+    eight: []const u8 = "",
+    fifteen: []const u8 = "",
+    sixteen: []const u8 = "",
+    thirty_one: []const u8 = "",
+    thirty_two: []const u8 = "",
+    sixty_four: []const u8 = "",
+    latin: []const u8 = "",
+    cjk: []const u8 = "",
+    _unknown: proto.Unknown = .{},
+
+    pub const FieldNumber = enum(u29) {
+        one = 1,
+        three = 2,
+        seven = 3,
+        eight = 4,
+        fifteen = 5,
+        sixteen = 6,
+        thirty_one = 7,
+        thirty_two = 8,
+        sixty_four = 9,
+        latin = 10,
+        cjk = 11,
+    };
+
+    pub const protobuf: proto.Descriptor = .{
+        .full_name = "bench.v1.Strings",
+        .fields = &.{
+            .{ .name = "one", .number = @intFromEnum(@This().FieldNumber.one), .kind = .string, .json_name = "one", .proto_name = "one" },
+            .{ .name = "three", .number = @intFromEnum(@This().FieldNumber.three), .kind = .string, .json_name = "three", .proto_name = "three" },
+            .{ .name = "seven", .number = @intFromEnum(@This().FieldNumber.seven), .kind = .string, .json_name = "seven", .proto_name = "seven" },
+            .{ .name = "eight", .number = @intFromEnum(@This().FieldNumber.eight), .kind = .string, .json_name = "eight", .proto_name = "eight" },
+            .{ .name = "fifteen", .number = @intFromEnum(@This().FieldNumber.fifteen), .kind = .string, .json_name = "fifteen", .proto_name = "fifteen" },
+            .{ .name = "sixteen", .number = @intFromEnum(@This().FieldNumber.sixteen), .kind = .string, .json_name = "sixteen", .proto_name = "sixteen" },
+            .{ .name = "thirty_one", .number = @intFromEnum(@This().FieldNumber.thirty_one), .kind = .string, .json_name = "thirtyOne", .proto_name = "thirty_one" },
+            .{ .name = "thirty_two", .number = @intFromEnum(@This().FieldNumber.thirty_two), .kind = .string, .json_name = "thirtyTwo", .proto_name = "thirty_two" },
+            .{ .name = "sixty_four", .number = @intFromEnum(@This().FieldNumber.sixty_four), .kind = .string, .json_name = "sixtyFour", .proto_name = "sixty_four" },
+            .{ .name = "latin", .number = @intFromEnum(@This().FieldNumber.latin), .kind = .string, .json_name = "latin", .proto_name = "latin" },
+            .{ .name = "cjk", .number = @intFromEnum(@This().FieldNumber.cjk), .kind = .string, .json_name = "cjk", .proto_name = "cjk" },
+        },
+    };
+};
+
+pub const Tree = struct {
+    children: proto.Repeated(Tree, .message) = .{},
+    _unknown: proto.Unknown = .{},
+
+    pub const FieldNumber = enum(u29) {
+        children = 1,
+    };
+
+    pub const protobuf: proto.Descriptor = .{
+        .full_name = "bench.v1.Tree",
+        .fields = &.{
+            .{ .name = "children", .number = @intFromEnum(@This().FieldNumber.children), .kind = .message, .json_name = "children", .proto_name = "children" },
+        },
+    };
+};
+
+pub const Packed = struct {
+    small: proto.Repeated(i32, .int32) = .{},
+    wide: proto.Repeated(u64, .uint64) = .{},
+    zigzag: proto.Repeated(i32, .sint32) = .{},
+    reals: proto.Repeated(f64, .double) = .{},
+    _unknown: proto.Unknown = .{},
+
+    pub const FieldNumber = enum(u29) {
+        small = 1,
+        wide = 2,
+        zigzag = 3,
+        reals = 4,
+    };
+
+    pub const protobuf: proto.Descriptor = .{
+        .full_name = "bench.v1.Packed",
+        .fields = &.{
+            .{ .name = "small", .number = @intFromEnum(@This().FieldNumber.small), .kind = .int32, .json_name = "small", .proto_name = "small" },
+            .{ .name = "wide", .number = @intFromEnum(@This().FieldNumber.wide), .kind = .uint64, .json_name = "wide", .proto_name = "wide" },
+            .{ .name = "zigzag", .number = @intFromEnum(@This().FieldNumber.zigzag), .kind = .sint32, .json_name = "zigzag", .proto_name = "zigzag" },
+            .{ .name = "reals", .number = @intFromEnum(@This().FieldNumber.reals), .kind = .double, .json_name = "reals", .proto_name = "reals" },
+        },
+    };
+};
+
 pub const Status = enum(i32) {
     status_unspecified = 0,
     status_active = 1,

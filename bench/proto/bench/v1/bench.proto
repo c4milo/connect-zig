@@ -75,3 +75,55 @@ message Deep {
   string label = 2;
   Deep child = 3;
 }
+
+// The four messages below each hold one kind of field alone, so the counts of one give the cost
+// of that kind per field (pepegrillo's performance method, step 2).
+
+// Varints alone: every varint kind, at each length from 1 to 10 bytes. Field 16's tag takes 2.
+message Varints {
+  int32 int32_one = 1;
+  int32 int32_two = 2;
+  int32 int32_negative = 3;
+  int64 int64_three = 4;
+  int64 int64_eight = 5;
+  uint32 uint32_four = 6;
+  uint32 uint32_five = 7;
+  uint64 uint64_six = 8;
+  uint64 uint64_ten = 9;
+  sint32 sint32_one = 10;
+  sint32 sint32_three = 11;
+  sint64 sint64_seven = 12;
+  sint64 sint64_nine = 13;
+  bool flag = 14;
+  Status status = 15;
+  uint64 uint64_two = 16;
+}
+
+// Strings alone: ASCII at lengths on each side of 8, 16 and 32 octets, where a UTF-8 check
+// changes its step, and two that hold Latin and CJK characters.
+message Strings {
+  string one = 1;
+  string three = 2;
+  string seven = 3;
+  string eight = 4;
+  string fifteen = 5;
+  string sixteen = 6;
+  string thirty_one = 7;
+  string thirty_two = 8;
+  string sixty_four = 9;
+  string latin = 10;
+  string cjk = 11;
+}
+
+// Nested messages alone: a tree whose nodes hold nothing but their children.
+message Tree {
+  repeated Tree children = 1;
+}
+
+// Packed repeated scalars alone: small and wide varints, zigzag and doubles.
+message Packed {
+  repeated int32 small = 1;
+  repeated uint64 wide = 2;
+  repeated sint32 zigzag = 3;
+  repeated double reals = 4;
+}

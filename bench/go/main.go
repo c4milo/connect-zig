@@ -1,5 +1,5 @@
 // Command bench is the Go counterpart of bench/main.zig: google.golang.org/protobuf on the same
-// four messages, timed the same way, printed as the same Markdown table.
+// eight messages, timed the same way, printed as the same Markdown table.
 //
 // Run it from bench/go with `go run . [--quick] [--write <dir>]`. Binary encoding uses
 // deterministic marshaling, which writes map entries in key order, as the Zig benchmark does.
@@ -73,6 +73,14 @@ func run(current settings, directory string) error {
 			walk: func(m proto.Message) uint64 { return walkLarge(m.(*benchv1.Large)) }},
 		{name: "deep", input: newDeep(), newMessage: func() proto.Message { return new(benchv1.Deep) },
 			walk: func(m proto.Message) uint64 { return walkDeep(m.(*benchv1.Deep)) }},
+		{name: "varints", input: newVarints(), newMessage: func() proto.Message { return new(benchv1.Varints) },
+			walk: func(m proto.Message) uint64 { return walkVarints(m.(*benchv1.Varints)) }},
+		{name: "strings", input: newStrings(), newMessage: func() proto.Message { return new(benchv1.Strings) },
+			walk: func(m proto.Message) uint64 { return walkStrings(m.(*benchv1.Strings)) }},
+		{name: "tree", input: newTree(treeLevelsCount), newMessage: func() proto.Message { return new(benchv1.Tree) },
+			walk: func(m proto.Message) uint64 { return walkTree(m.(*benchv1.Tree)) }},
+		{name: "packed", input: newPacked(), newMessage: func() proto.Message { return new(benchv1.Packed) },
+			walk: func(m proto.Message) uint64 { return walkPacked(m.(*benchv1.Packed)) }},
 	}
 	fmt.Print("| message | operation | bytes | ns/op | MB/s |\n| --- | --- | ---: | ---: | ---: |\n")
 	for _, m := range messages {

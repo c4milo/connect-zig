@@ -2,7 +2,8 @@ package main
 
 // Reads every field of a message and folds what it read into one number, as bench/walk.zig does:
 // each integer and enum as a sign-extended 64-bit value, each bool as 0 or 1, each float's bits,
-// and each string's and bytes field's length, added with wrapping in field-number order.
+// and each string's and bytes field's length, added with wrapping in field-number order. A tree,
+// which holds no scalar, adds one for each node.
 
 import (
 	"math"
@@ -91,6 +92,61 @@ func walkDeep(m *benchv1.Deep) uint64 {
 	for node := m; node != nil; node = node.Child {
 		sum += uint64(int64(node.Level))
 		sum += uint64(len(node.Label))
+	}
+	return sum
+}
+
+func walkVarints(m *benchv1.Varints) uint64 {
+	sum := uint64(int64(m.Int32One))
+	sum += uint64(int64(m.Int32Two))
+	sum += uint64(int64(m.Int32Negative))
+	sum += uint64(m.Int64Three)
+	sum += uint64(m.Int64Eight)
+	sum += uint64(m.Uint32Four)
+	sum += uint64(m.Uint32Five)
+	sum += m.Uint64Six
+	sum += m.Uint64Ten
+	sum += uint64(int64(m.Sint32One))
+	sum += uint64(int64(m.Sint32Three))
+	sum += uint64(m.Sint64Seven)
+	sum += uint64(m.Sint64Nine)
+	if m.Flag {
+		sum++
+	}
+	sum += uint64(int64(m.Status))
+	sum += m.Uint64Two
+	return sum
+}
+
+func walkStrings(m *benchv1.Strings) uint64 {
+	sum := uint64(len(m.One))
+	for _, text := range []string{m.Three, m.Seven, m.Eight, m.Fifteen, m.Sixteen, m.ThirtyOne, m.ThirtyTwo, m.SixtyFour, m.Latin, m.Cjk} {
+		sum += uint64(len(text))
+	}
+	return sum
+}
+
+func walkTree(m *benchv1.Tree) uint64 {
+	sum := uint64(1)
+	for _, child := range m.Children {
+		sum += walkTree(child)
+	}
+	return sum
+}
+
+func walkPacked(m *benchv1.Packed) uint64 {
+	var sum uint64
+	for _, value := range m.Small {
+		sum += uint64(int64(value))
+	}
+	for _, value := range m.Wide {
+		sum += value
+	}
+	for _, value := range m.Zigzag {
+		sum += uint64(int64(value))
+	}
+	for _, value := range m.Reals {
+		sum += math.Float64bits(value)
 	}
 	return sum
 }

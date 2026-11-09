@@ -5,7 +5,8 @@
 //!
 //! The fold adds, with wrapping: each integer and enum as a sign-extended 64-bit value, each bool
 //! as 0 or 1, each float's bits, and each string's and bytes field's length. A message folds its
-//! fields in field-number order, a repeated field its elements in order.
+//! fields in field-number order, a repeated field its elements in order. A tree, which holds no
+//! scalar, adds one for each node.
 const std = @import("std");
 const proto = @import("protobuf");
 const bench = @import("bench_v1");
@@ -89,6 +90,66 @@ pub fn deep(message: *const bench.Deep) Error!u64 {
         node = try node.child.get() orelse return sum;
     }
     return error.DepthExceeded;
+}
+
+pub fn varints(message: *const bench.Varints) Error!u64 {
+    var sum: u64 = int(message.int32_one);
+    sum +%= int(message.int32_two);
+    sum +%= int(message.int32_negative);
+    sum +%= int(message.int64_three);
+    sum +%= int(message.int64_eight);
+    sum +%= message.uint32_four;
+    sum +%= message.uint32_five;
+    sum +%= message.uint64_six;
+    sum +%= message.uint64_ten;
+    sum +%= int(message.sint32_one);
+    sum +%= int(message.sint32_three);
+    sum +%= int(message.sint64_seven);
+    sum +%= int(message.sint64_nine);
+    sum +%= @intFromBool(message.flag);
+    sum +%= int(@intFromEnum(message.status));
+    sum +%= message.uint64_two;
+    return sum;
+}
+
+pub fn strings(message: *const bench.Strings) Error!u64 {
+    var sum: u64 = message.one.len;
+    sum +%= message.three.len;
+    sum +%= message.seven.len;
+    sum +%= message.eight.len;
+    sum +%= message.fifteen.len;
+    sum +%= message.sixteen.len;
+    sum +%= message.thirty_one.len;
+    sum +%= message.thirty_two.len;
+    sum +%= message.sixty_four.len;
+    sum +%= message.latin.len;
+    sum +%= message.cjk.len;
+    return sum;
+}
+
+/// A tree holds no scalar, so its walk counts the nodes it reads, itself included.
+pub fn tree(message: *const bench.Tree) Error!u64 {
+    return tree_node(message.*);
+}
+
+fn tree_node(message: bench.Tree) Error!u64 {
+    return 1 +% try each(@TypeOf(message.children), &message.children, tree_node);
+}
+
+fn real(value: f64) Error!u64 {
+    return @bitCast(value);
+}
+
+fn unsigned(value: u64) Error!u64 {
+    return value;
+}
+
+pub fn packed_scalars(message: *const bench.Packed) Error!u64 {
+    var sum = try each(@TypeOf(message.small), &message.small, signed);
+    sum +%= try each(@TypeOf(message.wide), &message.wide, unsigned);
+    sum +%= try each(@TypeOf(message.zigzag), &message.zigzag, signed);
+    sum +%= try each(@TypeOf(message.reals), &message.reals, real);
+    return sum;
 }
 
 fn each(comptime Field: type, field: *const Field, comptime fold: fn (Field.Element) Error!u64) Error!u64 {

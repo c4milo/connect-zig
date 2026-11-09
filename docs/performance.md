@@ -25,10 +25,19 @@ paid for.
 
 ## The units of work
 
-The benchmark has four messages in `bench/inputs.zig`: Small (40 B), Medium (1 KB), Large
-(180 KB, with a 6 KB string) and Deep (50 nested levels). It runs six operations on each: binary
-encode, binary decode, binary decode with every field read, and the same three in JSON.
-`bench/instructions.txt` holds the count of each pair.
+The benchmark has eight messages in `bench/inputs.zig`. Four have the shapes services send:
+Small (40 B), Medium (1 KB), Large (180 KB, with a 6 KB string) and Deep (50 nested levels). Four
+hold one kind of field each, so their counts give the cost of that kind per field:
+
+- Varints (90 B): each varint kind, at each length from 1 to 10 bytes.
+- Strings (242 B): ASCII strings on each side of 8, 16 and 32 octets, and two short strings
+  with Latin and CJK characters.
+- Tree (684 B): 341 nodes that hold only their children, four to a node.
+- Packed (975 B): 64 elements in each of four packed fields.
+
+It runs six operations on each: binary encode, binary decode, binary decode with every field
+read, and the same three in JSON. `bench/instructions.txt` holds the count of each pair. The
+benchmark builds stdx's modules in ReleaseFast too, so no count includes a safety check.
 
 ## The admission rule
 
@@ -62,6 +71,7 @@ here.
 | The same tree timed 2x apart on two CI runs. | Shared runners share cores and caches. | Gate on instructions; compare times only within one job (decision 30). |
 | A short string decoded slower with stdx's vector UTF-8 check. | The vector loop's setup costs more than a short scalar walk. | The vector check starts at `constants.limits.utf8_vector_len_min`, 32 octets. |
 | A long JSON string failed to decode in the benchmark. | The JSON token buffer was shorter than the string. | The benchmark's token buffer holds 16 KB; size it from the longest token a caller expects. |
+| Large binary decode took 5.4% more instructions when the benchmark gained four messages. | More instances of the generic decoder made LLVM call `decode.read_repeated` instead of inlining it. | A new benchmark message writes a new baseline in its own commit, before any change it measures. |
 
 A pitfall that belongs to Zig and not to connect-zig moves to pepegrillo's
 `performance_zig.md`.
