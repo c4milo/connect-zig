@@ -134,10 +134,7 @@ fn encode_entry(comptime T: type, entry: *const T, sink: *Sink) Error!void {
 fn encode_field(comptime field: Field, item: anytype, sink: *Sink) Error!void {
     const F = @TypeOf(item);
     if (comptime repeated.is_repeated(F)) return encode_repeated(field, F, &item, sink);
-    if (comptime repeated.is_lazy(F)) {
-        const child = try item.get() orelse return;
-        return encode_child(F.Message, field.kind, field.number, &child, sink);
-    }
+    if (comptime repeated.is_lazy(F)) return encode_lazy(F, field, item, sink);
     switch (@typeInfo(F)) {
         .optional => |optional| {
             const set = item orelse return;
@@ -163,11 +160,16 @@ fn encode_member(comptime T: type, comptime field: Field, comptime oneof: []cons
     if (active != @field(std.meta.Tag(U), field.name)) return;
     const V = @FieldType(U, field.name);
     const item = @field(active, field.name);
-    if (comptime repeated.is_lazy(V)) {
-        const child = try item.get() orelse return;
-        return encode_child(V.Message, field.kind, field.number, &child, sink);
-    }
+    if (comptime repeated.is_lazy(V)) return encode_lazy(V, field, item, sink);
     try encode_present(field, V, item, sink);
+}
+
+/// Writes a `Lazy` field that is set. A program's value encodes where it lies: `get` would copy
+/// the whole message to the stack at each level. Decoded bytes are decoded first.
+fn encode_lazy(comptime L: type, comptime field: Field, item: L, sink: *Sink) Error!void {
+    if (item.value) |value| return encode_child(L.Message, field.kind, field.number, value, sink);
+    const child = try item.get() orelse return;
+    return encode_child(L.Message, field.kind, field.number, &child, sink);
 }
 
 fn encode_child(comptime M: type, comptime kind: Kind, number: u32, child: *const M, sink: *Sink) Error!void {
