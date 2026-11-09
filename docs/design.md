@@ -390,6 +390,12 @@ ran on Linux x86-64 with Zig 0.16.0.
   831. Conformance printed 2714 of 2714 and 8252 of 8264. The general path stays out of line; the
   varints JSON decode takes 1.39% more instructions, inside the gate, so the baseline stays.
 
+- **colibri v0.15.1.** colibri's client hands a response's status through when it is three
+  digits, whatever its value (colibri's ruling on RFC 9110 §15), so a status of 800 reaches
+  connect-zig, which maps it to unknown (Connect protocol, "HTTP to Error Code"). The 12
+  `nonexistent-http-status-code` cases leave `conformance/client_known_failing.txt`, which is
+  empty now. Conformance printed 2714 of 2714 and 8263 of 8264, the last a flaky timing case.
+
 ### What a later step owes
 
 - The client cases of `conformance/client_known_failing.txt`: a status outside 100 to 599,

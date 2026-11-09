@@ -265,8 +265,9 @@ Buffa's times, and the four one-kind messages.
   suite](https://github.com/connectrpc/conformance) v1.0.4 against a conformance server: 2714
   cases in Connect, gRPC and gRPC-Web, over h11 and h2, in proto and JSON, with gzip and zstd.
   All 2714 pass. It then runs the suite's reference server against the conformance client:
-  8264 cases, over h11, h2 and h3, in cleartext and over TLS. 8252 pass, and
-  `conformance/client_known_failing.txt` lists the rest with their reasons.
+  8264 cases, over h11, h2 and h3, in cleartext and over TLS. 8263 pass; the one left is a
+  timing case of the reference server, listed in `conformance/client_known_flaky.txt` with its
+  reason.
 - `tools/interop_languages_check.sh` calls the server from [clients in other
   languages](interop): connect-go and grpc-go, connect-es on Node, Python's grpcio, and Rust's
   tonic and connect-rust. Each echoes every coverage case, in every protocol, codec and

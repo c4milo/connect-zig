@@ -2,8 +2,4 @@
 # when a case listed here passes, so the list cannot go stale (decision 26). `*` stands for one
 # part of a case's name.
 #
-# The reference server answers status 800. colibri's client reads a status outside 100 to 599 as
-# a malformed response (colibri v0.15.0, src/http/status.zig:87, RFC 9110 §15), so the call fails
-# internal, where the case wants unknown, the code of a status the client does not know.
-Unexpected Responses/*/*/*/nonexistent-http-status-code
 

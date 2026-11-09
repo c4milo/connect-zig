@@ -98,4 +98,7 @@ test "each code has the HTTP status of the Connect table, and statuses map back"
     try testing.expectEqual(Code.unimplemented, Code.from_http_status(404));
     try testing.expectEqual(Code.unavailable, Code.from_http_status(502));
     try testing.expectEqual(Code.unknown, Code.from_http_status(418));
+    // A status outside RFC 9110's classes, which colibri hands through as it came: Connect
+    // protocol, "HTTP to Error Code", maps every other status to unknown.
+    try testing.expectEqual(Code.unknown, Code.from_http_status(800));
 }
