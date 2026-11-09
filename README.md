@@ -219,10 +219,15 @@ try sender.send(&.{ .text = "hello" });
 var response = chat.read(storage);
 ```
 
-[examples/](examples) holds eight programs, from generated messages alone to streaming,
+[examples/](examples) holds ten programs, from generated messages alone to streaming,
 interceptors, error details, a GitHub-style API with tokens, rate limits, pages and field masks,
 and a server on a socket. Each checks itself, and
 [examples/README.md](examples/README.md) says where to start.
+
+The library runs on any event loop (decision 32). The in-memory examples and the socket server
+run on [Rotor](https://github.com/c4milo/rotor). `examples/std_io_server.zig` runs on no loop at
+all: it drives colibri's `server.Engine` over Zig 0.16's `std.Io` sockets, tasks and clocks, and
+`zig build example-std-io` calls it over TCP with connect-zig's client, which runs on `std.Io` too.
 
 ## Performance
 

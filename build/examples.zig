@@ -1,6 +1,7 @@
 //! `zig build examples` builds and runs every program in examples/, and `zig build example-<name>`
 //! runs one. Each checks what arrived and exits with an error otherwise (design §8 step 5).
-//! `zig build run-eliza-server -- [port]` serves the ELIZA and demo services on a TCP socket.
+//! `zig build run-eliza-server -- [port]` serves the ELIZA and demo services on a TCP socket, and
+//! `zig build run-std-io-server -- [port]` serves ELIZA over `std.Io`, with no Rotor.
 const std = @import("std");
 
 const Graph = @import("graph.zig").Graph;
@@ -67,6 +68,8 @@ pub fn add(b: *std.Build, graph: Graph) *std.Build.Step {
         .{ .name = "github", .description = "Run a session against a GitHub-style API" },
     }) |linked| {
         const exe = program(b, graph, linked.name, b.fmt("examples/{s}.zig", .{linked.name}), services);
+        // The in-memory link runs on Rotor's loops.
+        exe.root_module.addImport("rotor", services.rotor);
         const run = b.addRunArtifact(exe);
         b.step(b.fmt("example-{s}", .{linked.name}), linked.description).dependOn(&run.step);
         step.dependOn(&run.step);
@@ -78,6 +81,18 @@ pub fn add(b: *std.Build, graph: Graph) *std.Build.Step {
     const serve = b.addRunArtifact(socket_server);
     if (b.args) |args| serve.addArgs(args);
     b.step("run-eliza-server", "Serve ELIZA on a TCP socket: zig build run-eliza-server -- [port]").dependOn(&serve.step);
+
+    // ELIZA on colibri's engine over std.Io, with no Rotor (decision 32).
+    const std_io_server = program(b, graph, "std-io-server", "examples/std_io_server.zig", services);
+    b.installArtifact(std_io_server);
+    const std_io_serve = b.addRunArtifact(std_io_server);
+    if (b.args) |args| std_io_serve.addArgs(args);
+    b.step("run-std-io-server", "Serve ELIZA over std.Io: zig build run-std-io-server -- [port]").dependOn(&std_io_serve.step);
+    // Its self-check starts that server and calls it over TCP, with no Rotor on either side.
+    const std_io_check = b.addRunArtifact(program(b, graph, "std_io", "examples/std_io.zig", services));
+    std_io_check.addArtifactArg(std_io_server);
+    b.step("example-std-io", "Call the std.Io server over TCP, with no Rotor").dependOn(&std_io_check.step);
+    step.dependOn(&std_io_check.step);
     return step;
 }
 
@@ -123,7 +138,6 @@ fn program(b: *std.Build, graph: Graph, name: []const u8, path: []const u8, serv
                 .{ .name = "github", .module = services.github },
                 .{ .name = "coverage", .module = services.coverage },
                 .{ .name = "interop", .module = services.interop },
-                .{ .name = "rotor", .module = services.rotor },
             },
         }),
     });

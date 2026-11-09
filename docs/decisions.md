@@ -289,8 +289,10 @@ first. Cite an entry by number in code and commits ("decision 6").
     `Server` and `Client` own a Rotor loop. `build.zig` gives the library no such module, and the
     `layering` lint rule reports a reference to either. So `rpc.ClientCall` stays on
     `client.ConnectionPool` when `colibri.Client` ships, and the example programs show Rotor as
-    one way to run the library. Beaten: building on `colibri.Client` and `colibri.Server`, which
-    is shorter for a Rotor program and makes every program adopt Rotor and its task model.
+    one way to run the library. `examples/std_io_server.zig` and `examples/std_io.zig` prove it:
+    they run the engine and the pool on Zig 0.16's `std.Io` alone, with no Rotor. Beaten:
+    building on `colibri.Client` and `colibri.Server`, which is shorter for a Rotor program and
+    makes every program adopt Rotor and its task model.
 
 ## Tooling
 

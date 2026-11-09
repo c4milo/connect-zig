@@ -97,6 +97,9 @@ confirm a test fails. Report `CAUGHT` or `NOT CAUGHT` per mutation in the commit
   run-eliza-server -- [port]` serves the ELIZA and demo services on `colibri.Server`: h11 and h2
   over TLS on a TCP socket, and h3 on the UDP socket of the same port, under the test identity
   (decision 31); port 0 lets the kernel choose, and the server prints `listening on port <port>`.
+  `zig build run-std-io-server -- [port]` serves ELIZA with no Rotor, on colibri's engine over
+  `std.Io`: h11 and h2 in cleartext, no TLS and no h3 (decision 32). `zig build example-std-io`,
+  which `zig build examples` runs, starts it and calls it over TCP with a pool driven over `std.Io`.
 - Generated code: `zig build test-generated` compiles `examples/gen` and runs its round trips.
   `tools/generate_check.sh` regenerates it with `buf generate` and fails on a difference;
   `--write` rewrites it. It needs buf, or `BUF` naming it.

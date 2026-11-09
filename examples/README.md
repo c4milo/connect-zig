@@ -15,6 +15,8 @@ Start at the top: each example adds one layer to the one before it.
 | [errors.zig](errors.zig) | Errors with typed details in Connect, gRPC and gRPC-Web, over h2 and h3 | `zig build example-errors` |
 | [github.zig](github.zig) | A GitHub-style API used as a real client would: tokens, rate limits, pages, field masks, private resources, streams | `zig build example-github` |
 | [socket_server.zig](socket_server.zig) | Both services on a TCP socket, for curl and `buf curl` | `zig build run-eliza-server -- 8080` |
+| [std_io_server.zig](std_io_server.zig) | ELIZA on colibri's engine over `std.Io`, with no Rotor: h11 and h2 in cleartext, no TLS and no h3 | `zig build run-std-io-server -- 8080` |
+| [std_io.zig](std_io.zig) | Starts that server and calls it over TCP with a `client.ConnectionPool` driven over `std.Io` | `zig build example-std-io` |
 
 ## The services
 
@@ -40,6 +42,27 @@ Start at the top: each example adds one layer to the one before it.
   are colibri's in-memory links for octet streams and for datagrams, copied unchanged, which stand
   where sockets would be. [services/link_server.zig](services/link_server.zig) and
   [services/link_client.zig](services/link_client.zig) run the server and the client over them.
+- [services/std_io_client.zig](services/std_io_client.zig) runs the client over a real TCP
+  socket through `std.Io`, with no Rotor.
+
+### Any event loop
+
+The library takes octets and gives octets back, so any loop drives it (decision 32). The programs
+over the links run on Rotor. [std_io_server.zig](std_io_server.zig) runs on Zig 0.16's `std.Io`
+alone. One task owns colibri's `server.Engine`. An acceptor task, a reader task for each socket
+and a ticker only wait, and each sends what it got to the owner through one bounded
+`std.Io.Queue`. The owner hands it to the engine and writes what the engine owes. The ticks fire
+the engine's deadlines, at most 50 ms late. It serves h11 and h2 with prior knowledge in
+cleartext, with no TLS and no h3.
+
+```sh
+zig build run-std-io-server -- 8080
+curl --json '{"sentence":"I feel tired"}' http://127.0.0.1:8080/connectrpc.eliza.v1.ElizaService/Say
+```
+
+[std_io.zig](std_io.zig) starts the server on port 0 and calls ELIZA over h2 and h11 through a
+`client.ConnectionPool` it drives by hand. It also checks that a socket that sends nothing closes
+at the server's first-request deadline, which only the ticks fire.
 
 ### Rounds and protocols
 

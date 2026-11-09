@@ -312,6 +312,17 @@ ran on Linux x86-64 with Zig 0.16.0.
   - a 200 response of another media type or codec was read as the protocol's;
   - a head's `grpc-status` counted even when a body or trailers followed it.
 
+- **ELIZA over `std.Io`, with no Rotor.** The owner ruled on 2026-11-09 that it lands before
+  v0.1.0, to prove decision 32. `examples/std_io_server.zig` drives colibri's `server.Engine` over
+  Zig 0.16's `std.Io`: one task owns the engine, and an acceptor, a reader for each socket and a
+  50 ms ticker send it messages through one bounded `std.Io.Queue`. It serves h11 and h2 in
+  cleartext, with no TLS and no h3. `examples/std_io.zig` starts it on port 0 and drives a
+  `client.ConnectionPool` over a `std.Io` TCP socket. No public name changed. Check: `zig build
+  example-std-io`, which `zig build examples` runs, answers six calls over h2 and over h11, and
+  sees an idle socket close at the first-request deadline. `zig build test` printed 80 of 80
+  steps and 183 of 183 tests passed; `zig build -Drelease` and `tools/interop_check.sh`, 48 calls,
+  pass.
+
 ### What a later step owes
 
 - The client cases of `conformance/client_known_failing.txt`. Each needs a ruling or a change
