@@ -203,16 +203,20 @@ and a server on a socket. Each checks itself, and
 
 ## Performance
 
-`zig build bench` times four messages, and `tools/bench_check.sh` runs Go's
-`google.golang.org/protobuf` beside it on the same inputs and checks both write the same bytes.
-Each cell is Go's time over connect-zig's: above 1 means connect-zig is faster.
+`zig build bench` times eight messages, and `tools/bench_check.sh` runs Go's
+`google.golang.org/protobuf` v1.36.12 beside it on the same inputs and checks both write the same
+bytes. Each cell is Go's time over connect-zig's: above 1 means connect-zig is faster. The numbers
+come from CI's `go-bench` job of commit `7a1d092`
+([run 48](https://github.com/c4milo/connect-zig/actions/runs/42553593664)), on GitHub's
+`ubuntu-24.04` runner, a Zen 4 core. Both programs ran in the same job. Every run of the job
+publishes the full table, with the four one-kind messages, in its summary.
 
 | Message | Binary encode | Binary decode, every field read | JSON encode | JSON decode |
 | --- | ---: | ---: | ---: | ---: |
-| Small, 40 B | 4.3 | 4.4 | 3.4 | 4.0 |
-| Medium, 1 KB | 4.9 | 3.6 | 4.4 | 5.2 |
-| Large, 180 KB | 1.0 | 1.5 | 2.8 | 5.0 |
-| Deep, 50 levels | 1.9 | 2.2 | 4.0 | 3.2 |
+| Small, 40 B | 3.3 | 6.5 | 3.2 | 5.0 |
+| Medium, 1 KB | 5.8 | 4.8 | 4.4 | 6.4 |
+| Large, 180 KB | 2.2 | 2.4 | 2.6 | 5.3 |
+| Deep, 50 levels | 2.4 | 3.0 | 4.4 | 4.4 |
 
 ## How it is checked
 
