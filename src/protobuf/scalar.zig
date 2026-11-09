@@ -48,11 +48,36 @@ fn read_string(reader: *wire.Reader) wire.Error![]const u8 {
     return octets;
 }
 
-/// Whether `octets` is UTF-8 (RFC 3629 §4): stdx's vector check for a long string, the standard
-/// library's for a short one, where the vector path costs more than it saves.
+/// Whether `octets` is UTF-8 (RFC 3629 §4): stdx's vector check for a long string. A short one,
+/// where the vector path costs more than it saves, is checked for ASCII a word at a time, and
+/// only text that is not ASCII goes to the standard library's check.
 pub fn is_utf8(octets: []const u8) bool {
-    if (octets.len < constants.limits.utf8_vector_len_min) return std.unicode.utf8ValidateSlice(octets);
+    if (octets.len < constants.limits.utf8_vector_len_min) {
+        if (is_ascii_short(octets)) return true;
+        return std.unicode.utf8ValidateSlice(octets);
+    }
     return json.is_utf8(octets, codec.Features.target());
+}
+
+/// The bit no ASCII octet sets: an octet below 0x80 is a character alone (RFC 3629 §3).
+const ascii_high_bit: u8 = 0x80;
+/// That bit in each octet of a word.
+const ascii_high_bits: u64 = std.mem.readInt(u64, &@as([@sizeOf(u64)]u8, @splat(ascii_high_bit)), .little);
+
+/// Whether a string shorter than the vector cutoff is ASCII, which is UTF-8 (RFC 3629 §3). It ORs
+/// the string's words, the last one overlapping the one before it, or its octets when it is
+/// shorter than a word, and tests the high bit of each octet once.
+fn is_ascii_short(octets: []const u8) bool {
+    assert(octets.len < constants.limits.utf8_vector_len_min);
+    const word_len = @sizeOf(u64);
+    if (octets.len < word_len) {
+        var high: u8 = 0;
+        for (octets) |octet| high |= octet;
+        return high & ascii_high_bit == 0;
+    }
+    var high: u64 = std.mem.readInt(u64, octets[octets.len - word_len ..][0..word_len], .little);
+    for (0..octets.len / word_len) |index| high |= std.mem.readInt(u64, octets[index * word_len ..][0..word_len], .little);
+    return high & ascii_high_bits == 0;
 }
 
 /// The integer a varint kind writes for `value`.
@@ -161,4 +186,18 @@ test "defaults: +0.0 is default and -0.0 is not" {
     try testing.expect(!is_default(f64, -0.0));
     try testing.expect(is_default([]const u8, ""));
     try testing.expect(!is_default(i32, -1));
+}
+
+test "a short string is ASCII exactly when no octet sets the high bit, wherever that octet is" {
+    var text: [constants.limits.utf8_vector_len_min - 1]u8 = @splat(0x7f);
+    for (0..text.len + 1) |text_len| {
+        try testing.expect(is_ascii_short(text[0..text_len]));
+        for (0..text_len) |place| {
+            text[place] = 0x80;
+            try testing.expect(!is_ascii_short(text[0..text_len]));
+            text[place] = 0xff;
+            try testing.expect(!is_ascii_short(text[0..text_len]));
+            text[place] = 0x7f;
+        }
+    }
 }
