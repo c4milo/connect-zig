@@ -211,6 +211,8 @@ come from CI's `go-bench` job of commit `7a1d092`
 `ubuntu-24.04` runner, a Zen 4 core. Both programs ran in the same job. Every run of the job
 publishes the full table, with the four one-kind messages, in its summary.
 
+![connect-zig is 2.2 to 6.5 times faster than Go's protobuf runtime, in binary and JSON, encode and decode](docs/images/speed-vs-go.svg)
+
 | Message | Binary encode | Binary decode, every field read | JSON encode | JSON decode |
 | --- | ---: | ---: | ---: | ---: |
 | Small, 40 B | 3.3 | 6.5 | 3.2 | 5.0 |

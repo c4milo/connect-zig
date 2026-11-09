@@ -1,0 +1,143 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 840 500" width="840" height="500" role="img" aria-labelledby="t d">
+<title id="t">connect-zig against Go's protobuf runtime</title>
+<desc id="d">How many times faster connect-zig is than google.golang.org/protobuf v1.36.12, Go's time over connect-zig's, for four messages and four operations. Every value is above 1: Small, 40 B: Binary encode 3.3x, Binary decode, every field read 6.5x, JSON encode 3.2x, JSON decode 5.0x; Medium, 1 KB: Binary encode 5.8x, Binary decode, every field read 4.8x, JSON encode 4.4x, JSON decode 6.4x; Large, 180 KB: Binary encode 2.2x, Binary decode, every field read 2.4x, JSON encode 2.6x, JSON decode 5.3x; Deep, 50 levels: Binary encode 2.4x, Binary decode, every field read 3.0x, JSON encode 4.4x, JSON decode 4.4x.</desc>
+<style>
+svg { --surface:#fcfcfb; --ink:#0b0b0b; --ink2:#52514e; --muted:#8a8984; --grid:#e4e3df; --bar:#2a78d6; --parity:#52514e; }
+@media (prefers-color-scheme: dark) {
+  svg { --surface:#1a1a19; --ink:#f0efec; --ink2:#c3c2b7; --muted:#8f8e86; --grid:#33332f; --bar:#3987e5; --parity:#c3c2b7; }
+}
+text { font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; fill: var(--ink); }
+.title { font-size: 20px; font-weight: 600; }
+.sub { font-size: 13px; fill: var(--ink2); }
+.panel { font-size: 14px; font-weight: 600; }
+.row { font-size: 12.5px; fill: var(--ink2); }
+.val { font-size: 12.5px; font-weight: 600; }
+.tick { font-size: 11px; fill: var(--muted); }
+.note { font-size: 11.5px; fill: var(--ink2); }
+</style>
+<rect width="840" height="500" rx="8" fill="var(--surface)"/>
+<text class="title" x="24" y="36">connect-zig is 2.2 to 6.5 times faster than Go's protobuf runtime</text>
+<text class="sub" x="24" y="58">Go's time over connect-zig's (higher is faster), against google.golang.org/protobuf v1.36.12, the runtime connect-go uses.</text>
+<text class="sub" x="24" y="76">Both ran in one CI job and wrote the same octets: run 48, commit 7a1d092.</text>
+<text class="panel" x="24" y="106">Binary encode</text>
+<line x1="136.0" y1="118" x2="136.0" y2="246" stroke="var(--grid)" stroke-width="1"/>
+<text class="tick" x="136.0" y="260" text-anchor="middle">0×</text>
+<line x1="168.6" y1="118" x2="168.6" y2="246" stroke="var(--grid)" stroke-width="1"/>
+<text class="tick" x="168.6" y="260" text-anchor="middle">1×</text>
+<line x1="201.1" y1="118" x2="201.1" y2="246" stroke="var(--grid)" stroke-width="1"/>
+<text class="tick" x="201.1" y="260" text-anchor="middle">2×</text>
+<line x1="233.7" y1="118" x2="233.7" y2="246" stroke="var(--grid)" stroke-width="1"/>
+<text class="tick" x="233.7" y="260" text-anchor="middle">3×</text>
+<line x1="266.3" y1="118" x2="266.3" y2="246" stroke="var(--grid)" stroke-width="1"/>
+<text class="tick" x="266.3" y="260" text-anchor="middle">4×</text>
+<line x1="298.9" y1="118" x2="298.9" y2="246" stroke="var(--grid)" stroke-width="1"/>
+<text class="tick" x="298.9" y="260" text-anchor="middle">5×</text>
+<line x1="331.4" y1="118" x2="331.4" y2="246" stroke="var(--grid)" stroke-width="1"/>
+<text class="tick" x="331.4" y="260" text-anchor="middle">6×</text>
+<line x1="364.0" y1="118" x2="364.0" y2="246" stroke="var(--grid)" stroke-width="1"/>
+<text class="tick" x="364.0" y="260" text-anchor="middle">7×</text>
+<text class="row" x="126" y="135" text-anchor="end">Small, 40 B</text>
+<path d="M136.0,122 h103.2 a4,4 0 0 1 4,4 v10 a4,4 0 0 1 -4,4 h-103.2 z" fill="var(--bar)"/>
+<text class="val" x="249.2" y="135">3.3×</text>
+<text class="row" x="126" y="169" text-anchor="end">Medium, 1 KB</text>
+<path d="M136.0,156 h185.2 a4,4 0 0 1 4,4 v10 a4,4 0 0 1 -4,4 h-185.2 z" fill="var(--bar)"/>
+<text class="val" x="331.2" y="169">5.8×</text>
+<text class="row" x="126" y="203" text-anchor="end">Large, 180 KB</text>
+<path d="M136.0,190 h68.6 a4,4 0 0 1 4,4 v10 a4,4 0 0 1 -4,4 h-68.6 z" fill="var(--bar)"/>
+<text class="val" x="214.6" y="203">2.2×</text>
+<text class="row" x="126" y="237" text-anchor="end">Deep, 50 levels</text>
+<path d="M136.0,224 h75.5 a4,4 0 0 1 4,4 v10 a4,4 0 0 1 -4,4 h-75.5 z" fill="var(--bar)"/>
+<text class="val" x="221.5" y="237">2.4×</text>
+<line x1="168.6" y1="114" x2="168.6" y2="246" stroke="var(--parity)" stroke-width="1.5" stroke-dasharray="4 3"/>
+<text class="note" x="172.6" y="112">1× = as fast as Go</text>
+<text class="panel" x="432" y="106">Binary decode, every field read</text>
+<line x1="544.0" y1="118" x2="544.0" y2="246" stroke="var(--grid)" stroke-width="1"/>
+<text class="tick" x="544.0" y="260" text-anchor="middle">0×</text>
+<line x1="576.6" y1="118" x2="576.6" y2="246" stroke="var(--grid)" stroke-width="1"/>
+<text class="tick" x="576.6" y="260" text-anchor="middle">1×</text>
+<line x1="609.1" y1="118" x2="609.1" y2="246" stroke="var(--grid)" stroke-width="1"/>
+<text class="tick" x="609.1" y="260" text-anchor="middle">2×</text>
+<line x1="641.7" y1="118" x2="641.7" y2="246" stroke="var(--grid)" stroke-width="1"/>
+<text class="tick" x="641.7" y="260" text-anchor="middle">3×</text>
+<line x1="674.3" y1="118" x2="674.3" y2="246" stroke="var(--grid)" stroke-width="1"/>
+<text class="tick" x="674.3" y="260" text-anchor="middle">4×</text>
+<line x1="706.9" y1="118" x2="706.9" y2="246" stroke="var(--grid)" stroke-width="1"/>
+<text class="tick" x="706.9" y="260" text-anchor="middle">5×</text>
+<line x1="739.4" y1="118" x2="739.4" y2="246" stroke="var(--grid)" stroke-width="1"/>
+<text class="tick" x="739.4" y="260" text-anchor="middle">6×</text>
+<line x1="772.0" y1="118" x2="772.0" y2="246" stroke="var(--grid)" stroke-width="1"/>
+<text class="tick" x="772.0" y="260" text-anchor="middle">7×</text>
+<text class="row" x="534" y="135" text-anchor="end">Small, 40 B</text>
+<path d="M544.0,122 h208.0 a4,4 0 0 1 4,4 v10 a4,4 0 0 1 -4,4 h-208.0 z" fill="var(--bar)"/>
+<text class="val" x="762.0" y="135">6.5×</text>
+<text class="row" x="534" y="169" text-anchor="end">Medium, 1 KB</text>
+<path d="M544.0,156 h152.0 a4,4 0 0 1 4,4 v10 a4,4 0 0 1 -4,4 h-152.0 z" fill="var(--bar)"/>
+<text class="val" x="706.0" y="169">4.8×</text>
+<text class="row" x="534" y="203" text-anchor="end">Large, 180 KB</text>
+<path d="M544.0,190 h73.2 a4,4 0 0 1 4,4 v10 a4,4 0 0 1 -4,4 h-73.2 z" fill="var(--bar)"/>
+<text class="val" x="627.2" y="203">2.4×</text>
+<text class="row" x="534" y="237" text-anchor="end">Deep, 50 levels</text>
+<path d="M544.0,224 h94.7 a4,4 0 0 1 4,4 v10 a4,4 0 0 1 -4,4 h-94.7 z" fill="var(--bar)"/>
+<text class="val" x="648.7" y="237">3.0×</text>
+<line x1="576.6" y1="114" x2="576.6" y2="246" stroke="var(--parity)" stroke-width="1.5" stroke-dasharray="4 3"/>
+<text class="panel" x="24" y="310">JSON encode</text>
+<line x1="136.0" y1="322" x2="136.0" y2="450" stroke="var(--grid)" stroke-width="1"/>
+<text class="tick" x="136.0" y="464" text-anchor="middle">0×</text>
+<line x1="168.6" y1="322" x2="168.6" y2="450" stroke="var(--grid)" stroke-width="1"/>
+<text class="tick" x="168.6" y="464" text-anchor="middle">1×</text>
+<line x1="201.1" y1="322" x2="201.1" y2="450" stroke="var(--grid)" stroke-width="1"/>
+<text class="tick" x="201.1" y="464" text-anchor="middle">2×</text>
+<line x1="233.7" y1="322" x2="233.7" y2="450" stroke="var(--grid)" stroke-width="1"/>
+<text class="tick" x="233.7" y="464" text-anchor="middle">3×</text>
+<line x1="266.3" y1="322" x2="266.3" y2="450" stroke="var(--grid)" stroke-width="1"/>
+<text class="tick" x="266.3" y="464" text-anchor="middle">4×</text>
+<line x1="298.9" y1="322" x2="298.9" y2="450" stroke="var(--grid)" stroke-width="1"/>
+<text class="tick" x="298.9" y="464" text-anchor="middle">5×</text>
+<line x1="331.4" y1="322" x2="331.4" y2="450" stroke="var(--grid)" stroke-width="1"/>
+<text class="tick" x="331.4" y="464" text-anchor="middle">6×</text>
+<line x1="364.0" y1="322" x2="364.0" y2="450" stroke="var(--grid)" stroke-width="1"/>
+<text class="tick" x="364.0" y="464" text-anchor="middle">7×</text>
+<text class="row" x="126" y="339" text-anchor="end">Small, 40 B</text>
+<path d="M136.0,326 h99.3 a4,4 0 0 1 4,4 v10 a4,4 0 0 1 -4,4 h-99.3 z" fill="var(--bar)"/>
+<text class="val" x="245.3" y="339">3.2×</text>
+<text class="row" x="126" y="373" text-anchor="end">Medium, 1 KB</text>
+<path d="M136.0,360 h140.0 a4,4 0 0 1 4,4 v10 a4,4 0 0 1 -4,4 h-140.0 z" fill="var(--bar)"/>
+<text class="val" x="286.0" y="373">4.4×</text>
+<text class="row" x="126" y="407" text-anchor="end">Large, 180 KB</text>
+<path d="M136.0,394 h80.4 a4,4 0 0 1 4,4 v10 a4,4 0 0 1 -4,4 h-80.4 z" fill="var(--bar)"/>
+<text class="val" x="226.4" y="407">2.6×</text>
+<text class="row" x="126" y="441" text-anchor="end">Deep, 50 levels</text>
+<path d="M136.0,428 h139.3 a4,4 0 0 1 4,4 v10 a4,4 0 0 1 -4,4 h-139.3 z" fill="var(--bar)"/>
+<text class="val" x="285.3" y="441">4.4×</text>
+<line x1="168.6" y1="318" x2="168.6" y2="450" stroke="var(--parity)" stroke-width="1.5" stroke-dasharray="4 3"/>
+<text class="panel" x="432" y="310">JSON decode</text>
+<line x1="544.0" y1="322" x2="544.0" y2="450" stroke="var(--grid)" stroke-width="1"/>
+<text class="tick" x="544.0" y="464" text-anchor="middle">0×</text>
+<line x1="576.6" y1="322" x2="576.6" y2="450" stroke="var(--grid)" stroke-width="1"/>
+<text class="tick" x="576.6" y="464" text-anchor="middle">1×</text>
+<line x1="609.1" y1="322" x2="609.1" y2="450" stroke="var(--grid)" stroke-width="1"/>
+<text class="tick" x="609.1" y="464" text-anchor="middle">2×</text>
+<line x1="641.7" y1="322" x2="641.7" y2="450" stroke="var(--grid)" stroke-width="1"/>
+<text class="tick" x="641.7" y="464" text-anchor="middle">3×</text>
+<line x1="674.3" y1="322" x2="674.3" y2="450" stroke="var(--grid)" stroke-width="1"/>
+<text class="tick" x="674.3" y="464" text-anchor="middle">4×</text>
+<line x1="706.9" y1="322" x2="706.9" y2="450" stroke="var(--grid)" stroke-width="1"/>
+<text class="tick" x="706.9" y="464" text-anchor="middle">5×</text>
+<line x1="739.4" y1="322" x2="739.4" y2="450" stroke="var(--grid)" stroke-width="1"/>
+<text class="tick" x="739.4" y="464" text-anchor="middle">6×</text>
+<line x1="772.0" y1="322" x2="772.0" y2="450" stroke="var(--grid)" stroke-width="1"/>
+<text class="tick" x="772.0" y="464" text-anchor="middle">7×</text>
+<text class="row" x="534" y="339" text-anchor="end">Small, 40 B</text>
+<path d="M544.0,326 h159.5 a4,4 0 0 1 4,4 v10 a4,4 0 0 1 -4,4 h-159.5 z" fill="var(--bar)"/>
+<text class="val" x="713.5" y="339">5.0×</text>
+<text class="row" x="534" y="373" text-anchor="end">Medium, 1 KB</text>
+<path d="M544.0,360 h203.2 a4,4 0 0 1 4,4 v10 a4,4 0 0 1 -4,4 h-203.2 z" fill="var(--bar)"/>
+<text class="val" x="757.2" y="373">6.4×</text>
+<text class="row" x="534" y="407" text-anchor="end">Large, 180 KB</text>
+<path d="M544.0,394 h167.7 a4,4 0 0 1 4,4 v10 a4,4 0 0 1 -4,4 h-167.7 z" fill="var(--bar)"/>
+<text class="val" x="721.7" y="407">5.3×</text>
+<text class="row" x="534" y="441" text-anchor="end">Deep, 50 levels</text>
+<path d="M544.0,428 h139.3 a4,4 0 0 1 4,4 v10 a4,4 0 0 1 -4,4 h-139.3 z" fill="var(--bar)"/>
+<text class="val" x="693.3" y="441">4.4×</text>
+<line x1="576.6" y1="318" x2="576.6" y2="450" stroke="var(--parity)" stroke-width="1.5" stroke-dasharray="4 3"/>
+</svg>
