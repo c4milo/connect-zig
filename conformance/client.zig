@@ -42,12 +42,12 @@ var request_bytes: [constants.client_compat_request_bytes]u8 = undefined;
 var result_bytes: [constants.client_compat_response_bytes]u8 = undefined;
 var response_bytes: [constants.client_compat_response_bytes]u8 = undefined;
 var header_lines: [connect.client.request_headers_max]connect.Header align(@alignOf(connect.Header)) = undefined;
+var stdin_buffer: [constants.length_prefix_len]u8 = undefined;
+var stdout_buffer: [constants.length_prefix_len]u8 = undefined;
 
 pub fn main(init: std.process.Init) !void {
     transport.init(init.io);
-    var stdin_buffer: [constants.length_prefix_len]u8 = undefined;
     var stdin = std.Io.File.stdin().reader(init.io, &stdin_buffer);
-    var stdout_buffer: [constants.length_prefix_len]u8 = undefined;
     var stdout = std.Io.File.stdout().writer(init.io, &stdout_buffer);
     for (0..constants.client_cases_max) |_| {
         const bytes = try read_request(&stdin.interface) orelse return;
@@ -60,22 +60,18 @@ pub fn main(init: std.process.Init) !void {
 
 /// Reads one length-prefixed ClientCompatRequest, or null at the end of stdin.
 fn read_request(stdin: *std.Io.Reader) !?[]const u8 {
-    var prefix: [constants.length_prefix_len]u8 = undefined;
-    stdin.readSliceAll(&prefix) catch |failure| switch (failure) {
+    // docs/testing_clients.md: "a network-byte-order (i.e. big-endian) 32-bit integer".
+    const len = stdin.takeInt(u32, .big) catch |failure| switch (failure) {
         error.EndOfStream => return null,
         else => |other| return other,
     };
-    // docs/testing_clients.md: "a network-byte-order (i.e. big-endian) 32-bit integer".
-    const len = std.mem.readInt(u32, &prefix, .big);
     if (len > request_bytes.len) return error.RequestTooLarge;
     try stdin.readSliceAll(request_bytes[0..len]);
     return request_bytes[0..len];
 }
 
 fn write_response(stdout: *std.Io.Writer, response: []const u8) !void {
-    var prefix: [constants.length_prefix_len]u8 = undefined;
-    std.mem.writeInt(u32, &prefix, @intCast(response.len), .big);
-    try stdout.writeAll(&prefix);
+    try stdout.writeInt(u32, @intCast(response.len), .big);
     try stdout.writeAll(response);
     try stdout.flush();
 }

@@ -53,16 +53,28 @@ pub fn server_stream(app: *App, call: *rpc.Call, request: *const service.ServerS
     const info = echo.request_info(call, requests);
     const wanted = request.response_definition orelse return null;
     if (echo_file.apply_metadata(call, &wanted.response_headers, &wanted.response_trailers)) |failure| return failure;
+    const sent = switch (send_each(app, call, &wanted, &info, sender)) {
+        .count => |count| count,
+        .failure => |failure| return failure,
+    };
+    const failure = if (wanted.@"error") |*failure| failure else return null;
+    return echo.failure(failure, if (sent == 0) &info else null);
+}
+
+/// How many responses `send_each` sent, or the error that stopped it.
+const Sent = union(enum) { count: usize, failure: connect.RpcError };
+
+/// Sends each response `wanted` lists, after its delay, the first with `info`.
+fn send_each(app: *App, call: *rpc.Call, wanted: *const service.StreamResponseDefinition, info: *const RequestInfo, sender: *rpc.Sender(service.ServerStreamResponse)) Sent {
     var slept_ms: u64 = 0;
     var data = wanted.response_data.iterator();
     var sent: usize = 0;
     for (0..constants.responses_max) |_| {
-        const bytes = (data.next() catch return echo_file.internal) orelse break;
-        if (echo_file.pause(app.io, call, wanted.response_delay_ms, &slept_ms)) |failure| return failure;
-        const payload: service.ConformancePayload = .{ .data = bytes, .request_info = if (sent == 0) info else null };
-        sender.send(&.{ .payload = payload }) catch return echo_file.internal;
+        const bytes = (data.next() catch return .{ .failure = echo_file.internal }) orelse break;
+        if (echo_file.pause(app.io, call, wanted.response_delay_ms, &slept_ms)) |failure| return .{ .failure = failure };
+        const payload: service.ConformancePayload = .{ .data = bytes, .request_info = if (sent == 0) info.* else null };
+        sender.send(&.{ .payload = payload }) catch return .{ .failure = echo_file.internal };
         sent += 1;
     }
-    const failure = if (wanted.@"error") |*failure| failure else return null;
-    return echo.failure(failure, if (sent == 0) &info else null);
+    return .{ .count = sent };
 }

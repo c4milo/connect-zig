@@ -6,6 +6,10 @@ const connect = @import("connect");
 const constants = @import("constants.zig");
 const invoke = @import("client_invoke.zig");
 
+/// The response's header lines and trailer lines, which one case at a time records.
+var header_lines: [constants.client_fields_max]connect.Header align(@alignOf(connect.Header)) = undefined;
+var trailer_lines: [constants.client_fields_max]connect.Header align(@alignOf(connect.Header)) = undefined;
+
 const out_of_room: connect.RpcError = .{ .code = .internal, .message = "the client's result ran out of room" };
 
 /// Reads each message of a streamed response that arrived whole. A unary-response call reads
@@ -62,11 +66,9 @@ pub fn record_metadata(self: anytype) void {
     const Self = @TypeOf(self.*);
     const arrived = if (Self.streamed) self.headers_seen else self.call.response.result == .response;
     if (!arrived) return;
-    var lines: [constants.client_fields_max]connect.Header = undefined;
-    const headers = lines_of(&self.call.response.headers, &lines);
+    const headers = lines_of(&self.call.response.headers, &header_lines);
     self.result.add_metadata(.headers, headers) catch {};
     if (self.stopped) return;
-    var trailer_lines: [constants.client_fields_max]connect.Header = undefined;
     const speaks = self.call.call.speaks;
     const trailers = switch (speaks.protocol) {
         // PROTOCOL-HTTP2.md, "Responses": gRPC's trailers are HTTP trailers.

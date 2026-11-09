@@ -6,7 +6,7 @@ const std = @import("std");
 const cognitive_complexity_max = "15";
 
 /// The directories the complexity score and the lint rules read.
-const source_directories = [_][]const u8{ "src", "tools", "build", "examples", "bench" };
+const source_directories = [_][]const u8{ "src", "tools", "build", "examples", "bench", "conformance" };
 
 /// The Markdown files at the root, which the markdown rule reads beside `docs/`.
 const root_documents = [_][]const u8{ "README.md", "CLAUDE.md" };

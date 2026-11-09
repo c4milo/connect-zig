@@ -41,6 +41,9 @@ var gzip_encoder: connect.GzipEncoder align(@alignOf(connect.GzipEncoder)) = und
 var zstd_decoder: connect.ZstdDecoder align(@alignOf(connect.ZstdDecoder)) = undefined;
 var zstd_encoder: connect.ZstdEncoder align(@alignOf(connect.ZstdEncoder)) = undefined;
 var compat_request_bytes: [constants.compat_request_bytes_max]u8 align(@alignOf(u64)) = undefined;
+var compat_response_bytes: [constants.compat_response_bytes]u8 = undefined;
+var stdin_buffer: [constants.length_prefix_len]u8 = undefined;
+var stdout_buffer: [constants.compat_response_bytes]u8 = undefined;
 
 /// The host the runner's client connects to.
 const host = "127.0.0.1";
@@ -71,12 +74,9 @@ pub fn main(init: std.process.Init) !void {
 
 /// Reads the length-prefixed ServerCompatRequest from stdin.
 fn read_request(io: std.Io) ![]const u8 {
-    var buffer: [constants.length_prefix_len]u8 = undefined;
-    var stdin = std.Io.File.stdin().reader(io, &buffer);
-    var prefix: [constants.length_prefix_len]u8 = undefined;
-    try stdin.interface.readSliceAll(&prefix);
+    var stdin = std.Io.File.stdin().reader(io, &stdin_buffer);
     // docs/testing_servers.md: "a network-byte-order (i.e. big-endian) 32-bit integer".
-    const len = std.mem.readInt(u32, &prefix, .big);
+    const len = try stdin.interface.takeInt(u32, .big);
     if (len > compat_request_bytes.len) return error.RequestTooLarge;
     try stdin.interface.readSliceAll(compat_request_bytes[0..len]);
     return compat_request_bytes[0..len];
@@ -84,14 +84,10 @@ fn read_request(io: std.Io) ![]const u8 {
 
 /// Writes the length-prefixed ServerCompatResponse, with the port the server bound, to stdout.
 fn write_response(io: std.Io, port: u16) !void {
-    var message: [constants.compat_response_bytes]u8 = undefined;
     const response: server_compat.ServerCompatResponse = .{ .host = host, .port = port };
-    const encoded = try proto.encode(server_compat.ServerCompatResponse, &response, &message);
-    var prefix: [constants.length_prefix_len]u8 = undefined;
-    std.mem.writeInt(u32, &prefix, @intCast(encoded.len), .big);
-    var buffer: [constants.compat_response_bytes]u8 = undefined;
-    var stdout = std.Io.File.stdout().writer(io, &buffer);
-    try stdout.interface.writeAll(&prefix);
+    const encoded = try proto.encode(server_compat.ServerCompatResponse, &response, &compat_response_bytes);
+    var stdout = std.Io.File.stdout().writer(io, &stdout_buffer);
+    try stdout.interface.writeInt(u32, @intCast(encoded.len), .big);
     try stdout.interface.writeAll(encoded);
     try stdout.interface.flush();
 }

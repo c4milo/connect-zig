@@ -366,6 +366,16 @@ ran on Linux x86-64 with Zig 0.16.0.
   passed, the server 2714 of 2714, `tools/interop_check.sh` 48 calls and
   `tools/interop_languages_check.sh` 713, and no instruction count moved.
 
+- **The lint reads `conformance/`.** The owner ruled on 2026-11-09 that the conformance programs
+  keep the tree's rules. `build/lint.zig` scores `conformance/` and passes it to the rules, which
+  read it as `examples/`, and `conformance/gen` as `examples/gen`. denied-words skips
+  `conformance/proto`, connectrpc's copy. Its findings are fixed: `echo.zig`'s `add_each`
+  (complexity 21) and `unary.zig`'s `server_stream` (18) are split, and the local buffers the
+  undefined-fill rule names move to the container, or are written whole. No public name changed.
+  Conformance printed 2714 of 2714 and 8252 of 8264, `tools/interop_servers_check.sh` 782 calls,
+  `tools/interop_check.sh` 48 and `tools/interop_languages_check.sh` 713, and no instruction count
+  moved.
+
 ### What a later step owes
 
 - The client cases of `conformance/client_known_failing.txt`: a status outside 100 to 599,

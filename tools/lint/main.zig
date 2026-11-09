@@ -51,7 +51,7 @@ pub const determinism = rules.forbidden_references.Rule(.{
 
 /// CLAUDE.md, Conventions: every loop is bounded.
 pub const unbounded_loop = rules.unbounded_loop.Rule(.{
-    .scope = .{ .extensions = &.{lint.paths.zig_extension}, .include_directories = &.{ "src", "examples", "bench" } },
+    .scope = .{ .extensions = &.{lint.paths.zig_extension}, .include_directories = &.{ "src", "examples", "bench", "conformance" } },
     .forever = .unless_bounded_break,
     .length_read = true,
     .bound = .{ .segments = &.{"constants"}, .last_segment_suffixes = &.{"_max"} },
@@ -77,7 +77,7 @@ pub const relative_import = rules.relative_import.Rule(.{
 });
 pub const relative_import_outside = rules.relative_import.Rule(.{
     .name = "relative-import-outside",
-    .scope = .{ .extensions = &.{lint.paths.zig_extension}, .include_directories = &.{ "examples", "tools", "build", "bench" } },
+    .scope = .{ .extensions = &.{lint.paths.zig_extension}, .include_directories = &.{ "examples", "tools", "build", "bench", "conformance" } },
     .mode = .parent_or_absolute,
 });
 
@@ -86,19 +86,19 @@ pub const relative_import_outside = rules.relative_import.Rule(.{
 pub const magic_numbers = rules.magic_numbers.Rule(.{
     .scope = .{
         .extensions = &.{lint.paths.zig_extension},
-        .include_directories = &.{ "src", "examples/gen", "bench/gen" },
+        .include_directories = &.{ "src", "examples/gen", "bench/gen", "conformance/gen" },
         .exclude_basenames = &.{"constants.zig"},
     },
 });
 
 /// The library keeps no state every thread shares.
 pub const global_state = rules.global_state.Rule(.{
-    .scope = .{ .extensions = &.{lint.paths.zig_extension}, .include_directories = &.{ "src", "examples/gen", "bench/gen" } },
+    .scope = .{ .extensions = &.{lint.paths.zig_extension}, .include_directories = &.{ "src", "examples/gen", "bench/gen", "conformance/gen" } },
 });
 
 /// A container-level `var` states its alignment, which Zig 0.16's x86_64 backend needs.
 pub const static_alignment = rules.static_alignment.Rule(.{
-    .scope = .{ .extensions = &.{lint.paths.zig_extension}, .include_directories = &.{ "src", "examples", "bench" } },
+    .scope = .{ .extensions = &.{lint.paths.zig_extension}, .include_directories = &.{ "src", "examples", "bench", "conformance" } },
 });
 
 /// CLAUDE.md, Conventions: every Markdown file renders on GitHub as written.
@@ -112,7 +112,7 @@ pub const markdown = rules.markdown.Rule(.{
 });
 
 /// The Zig code this tree writes by hand or generates, which the remaining rules read.
-const zig_tree: lint.Scope = .{ .extensions = &.{lint.paths.zig_extension}, .include_directories = &.{ "src", "examples", "tools", "build", "bench" } };
+const zig_tree: lint.Scope = .{ .extensions = &.{lint.paths.zig_extension}, .include_directories = &.{ "src", "examples", "tools", "build", "bench", "conformance" } };
 
 /// A `defer` goes above any statement that can fail, so what the block acquired is released.
 pub const defer_order = rules.defer_order.Rule(.{ .scope = zig_tree });
@@ -120,7 +120,7 @@ pub const defer_order = rules.defer_order.Rule(.{ .scope = zig_tree });
 /// A function's local array is not set to `undefined`, which Debug and ReleaseSafe fill on each
 /// call: the library, the examples and the benchmark take that memory from their caller instead.
 pub const undefined_fill = rules.undefined_fill.Rule(.{
-    .scope = .{ .extensions = &.{lint.paths.zig_extension}, .include_directories = &.{ "src", "examples", "bench" } },
+    .scope = .{ .extensions = &.{lint.paths.zig_extension}, .include_directories = &.{ "src", "examples", "bench", "conformance" } },
     .stop_at_testing_import = true,
     // A copy of colibri's examples/link.zig, kept as colibri wrote it.
     .allowed = &.{
@@ -137,8 +137,13 @@ pub const unreleased_acquire = rules.unreleased_acquire.Rule(.{
 
 /// No unresolved marker ships: open work is a GitHub issue (CLAUDE.md, Conventions).
 pub const denied_words = rules.denied_words.Rule(.{
-    // This file names the words to deny them.
-    .scope = .{ .extensions = &.{ lint.paths.zig_extension, ".md", ".sh", ".yml", ".proto" }, .exclude_paths = &.{"tools/lint/main.zig"} },
+    // This file names the words to deny them. conformance/proto is connectrpc's copy, kept as
+    // connectrpc wrote it.
+    .scope = .{
+        .extensions = &.{ lint.paths.zig_extension, ".md", ".sh", ".yml", ".proto" },
+        .exclude_paths = &.{"tools/lint/main.zig"},
+        .exclude_directories = &.{"conformance/proto"},
+    },
     .words = &.{ "TODO", "FIXME", "XXX", "HACK" },
     .word_label = "unresolved marker",
 });
@@ -196,4 +201,24 @@ test "defer-order refuses a defer under a statement that can fail" {
     defer arena_state.deinit();
     const source: [:0]const u8 = "fn f() !void {\n    const a = try open();\n    try flush();\n    defer close(a);\n}\n";
     try testing.expect((try harness.run(arena_state.allocator(), defer_order, "src/connect/x.zig", source)).len == 1);
+}
+
+test "the conformance programs are read as the examples are" {
+    var arena_state = std.heap.ArenaAllocator.init(testing.allocator);
+    defer arena_state.deinit();
+    const arena = arena_state.allocator();
+    const fill: [:0]const u8 = "const T = struct { a: u64 };\nfn f() void {\n    var events: [16]T = undefined;\n    _ = &events;\n}\n";
+    const loop: [:0]const u8 = "fn f(go: bool) void {\n    while (true) {\n        if (go) break;\n    }\n}\n";
+    const global: [:0]const u8 = "const std = @import(\"std\");\nvar io: std.Io = undefined;\n";
+    const climb: [:0]const u8 = "const a = @import(\"../src/connect/code.zig\");\n";
+    try testing.expect((try harness.run(arena, undefined_fill, "conformance/echo.zig", fill)).len == 1);
+    try testing.expect((try harness.run(arena, unbounded_loop, "conformance/echo.zig", loop)).len == 1);
+    try testing.expect((try harness.run(arena, static_alignment, "conformance/client.zig", global)).len == 1);
+    try testing.expect((try harness.run(arena, relative_import_outside, "conformance/echo.zig", climb)).len == 1);
+    const late: [:0]const u8 = "fn f() !void {\n    const a = try open();\n    try flush();\n    defer close(a);\n}\n";
+    try testing.expect((try harness.run(arena, defer_order, "conformance/server.zig", late)).len == 1);
+    // The code buf generates for the suite keeps the rules of generated code (decision 17).
+    const shared: [:0]const u8 = "var calls: u32 align(4) = 0;\n";
+    try testing.expect((try harness.run(arena, global_state, "conformance/gen/a.pb.zig", shared)).len == 1);
+    try testing.expect((try harness.run(arena, magic_numbers, "conformance/gen/a.pb.zig", "fn f() u32 {\n    return 300;\n}\n")).len == 1);
 }

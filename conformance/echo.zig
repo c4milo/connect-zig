@@ -165,16 +165,22 @@ fn add_each(call: *rpc.Call, list: *const proto.Repeated(Header, .message), sect
     var fields = list.iterator();
     for (0..rpc.constants.fields_max + 1) |_| {
         const field = (fields.next() catch return internal) orelse return null;
-        var values = field.value.iterator();
-        for (0..rpc.constants.fields_max + 1) |_| {
-            const value = (values.next() catch return internal) orelse break;
-            switch (section) {
-                .header => call.add_header(field.name, value) catch return internal,
-                .trailer => call.add_trailer(field.name, value) catch return internal,
-            }
-        }
+        if (add_values(call, &field, section)) |failure| return failure;
     }
     return internal;
+}
+
+/// Adds one header or trailer of `field`'s name for each of its values.
+fn add_values(call: *rpc.Call, field: *const Header, section: Section) ?connect.RpcError {
+    var values = field.value.iterator();
+    for (0..rpc.constants.fields_max + 1) |_| {
+        const value = (values.next() catch return internal) orelse return null;
+        switch (section) {
+            .header => call.add_header(field.name, value) catch return internal,
+            .trailer => call.add_trailer(field.name, value) catch return internal,
+        }
+    }
+    return null;
 }
 
 /// Waits `delay_ms` before a response, as a definition asks. `slept_ms` counts the call's waits

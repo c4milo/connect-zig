@@ -83,8 +83,10 @@ confirm a test fails. Report `CAUGHT` or `NOT CAUGHT` per mutation in the commit
 - Lint: `zig build lint`: the cognitive-complexity score, then the rules of `tools/lint/main.zig`:
   heap, io, determinism, layering, unbounded-loop, file-length, markdown, relative-import,
   magic-numbers, global-state, static-alignment, defer-order, undefined-fill, unreleased-acquire and
-  denied-words, all from pepegrillo. `zig build test` also requires `.githooks/pre-push` to equal
-  pepegrillo's hook (`zig build hook-check`).
+  denied-words, all from pepegrillo. The rules read `conformance/` as they read `examples/`, and
+  `conformance/gen` as `examples/gen`; `conformance/proto` is connectrpc's copy, which
+  denied-words skips. `zig build test` also requires `.githooks/pre-push` to equal pepegrillo's
+  hook (`zig build hook-check`).
 - Hooks: `zig build hooks` once after cloning points `core.hooksPath` at `.githooks`, whose
   pre-push hook runs the commit linter that `zig build install-commit-lint` installs. They read `examples/gen` as they read hand-written code
   (decision 17).

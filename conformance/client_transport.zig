@@ -43,14 +43,14 @@ var input: [constants.client_socket_input_bytes]u8 = undefined;
 var input_len: usize = 0;
 var output: [client.constants.limits.stream_output_len_min]u8 = undefined;
 var listener: ?Listener align(@alignOf(Listener)) = null;
-var io: std.Io = undefined;
+var io: std.Io align(@alignOf(std.Io)) = undefined;
 /// The source each TLS session draws from, seeded from the system once.
 var csprng: std.Random.DefaultCsprng align(@alignOf(std.Random.DefaultCsprng)) = undefined;
 
 /// Keeps the program's I/O, and seeds the random source from the system.
 pub fn init(program_io: std.Io) void {
     io = program_io;
-    var seed: [std.Random.DefaultCsprng.secret_seed_length]u8 = undefined;
+    var seed: [std.Random.DefaultCsprng.secret_seed_length]u8 = @splat(0);
     io.random(&seed);
     csprng = .init(seed);
 }
@@ -135,9 +135,9 @@ fn read_sockets(wait_ns: u64) void {
     // An fd below 0 is one poll skips (POSIX poll()).
     const skipped: std.posix.fd_t = -1;
     const tcp_fd = if (stream) |open| (if (input_len < input.len) open.socket.handle else skipped) else skipped;
-    var descriptors: [std.enums.values(Socket).len]std.posix.pollfd = undefined;
-    descriptors[@intFromEnum(Socket.tcp)] = .{ .fd = tcp_fd, .events = std.posix.POLL.IN, .revents = 0 };
-    descriptors[@intFromEnum(Socket.udp)] = .{ .fd = datagram.descriptor() orelse skipped, .events = std.posix.POLL.IN, .revents = 0 };
+    var descriptors: [std.enums.values(Socket).len]std.posix.pollfd = @splat(.{ .fd = skipped, .events = std.posix.POLL.IN, .revents = 0 });
+    descriptors[@intFromEnum(Socket.tcp)].fd = tcp_fd;
+    descriptors[@intFromEnum(Socket.udp)].fd = datagram.descriptor() orelse skipped;
     const ready = std.posix.poll(&descriptors, wait_ms) catch return;
     if (ready == 0) return;
     if (descriptors[@intFromEnum(Socket.tcp)].revents != 0) read_stream();

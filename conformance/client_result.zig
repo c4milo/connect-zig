@@ -14,6 +14,13 @@ const client_compat = @import("connectrpc_conformance_v1_client_compat");
 const constants = @import("constants.zig");
 const echo = @import("echo.zig");
 
+/// A metadata section's groups and values, and an error's details as Anys with their type URLs,
+/// which one case at a time writes.
+var groups: [constants.client_fields_max]Header align(@alignOf(Header)) = undefined;
+var values: [constants.client_fields_max][]const u8 align(@alignOf([]const u8)) = undefined;
+var anys: [constants.client_details_max]Any align(@alignOf(Any)) = undefined;
+var urls: [constants.client_details_max * constants.client_type_url_bytes]u8 = undefined;
+
 const ResponseResult = client_compat.ClientResponseResult;
 const Header = service.Header;
 const Any = proto.wkt.Any;
@@ -89,8 +96,6 @@ pub const Result = struct {
     /// Records a section of response metadata, grouped by name with each value in order.
     pub fn add_metadata(result: *Result, section: Section, lines: []const connect.Header) proto.EncodeError!void {
         if (lines.len == 0) return;
-        var groups: [constants.client_fields_max]Header = undefined;
-        var values: [constants.client_fields_max][]const u8 = undefined;
         const count = @min(lines.len, groups.len);
         const grouped = echo.group(lines[0..count], groups[0..count], values[0..count]);
         switch (section) {
@@ -121,8 +126,6 @@ pub const Result = struct {
     /// Any named by its full name.
     fn append_failure(result: *Result) proto.EncodeError!void {
         const failure = result.failure orelse return;
-        var anys: [constants.client_details_max]Any = undefined;
-        var urls: [constants.client_details_max * constants.client_type_url_bytes]u8 = undefined;
         const count = @min(failure.details.len, anys.len);
         for (failure.details[0..count], 0..) |detail, index| {
             const url = urls[index * constants.client_type_url_bytes ..][0..constants.client_type_url_bytes];
