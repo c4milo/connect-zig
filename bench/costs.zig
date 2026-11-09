@@ -42,7 +42,8 @@ const syscall_calls = 100_000;
 /// The seed of the generator that orders the chase and draws the random bits.
 const seed = 0x9e37_79b9_7f4a_7c15;
 /// The least a mispredict costs on any core CI runs: about ten cycles. Less means the branch
-/// became a select and nothing was measured, so the program fails.
+/// became a select and nothing was measured, so the row is marked suspect. The table reports and
+/// never gates (the owner's ruling of 2026-11-09).
 const mispredict_ns_min = 1.0;
 const output_len = 4096;
 const percent = 100;
@@ -51,12 +52,14 @@ const Cost = struct {
     name: []const u8,
     unit: []const u8,
     measure: *const fn (*Buffers, std.Io) anyerror!f64,
+    /// The least a real measurement of this cost gives. A median below it is marked suspect.
+    floor: f64 = 0,
 };
 
 const costs = [_]Cost{
     .{ .name = "first-level cache hit", .unit = "ns per load", .measure = cache_hit },
     .{ .name = "main-memory read", .unit = "ns per load", .measure = memory_read },
-    .{ .name = "branch mispredict", .unit = "ns per mispredict", .measure = mispredict },
+    .{ .name = "branch mispredict", .unit = "ns per mispredict", .measure = mispredict, .floor = mispredict_ns_min },
     .{ .name = "copy of 64 KiB", .unit = "ns per copy", .measure = copy },
     .{ .name = "system call (getpid)", .unit = "ns per call", .measure = system_call },
 };
@@ -95,7 +98,8 @@ pub fn main(init: std.process.Init) !void {
     try writer.print("| Cost | Median | Spread | Unit |\n| --- | ---: | ---: | --- |\n", .{});
     for (costs) |cost| {
         const result = try median(cost, &buffers, init.io);
-        try writer.print("| {s} | {d:.2} | {d:.1}% | {s} |\n", .{ cost.name, result.median, result.spread_percent, cost.unit });
+        const suspect = if (result.median < cost.floor) " (suspect: below the floor a real measurement gives)" else "";
+        try writer.print("| {s} | {d:.2}{s} | {d:.1}% | {s} |\n", .{ cost.name, result.median, suspect, result.spread_percent, cost.unit });
     }
     try writer.flush();
 }
@@ -189,9 +193,7 @@ fn mispredict(buffers: *Buffers, io: std.Io) !f64 {
     const random_ns = time_branch(buffers.random_bits, io);
     const sorted_ns = time_branch(buffers.sorted_bits, io);
     const mispredicts = @as(f64, @floatFromInt(branch_bits_count * branch_rounds)) * mispredicts_per_bit;
-    const ns = (random_ns - sorted_ns) / mispredicts;
-    if (ns < mispredict_ns_min) return error.NoMispredict;
-    return ns;
+    return (random_ns - sorted_ns) / mispredicts;
 }
 
 fn copy(buffers: *Buffers, io: std.Io) !f64 {

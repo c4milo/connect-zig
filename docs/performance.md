@@ -16,7 +16,9 @@ paid for.
 - **Time is a filter.** `zig build bench` times each operation in ReleaseFast.
   `tools/bench_check.sh` runs Go's `google.golang.org/protobuf` on the same inputs beside it, and
   checks that both write the same octets. A time orders candidates and never lands in a document
-  unless both programs ran in the same job on the same machine. The README's table is such a run.
+  unless both programs ran in the same job on the same machine. CI's `go-bench` job runs it and
+  adds the table to the job's summary; it fails only when the octets differ, never on a time. The
+  README's table comes from one named run of that job.
 - **The smoke run.** `zig build bench -- --quick` runs every operation on every message in a few
   short batches. CI's `bench` job runs it, so a broken operation fails before anyone times it.
 - **A profile shows where the cost goes, and is never a measurement.** Run callgrind on
@@ -62,7 +64,9 @@ The method prices a claim against the costs of a first-level cache hit, a main-m
 branch mispredict, a copy and a system call, each measured on the judge. `zig build costs` times
 them with `bench/costs.zig`, in ReleaseFast, and prints each median of five runs with its
 spread. CI's `costs` job runs it through `tools/ci.sh --only costs` and adds the table to the
-job's summary. No run is recorded here yet: the table below takes the numbers of one CI run,
+job's summary. It reports and never fails CI: a shared runner can time any row badly, and a row
+below the floor a real measurement gives, such as a mispredict under 1 ns, is marked suspect and
+raises a warning. No run is recorded here yet: the table below takes the numbers of one CI run,
 with the run's link, the runner's CPU and the commit.
 
 | Cost | Median | Spread | Run |
@@ -72,6 +76,24 @@ with the run's link, the runner's CPU and the commit.
 | Branch mispredict, ns | not measured | | |
 | Copy of 64 KiB, ns | not measured | | |
 | System call (`getpid`), ns | not measured | | |
+
+## The fast paths the judge guards
+
+A fast path that is switched off gives the same octets as its reference, so no test sees it: the
+proof harness checks that the two agree, not that the fast one runs. The judge sees it. Each fast
+path below was switched off on purpose once its baseline was written, and `tools/perf_check.sh`
+failed (the owner's ruling of 2026-11-09). A new fast path joins this list the same way.
+
+| Fast path | Where | What the judge reported when it was off |
+| --- | --- | --- |
+| A program's repeated items, without the iterator (binary and JSON) | `encode.zig`, `json_encode.zig` | failed; the commit of each names the operations |
+| The child's length guess | `encode.zig` | failed; its commit names the operations |
+| The ASCII word check | `scalar.zig` | failed; its commit names the operations |
+| One- and two-octet varint write | `wire.zig`, `Writer.varint` | deep binary encode +67.89%, deep JSON decode +8.57% |
+| One- and two-octet varint read | `wire.zig`, `Reader.varint` | deep binary decode +28.98%, deep binary decode+walk +28.65% |
+| The packed element inline | `repeated.zig` | failed; its commit names the operations |
+| A `Lazy` child through its pointer | `encode.zig` | failed; its commit names the operations |
+| A JSON member name against comptime names | `json_decode.zig`, `name_is` | deep JSON decode +11.09%, large JSON decode +4.71% |
 
 ## The pitfalls
 

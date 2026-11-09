@@ -12,7 +12,7 @@
 # apart in GitHub.
 set -eu
 cd "$(dirname "$0")/.."
-checks="format commits test release bench costs perf generated interop interop-languages coverage conformance"
+checks="format commits test release bench costs go-bench perf generated interop interop-languages coverage conformance"
 only=""
 case "${1:-}" in
     --list)
@@ -37,6 +37,16 @@ export PERF_REPORT="${report}"
 export CONFORMANCE_REPORT="${report}"
 failed=""
 
+# Writes a check's table to the report and passes: the check reports and never gates. A row
+# marked "suspect" becomes a warning in GitHub's summary.
+report_only() {
+    printf '%s\n\n' "$2" | tee -a "${report}"
+    if [ -n "${GITHUB_ACTIONS:-}" ] && printf '%s\n' "$2" | grep -q suspect; then
+        echo "::warning title=$1::the $1 report holds a suspect row; its summary says which"
+    fi
+    return 0
+}
+
 # Runs one check by name.
 check() {
     case "$1" in
@@ -50,7 +60,13 @@ check() {
         # The full run, and the comparison with Go, is tools/bench_check.sh.
         bench) zig build bench -- --quick ;;
         # The costs table of docs/performance.md, timed on this runner: the table goes to the report.
-        costs) costs_table="$(zig build costs)" && printf '%s\n\n' "${costs_table}" | tee -a "${report}" ;;
+        # It reports and never gates, since a shared runner can time any row badly.
+        costs) report_only costs "$(zig build costs 2>&1)" ;;
+        # Go's runtime beside connect-zig's on the same inputs: the README's table comes from one
+        # such run. The times report and never gate; the octets of both runtimes must match.
+        go-bench) go_bench="$(tools/bench_check.sh 2>&1)" && go_status=0 || go_status=$?
+            report_only go-bench "${go_bench}"
+            return "${go_status}" ;;
         perf) tools/perf_check.sh ;;
         generated) tools/generate_check.sh ;;
         interop) tools/interop_check.sh ;;
