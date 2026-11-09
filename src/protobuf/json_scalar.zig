@@ -12,6 +12,7 @@ const json = @import("json");
 const wire = @import("wire.zig");
 const descriptor = @import("descriptor.zig");
 const constants = @import("constants.zig");
+const json_float = @import("json_float.zig");
 const Kind = descriptor.Kind;
 
 /// What writing JSON fails with.
@@ -48,6 +49,10 @@ pub const DecodeError = json.DecodeError || error{ Truncated, NoSpaceLeft } || w
 const integer_text_len_max = 20;
 /// The longest text `{d}` or `{e}` writes for a double.
 const float_text_len_max = 32;
+
+comptime {
+    assert(float_text_len_max >= json_float.text_len_max);
+}
 /// The base64 octets one piece of a bytes field writes: 4 for each 3 input octets, and under one
 /// cache line, so the staging buffer costs a few stores a call.
 const base64_piece_len = 60;
@@ -95,13 +100,17 @@ pub fn write_float(comptime V: type, value: V, text: *json.TextWriter) EncodeErr
     if (std.math.isNan(value)) return text.string("NaN");
     if (std.math.isInf(value)) return text.string(if (value > 0) "Infinity" else "-Infinity");
     var buffer: [float_text_len_max]u8 = undefined;
+    try text.number(float_text(V, value, &buffer));
+}
+
+/// The shortest text of a finite float: plain between the exponent bounds, where a value equal
+/// to a short decimal takes `json_float`'s fast path, and with an exponent outside them.
+fn float_text(comptime V: type, value: V, buffer: *[float_text_len_max]u8) []const u8 {
     const magnitude = @abs(value);
     const plain = magnitude == 0 or (magnitude >= float_exponent_below and magnitude < float_exponent_above);
-    const digits = if (plain)
-        std.fmt.bufPrint(&buffer, "{d}", .{value}) catch unreachable
-    else
-        std.fmt.bufPrint(&buffer, "{e}", .{value}) catch unreachable;
-    try text.number(digits);
+    if (!plain) return std.fmt.bufPrint(buffer, "{e}", .{value}) catch unreachable;
+    if (json_float.exact_text(V, value, buffer)) |digits| return digits;
+    return std.fmt.bufPrint(buffer, "{d}", .{value}) catch unreachable;
 }
 
 /// Writes `octets` as one string of standard base64 with padding, in pieces.
