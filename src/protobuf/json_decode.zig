@@ -93,9 +93,23 @@ pub fn members(comptime T: type, transcoder: *Transcoder, depth_left: u32, compt
 /// a parser accepts both).
 fn field_index(comptime T: type, name: []const u8) ?usize {
     inline for (T.protobuf.fields, 0..) |field, index| {
-        if (std.mem.eql(u8, name, field.json_name) or std.mem.eql(u8, name, field.proto_name)) return index;
+        if (name_is(name, field.json_name)) return index;
+        if (comptime !std.mem.eql(u8, field.json_name, field.proto_name)) {
+            if (name_is(name, field.proto_name)) return index;
+        }
     }
     return null;
+}
+
+/// Whether `name` is `expected`, a name the descriptor fixes: the lengths first, which most
+/// names fail, then the octets, unrolled for a short name.
+inline fn name_is(name: []const u8, comptime expected: []const u8) bool {
+    if (name.len != expected.len) return false;
+    if (comptime expected.len > constants.limits.json_name_unrolled_len_max) return std.mem.eql(u8, name, expected);
+    inline for (expected, 0..) |octet, index| {
+        if (name[index] != octet) return false;
+    }
+    return true;
 }
 
 fn read_member(comptime T: type, transcoder: *Transcoder, index: usize, depth_left: u32, comptime registry: []const type) Error!void {

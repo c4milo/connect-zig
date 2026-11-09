@@ -50,6 +50,9 @@ pub const limits = struct {
     /// yet. 32 moved Medium's 40-octet addresses with no call; 64 saved 1% more there
     /// (`tools/perf_check.sh`, 2026-11-09).
     pub const child_move_chunk_len = 32;
+    /// The longest field name the JSON transcoder compares octet by octet, unrolled at comptime,
+    /// after it compares the length: a longer one goes to `std.mem.eql`'s vector loop.
+    pub const json_name_unrolled_len_max = 16;
     /// The length a nested message's prefix takes when the JSON transcoder writes it before it
     /// knows the length: 5 bytes hold any length below 2^35, padded with continuation bits.
     pub const padded_length_len = 5;
