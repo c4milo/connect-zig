@@ -160,6 +160,11 @@ pub const Response = struct {
 
     /// The next message, or null once the response holds no more. `failure` is then set when
     /// the call failed.
+    ///
+    /// A message stays valid only until the next call to `next` or `end_body`, or the client
+    /// call's `read`. Its strings and bytes may point into `storage.scratch`, where a compressed
+    /// message, a JSON one and gRPC-Web's trailers frame are written, so reading on writes over
+    /// it. A program that keeps a message copies it first.
     pub fn next(response: *Response, comptime T: type) Error!?T {
         const octets = (if (response.done) null else try response.next_octets()) orelse {
             response.check_none();
