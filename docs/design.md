@@ -262,6 +262,20 @@ ran on Linux x86-64 with Zig 0.16.0.
   interop. Colibri's client tries TCP first now; the h3 rounds offer h3 alone and check the
   protocol they spoke, so they still run h3.
 
+- **The protobuf fast paths.** The owner approved an audit's nine fixes on 2026-11-08. Four
+  benchmark messages that each hold one kind of field joined the four of `bench/inputs.zig`, and
+  stdx builds ReleaseFast in the benchmark. A proof harness compares each fast path with a
+  reference that steps one octet at a time. The fixes then landed one commit each: repeated items
+  encode from their slice, a child's length is guessed at 2 octets, short strings are checked for
+  ASCII a word at a time, base64 tries the standard alphabet first, a `Lazy` child encodes
+  through its pointer, varints of one and two octets are written and read inline, the next packed
+  element is read inline, and a JSON member's name is matched against comptime names. Per
+  operation, from the first baseline to the last: large binary encode 2,161,408 to 901,289
+  instructions (-58.30%), large binary decode 1,213,474 to 786,889 (-35.15%), deep binary encode
+  21,511 to 13,548 (-37.02%), small binary decode 738 to 525 (-28.86%), large JSON decode
+  13,135,358 to 10,832,454 (-17.53%). JSON encode moved by +0.81% at most. `zig build test`,
+  `tools/coverage_check.sh` and `tools/bench_check.sh` pass.
+
 ### What a later step owes
 
 - The connectrpc conformance suite against the client (step 7), once colibri's client exposes
