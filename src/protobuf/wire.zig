@@ -87,7 +87,30 @@ pub const Reader = struct {
         return reader.position == reader.bytes.len;
     }
 
-    pub fn varint(reader: *Reader) Error!u64 {
+    pub inline fn varint(reader: *Reader) Error!u64 {
+        // "Base 128 Varints": an octet with no continuation bit is the last of its varint. A first
+        // octet without it is the whole varint, as most tags and short lengths are.
+        if (reader.position < reader.bytes.len) {
+            const first = reader.bytes[reader.position];
+            if (first < continuation) {
+                reader.position += 1;
+                return first;
+            }
+            // Two octets, the second with no continuation bit: most lengths of a nested message.
+            if (two_octets <= reader.bytes.len - reader.position) {
+                const second = reader.bytes[reader.position + 1];
+                if (second < continuation) {
+                    reader.position += two_octets;
+                    return @as(u64, first & payload_mask) | @as(u64, second) << group_bits;
+                }
+            }
+        }
+        return reader.varint_long();
+    }
+
+    /// A varint of two octets or more, or the refusal of one, out of line, so each inlined call
+    /// keeps the one-octet path alone.
+    noinline fn varint_long(reader: *Reader) Error!u64 {
         var value: u64 = 0;
         for (0..constants.protocol.varint_len_max) |index| {
             if (reader.position == reader.bytes.len) return error.Truncated;
@@ -272,7 +295,7 @@ pub const Writer = struct {
     }
 };
 
-/// The octets of the longest varint `Writer.varint` writes inline.
+/// The octets of the longest varint `Writer.varint` writes inline and `Reader.varint` reads inline.
 const two_octets = 2;
 
 /// A padded varint of 0: every byte but the last carries the continuation bit alone.
