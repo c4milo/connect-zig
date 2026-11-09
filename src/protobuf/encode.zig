@@ -279,6 +279,8 @@ fn encode_unknown_numbers(comptime field: Field, comptime V: type, tag: wire.Tag
 }
 
 fn encode_each(comptime field: Field, comptime F: type, item: *const F, sink: *Sink) Error!void {
+    // A program's items are a slice: one loop over it, without an iterator call per element.
+    if (item.items.len != 0) return encode_each_item(field, F, item.items, sink);
     var elements = item.iterator();
     for (0..constants.limits.elements_max) |_| {
         const element = try elements.next() orelse return;
@@ -292,7 +294,19 @@ fn encode_each(comptime field: Field, comptime F: type, item: *const F, sink: *S
     unreachable;
 }
 
+fn encode_each_item(comptime field: Field, comptime F: type, items: []const F.Element, sink: *Sink) Error!void {
+    for (items) |*element| {
+        if (comptime F.kind.holds_message()) {
+            try encode_child(F.Element, F.kind, field.number, element, sink);
+        } else {
+            try sink.tag(field.number, F.kind.wire_type());
+            try sink.value(F.kind, F.Element, element.*);
+        }
+    }
+}
+
 fn encode_packed(comptime field: Field, comptime F: type, item: *const F, sink: *Sink) Error!void {
+    if (item.items.len != 0) return encode_packed_items(field, F, item.items, sink);
     var payload_len: usize = 0;
     var counting = item.iterator();
     for (0..constants.limits.elements_max) |_| {
@@ -312,4 +326,23 @@ fn encode_packed(comptime field: Field, comptime F: type, item: *const F, sink: 
         try sink.value(F.kind, F.Element, element);
     }
     unreachable;
+}
+
+/// A program's items, packed ("Packed Repeated Fields"): their length in one loop, then their
+/// values in another, each straight from the slice.
+fn encode_packed_items(comptime field: Field, comptime F: type, items: []const F.Element, sink: *Sink) Error!void {
+    var payload_len: usize = 0;
+    for (items) |element| payload_len += scalar.len(F.kind, F.Element, element);
+    // Each element takes an octet at least, so a set field writes a record.
+    assert(payload_len >= items.len);
+    try sink.tag(field.number, .len);
+    try sink.varint(payload_len);
+    const writer = sink.writer orelse {
+        sink.len += payload_len;
+        return;
+    };
+    const start = writer.len;
+    for (items) |element| try scalar.write(F.kind, F.Element, element, writer);
+    assert(writer.len - start == payload_len);
+    sink.len += payload_len;
 }
