@@ -6,7 +6,9 @@
 //! A program calls `init` once, then for each round:
 //!
 //! 1. `begin` with the protocols the pool may speak: h3 alone, or h11 and h2 without h3;
-//! 2. `request` for each call, with the colibri request and response of an `ClientCall`;
+//! 2. `request` for each call, with the colibri request and response of an `ClientCall`, or, for
+//!    a streamed call, its `start` on `pool()` and then `listen`, which passes the call's events
+//!    on as they arrive;
 //! 3. `finish` with the protocol the round must speak, which runs client and server until every
 //!    call finished and the connection closed;
 //! 4. `read` on each client call, with `storage()`, to check what arrived.
@@ -49,13 +51,18 @@ const server_addresses = [_]client.Address{.of(&loopback, 0)};
 const read_len = 4096;
 const entries_max = 8;
 
+/// The streamed calls of one round, at most.
+const listeners_max = 8;
+
 pub const Error = error{ CallUnfinished, CallWrong };
 
 /// Octets of each buffer one call writes its request into and reads its response into.
 pub const call_buffer_len = 4096;
+/// Octets of each piece of a streamed response: fewer than most envelopes, so pieces split them.
+pub const piece_len = 16;
 /// The buffers of one call: its request's body, scratch and header values, and its response's
-/// headers, trailers and body.
-pub const CallBuffers = [7][call_buffer_len]u8;
+/// headers, trailers and body, and its pieces when it streams.
+pub const CallBuffers = [8][call_buffer_len]u8;
 
 /// The `ClientCall` buffers that `set` holds.
 pub fn buffers(set: *CallBuffers) rpc.ClientCallBuffers {
@@ -64,8 +71,34 @@ pub fn buffers(set: *CallBuffers) rpc.ClientCallBuffers {
         .headers = &set[4],
         .trailers = &set[5],
         .body = &set[6],
+        .piece = set[7][0..piece_len],
     };
 }
+
+/// Room for one streamed call's reading: its strings, details and metadata, which it keeps from
+/// its `headers` event to its end.
+pub const ReadBuffers = struct {
+    octets: [4][read_len]u8 = undefined,
+    details: [entries_max]connect.Detail = undefined,
+    metadata: [entries_max]connect.Header = undefined,
+
+    pub fn storage(room: *ReadBuffers) connect.client.Storage {
+        return .{
+            .scratch = .{ .message = &room.octets[0], .work = &room.octets[1], .tokens = &room.octets[2] },
+            .octets = &room.octets[3],
+            .details = &room.details,
+            .metadata = &room.metadata,
+        };
+    }
+};
+
+/// A streamed call of the round, which gets the `headers`, `body`, `body_taken` and `finished`
+/// events of its exchange.
+pub const Listener = struct {
+    id: client.RequestId,
+    context: *anyopaque,
+    on_event: *const fn (context: *anyopaque, event: client.Event) anyerror!void,
+};
 
 comptime {
     _ = @import("hooks.zig");
@@ -94,6 +127,8 @@ var requested: u32 = 0;
 var finished: u32 = 0;
 var pool_closed: bool = false;
 var spoken: ?client.Protocol align(@alignOf(client.Protocol)) = null;
+var listeners: [listeners_max]Listener align(@alignOf(Listener)) = undefined;
+var listener_count: usize = 0;
 var read_buffers: [4][read_len]u8 = undefined;
 var details: [entries_max]connect.Detail align(@alignOf(connect.Detail)) = undefined;
 var metadata: [entries_max]connect.Header align(@alignOf(connect.Header)) = undefined;
@@ -135,6 +170,25 @@ pub fn begin(protocols: client.Protocols) !void {
     finished = 0;
     pool_closed = false;
     spoken = null;
+    listener_count = 0;
+}
+
+/// The round's pool, which a streamed call's `start` takes.
+pub fn pool_of() *Pool {
+    return &pool;
+}
+
+/// Adds a streamed call the program started on `pool_of()`: its events go to `listener`.
+pub fn listen(listener: Listener) !void {
+    if (listener_count == listeners_max) return error.CallWrong;
+    listeners[listener_count] = listener;
+    listener_count += 1;
+    requested += 1;
+}
+
+/// The protocol the round's connection speaks, once it connected.
+pub fn protocol() ?client.Protocol {
+    return spoken;
 }
 
 /// Adds a call to the round. Both stay in place until `finish` returns.
@@ -227,7 +281,8 @@ fn report(event: client.Event, now_ns: u64) !void {
         .open => |open| try open_transport(open, now_ns),
         .send => |connection| try send_owed(connection, now_ns),
         .connected => |connected| spoken = connected.protocol,
-        .finished => {
+        .finished => |ended| {
+            if (find(ended.id)) |listener| try listener.on_event(listener.context, event);
             finished += 1;
             if (finished == requested) pool.shutdown();
         },
@@ -235,15 +290,29 @@ fn report(event: client.Event, now_ns: u64) !void {
         // connection told the server itself, with CONNECTION_CLOSE.
         .close => if (!quic) link_server.peer_closed(),
         .closed => pool_closed = true,
-        // A streamed exchange alone reports these (colibri decision 153), and each call here
-        // sends its body whole.
-        .headers, .body, .body_taken => unreachable,
+        // A streamed exchange alone reports these (colibri decision 153).
+        .headers => |id| try pass(id, event),
+        .body => |piece| try pass(piece.id, event),
+        .body_taken => |id| try pass(id, event),
         // The pool opens no second connection to resume, so it wipes the server's ticket.
         .ticket => |connection| if (pool.take_ticket(connection)) |ticket| {
             var held = ticket;
             held.wipe();
         },
     }
+}
+
+fn find(id: client.RequestId) ?*const Listener {
+    for (listeners[0..listener_count]) |*listener| {
+        if (listener.id == id) return listener;
+    }
+    return null;
+}
+
+/// Passes a streamed exchange's event to its call.
+fn pass(id: client.RequestId, event: client.Event) !void {
+    const listener = find(id) orelse return error.CallWrong;
+    try listener.on_event(listener.context, event);
 }
 
 /// Starts the connection an `open` named, over the transport the round runs. The link stands

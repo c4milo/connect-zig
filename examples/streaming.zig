@@ -2,9 +2,9 @@
 //!
 //! - Chat is a bidirectional stream, which an empty message fails. Its handler in `services/demo.zig` is a type whose
 //!   `on_message` answers each message the moment it arrives, so over h2 and h3 the server writes
-//!   answers while the client still sends. colibri's client sends its body whole, so here the
-//!   client sends all of its messages first; `buf curl` shows the full-duplex side, see
-//!   `tools/interop_check.sh`.
+//!   answers while the client still sends. The calls here send their messages in one body; the
+//!   streamed calls of `streaming_duplex.zig` send each one with a `Sender`, and over h2 and h3
+//!   read each answer before they send the next line.
 //! - Sum is a client stream, whose type handler adds each number as it arrives and answers once
 //!   the client ends.
 //! - Countdown is a server stream, which also fails when asked to count from too far.
@@ -17,6 +17,7 @@ const rpc = @import("connect_colibri");
 const demo = @import("demo");
 const service = @import("services/demo.zig");
 const harness = @import("services/link_client.zig");
+const duplex = @import("streaming_duplex.zig");
 const Service = demo.DemoService;
 
 const calls_count = 8;
@@ -38,6 +39,7 @@ var sum_web: rpc.ClientCall(Service.sum, .{}) align(@alignOf(rpc.ClientCall(Serv
 var countdown: rpc.ClientCall(Service.countdown, .{}) align(@alignOf(rpc.ClientCall(Service.countdown, .{}))) = undefined;
 var countdown_far: rpc.ClientCall(Service.countdown, .{}) align(@alignOf(rpc.ClientCall(Service.countdown, .{}))) = undefined;
 var buffers: [calls_count]harness.CallBuffers align(@alignOf(harness.CallBuffers)) = undefined;
+var streamed_buffers: [duplex.calls_count]harness.CallBuffers align(@alignOf(harness.CallBuffers)) = undefined;
 
 pub fn main() !void {
     try harness.init();
@@ -75,6 +77,13 @@ fn round(protocols: client.Protocols, expected: client.Protocol) !void {
     try check_sum(&sum_web);
     try check_countdown();
     std.debug.print("streaming: round over {s} answered\n", .{@tagName(expected)});
+    // The server's router holds eight calls at once, so the streamed calls take a round of
+    // their own.
+    try harness.begin(protocols);
+    try duplex.begin(&streamed_buffers, expected);
+    try harness.finish(expected);
+    try duplex.check();
+    std.debug.print("streaming: streamed round over {s} answered, {s}\n", .{ @tagName(expected), if (rpc.full_duplex(expected)) "full-duplex" else "half-duplex" });
 }
 
 fn check_chat() !void {
