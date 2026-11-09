@@ -71,7 +71,18 @@ pub fn RepeatedIterator(comptime T: type, comptime element_kind: Kind) type {
         /// The rest of a packed record being read, or empty.
         packed_reader: wire.Reader = .{ .bytes = &.{} },
 
-        pub fn next(it: *Self) wire.Error!?T {
+        pub inline fn next(it: *Self) wire.Error!?T {
+            // Inside a packed record whose every number is an element, the next element is the
+            // record's next scalar ("Packed Repeated Fields").
+            if (comptime keeps_every_number(T, element_kind)) {
+                if (!it.packed_reader.at_end()) return try read_scalar(T, element_kind, &it.packed_reader);
+            }
+            return it.next_slow();
+        }
+
+        /// Items, a new record, the end of the field and the numbers of a closed enum: out of
+        /// line, so each inlined call keeps the packed path alone.
+        noinline fn next_slow(it: *Self) wire.Error!?T {
             if (it.items.len != 0) return next_item(T, it);
             // A number a closed enum does not name stays with the unknown fields, so the
             // iterator passes over it (editions, "enum_type"). Each one takes an octet at least.
@@ -82,6 +93,14 @@ pub fn RepeatedIterator(comptime T: type, comptime element_kind: Kind) type {
             unreachable;
         }
     };
+}
+
+/// Whether a packed record of `element_kind` yields each number it holds: every packable kind but
+/// a closed enum, which passes over a number it does not name (editions, "enum_type").
+fn keeps_every_number(comptime T: type, comptime element_kind: Kind) bool {
+    if (!element_kind.packable()) return false;
+    if (element_kind != .@"enum") return true;
+    return !T.protobuf.closed;
 }
 
 fn next_read(comptime T: type, comptime element_kind: Kind, it: anytype) wire.Error!?T {
