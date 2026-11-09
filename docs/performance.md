@@ -59,9 +59,19 @@ benchmark builds stdx's modules in ReleaseFast too, so no count includes a safet
 ## The costs
 
 The method prices a claim against the costs of a first-level cache hit, a main-memory read, a
-branch mispredict, a copy and a system call, each measured on the judge. connect-zig has not
-measured them yet. The first change whose claim needs a price measures it, and records the run
-here.
+branch mispredict, a copy and a system call, each measured on the judge. `zig build costs` times
+them with `bench/costs.zig`, in ReleaseFast, and prints each median of five runs with its
+spread. CI's `costs` job runs it through `tools/ci.sh --only costs` and adds the table to the
+job's summary. No run is recorded here yet: the table below takes the numbers of one CI run,
+with the run's link, the runner's CPU and the commit.
+
+| Cost | Median | Spread | Run |
+| --- | ---: | ---: | --- |
+| First-level cache hit, ns per load | not measured | | |
+| Main-memory read, ns per load | not measured | | |
+| Branch mispredict, ns | not measured | | |
+| Copy of 64 KiB, ns | not measured | | |
+| System call (`getpid`), ns | not measured | | |
 
 ## The pitfalls
 
@@ -87,6 +97,7 @@ tools/perf_check.sh              # the judge: instructions of each operation aga
 tools/perf_check.sh --write      # write a new baseline, in the commit that pays for it
 zig build bench                  # time every operation, ReleaseFast
 zig build bench -- --quick       # the smoke run CI runs
+zig build costs                  # time the costs table on this machine
 tools/bench_check.sh             # time connect-zig beside Go's runtime, and compare the octets
 zig build install-bench -Dcpu=x86_64_v3
 valgrind --tool=callgrind --collect-atstart=no zig-out/bin/bench --instructions

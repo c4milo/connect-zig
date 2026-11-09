@@ -50,6 +50,15 @@ pub fn add(b: *std.Build, public_names: *std.Build.Module, target: std.Build.Res
     // tools/perf_check.sh runs the program under valgrind, so it needs the binary itself.
     b.step("install-bench", "Install the benchmark program into zig-out/bin").dependOn(&b.addInstallArtifact(exe, .{}).step);
     b.step("bench", "Benchmark the protobuf runtime, ReleaseFast: zig build bench -- [--quick] [--write <dir>]").dependOn(&run.step);
+
+    // `zig build costs`: the costs table of docs/performance.md, timed on the machine that runs it.
+    const costs = b.addExecutable(.{
+        .name = "costs",
+        .root_module = b.createModule(.{ .root_source_file = b.path("bench/costs.zig"), .target = target, .optimize = optimize }),
+    });
+    const costs_run = b.addRunArtifact(costs);
+    costs_run.has_side_effects = true;
+    b.step("costs", "Time a cache hit, a memory read, a mispredict, a copy and a system call, ReleaseFast").dependOn(&costs_run.step);
 }
 
 /// Each module copied so far, by its original: a module two others import is copied once, as a

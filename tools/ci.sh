@@ -7,12 +7,12 @@
 #   tools/ci.sh --list                      the checks' names, as a JSON array
 #
 # The report gets a line for each check, and the tables of the checks that write one: interop
-# across languages, the instruction counts and the conformance totals. CI publishes it as the
+# across languages, the costs, the instruction counts and the conformance totals. CI publishes it as the
 # job's summary, and the workflow runs each check of `--list` as a job of its own, so each shows
 # apart in GitHub.
 set -eu
 cd "$(dirname "$0")/.."
-checks="format commits test release bench perf generated interop interop-languages coverage conformance"
+checks="format commits test release bench costs perf generated interop interop-languages coverage conformance"
 only=""
 case "${1:-}" in
     --list)
@@ -49,6 +49,8 @@ check() {
         # The benchmark's smoke run: every operation on every message, a few short batches each.
         # The full run, and the comparison with Go, is tools/bench_check.sh.
         bench) zig build bench -- --quick ;;
+        # The costs table of docs/performance.md, timed on this runner: the table goes to the report.
+        costs) costs_table="$(zig build costs)" && printf '%s\n\n' "${costs_table}" | tee -a "${report}" ;;
         perf) tools/perf_check.sh ;;
         generated) tools/generate_check.sh ;;
         interop) tools/interop_check.sh ;;
