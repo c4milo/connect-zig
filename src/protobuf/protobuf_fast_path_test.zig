@@ -185,9 +185,9 @@ test "a varint writes as the reference writes it, at every boundary, offset and 
 /// a lone continuation octet, an octet UTF-8 never uses, an overlong form, a surrogate, a code
 /// point past U+10FFFF, and a lead octet whose continuation is missing.
 const utf8_letters = [_][]const u8{
-    "\x7f",             "\xc2\xa9",     "\xe2\x82\xac", "\xf0\x9f\x98\x80",
-    "\x80",             "\xff",         "\xc0\x80",     "\xed\xa0\x80",
-    "\xf4\x90\x80\x80", "\xe2\x82",     "\xc2",
+    "\x7f",             "\xc2\xa9", "\xe2\x82\xac", "\xf0\x9f\x98\x80",
+    "\x80",             "\xff",     "\xc0\x80",     "\xed\xa0\x80",
+    "\xf4\x90\x80\x80", "\xe2\x82", "\xc2",
 };
 
 fn check_utf8(octets: []const u8) !void {
