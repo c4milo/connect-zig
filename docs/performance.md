@@ -106,6 +106,7 @@ failed (the owner's ruling of 2026-11-09). A new fast path joins this list the s
 | A JSON member name against comptime names | `json_decode.zig`, `name_is` | deep JSON decode +11.09%, large JSON decode +4.71% |
 | A JSON integer of up to 19 decimal digits | `json_scalar.zig`, `parse_decimal` | packed JSON decode +8.66%, varints JSON decode +8.67%, medium JSON decode +7.10% |
 | A JSON float equal to a short decimal | `json_float.zig`, `exact_text` | packed JSON encode +44.66%, small JSON encode +15.15%, large JSON encode +7.68% |
+| A JSON float text read as one exact quotient | `json_float.zig`, `parse_exact` | packed JSON decode +4.63%, small JSON decode +2.47% |
 
 ## The pitfalls
 

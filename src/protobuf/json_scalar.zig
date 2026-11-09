@@ -194,6 +194,7 @@ pub fn parse_float(comptime V: type, octets: []const u8, from_string: bool) Deco
         if (std.mem.eql(u8, octets, "Infinity")) return std.math.inf(V);
         if (std.mem.eql(u8, octets, "-Infinity")) return -std.math.inf(V);
     }
+    if (json_float.parse_exact(V, octets)) |value| return value;
     // Parsing straight into `V` rounds the text once. Through f64 it would round twice, and a
     // text such as float's maximum, 3.4028235e38, lies above floatMax(f32) as an f64.
     const value = std.fmt.parseFloat(V, octets) catch return error.InvalidNumber;

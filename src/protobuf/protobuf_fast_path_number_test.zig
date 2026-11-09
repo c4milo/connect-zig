@@ -10,7 +10,11 @@
 //!   `write_float` ran before its exact-decimal path. The sweeps cover every binary fraction of
 //!   up to 24 bits with each numerator to 1024, the bounds of the digits the path takes and one
 //!   on each side, powers of two and ten, and values spread over every bit pattern.
-//! - A fuzz property over both checks, which `zig build test` runs over its corpus.
+//! - Float texts: each float and double reads every text as the standard library's parser reads
+//!   it, the code `parse_float` ran before its exact-quotient path. The sweeps place a point at
+//!   each place of numerators at the bounds of an exact significand, and of 19 and 20 digits,
+//!   with signs, leading zeros and malformed points.
+//! - A fuzz property over every check, which `zig build test` runs over its corpus.
 const std = @import("std");
 const testing = std.testing;
 const json = @import("json");
@@ -46,6 +50,8 @@ const float_exponent_above = 1e21;
 const bound_neighbours = 2;
 /// 1 / 2^k = 5^k / 10^k.
 const binary_to_decimal = 5;
+/// The most digits after the point the float text sweep writes, past a double's 22.
+const fraction_len_max = 24;
 
 /// Reads an integer as `parse_integer` read it before its decimal path: the standard library's
 /// integer parser, then its float parser for an integral value with an exponent or a fraction.
@@ -234,6 +240,87 @@ test "floats write as Ryu writes them, over values spread across every bit patte
     }
 }
 
+/// Reads a float as `parse_float` read a number before its exact-quotient path.
+fn reference_float_text(comptime V: type, octets: []const u8) json_scalar.DecodeError!V {
+    const value = std.fmt.parseFloat(V, octets) catch return error.InvalidNumber;
+    if (std.math.isInf(value)) return error.NumberOutOfRange;
+    return value;
+}
+
+fn check_float_text_as(comptime V: type, octets: []const u8) !void {
+    const Bits = std.meta.Int(.unsigned, @bitSizeOf(V));
+    const want = reference_float_text(V, octets);
+    const got = json_scalar.parse_float(V, octets, false);
+    if (want) |value| {
+        testing.expectEqual(@as(Bits, @bitCast(value)), @as(Bits, @bitCast(try got))) catch |failure| {
+            std.debug.print("{s} as {s}\n", .{ octets, @typeName(V) });
+            return failure;
+        };
+    } else |refusal| try testing.expectError(refusal, got);
+}
+
+fn check_float_text(octets: []const u8) !void {
+    try check_float_text_as(f64, octets);
+    try check_float_text_as(f32, octets);
+}
+
+/// Checks the digits of `numerator`, with "-" and without, with a point at each place from none
+/// to `fraction_len_max` digits before the end, padded with leading zeros.
+fn check_point_places(numerator: u64) !void {
+    var digits_room: [integer_text_len_max]u8 = undefined;
+    const digits = std.fmt.bufPrint(&digits_room, "{d}", .{numerator}) catch unreachable;
+    var text: [float_room_len]u8 = undefined;
+    for (0..fraction_len_max + 1) |fraction_len| {
+        const padded_len = @max(digits.len, fraction_len + 1);
+        const zeros = padded_len - digits.len;
+        for ([_][]const u8{ "", "-" }) |sign| {
+            @memcpy(text[0..sign.len], sign);
+            @memset(text[sign.len..][0..zeros], '0');
+            @memcpy(text[sign.len + zeros ..][0..digits.len], digits);
+            const point = sign.len + padded_len - fraction_len;
+            if (fraction_len == 0) {
+                try check_float_text(text[0 .. sign.len + padded_len]);
+                continue;
+            }
+            std.mem.copyBackwards(u8, text[point + 1 ..][0..fraction_len], text[point..][0..fraction_len]);
+            text[point] = '.';
+            try check_float_text(text[0 .. sign.len + padded_len + 1]);
+        }
+    }
+}
+
+test "float texts read as the reference reads them, with a point at each place" {
+    const significand32: u64 = 1 << (std.math.floatMantissaBits(f32) + 1);
+    const significand64: u64 = 1 << (std.math.floatMantissaBits(f64) + 1);
+    for ([_]u64{ significand32, significand64 }) |bound| {
+        for (0..bound_neighbours + bound_neighbours + 1) |offset| try check_point_places(bound + offset - bound_neighbours);
+    }
+    for (0..numerator_max) |numerator| try check_point_places(numerator);
+    // Each power of ten a u64 holds, 10^0 to 10^19, and the run of nines below it.
+    for (0..digits_len_max - 1) |exponent| {
+        const power = std.math.pow(u64, decimal_base, exponent);
+        try check_point_places(power);
+        try check_point_places(power - 1);
+    }
+    try check_point_places(std.math.maxInt(u64));
+}
+
+/// Float texts beside the short decimals a JSON writer gives, which the general path reads or
+/// refuses.
+const unusual_floats = [_][]const u8{
+    "",    "-",    ".",   "-.",     ".5",   "-.5",     "1.",       "-1.",     "1.2.3",     "1..2",
+    "+1",  "+1.5", "1e5", "1.5e-3", "1E+2", "0x1p3",   "inf",      "nan",     "1_0.5",     "1.5_0",
+    "1-",  "1.-5", "--1", "-0",     "-0.0", "00.250", "0.000000", " 1.5",    "1.5 ",      "1,5",
+    "1e400", "3.4028235e38", "3.4028236e38", "340282356779733661637539395458142568448",
+    "0.0000000000000000000001", "9007199254740993", "9007199254740993.0", "16777217.0",
+    // Past maxInt(u64), where 20 digits wrap to 0 and 1.
+    "18446744073709551616", "18446744073709551617",
+};
+
+test "float texts read as the reference reads them, from texts a JSON writer does not give" {
+    for (unusual_floats) |text| try check_float_text(text);
+}
+
 fn fuzz_integer(_: void, smith: *testing.Smith) anyerror!void {
     var input: [fuzz_input_len_max]u8 = @splat(0);
     const len = smith.slice(&input);
@@ -243,9 +330,11 @@ fn fuzz_integer(_: void, smith: *testing.Smith) anyerror!void {
     try check_integer(std.fmt.bufPrint(&buffer, "{d}", .{smith.value(u64)}) catch unreachable);
     try check_float_as(f64, @bitCast(smith.value(u64)));
     try check_float_as(f32, @bitCast(smith.value(u32)));
+    try check_float_text(input[0..len]);
+    try check_point_places(smith.value(u64));
 }
 
-test "fuzz: an integer reads and a float writes as the references do, from any input" {
+test "fuzz: each number path gives what its reference gives, on any input" {
     try testing.fuzz({}, fuzz_integer, .{ .corpus = &.{
         "0",
         "-9223372036854775808",
@@ -254,5 +343,7 @@ test "fuzz: an integer reads and a float writes as the references do, from any i
         "-2147483649",
         "1e2",
         "+1_0",
+        "98.625",
+        "-0.000000059604644775390625",
     } });
 }

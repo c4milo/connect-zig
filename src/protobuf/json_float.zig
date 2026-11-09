@@ -7,6 +7,11 @@
 //! that reads back as x lies within one unit in the last place of x: 2^-52 x for a double and
 //! 2^-23 x for a float. So when 10^-p is larger, at most one such decimal reads back as x, and
 //! the decimal equal to x is it. That bounds p at 15 for a double and 6 for a float.
+//!
+//! The reading side has a fast path too: a text "-int.frac" whose digits m and fraction length k
+//! are small reads as m / 10^k in one division. Both operands are exact in `V` when m is at most
+//! 2^53 (2^24 for a float) and 10^k at most 10^22 (10^10), so the quotient rounds once, as a
+//! correct parser rounds (Clinger, "How to read floating point numbers accurately", 1990).
 const std = @import("std");
 const assert = std.debug.assert;
 const constants = @import("constants.zig");
@@ -21,6 +26,9 @@ pub const text_len_max = 24;
 comptime {
     assert(text_len_max >= "-0.".len + powers_of_five(f64).len - 1);
 }
+
+/// The most digits the reading fast path accumulates: any 19 fit in a u64.
+const read_digits_len_max = constants.limits.json_integer_digits_len_max;
 
 /// The most significant digits of a decimal the fast path writes for `V`.
 fn digits_max(comptime V: type) comptime_int {
@@ -105,4 +113,56 @@ fn write_decimal(digits: u64, fraction_len: u32, negative: bool, buffer: []u8) [
         buffer[start] = '-';
     }
     return buffer[start..];
+}
+
+/// The powers 10^k that `V` holds exactly: 5^k fits in its significand.
+fn exact_powers_of_ten(comptime V: type) []const V {
+    const significand_max = 1 << (std.math.floatMantissaBits(V) + 1);
+    comptime var powers: []const V = &.{};
+    comptime var five_power: u64 = 1;
+    comptime var power: V = 1;
+    inline while (five_power <= significand_max) : (five_power *= binary_to_decimal) {
+        powers = powers ++ .{power};
+        power *= decimal_base;
+    }
+    return powers;
+}
+
+/// The digits of a decimal text as one integer, and how many of them follow its point.
+const Decimal = struct { magnitude: u64, fraction_len: usize };
+
+/// Reads "int", "int.frac" or ".frac", with a digit after any point, of at most
+/// `read_digits_len_max` digits in all. Gives null for any other text. The standard library's
+/// parser reads ".frac" as the same value.
+fn scan_decimal(digits: []const u8) ?Decimal {
+    if (digits.len == 0 or digits.len > read_digits_len_max + 1) return null;
+    var magnitude: u64 = 0;
+    var point: ?usize = null;
+    for (digits, 0..) |character, index| {
+        const digit = character -% '0';
+        if (digit < decimal_base) {
+            // 20 digits with no point wrap, and the count check below refuses them.
+            magnitude = magnitude *% decimal_base +% digit;
+        } else if (character == '.' and point == null) {
+            point = index;
+        } else return null;
+    }
+    const fraction_len = if (point) |index| digits.len - index - 1 else 0;
+    if (point != null and fraction_len == 0) return null;
+    if (digits.len - @intFromBool(point != null) > read_digits_len_max) return null;
+    return .{ .magnitude = magnitude, .fraction_len = fraction_len };
+}
+
+/// Reads `octets` as m / 10^k when it is "-int.frac" with m and 10^k exact in `V`, the form JSON
+/// writers give a short decimal. Gives null for any other text, which the caller reads with the
+/// standard library's parser, so the two agree.
+pub fn parse_exact(comptime V: type, octets: []const u8) ?V {
+    comptime assert(V == f32 or V == f64);
+    const negative = octets.len != 0 and octets[0] == '-';
+    const decimal = scan_decimal(octets[@intFromBool(negative)..]) orelse return null;
+    const powers = comptime exact_powers_of_ten(V);
+    const significand_max = 1 << (std.math.floatMantissaBits(V) + 1);
+    if (decimal.magnitude > significand_max or decimal.fraction_len >= powers.len) return null;
+    const value = @as(V, @floatFromInt(decimal.magnitude)) / powers[decimal.fraction_len];
+    return if (negative) -value else value;
 }
