@@ -44,8 +44,9 @@ pub const Buffers = struct {
 pub const request_headers_max = protocol_headers_max + extra_headers_max;
 /// The headers the protocol needs: content type, version, codings, accept list and timeout.
 const protocol_headers_max = 6;
-/// The headers a program or its interceptors add to one request, at most.
-pub const extra_headers_max = 8;
+/// The headers a program or its interceptors add to one request, at most. The conformance
+/// runner sends seven of its own, and a case's headers after them.
+pub const extra_headers_max = 16;
 
 pub const Request = struct {
     /// The protocol, codec and framing the request speaks, which its response is read with.
@@ -227,4 +228,21 @@ test "a client stream over gRPC-Web is envelopes, and a GET carries its message 
     const fetch = try request(say, &.{ .use_get = true, .codec = .json }, &.{.{ .text = "x" }}, &.{ .body = &buffers[0], .scratch = scratch, .values = &buffers[3] });
     try testing.expectEqualStrings("GET", fetch.http_method);
     try testing.expectEqualStrings("/test.Svc/Say?connect=v1&encoding=json&base64=1&message=eyJ0ZXh0IjoieCJ9", fetch.target);
+}
+
+test "a request carries the conformance runner's seven headers and a case's beside them" {
+    var buffers: [4][128]u8 = undefined;
+    const extra = [_]Header{
+        .{ .name = "x-test-case-name", .value = "a" },        .{ .name = "x-expect-http-version", .value = "2" },
+        .{ .name = "x-expect-http-method", .value = "POST" }, .{ .name = "x-expect-protocol", .value = "1" },
+        .{ .name = "x-expect-codec", .value = "1" },          .{ .name = "x-expect-compression", .value = "1" },
+        .{ .name = "x-expect-tls", .value = "false" },        .{ .name = "x-conformance-test", .value = "Value1" },
+        .{ .name = "x-conformance-test", .value = "Value2" },
+    };
+    const call = try request(say, &.{ .headers = &extra }, &.{.{}}, &.{
+        .body = &buffers[0],
+        .scratch = .{ .message = &buffers[1], .work = &buffers[2], .tokens = &.{} },
+        .values = &buffers[3],
+    });
+    try testing.expectEqualStrings("Value2", call.headers()[call.headers().len - 1].value);
 }
