@@ -357,6 +357,15 @@ ran on Linux x86-64 with Zig 0.16.0.
   `tools/interop_check.sh` 48 calls, `tools/interop_languages_check.sh` 713, and no instruction
   count moved.
 
+- **Lowercase header names in the library.** The owner ruled on 2026-11-09 that
+  `connect_colibri`'s `ClientCall.init` writes each request header name in lowercase, as h2 and
+  h3 carry it (RFC 9113 §8.2.1, RFC 9114 §4.2), so a program's own names and its interceptors'
+  may take any case. A name with an uppercase letter goes into `ClientCall.names`, a new field of
+  `constants.client_header_name_bytes`, 1 KiB, and no allocator; a lowercase one is used as it
+  is. The conformance client's copy goes. Conformance's client half still printed 8252 of 8264
+  passed, the server 2714 of 2714, `tools/interop_check.sh` 48 calls and
+  `tools/interop_languages_check.sh` 713, and no instruction count moved.
+
 ### What a later step owes
 
 - The client cases of `conformance/client_known_failing.txt`: a status outside 100 to 599,

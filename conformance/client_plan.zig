@@ -54,9 +54,9 @@ pub const Refusal = error{
     RawRequestUnsupported,
 };
 
-/// Reads the plan of `request`. The header lines go into `headers`, and their names into
-/// `names`, which the plan's options name.
-pub fn plan_of(request: *const Request, codings: *const Codings, headers: []connect.Header, names: []u8) (Refusal || proto.Error)!Plan {
+/// Reads the plan of `request`. The header lines go into `headers`, which the plan's options
+/// name.
+pub fn plan_of(request: *const Request, codings: *const Codings, headers: []connect.Header) (Refusal || proto.Error)!Plan {
     // docs/testing_clients.md: raw_request is for the reference client alone.
     if (request.raw_request != null) return error.RawRequestUnsupported;
     // client_compat.proto: client_tls_creds asks for a client certificate, which the client
@@ -74,7 +74,7 @@ pub fn plan_of(request: *const Request, codings: *const Codings, headers: []conn
             .request_coding = coding,
             .encoders = codings.encoders,
             .decoders = codings.decoders,
-            .headers = try headers_of(request, headers, names),
+            .headers = try headers_of(request, headers),
         },
         .protocols = try protocols_of(request.http_version),
         .cancel = cancel_of(request.cancel),
@@ -168,23 +168,18 @@ fn cancel_of(cancel: ?Request.Cancel) Cancel {
     };
 }
 
-/// The case's request headers, one line for each value, in order. Each name goes in lowercase
-/// into `names`: names compare without case (RFC 9110 §5.1), and h2 carries them in lowercase
-/// alone (RFC 9113 §8.2.1).
-fn headers_of(request: *const Request, lines: []connect.Header, names: []u8) (Refusal || proto.Error)![]const connect.Header {
+/// The case's request headers, one line for each value, in order. The client call writes each
+/// name in lowercase, as h2 and h3 carry it (RFC 9113 §8.2.1).
+fn headers_of(request: *const Request, lines: []connect.Header) (Refusal || proto.Error)![]const connect.Header {
     var count: usize = 0;
-    var names_len: usize = 0;
     var groups = request.request_headers.iterator();
     for (0..constants.client_fields_max) |_| {
         const group = try groups.next() orelse return lines[0..count];
-        if (group.name.len > names.len - names_len) return error.TooManyHeaders;
-        const name = std.ascii.lowerString(names[names_len..][0..group.name.len], group.name);
-        names_len += name.len;
         var values = group.value.iterator();
         for (0..constants.client_fields_max) |_| {
             const value = try values.next() orelse break;
             if (count == lines.len) return error.TooManyHeaders;
-            lines[count] = .{ .name = name, .value = value };
+            lines[count] = .{ .name = group.name, .value = value };
             count += 1;
         }
     }

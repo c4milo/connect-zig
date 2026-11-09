@@ -13,6 +13,7 @@ const connect = @import("connect");
 const client = @import("client");
 const http = @import("http");
 const client_stream = @import("client_stream.zig");
+const constants = @import("constants.zig");
 
 pub const Buffers = struct {
     /// The request: its body, the encoding work and the header values.
@@ -64,6 +65,8 @@ pub fn ClientCall(comptime method: connect.Method, comptime call_options: Option
         options: connect.client.Options,
         call: connect.client.Request,
         fields: [connect.client.request_headers_max]http.Field,
+        /// The names of `fields` that `init` wrote in lowercase.
+        names: [constants.client_header_name_bytes]u8 = undefined,
         request: client.Request,
         response: client.Response,
         /// The pool `start` handed the call to, and the id it gave.
@@ -93,18 +96,17 @@ pub fn ClientCall(comptime method: connect.Method, comptime call_options: Option
             }
         };
 
-        /// Builds the request of a call that sends `messages`.
+        /// Builds the request of a call that sends `messages`. Each header name goes to colibri
+        /// in lowercase, the program's and its interceptors' included.
         pub fn init(self: *Self, options: *const connect.client.Options, messages: []const method.Request, buffers: *const Buffers) connect.client.RequestError!void {
             self.streamed = false;
             self.options = options.*;
             self.call = try connect.client.request(method, options, messages, &buffers.request);
             try run_on_request(interceptors, &self.call);
-            const headers = self.call.headers();
-            for (headers, 0..) |header, index| self.fields[index] = .{ .name = header.name, .value = header.value };
             self.request = .{
                 .method = self.call.http_method,
                 .path = self.call.target,
-                .headers = self.fields[0..headers.len],
+                .headers = try fields_of(self.call.headers(), &self.fields, &self.names),
                 .body = self.call.body,
             };
             self.response = .{
@@ -187,6 +189,32 @@ pub fn ClientCall(comptime method: connect.Method, comptime call_options: Option
     };
 }
 
+/// Copies `headers` into colibri's `fields`, each name in lowercase. h2 and h3 carry field names
+/// in lowercase alone (RFC 9113 §8.2.1, RFC 9114 §4.2), and colibri refuses another, while names
+/// compare without case (RFC 9110 §5.1). A name with an uppercase letter is written in lowercase
+/// into `names`; one in lowercase is used as it is.
+fn fields_of(headers: []const connect.Header, fields: []http.Field, names: []u8) error{NoSpaceLeft}![]const http.Field {
+    assert(headers.len <= fields.len);
+    var names_len: usize = 0;
+    for (headers, fields[0..headers.len]) |header, *field| {
+        var name = header.name;
+        if (has_uppercase(name)) {
+            if (name.len > names.len - names_len) return error.NoSpaceLeft;
+            name = std.ascii.lowerString(names[names_len..][0..name.len], name);
+            names_len += name.len;
+        }
+        field.* = .{ .name = name, .value = header.value };
+    }
+    return fields[0..headers.len];
+}
+
+fn has_uppercase(name: []const u8) bool {
+    for (name) |octet| {
+        if (std.ascii.isUpper(octet)) return true;
+    }
+    return false;
+}
+
 fn run_on_request(comptime interceptors: []const type, request: *connect.client.Request) !void {
     inline for (interceptors) |Interceptor| {
         if (comptime @hasDecl(Interceptor, "on_request")) try Interceptor.on_request(request);
@@ -244,4 +272,21 @@ pub fn failure_of(result: client.Result) connect.RpcError {
         .invalid => .{ .code = .internal, .message = "the HTTP client refused the request" },
         .too_large => .{ .code = .resource_exhausted, .message = "the response did not fit the client's buffers" },
     };
+}
+
+test "a request's header names go to colibri in lowercase, and lowercase ones as they are" {
+    const headers = [_]connect.Header{
+        .{ .name = "content-type", .value = "application/proto" },
+        .{ .name = "X-Test-Case", .value = "A" },
+        .{ .name = "AUTHORIZATION", .value = "Bearer t" },
+    };
+    var fields: [headers.len]http.Field = undefined;
+    var names: [constants.client_header_name_bytes]u8 = undefined;
+    const written = try fields_of(&headers, &fields, &names);
+    try std.testing.expectEqualStrings("x-test-case", written[1].name);
+    try std.testing.expectEqualStrings("authorization", written[2].name);
+    // The value keeps its case, and a lowercase name is the program's own octets.
+    try std.testing.expectEqualStrings("A", written[1].value);
+    try std.testing.expectEqual(headers[0].name.ptr, written[0].name.ptr);
+    try std.testing.expectError(error.NoSpaceLeft, fields_of(&headers, &fields, names[0.."x-test-case".len]));
 }

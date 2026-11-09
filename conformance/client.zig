@@ -42,7 +42,6 @@ var request_bytes: [constants.client_compat_request_bytes]u8 = undefined;
 var result_bytes: [constants.client_compat_response_bytes]u8 = undefined;
 var response_bytes: [constants.client_compat_response_bytes]u8 = undefined;
 var header_lines: [connect.client.request_headers_max]connect.Header align(@alignOf(connect.Header)) = undefined;
-var header_names: [constants.client_field_bytes]u8 = undefined;
 
 pub fn main(init: std.process.Init) !void {
     transport.init(init.io);
@@ -96,7 +95,7 @@ fn dispatch(request: *const Request, result: *result_module.Result) !void {
         if (!std.mem.eql(u8, name, Service.service_name)) return error.UnknownService;
     }
     const name = request.method orelse return error.NoMethod;
-    const plan = try plan_module.plan_of(request, &codings, &header_lines, &header_names);
+    const plan = try plan_module.plan_of(request, &codings, &header_lines);
     try transport.begin(request.host, std.math.cast(u16, request.port) orelse return error.InvalidPort, plan.protocols, plan.tls);
     defer transport.end();
     inline for (.{ Service.unary, Service.idempotent_unary, Service.unimplemented, Service.server_stream, Service.client_stream, Service.bidi_stream }) |method| {

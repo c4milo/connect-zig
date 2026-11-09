@@ -14,6 +14,9 @@ pub const trailer_bytes = 16 * 1024;
 pub const fields_max = 8;
 /// The octets of a request's headers a route copies at its head, names and values together.
 pub const request_header_bytes = 4096;
+/// The octets of the request header names a client call writes in lowercase: those a program or
+/// its interceptors gave with an uppercase letter. A name already in lowercase takes none.
+pub const client_header_name_bytes = 1024;
 /// The request headers a route copies at its head, at most.
 pub const request_headers_max = 32;
 /// The octets of a GET's query a route copies at its head: the request-line length RFC 9110 §4.1
