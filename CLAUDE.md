@@ -124,6 +124,11 @@ confirm a test fails. Report `CAUGHT` or `NOT CAUGHT` per mutation in the commit
 - Interop across languages: `tools/interop_languages_check.sh [client...]` runs the clients of
   `interop/` (Go, TypeScript, Python, and Rust's tonic and connect-rust) against the socket
   server; `interop/README.md` holds their contract. It needs buf, go, node with npm, python3 with venv, and cargo.
+- Interop servers: `tools/interop_servers_check.sh [server...]` starts the servers of `interop/`
+  (connect-go, grpc-go, connect-node, grpcio and connect-rust) and runs connect-zig's client,
+  `zig build interop-client`, against each in every protocol it speaks; `interop/README.md`,
+  "The server side", holds their contract. It needs buf, go, node with npm, python3 with venv,
+  and cargo.
 - Guide: `zig build guide` installs pepegrillo's performance method and API guide to
   `zig-out/docs`, at the commit `build.zig.zon` pins.
 - Performance: `tools/perf_check.sh` counts each benchmark operation's instructions under

@@ -323,6 +323,20 @@ ran on Linux x86-64 with Zig 0.16.0.
   steps and 183 of 183 tests passed; `zig build -Drelease` and `tools/interop_check.sh`, 48 calls,
   pass.
 
+- **The client against servers in other languages.** The owner approved on 2026-11-09 the third
+  of three client commits, the mirror of decision 29: connect-zig's client calls servers in other
+  languages, across the protocol and every type (decision 29 as amended). `interop/` gains a
+  server beside each client: connect-go and grpc-go, connect-node, grpcio, and a serve mode of
+  connect-rust, each over TLS with the test identity. `examples/interop_client.zig`, which `zig
+  build interop-client` builds, drives one pool per run with the conformance client's transport
+  (decision 32). No public name changed. Check: `tools/interop_servers_check.sh`, which
+  `tools/ci.sh` runs as `interop-servers`, printed 782 calls passed: 238 against connect-go, 33
+  against grpc-go, 238 against connect-node, 33 against grpcio and 240 against connect-rust.
+  connect-go and connect-node answer chat over HTTP/1.1 with 505, so the client leaves it out
+  there. `zig build test` printed 86 of 86 steps and 212 of 212 tests passed;
+  `tools/interop_languages_check.sh` still prints 713 calls passed, and `tools/interop_check.sh`
+  passes.
+
 ### What a later step owes
 
 - The client cases of `conformance/client_known_failing.txt`. Each needs a ruling or a change

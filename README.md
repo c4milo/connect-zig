@@ -272,6 +272,11 @@ Buffa's times, and the four one-kind messages.
   tonic and connect-rust. Each echoes every coverage case, in every protocol, codec and
   compression its library speaks, and runs every stream shape, a typed error, a timeout, headers
   and trailers: 713 calls.
+- `tools/interop_servers_check.sh` runs the mirror: connect-zig's client calls [servers in other
+  languages](interop#the-server-side), connect-go and grpc-go, connect-node, grpcio and
+  connect-rust, with every coverage case in Connect proto and JSON with GET, gRPC and gRPC-Web,
+  over h2 and HTTP/1.1, with gzip, every stream shape, a typed error, a timeout, headers and
+  trailers: 782 calls.
 - `tools/perf_check.sh` counts the instructions of each benchmark operation under callgrind and
   fails when one takes more than 2% above `bench/instructions.txt`. Counts do not move with a
   shared runner's load, so CI catches a regression that wall time would hide.
@@ -304,6 +309,7 @@ Still to come:
 - [ ] brotli compression of messages, once stdx ships its encoder
 - [x] A gRPC client, over h11, h2 and h3
 - [x] Full-duplex streams on the client side, over h2 and h3
+- [x] The client against servers in Go, TypeScript, Python and Rust
 - [ ] Long server streams
 - [x] HTTP/3 in the in-memory examples, with a test-only TLS identity
 - [x] Full-duplex streams on the server, interceptors and error details
@@ -326,6 +332,7 @@ tools/interop_check.sh    # buf curl and curl against the example server
 tools/coverage_check.sh   # every protobuf type against Go's runtime
 tools/conformance_check.sh  # the connectrpc conformance suite against the server and client
 tools/interop_languages_check.sh  # Go, TypeScript, Python and Rust clients against the server
+tools/interop_servers_check.sh    # the client against Go, TypeScript, Python and Rust servers
 tools/perf_check.sh       # instructions of each benchmark operation against the baseline
 tools/bench_check.sh      # the benchmark beside Go's
 ```

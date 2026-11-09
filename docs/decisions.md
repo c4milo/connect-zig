@@ -263,9 +263,16 @@ first. Cite an entry by number in code and commits ("decision 6").
     grpcio and tonic, each pinned by its lock file, which echo every coverage case in each
     protocol, codec and compression their library speaks, and run every stream shape, a typed
     error, a timeout, headers and trailers. Two messages are the same when a runtime writes the
-    same octets for both. The client side waits for `colibri.Client` (colibri decision 153).
-    Beaten: buf curl alone, which is one client; and the conformance runner alone, whose
-    reference client is connect-go.
+    same octets for both. Beaten: buf curl alone, which is one client; and the conformance
+    runner alone, whose reference client is connect-go.
+    Amended on 2026-11-09, with the client half the owner approved: the client side runs too,
+    on `rpc.ClientCall` over `client.ConnectionPool` (decision 32), not on `colibri.Client`.
+    `interop/` also holds servers on connect-go and grpc-go, connect-node, grpcio and
+    connect-rust, each pinned by its client's lock file. `examples/interop_client.zig` runs every
+    scenario against each, in each protocol, codec and HTTP version the server speaks, and
+    `tools/interop_servers_check.sh` runs it. connect-zig writes no map in a deterministic order,
+    so where the octets differ the client compares the two messages' proto3 JSON as values.
+    Beaten: a third transport, where the conformance client's already drives a pool over TLS.
 
 30. **CI gates performance on instruction counts.** `tools/perf_check.sh` counts each benchmark
     operation under callgrind, on an x86-64-v3 build, and fails past 2% above
