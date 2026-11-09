@@ -65,6 +65,12 @@ pub const Response = struct {
             response.failure = http_failure(speaks, incoming.*, storage.*, decoders.*);
             return response;
         }
+        response.body_seen = incoming.body.len > 0;
+        if (head_failure(speaks, incoming)) |failure| {
+            response.done = true;
+            response.failure = failure;
+            return response;
+        }
         const coding_name = coding_header(speaks);
         if (incoming.headers.find(coding_name)) |name| {
             response.coding = compression.Coding.from_name(name) orelse {
@@ -73,12 +79,27 @@ pub const Response = struct {
                 return response;
             };
         }
-        // PROTOCOL-HTTP2.md, "Responses": Trailers-Only puts the status in the head.
+        // PROTOCOL-HTTP2.md, "Responses": Trailers-Only puts the status in the head, and holds
+        // no body and no trailers. The head's status of a response with either is ignored. A
+        // streamed body may still come, so its head's status waits for the body's end.
         if (speaks.protocol != .connect and incoming.headers.find("grpc-status") != null) {
-            response.done = true;
-            response.failure = trailers.read(incoming.headers, find_lookup, status_storage(storage.*));
+            response.head_status = true;
+            if (!incoming.streamed and response.trailers_only()) response.read_head_status();
         }
         return response;
+    }
+
+    /// Whether the response is Trailers-Only, once its body ended: its head named a status, and
+    /// neither a body nor trailers with a status followed (PROTOCOL-HTTP2.md, "Responses").
+    fn trailers_only(response: *const Response) bool {
+        if (!response.head_status or response.body_seen) return false;
+        const lookup = response.incoming.trailers orelse return true;
+        return lookup.find("grpc-status") == null;
+    }
+
+    fn read_head_status(response: *Response) void {
+        response.done = true;
+        response.failure = trailers.read(response.incoming.headers, find_lookup, status_storage(response.storage));
     }
 
     speaks: protocol.Speaks,
@@ -94,6 +115,10 @@ pub const Response = struct {
     /// More of a streamed body may follow what `feed` gave, so `next` returns null between pieces
     /// with `done` still false.
     streaming: bool = false,
+    /// The head named a gRPC status, which counts only for a Trailers-Only response, and some of
+    /// the body arrived.
+    head_status: bool = false,
+    body_seen: bool = false,
 
     /// Gives a streamed response the octets of its body that `next` has not read, from the first
     /// one it has not read: the envelopes left, and the start of one that a later piece ends.
@@ -102,6 +127,7 @@ pub const Response = struct {
     pub fn feed(response: *Response, body: []const u8) Error!usize {
         assert(response.streaming or response.done);
         if (response.done) return body.len;
+        if (body.len > 0) response.body_seen = true;
         const payload_len_max = response.reader.payload_len_max;
         var reader: envelope.Reader = .{ .body = body, .payload_len_max = payload_len_max };
         // Each envelope takes at least its prefix, so the loop ends.
@@ -199,6 +225,10 @@ pub const Response = struct {
     }
 
     fn end_without_status(response: *Response) ?[]const u8 {
+        if (response.trailers_only()) {
+            response.read_head_status();
+            return null;
+        }
         response.done = true;
         response.failure = switch (response.speaks.protocol) {
             // Connect protocol, "Streaming-Response": the end-stream message is mandatory.
@@ -212,6 +242,23 @@ pub const Response = struct {
         return null;
     }
 };
+
+/// The error of a 200 response whose Content-Type is not the protocol and codec the request
+/// spoke, or null. Connect protocol, "Unary-Response" and "Streaming-Response", PROTOCOL-HTTP2.md,
+/// "Responses", and PROTOCOL-WEB.md name the Content-Type of each. Another media type is no
+/// response of the protocol, so the code comes from the HTTP status, which for 200 is `unknown`
+/// (gRPC's http-grpc-status-mapping.md; Connect protocol, "HTTP to Error Code"). The right
+/// protocol in another codec is a response the client cannot read: `internal`.
+fn head_failure(speaks: protocol.Speaks, incoming: *const Incoming) ?RpcError {
+    const content_type = incoming.headers.find("content-type") orelse return null;
+    // The status is 200 here, which maps to no code of its own: `unknown`.
+    assert(incoming.status == constants.protocol.status.ok);
+    const unexpected: RpcError = .{ .code = .unknown, .message = "unexpected content type" };
+    const answered = protocol.of_content_type(content_type) catch return unexpected;
+    if (answered.protocol != speaks.protocol or answered.enveloped != speaks.enveloped) return unexpected;
+    if (answered.codec != speaks.codec) return .{ .code = .internal, .message = "unexpected codec" };
+    return null;
+}
 
 /// The octets of an envelope's prefix: its flags and its length.
 const flag_prefix_len = constants.protocol.envelope_prefix_len;

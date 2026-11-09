@@ -156,3 +156,70 @@ test "a response message past the client's limit fails resource_exhausted" {
     var response = read(connect_unary, ok, &head, &long, &room);
     try testing.expectError(error.MessageTooLarge, response.next(Note));
 }
+
+test "a 200 response of another media type fails unknown, and of another codec internal" {
+    var room: Room = .{};
+    const image: Lines = .{ .lines = &.{.{ .name = "content-type", .value = "image/jpeg" }} };
+    try testing.expectEqual(Code.unknown, read(connect_unary, ok, &image, "", &room).failure.?.code);
+    const web: Lines = .{ .lines = &.{.{ .name = "content-type", .value = "application/grpc-web+proto" }} };
+    try testing.expectEqual(Code.unknown, read(grpc, ok, &web, "", &room).failure.?.code);
+    // A stream's framing answers a unary request: no response of the request's protocol.
+    const framed: Lines = .{ .lines = &.{.{ .name = "content-type", .value = "application/connect+proto" }} };
+    try testing.expectEqual(Code.unknown, read(connect_unary, ok, &framed, "", &room).failure.?.code);
+    const json: Lines = .{ .lines = &.{.{ .name = "content-type", .value = "application/json" }} };
+    try testing.expectEqual(Code.internal, read(connect_unary, ok, &json, "", &room).failure.?.code);
+    const right: Lines = .{ .lines = &.{.{ .name = "content-type", .value = "application/proto; charset=utf-8" }} };
+    try testing.expectEqual(@as(?rpc_error.RpcError, null), read(connect_unary, ok, &right, "", &room).failure);
+}
+
+/// A gRPC response whose head names `head_status`, with `body` and the trailers `tail`.
+fn grpc_read(head_status: []const u8, body: []const u8, tail: *const Lines, room: *Room) Response {
+    const head: Lines = .{ .lines = &.{ .{ .name = "content-type", .value = "application/grpc" }, .{ .name = "grpc-status", .value = head_status } } };
+    const incoming: Incoming = .{ .status = ok, .headers = head.lookup(), .body = body, .trailers = tail.lookup() };
+    return Response.init(grpc, &incoming, &room.storage(), &decoders());
+}
+
+test "a head's gRPC status counts only for a Trailers-Only response" {
+    var room: Room = .{};
+    var body_room: [buffer_len]u8 = undefined;
+    const none: Lines = .{ .lines = &.{} };
+    // PROTOCOL-HTTP2.md, "Responses": a head with a status and nothing after it is Trailers-Only.
+    const only = grpc_read("9", "", &none, &room);
+    try testing.expectEqual(Code.failed_precondition, only.failure.?.code);
+    // A body follows: the head's status is ignored, and the missing trailers fail the call.
+    var with_body = grpc_read("9", enveloped(0, &.{ 0x0a, 1, 'a' }, &body_room), &none, &room);
+    try testing.expectEqualStrings("a", (try with_body.next(Note)).?.text);
+    try testing.expectEqual(@as(?Note, null), try with_body.next(Note));
+    try testing.expect(with_body.failure.?.code != Code.failed_precondition);
+    // Trailers follow: theirs is the status.
+    const tail: Lines = .{ .lines = &.{.{ .name = "grpc-status", .value = "9" }} };
+    var with_trailers = grpc_read("8", "", &tail, &room);
+    try testing.expectEqual(@as(?Note, null), try with_trailers.next(Note));
+    try testing.expectEqual(Code.failed_precondition, with_trailers.failure.?.code);
+}
+
+test "a streamed response's head status waits for its body to end empty" {
+    var room: Room = .{};
+    const head: Lines = .{ .lines = &.{ .{ .name = "content-type", .value = "application/grpc-web" }, .{ .name = "grpc-status", .value = "9" } } };
+    const incoming: Incoming = .{ .status = ok, .headers = head.lookup(), .body = "", .streamed = true };
+    var response = Response.init(grpc_web, &incoming, &room.storage(), &decoders());
+    try testing.expect(!response.done);
+    response.end_body("");
+    try testing.expectEqual(@as(?Note, null), try response.next(Note));
+    try testing.expectEqual(Code.failed_precondition, response.failure.?.code);
+}
+
+test "a streamed response's head status is ignored once a message arrived" {
+    var room: Room = .{};
+    var body_room: [buffer_len]u8 = undefined;
+    const head: Lines = .{ .lines = &.{ .{ .name = "content-type", .value = "application/grpc-web" }, .{ .name = "grpc-status", .value = "9" } } };
+    const incoming: Incoming = .{ .status = ok, .headers = head.lookup(), .body = "", .streamed = true };
+    var response = Response.init(grpc_web, &incoming, &room.storage(), &decoders());
+    const body = enveloped(0, &.{ 0x0a, 1, 'a' }, &body_room);
+    try testing.expectEqual(body.len, try response.feed(body));
+    try testing.expectEqualStrings("a", (try response.next(Note)).?.text);
+    response.end_body("");
+    try testing.expectEqual(@as(?Note, null), try response.next(Note));
+    // The trailers frame is missing, and the head's status does not stand in for it.
+    try testing.expectEqualStrings("missing trailers frame", response.failure.?.message);
+}
