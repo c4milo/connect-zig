@@ -77,6 +77,23 @@ test "every kind round-trips through JSON" {
     try testing.expectEqual(@as(?i32, 9), try proto.map_get(@TypeOf(back.counts), &back.counts, "k"));
 }
 
+test "a message decoded from binary writes the JSON of the message it came from" {
+    // A decoded message's repeated fields and maps hold their octets, which an iterator reads.
+    var buffers: Buffers = .{};
+    const node: Node = .{ .value = -3 };
+    const all: All = .{
+        .inner = .{ .a = 1, .tags = .of(&.{ "x", "y" }) },
+        .numbers = .of(&.{ 1, 2 }),
+        .counts = .of(&.{ .{ .key = "k", .value = 9 }, .{ .key = "j", .value = 8 } }),
+        .node = .of(&node),
+    };
+    const want = try proto.encode_json(All, &all, &buffers.text);
+    try testing.expect(std.mem.indexOf(u8, want, "\"counts\":{\"k\":9,\"j\":8}") != null);
+    const decoded = try proto.decode(All, try proto.encode(All, &all, &buffers.binary));
+    var again: [text_len]u8 = undefined;
+    try testing.expectEqualStrings(want, try proto.encode_json(All, &decoded, &again));
+}
+
 test "a parser takes .proto names, quoted numbers, enum numbers and null" {
     var buffers: Buffers = .{};
     const text = "{\"int32_field\":\"12\",\"color\":1,\"stringField\":null,\"sint32Field\":1e1}";

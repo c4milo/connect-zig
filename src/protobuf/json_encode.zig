@@ -235,14 +235,20 @@ fn write_array(comptime field: Field, comptime F: type, item: *const F, text: *j
     // binary encode does.
     if (item.items.len != 0) {
         for (item.items) |*element| try write_element(field, F.Element, element, text, registry);
-        return text.end_array();
-    }
-    var elements = item.iterator();
-    for (0..constants.limits.elements_max) |_| {
-        const element = try elements.next() orelse break;
-        try write_value(field, F.Element, element, text, registry);
+    } else {
+        try write_array_encoded(field, F, item, text, registry);
     }
     try text.end_array();
+}
+
+/// The elements of a decoded message's repeated field, which an iterator reads from its octets.
+/// It stays out of line, so the frame of a program's recursive message holds no iterator.
+noinline fn write_array_encoded(comptime field: Field, comptime F: type, item: *const F, text: *json.TextWriter, comptime registry: []const type) Error!void {
+    var elements = item.iterator();
+    for (0..constants.limits.elements_max) |_| {
+        const element = try elements.next() orelse return;
+        try write_value(field, F.Element, element, text, registry);
+    }
 }
 
 fn write_map(comptime F: type, item: *const F, text: *json.TextWriter, comptime registry: []const type) Error!void {
@@ -253,14 +259,21 @@ fn write_map(comptime F: type, item: *const F, text: *json.TextWriter, comptime 
     try text.begin_object();
     if (item.items.len != 0) {
         for (item.items) |*entry| try write_entry(Entry, key_field, value_field, entry, text, registry);
-        return text.end_object();
-    }
-    var entries = item.iterator();
-    for (0..constants.limits.elements_max) |_| {
-        const entry = try entries.next() orelse break;
-        try write_entry(Entry, key_field, value_field, &entry, text, registry);
+    } else {
+        try write_map_encoded(F, item, text, registry);
     }
     try text.end_object();
+}
+
+/// The entries of a decoded message's map, which an iterator reads from its octets, out of line
+/// as `write_array_encoded` is.
+noinline fn write_map_encoded(comptime F: type, item: *const F, text: *json.TextWriter, comptime registry: []const type) Error!void {
+    const Entry = F.Element;
+    var entries = item.iterator();
+    for (0..constants.limits.elements_max) |_| {
+        const entry = try entries.next() orelse return;
+        try write_entry(Entry, Entry.protobuf.fields[0], Entry.protobuf.fields[1], &entry, text, registry);
+    }
 }
 
 fn write_entry(comptime Entry: type, comptime key_field: Field, comptime value_field: Field, entry: *const Entry, text: *json.TextWriter, comptime registry: []const type) Error!void {
