@@ -98,6 +98,10 @@ pub const Call = struct {
     /// Messages the call read and wrote, which an interceptor may report.
     received: u32 = 0,
     sent: u32 = 0,
+    /// One envelope the response memory had no room for, which goes out before anything else the
+    /// call writes (`write_held`). It points into the reply's scratch storage, and is empty when
+    /// the call holds none. Only a route with `next` holds one (`pull.zig`).
+    held: []const u8 = "",
 
     /// The protocol the request spoke.
     pub fn protocol(call: *const Call) connect.Protocol {
@@ -170,11 +174,15 @@ pub fn Sender(comptime T: type) type {
         pub fn send(sender: *@This(), message: *const T) !void {
             const call = sender.call;
             try write_head_once(call, .plain);
+            // A message the call holds was written first, so it goes out first.
+            if (!write_held(call)) return error.WriteFailed;
             const body = call.response.body();
             try write_message(T, call, message, body);
-            // The writer hands what it holds to the endpoint now, rather than at the end.
-            try body.flush();
             call.sent += 1;
+            // The writer hands what it holds to the endpoint now, rather than at the end. A flush
+            // that finds the engine full keeps its octets in the writer, which sends them later
+            // (colibri's usage guide), so the message went all the same.
+            body.flush() catch {};
         }
     };
 }
@@ -204,7 +212,19 @@ fn apply_head(call: *Call, head: *const connect.server.Head) !void {
     for (call.room.response_headers[0..call.room.response_header_count]) |header| try call.response.header(header.name, header.value);
 }
 
-fn write_head_once(call: *Call, body: connect.server.Body) !void {
+/// Writes the message the call holds into the response memory, and returns whether the call
+/// then holds none. colibri's `ResponseWriter.body` takes one slice whole or not at all, so a
+/// message that still finds no room stays held, whole.
+pub fn write_held(call: *Call) bool {
+    if (call.held.len == 0) return true;
+    assert(call.head_written);
+    call.response.body().writeAll(call.held) catch return false;
+    call.held = "";
+    call.sent += 1;
+    return true;
+}
+
+pub fn write_head_once(call: *Call, body: connect.server.Body) !void {
     if (call.head_written) return;
     const head = call.reply.head(body);
     try apply_head(call, &head);
@@ -251,10 +271,18 @@ pub fn finish(call: *Call, failure: ?connect.RpcError) !void {
     const metadata = call.room.metadata[0..call.room.metadata_count];
     const trailers = try call.reply.finish(failure, metadata, call.response.body(), &call.room.storage, &call.room.headers);
     if (trailers.len == 0) return call.response.end();
+    return call.response.trailers(trailer_fields(call, trailers));
+}
+
+/// The trailer section of a gRPC response as colibri takes it: the status trailers, then the
+/// call's own. The fields are in the call's `Room`.
+pub fn trailer_fields(call: *Call, trailers: []const connect.Header) []const http.Field {
+    const metadata = call.room.metadata[0..call.room.metadata_count];
     const fields = &call.room.fields;
+    assert(trailers.len + metadata.len <= fields.len);
     for (trailers, 0..) |trailer, index| fields[index] = .{ .name = trailer.name, .value = trailer.value };
     for (metadata, trailers.len..) |trailer, index| fields[index] = .{ .name = trailer.name, .value = trailer.value };
-    return call.response.trailers(fields[0 .. trailers.len + metadata.len]);
+    return fields[0 .. trailers.len + metadata.len];
 }
 
 /// Writes a reply's one message: for Connect unary, with its head and its trailers as headers.

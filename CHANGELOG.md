@@ -10,7 +10,7 @@ change the public API, and the entry marks each change that does.
 
 ## Unreleased: v0.1.0
 
-The first release. It waits on two changes in colibri, for long server streams.
+The first release.
 
 ### Protocols
 
@@ -19,6 +19,8 @@ The first release. It waits on two changes in colibri, for long server streams.
 - Unary calls and every stream type. Bidirectional streams are full-duplex over h2 and h3, on the
   server through type handlers and on the client through `rpc.ClientCall`'s `Sender`. Over h11
   both sides are half-duplex (decision 18).
+- Server and bidirectional streams of any length. A type handler declares `next`, and its route
+  asks it for one message at a time while the response memory has room (decision 33).
 - Connect's unary GET for methods marked `NO_SIDE_EFFECTS`.
 - gzip and zstd both ways. brotli is read, not written, until stdx has an encoder.
 - Interceptors on the server and the client, typed error details, timeouts, headers and trailers.
@@ -57,8 +59,10 @@ The first release. It waits on two changes in colibri, for long server streams.
 
 ### Known limits
 
-- A server stream is bounded by the router's response memory (decision 12). Long server streams
-  wait on colibri.
+- A function handler writes its whole stream in one call, so the router's response memory
+  bounds it (decision 12). A long stream takes a type handler with `next`.
+- A stream cannot wait for an event of the program once its request ended. colibri plans that
+  for v0.16.0 (colibri issue 130).
 - connect-zig's JSON is slower than Buffa's on most messages, mostly inside stdx's JSON writer
   and reader. The work to close it is under way in stdx.
 - The library does not report a missing required field (decision 23).

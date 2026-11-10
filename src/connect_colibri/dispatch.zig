@@ -5,6 +5,10 @@
 //! once the client ends its stream. A type handler answers while the client still sends, which
 //! over h2 is a full-duplex stream (Connect protocol, "Streaming RPCs"; decision 18).
 //!
+//! A type handler of a server or bidirectional stream may declare `next`, which its route calls
+//! for one message at a time while the response memory has room (`pull.zig`, decision 33). A
+//! server stream's type handler takes its one request in `on_request`.
+//!
 //! An interceptor is a type with any of:
 //!
 //! - `on_call(app, *Call) ?connect.RpcError`, which runs before the handler and refuses the call
@@ -48,6 +52,32 @@ pub fn Interceptors(comptime list: []const type) type {
 /// Whether `handler` is a type that takes messages as they arrive.
 pub fn is_streaming(comptime handler: anytype) bool {
     return @TypeOf(handler) == type;
+}
+
+/// Whether `handler` is a type whose route asks it for each message of the response (`next`).
+pub fn pulls(comptime handler: anytype) bool {
+    return is_streaming(handler) and @hasDecl(handler, "next");
+}
+
+/// Whether the route of `handler` reads the request body as it arrives: a type handler of a
+/// client or bidirectional stream. A server stream's request is one message, read whole.
+pub fn reads_pieces(comptime method: connect.Method, comptime handler: anytype) bool {
+    return is_streaming(handler) and method.stream_type != .server_stream;
+}
+
+/// Fails the build when a type handler lacks a declaration its stream type calls, or declares
+/// `next` for a stream that answers with one message.
+pub fn check(comptime method: connect.Method, comptime handler: anytype) void {
+    if (!is_streaming(handler)) return;
+    switch (method.stream_type) {
+        .unary => @compileError("a unary method takes a function handler"),
+        .client_stream => if (pulls(handler)) @compileError("a client stream answers with one message, so its handler declares no next"),
+        .server_stream => if (!pulls(handler) or !@hasDecl(handler, "on_request")) @compileError("a server stream's type handler declares on_request and next"),
+        .bidi_stream => {},
+    }
+    if (method.stream_type != .server_stream and (!@hasDecl(handler, "on_message") or !@hasDecl(handler, "on_end"))) {
+        @compileError("a client or bidirectional stream's type handler declares on_message and on_end");
+    }
 }
 
 /// The state a type handler keeps for one call: its `State`, or none.
@@ -126,6 +156,15 @@ pub fn each_message(comptime method: connect.Method, comptime handler: type, app
         if (failure) |rpc_failure| return rpc_failure;
     }
     return null;
+}
+
+/// Runs the `on_end` of a bidirectional stream's type handler with `next`, once the client ended
+/// its stream, and returns the error that ends the call, if any. The handler's `next` ends the
+/// stream otherwise.
+pub fn end_input(comptime method: connect.Method, comptime handler: type, app: anytype, call: *Call, state: *HandlerState(handler)) ?connect.RpcError {
+    comptime assert(method.stream_type == .bidi_stream and pulls(handler));
+    var sender: Sender(method.Response) = .{ .call = call };
+    return handler.on_end(app, call, state, &sender);
 }
 
 /// Runs a type handler's `on_end` once the client ended its stream, then ends the call.

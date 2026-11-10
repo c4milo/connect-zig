@@ -85,7 +85,9 @@ Empty, FieldMask, Struct, Value, ListValue and Any. An Any names its type from a
 `connect_colibri` maps a `connect.Method` onto a route of `server.Router`, and onto
 `client.Request` and `client.Response`. A function handler's route sets `.whole_body` and takes
 its stream whole (decision 12). A type handler's route reads the body as it arrives and answers
-each message at once, full-duplex over h2 (decision 18). A client's streamed call writes each
+each message at once, full-duplex over h2 (decision 18). A type handler with `next` gives one
+message at a time, at colibri's `on_writable`, so its stream may be longer than the router's
+response memory (decision 33). A client's streamed call writes each
 message with its `Sender` and reads each answer as its piece arrives, full-duplex over h2 and h3
 (decision 18 as amended). Interceptors wrap a route's handler and a client's exchange (decision
 19). The client speaks Connect, gRPC-Web and gRPC (decision 11).
@@ -396,6 +398,29 @@ ran on Linux x86-64 with Zig 0.16.0.
   `nonexistent-http-status-code` cases leave `conformance/client_known_failing.txt`, which is
   empty now. Conformance printed 2714 of 2714 and 8263 of 8264, the last a flaky timing case.
 
+- **Long streams.** The owner ruled on 2026-11-09 that a long stream's handler gives one
+  message at a time, for server and bidirectional streams (decision 33). New public name:
+  `Next`. `connect.server.Reply` gains `envelope_of` and `ending`, and writes each envelope and
+  each stream's end as one slice. A route with `next` declares colibri's `on_writable`, holds
+  one envelope that found no room, and builds the stream's end once. connect-zig pins colibri
+  v0.15.2 (`a2bda1e`) and the stdx commit it pins, `57a7040`, so the build holds one stdx
+  (decision 10).
+  - `zig build test-connect-colibri` runs 21 tests of a route with `next` through colibri's
+    router and an engine each test controls: 200 notes through 256 octets of response memory,
+    over an engine that copies each run and over one that holds each run until its
+    acknowledgment. A sweep of 40 stream lengths makes the stream's end find the memory full.
+  - colibri's `end` and `trailers` return `error.Full` or `error.NoSpaceLeft` and leave the
+    response as it was. The route then returns from `on_writable` and makes the call again at
+    the next one, as colibri's usage guide states for v0.15.2. A test of this route found the
+    `error.Full` case on colibri's branch, before the tag.
+  - The demo's Countdown is a handler with `next`. `zig build examples` runs it over h2, h11 and
+    h3 in memory, and `tools/interop_check.sh` reads a Countdown from 200000 with buf curl:
+    about 1.6 MiB through 64 KiB of response memory, in Connect, gRPC and gRPC-Web over h2, and
+    in gRPC over h3.
+
 ### What a later step owes
 
-- Long server streams written at `on_writable` (decision 12).
+- A stream that waits for an event of the program once its request ended (colibri issue 130,
+  planned for colibri v0.16.0).
+- The conformance server's streams, which still write through a `Sender` in one call. So
+  `conformance/constants.zig` keeps 640 KiB of response memory.

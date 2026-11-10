@@ -260,7 +260,8 @@ Buffa's times, and the four one-kind messages.
   JSON, and requires the same message.
 - `tools/interop_check.sh` calls the example server with `buf curl`, connect-go's client, in all
   three protocols, and with curl over h11 and h2. It requires a bidirectional stream to answer
-  before the client finishes sending.
+  before the client finishes sending, and it reads a server stream of 200000 messages, about
+  1.6 MiB through 64 KiB of response memory, over h2 and h3.
 - `tools/conformance_check.sh` runs the [connectrpc conformance
   suite](https://github.com/connectrpc/conformance) v1.0.4 against a conformance server: 2714
   cases in Connect, gRPC and gRPC-Web, over h11 and h2, in proto and JSON, with gzip and zstd.
@@ -289,10 +290,12 @@ totals. A failure also shows as an annotation on the change.
 ## Good to know
 
 > [!IMPORTANT]
-> A server stream is written into the router's response memory, so a long one is bounded by it
-> (decision 12). A type handler streams full-duplex, and so does a client's streamed call, over
-> h2 and h3 (decision 18). Over h11 both sides are half-duplex. brotli is read but not written
-> yet, since stdx has no brotli encoder (decision 10).
+> A function handler writes its whole stream in one call, into the router's response memory, so
+> that memory bounds it (decision 12). A long stream takes a type handler with `next`, which
+> gives one message at a time (decision 33). It cannot yet wait for an event of the program
+> once its request ended. A type handler streams full-duplex, and so does a client's streamed
+> call, over h2 and h3 (decision 18). Over h11 both sides are half-duplex. brotli is read but
+> not written yet, since stdx has no brotli encoder (decision 10).
 
 Editions 2023 and 2024 follow [protobuf.dev's editions
 overview](https://protobuf.dev/editions/overview/): field presence, packed and expanded repeated

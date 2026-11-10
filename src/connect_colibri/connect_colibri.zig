@@ -13,6 +13,7 @@ const files = struct {
     pub const client_call = @import("client_call.zig");
     pub const client_stream = @import("client_stream.zig");
     pub const dispatch = @import("dispatch.zig");
+    pub const pull = @import("pull.zig");
 };
 
 /// The struct route that serves a method, and its router entries.
@@ -27,6 +28,8 @@ pub const Refusals = files.refusal.Refusals;
 pub const Call = files.call.Call;
 pub const Sender = files.call.Sender;
 pub const Receiver = files.call.Receiver;
+/// What a type handler's `next` answers when its route asks for the stream's next message.
+pub const Next = files.pull.Next;
 /// A client call over colibri's pool.
 pub const ClientCall = files.client_call.ClientCall;
 pub const ClientCallOptions = files.client_call.Options;
@@ -50,7 +53,7 @@ test "the root exports the names a program calls" {
     try @import("public_names").expect(@This(), &.{
         "constants",         "Route",      "RouteOptions",    "Codings",     "post",       "get",
         "Refusals",          "Call",       "Sender",          "Receiver",    "ClientCall", "ClientCallOptions",
-        "ClientCallBuffers", "failure_of", "ClientSendError", "full_duplex",
+        "ClientCallBuffers", "failure_of", "ClientSendError", "full_duplex", "Next",
     });
 }
 
@@ -58,4 +61,5 @@ test {
     std.testing.refAllDecls(files);
     _ = @import("connect_colibri_test.zig");
     _ = @import("client_stream_test.zig");
+    _ = @import("pull_test.zig");
 }

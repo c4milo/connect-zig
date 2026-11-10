@@ -96,6 +96,9 @@ first. Cite an entry by number in code and commits ("decision 6").
     Amended on 2026-11-09: a client's streamed call sends its request and reads its response in
     pieces, through colibri's pool (colibri decision 153), so the client side of a stream is no
     whole body. The server side keeps this decision's bounds.
+    Amended by the owner on 2026-11-09, a second time: a type handler with `next` sends a stream
+    of any length (decision 33). A function handler keeps this decision's bound on what it
+    writes in its one call.
 
 13. **Examples run in cleartext.** The ELIZA programs speak h2 with prior knowledge and h11, and
     hold no TLS identity, so they need no certificate to run. colibri's `tls` module still links
@@ -310,6 +313,32 @@ first. Cite an entry by number in code and commits ("decision 6").
     they run the engine and the pool on Zig 0.16's `std.Io` alone, with no Rotor. Beaten:
     building on `colibri.Client` and `colibri.Server`, which is shorter for a Rotor program and
     makes every program adopt Rotor and its task model.
+
+33. **A long stream's handler gives one message at a time.** Ruled by the owner on 2026-11-09.
+    A type handler of a server or bidirectional stream may declare `next`, which fills one
+    response and answers `rpc.Next`: `.message`, `.wait`, `.end` or `.failure`. A server stream's
+    type handler takes its one request in `on_request`.
+    - The route declares colibri's `on_writable`, and calls `next` while the response memory has
+      room. So colibri's `response_bytes` bound the octets in flight, not the stream (colibri
+      decisions 103 and 127 as amended on 2026-11-09).
+    - A message that found no room stays in the call as one envelope, and goes out first at the
+      next call. The handler never sees a full writer, and never gives a message twice.
+    - Each envelope goes to colibri's writer as one slice, which that writer takes whole or not
+      at all. `Reply.prepare` leaves room for the prefix before the message, so no copy joins
+      them.
+    - The route builds the stream's end once, when the handler ends the stream, and writes it
+      when the memory has room. The handler's memory may change in between.
+    - Each call of `on_writable` ends with one flush, not one for each message, so a stream of
+      small messages stays under the runs an h3 response holds.
+
+    Limits. `.wait` is for a bidirectional stream whose client still sends: colibri cannot yet
+    wake a route whose request ended (colibri issue 130), so the route answers `internal` there.
+    An envelope longer than the response memory never fits, and colibri then cancels its call,
+    so a route table that streams sets `response_bytes` above `message_bytes`. Beaten: a handler
+    with `on_writable` and a `Sender` whose `send` fails when the writer is full, which makes
+    each handler keep its own position, and which colibri cancels when a call sends nothing; and
+    a function handler that blocks in `send`, which needs a thread or a coroutine the library
+    does not have (decision 18).
 
 ## Tooling
 
