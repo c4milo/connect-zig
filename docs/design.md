@@ -430,6 +430,19 @@ ran on Linux x86-64 with Zig 0.16.0.
     not complete a quantum, such as `/w=`, and a URL-safe letter, as before.
   - Mutations, 17, each CAUGHT, on the alphabet, the padding, the room and the input of each
     encoder and decoder.
+  - The judge, CI's `perf` job: large JSON decode -7.19% instructions, large decode+walk -5.95%,
+    large JSON encode -0.80%. No other operation moved.
+
+- **JSON encode reads a repeated or lazy field in place.** A profile of the tree message's JSON
+  encode, on stdx `8eefa96`, put about 73% of its time in stdx's `TextWriter`: about 2.3 ns for
+  each brace or bracket, and 7.4 ns for each name. connect-zig's own 27% was a copy of each
+  node's repeated field, and a recursive frame that held the iterator a program's message never
+  uses. `write_fields` now passes a repeated or lazy field by pointer, and the iterator's loops
+  run out of line. On x86-64-v3 the tree's recursive frame shrinks from 168 to 96 octets.
+  - The judge: tree JSON encode -1.28% instructions; no other operation moved past 0.05%.
+  - A new test writes JSON for a message decoded from binary, with an array and a map.
+  - stdx's session takes the rest to the owner: a cheaper step for a brace or a bracket, and a
+    name call for octets that need no escape.
 
 ### What a later step owes
 
