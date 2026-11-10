@@ -4,17 +4,21 @@ const std = @import("std");
 const assert = std.debug.assert;
 const json = @import("json");
 const codec = @import("codec");
+const base64 = @import("base64");
 const constants = @import("constants.zig");
 
 pub const Error = json.DecodeError || error{ Truncated, NoSpaceLeft, UnexpectedToken, DepthExceeded, InvalidBase64, TooManyDetails, TooManyMetadata };
 
-/// Decodes base64 into the start of `buffer`, with its padding or without: a decoder accepts
-/// both (Connect protocol, "Error End-Stream"; gRPC PROTOCOL-HTTP2.md, "-bin" headers).
-pub fn decode_base64(decoder: std.base64.Base64Decoder, text: []const u8, buffer: []u8) error{ InvalidBase64, NoSpaceLeft }![]u8 {
-    const trimmed = std.mem.trimEnd(u8, text, "=");
-    const len = decoder.calcSizeForSlice(trimmed) catch return error.InvalidBase64;
+/// Decodes base64 in the alphabets `accept` names into the start of `buffer`, with its padding or
+/// without: a decoder accepts both (Connect protocol, "Error End-Stream"; gRPC PROTOCOL-HTTP2.md,
+/// "-bin" headers). The decoder may write past the octets it returns, in `buffer`'s free room.
+pub fn decode_base64(accept: base64.Accept, text: []const u8, buffer: []u8) error{ InvalidBase64, NoSpaceLeft }![]u8 {
+    const len = base64.Decoder.decoded_len(text) catch return error.InvalidBase64;
     if (len > buffer.len) return error.NoSpaceLeft;
-    decoder.decode(buffer[0..len], trimmed) catch return error.InvalidBase64;
+    var decoder: base64.Decoder = undefined;
+    decoder.init(.{ .accept = accept, .padding = .optional }, codec.Features.target());
+    const decoded_len = decoder.decode_all(text, buffer) catch return error.InvalidBase64;
+    assert(decoded_len == len);
     return buffer[0..len];
 }
 
@@ -65,7 +69,7 @@ pub const Tokens = struct {
             .string => |octets| octets,
             else => return error.UnexpectedToken,
         };
-        const kept = try decode_base64(std.base64.standard_no_pad.Decoder, octets, self.storage[self.used..]);
+        const kept = try decode_base64(.standard, octets, self.storage[self.used..]);
         self.used += kept.len;
         return kept;
     }
@@ -97,24 +101,41 @@ pub const Tokens = struct {
 
 const base64_chars = 4;
 const base64_octets = 3;
-/// The base64 octets one string piece writes, under one cache line, so the staging buffer
+/// The base64 letters one string piece writes, under one cache line, so the staging buffer
 /// costs a few stores a call.
 const piece_len = 60;
+/// The calls of the base64 encoder past one for each full piece: a part piece, and the end.
+const base64_calls_extra = 2;
 
-/// Writes `octets` as one string of unpadded standard base64, in pieces.
+/// Writes `octets` as one string of unpadded standard base64, in pieces. One encoder takes the
+/// whole value, and each call fills the staging buffer.
 pub fn write_base64(octets: []const u8, text: *json.TextWriter) (json.EncodeError || error{NoSpaceLeft})!void {
-    const encoder = std.base64.standard_no_pad.Encoder;
-    // Base64 writes 4 characters for each 3 octets.
-    const chunk_len = piece_len / base64_chars * base64_octets;
     var buffer: [piece_len]u8 = undefined;
+    var encoder: base64.Encoder = undefined;
+    encoder.init(.{ .alphabet = .standard, .padding = false }, codec.Features.target());
     var start: usize = 0;
-    for (0..octets.len / chunk_len + 1) |_| {
-        const end = @min(start + chunk_len, octets.len);
-        const piece = encoder.encode(&buffer, octets[start..end]);
-        const last = end == octets.len;
-        try text.write(.{ .string = if (last) .last else .more }, piece);
+    // Bounded: each call but the last fills the buffer. Base64 writes 4 letters for each 3 octets.
+    for (0..octets.len / (piece_len / base64_chars * base64_octets) + base64_calls_extra) |_| {
+        const progress = encoder.encode(octets[start..], &buffer, .finish);
+        start += progress.consumed;
+        const last = progress.status == .done;
+        try text.write(.{ .string = if (last) .last else .more }, buffer[0..progress.written]);
         if (last) return;
-        start = end;
     }
     unreachable;
+}
+
+const testing = std.testing;
+
+test "base64 decodes padded or not, in the alphabets asked, and refuses a partial padding" {
+    var buffer: [8]u8 = undefined;
+    // Connect protocol, "Error End-Stream", and gRPC's "-bin" headers: padded or not.
+    for ([_][]const u8{ "/w==", "/w" }) |text| try testing.expectEqualSlices(u8, &.{0xff}, try decode_base64(.standard, text, &buffer));
+    // The URL-safe alphabet is read only where the caller names it.
+    try testing.expectError(error.InvalidBase64, decode_base64(.standard, "_w", &buffer));
+    try testing.expectEqualSlices(u8, &.{0xff}, try decode_base64(.either, "_w", &buffer));
+    // RFC 4648 §4: pad characters complete a quantum of four, so one too few or too many fails.
+    try testing.expectError(error.InvalidBase64, decode_base64(.standard, "/w=", &buffer));
+    try testing.expectError(error.InvalidBase64, decode_base64(.standard, "/w===", &buffer));
+    try testing.expectError(error.NoSpaceLeft, decode_base64(.standard, "AAAA", buffer[0..2]));
 }

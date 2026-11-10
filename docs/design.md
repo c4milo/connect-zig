@@ -418,6 +418,19 @@ ran on Linux x86-64 with Zig 0.16.0.
     about 1.6 MiB through 64 KiB of response memory, in Connect, gRPC and gRPC-Web over h2, and
     in gRPC over h3.
 
+- **base64 from stdx.** The owner approved on 2026-11-10 the move from `std.base64` to stdx's
+  `base64` module, which colibri v0.15.2's stdx commit `57a7040` holds (decision 10 as
+  amended). The `protobuf` and `connect` modules import it, and so does the benchmark's copy of
+  `protobuf`. Each base64 value goes through one encoder or decoder, and a long one through one
+  encoder in pieces of 60 letters, which the `undefined-fill` rule keeps under a cache line.
+  - A sweep compares stdx's decoder with `std.base64`, the reference of
+    `protobuf_fast_path_test.zig`, over every text of up to four letters and each letter at each
+    place of longer text. Both accept and refuse the same texts and give the same octets.
+  - Connect's error details and gRPC's "-bin" values now refuse a text whose pad characters do
+    not complete a quantum, such as `/w=`, and a URL-safe letter, as before.
+  - Mutations, 17, each CAUGHT, on the alphabet, the padding, the room and the input of each
+    encoder and decoder.
+
 ### What a later step owes
 
 - A stream that waits for an event of the program once its request ended (colibri issue 130,

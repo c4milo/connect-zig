@@ -170,4 +170,22 @@ test "an error body reads back, with padding, unknown members and an unknown cod
     try testing.expectEqual(Code.unknown, (try decode("{\"code\":\"teapot\"}", &storage)).code);
     try testing.expectEqual(Code.unknown, (try decode("{\"code\":\"ok\"}", &storage)).code);
     try testing.expectError(error.TooManyDetails, decode("{\"details\":[{},{},{}]}", &storage));
+    // Connect protocol, "Error End-Stream": a detail's value is in the standard alphabet.
+    try testing.expectError(error.InvalidBase64, decode("{\"details\":[{\"type\":\"a.B\",\"value\":\"_w\"}]}", &storage));
+}
+
+test "a detail longer than one piece writes the base64 that std.base64 writes" {
+    var value: [100]u8 = undefined;
+    for (&value, 0..) |*octet, index| octet.* = @truncate(index * 7);
+    const failure: RpcError = .{ .code = .internal, .details = &.{.{ .type_name = "a.B", .value = &value }} };
+    var buffer: [512]u8 = undefined;
+    const body = try encode(&failure, &buffer);
+    var reference: [256]u8 = undefined;
+    const want = std.base64.standard_no_pad.Encoder.encode(&reference, &value);
+    try testing.expect(std.mem.indexOf(u8, body, want) != null);
+    var tokens: [256]u8 = undefined;
+    var octets: [256]u8 = undefined;
+    var details: [2]Detail = undefined;
+    const back = try decode(body, &.{ .tokens = &tokens, .octets = &octets, .details = &details });
+    try testing.expectEqualSlices(u8, &value, back.details[0].value);
 }

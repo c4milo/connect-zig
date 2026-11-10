@@ -6,6 +6,8 @@
 //! - `compression`: the coding, when the message is compressed;
 //! - `connect=v1`: the protocol version.
 const std = @import("std");
+const base64 = @import("base64");
+const Features = @import("codec").Features;
 const json_read = @import("json_read.zig");
 const assert = std.debug.assert;
 const protocol = @import("protocol.zig");
@@ -29,15 +31,15 @@ pub const Error = error{
 
 /// Writes the query of a GET for an encoded message, without the "?".
 pub fn write_query(codec: Codec, coding: Coding, message: []const u8, buffer: []u8) error{NoSpaceLeft}![]const u8 {
-    const encoder = std.base64.url_safe_no_pad.Encoder;
     const head = if (coding == .identity)
         std.fmt.bufPrint(buffer, "connect=v1&encoding={s}&base64=1&message=", .{codec.name()})
     else
         std.fmt.bufPrint(buffer, "connect=v1&encoding={s}&compression={s}&base64=1&message=", .{ codec.name(), coding.name() });
     const written = head catch return error.NoSpaceLeft;
-    const len = encoder.calcSize(message.len);
-    if (written.len + len > buffer.len) return error.NoSpaceLeft;
-    _ = encoder.encode(buffer[written.len..][0..len], message);
+    // Connect protocol, "Unary-Get-Request": the URL-safe alphabet, padding omitted.
+    var encoder: base64.Encoder = undefined;
+    encoder.init(.{ .alphabet = .url_safe, .padding = false }, Features.target());
+    const len = try encoder.encode_all(message, buffer[written.len..]);
     return buffer[0 .. written.len + len];
 }
 
@@ -96,9 +98,7 @@ pub fn message_octets(query: Query, buffer: []u8) Error![]const u8 {
         if (std.mem.endsWith(u8, text, escaped_padding)) text = text[0 .. text.len - escaped_padding.len];
         if (std.mem.endsWith(u8, text, "=")) text = text[0 .. text.len - 1];
     }
-    const url_safe = std.mem.indexOfAny(u8, text, "+/") == null;
-    const decoder = if (url_safe) std.base64.url_safe_no_pad.Decoder else std.base64.standard_no_pad.Decoder;
-    return json_read.decode_base64(decoder, text, buffer);
+    return json_read.decode_base64(.either, text, buffer);
 }
 
 fn percent_decode(text: []const u8, buffer: []u8) Error![]const u8 {

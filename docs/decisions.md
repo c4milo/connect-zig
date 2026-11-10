@@ -75,6 +75,12 @@ first. Cite an entry by number in code and commits ("decision 6").
     128 KiB window, which an RPC message rarely outgrows. connect-zig pins the stdx colibri
     pins, since two stdx in one binary repeat its exported symbols. Beaten: a C codec, which
     stdx exists to replace.
+    Amended on 2026-11-10: base64 comes from stdx too, for proto3 JSON's bytes, Connect's error
+    details, gRPC's "-bin" values and a unary GET's message. stdx's decoder reads either alphabet
+    in one pass and refuses a text that mixes them. It refuses pad characters that do not
+    complete a quantum of four (RFC 4648 §4), which connect-zig's own reader dropped before.
+    Beaten: `std.base64`, which reads one alphabet in a call, so a reader that takes either one
+    tried each in turn.
 
 11. **Plain gRPC waits on colibri for the client.** colibri's `client.Response` holds no
     trailers, so a client cannot read `grpc-status` over h2. The server speaks gRPC now. The

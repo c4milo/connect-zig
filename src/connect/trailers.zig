@@ -9,6 +9,8 @@
 const std = @import("std");
 const assert = std.debug.assert;
 const rpc_error = @import("rpc_error.zig");
+const codec = @import("codec");
+const base64 = @import("base64");
 const json_read = @import("json_read.zig");
 const envelope = @import("envelope.zig");
 const constants = @import("constants.zig");
@@ -43,9 +45,11 @@ pub fn write(failure: ?RpcError, buffer: []u8, out: []Header) Error![]const Head
     // The Status's octets go in the second half of the room, and their base64 in the first.
     const half = (buffer.len - used) / constants.storage_halves;
     const status_bytes = try rpc_error.encode_status(status, buffer[used + half ..], buffer[used..][0..half]);
-    const encoder = std.base64.standard_no_pad.Encoder;
-    if (encoder.calcSize(status_bytes.len) > half) return error.NoSpaceLeft;
-    const details = encoder.encode(buffer[used..][0..half], status_bytes);
+    // gRPC PROTOCOL-HTTP2.md: a "-bin" value is base64, written without padding.
+    var encoder: base64.Encoder = undefined;
+    encoder.init(.{ .alphabet = .standard, .padding = false }, codec.Features.target());
+    const details_len = try encoder.encode_all(status_bytes, buffer[used..][0..half]);
+    const details = buffer[used..][0..details_len];
     count = add(out, count, "grpc-status-details-bin", details);
     return out[0..count];
 }
@@ -124,7 +128,7 @@ pub fn read(context: anytype, comptime find: fn (@TypeOf(context), []const u8) ?
 }
 
 fn decode_bin(text: []const u8, buffer: []u8) ?[]const u8 {
-    return json_read.decode_base64(std.base64.standard_no_pad.Decoder, text, buffer) catch null;
+    return json_read.decode_base64(.standard, text, buffer) catch null;
 }
 
 /// Whether a trailer is a header field line: a token for its name (RFC 9110 §5.6.2), and a value
@@ -197,9 +201,16 @@ test "grpc-message is percent-encoded, and malformed escapes are kept" {
 test "status trailers round-trip, details included" {
     var buffer: [256]u8 = undefined;
     var out: [trailers_max]Header = undefined;
-    const failure: RpcError = .{ .code = .permission_denied, .message = "no", .details = &.{.{ .type_name = "a.B", .value = "x" }} };
+    // A detail whose Status takes no multiple of 3 octets, so its base64 would end in padding.
+    const failure: RpcError = .{ .code = .permission_denied, .message = "no", .details = &.{.{ .type_name = "a.B", .value = "xy" }} };
     const written = try write(failure, &buffer, &out);
     try testing.expectEqualStrings("7", written[0].value);
+    // PROTOCOL-HTTP2.md, "Custom-Metadata": a "-bin" value goes out without padding.
+    var status_octets: [64]u8 = undefined;
+    const details_bin = written[2].value;
+    const status_len = (try json_read.decode_base64(.standard, details_bin, &status_octets)).len;
+    try testing.expect(status_len % 3 != 0);
+    try testing.expectEqual(base64.Encoder.encoded_len(status_len, false), details_bin.len);
     var message: [16]u8 = undefined;
     var status: [64]u8 = undefined;
     var details: [2]rpc_error.Detail = undefined;
@@ -209,6 +220,14 @@ test "status trailers round-trip, details included" {
     try testing.expectEqualStrings("a.B", back.details[0].type_name);
     const ok = try write(null, &buffer, &out);
     try testing.expectEqual(@as(?RpcError, null), read(ok, rpc_error.find_header, .{ .message = &message, .status = &status, .details = &details }));
+}
+
+test "a -bin value is read padded or not, in the standard alphabet alone" {
+    var buffer: [4]u8 = undefined;
+    try testing.expectEqualSlices(u8, &.{0xff}, decode_bin("/w", &buffer).?);
+    try testing.expectEqualSlices(u8, &.{0xff}, decode_bin("/w==", &buffer).?);
+    // PROTOCOL-HTTP2.md, "Custom-Metadata": base64 as RFC 4648 §4 gives it, not the URL-safe form.
+    try testing.expectEqual(@as(?[]const u8, null), decode_bin("_w", &buffer));
 }
 
 test "a gRPC-Web trailers frame is an 0x80 envelope of lowercase header lines" {

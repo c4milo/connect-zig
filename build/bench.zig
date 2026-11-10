@@ -20,6 +20,7 @@ pub fn add(b: *std.Build, public_names: *std.Build.Module, target: std.Build.Res
         .imports = &.{
             .{ .name = "json", .module = release_fast(b, &copies, stdx.module("json")) },
             .{ .name = "codec", .module = release_fast(b, &copies, stdx.module("codec")) },
+            .{ .name = "base64", .module = release_fast(b, &copies, stdx.module("base64")) },
             .{ .name = "public_names", .module = public_names },
         },
     });

@@ -35,6 +35,8 @@ The first release.
 - proto2, proto3, and editions 2023 and 2024, with groups, closed enums and `utf8_validation`.
 - The proto3 JSON mapping, with every well-known type: Timestamp, Duration, FieldMask, the
   wrappers, Empty, Struct, Value, ListValue and Any.
+- base64 from stdx for bytes in JSON, error details, "-bin" values and unary GET messages. A
+  value whose pad characters do not complete a quantum of four is refused (RFC 4648 §4).
 - `protoc-gen-connect-zig`, a protoc and buf plugin that writes one `.pb.zig` file for each
   `.proto` file.
 

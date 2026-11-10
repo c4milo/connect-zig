@@ -9,6 +9,8 @@
 const std = @import("std");
 const assert = std.debug.assert;
 const json = @import("json");
+const codec = @import("codec");
+const base64 = @import("base64");
 const wire = @import("wire.zig");
 const descriptor = @import("descriptor.zig");
 const constants = @import("constants.zig");
@@ -53,9 +55,11 @@ const float_text_len_max = 32;
 comptime {
     assert(float_text_len_max >= json_float.text_len_max);
 }
-/// The base64 octets one piece of a bytes field writes: 4 for each 3 input octets, and under one
-/// cache line, so the staging buffer costs a few stores a call.
+/// The base64 letters one piece of a bytes field writes, under one cache line, so the staging
+/// buffer costs a few stores a call.
 const base64_piece_len = 60;
+/// The calls of the base64 encoder past one for each full piece: a part piece, and the end.
+const base64_calls_extra = 2;
 /// Base64 writes 4 characters for each 3 octets (RFC 4648 §4).
 const base64_chars = 4;
 const base64_octets = 3;
@@ -113,19 +117,20 @@ fn float_text(comptime V: type, value: V, buffer: *[float_text_len_max]u8) []con
     return std.fmt.bufPrint(buffer, "{d}", .{value}) catch unreachable;
 }
 
-/// Writes `octets` as one string of standard base64 with padding, in pieces.
+/// Writes `octets` as one string of standard base64 with padding, in pieces. One encoder takes
+/// the whole field, and each call fills the staging buffer.
 pub fn write_base64(octets: []const u8, text: *json.TextWriter) EncodeError!void {
-    const encoder = std.base64.standard.Encoder;
-    const chunk_len = base64_piece_len / base64_chars * base64_octets;
     var buffer: [base64_piece_len]u8 = undefined;
+    var encoder: base64.Encoder = undefined;
+    encoder.init(.{ .alphabet = .standard, .padding = true }, codec.Features.target());
     var start: usize = 0;
-    for (0..octets.len / chunk_len + 1) |_| {
-        const end = @min(start + chunk_len, octets.len);
-        const piece = encoder.encode(&buffer, octets[start..end]);
-        const last = end == octets.len;
-        try text.write(.{ .string = if (last) .last else .more }, piece);
+    // Bounded: each call but the last fills the buffer, with 3 octets for each 4 letters.
+    for (0..octets.len / (base64_piece_len / base64_chars * base64_octets) + base64_calls_extra) |_| {
+        const progress = encoder.encode(octets[start..], &buffer, .finish);
+        start += progress.consumed;
+        const last = progress.status == .done;
+        try text.write(.{ .string = if (last) .last else .more }, buffer[0..progress.written]);
         if (last) return;
-        start = end;
     }
     unreachable;
 }
@@ -314,24 +319,21 @@ pub fn parse_float(comptime V: type, octets: []const u8, from_string: bool) Deco
 /// The octets base64 text decodes to, written into `writer` after their length, in standard or
 /// URL-safe base64, with or without padding ("JSON Mapping", bytes).
 pub fn write_base64_field(octets: []const u8, writer: *wire.Writer) DecodeError!void {
-    const padded = octets.len % base64_chars == 0 and octets.len != 0 and octets[octets.len - 1] == '=';
-    const standard = if (padded) std.base64.standard.Decoder else std.base64.standard_no_pad.Decoder;
-    const url_safe = if (padded) std.base64.url_safe.Decoder else std.base64.url_safe_no_pad.Decoder;
-    // The alphabets differ in two letters alone (RFC 4648 §5), so a text has one size in both.
-    const len = standard.calcSizeForSlice(octets) catch return error.InvalidBase64;
+    // The length and the pad characters give the octets' count, so the length goes first.
+    const len = base64.Decoder.decoded_len(octets) catch return error.InvalidBase64;
     try writer.varint(len);
     if (len > writer.buffer.len - writer.len) return error.NoSpaceLeft;
-    const room = writer.buffer[writer.len..][0..len];
-    // "JSON Mapping", bytes: a parser accepts either alphabet. A text the standard one refuses is
-    // read again as URL-safe into the same room, and a text that mixes the two fails both.
-    standard.decode(room, octets) catch {
-        url_safe.decode(room, octets) catch return error.InvalidBase64;
-    };
+    // "JSON Mapping", bytes: a parser accepts either alphabet, but one alone in a text (RFC 4648
+    // §5), with or without padding. The decoder takes the free room after the length, whose slack
+    // its vector step uses, and writes `len` octets.
+    var decoder: base64.Decoder = undefined;
+    decoder.init(.{ .accept = .either, .padding = .optional }, codec.Features.target());
+    const decoded_len = decoder.decode_all(octets, writer.buffer[writer.len..]) catch return error.InvalidBase64;
+    assert(decoded_len == len);
     writer.len += len;
 }
 
 const testing = std.testing;
-const codec = @import("codec");
 
 fn written(comptime kind: Kind, comptime V: type, value: V, buffer: []u8) ![]const u8 {
     var text = json.TextWriter.init(buffer, .text, codec.Features.target());
@@ -414,4 +416,21 @@ test "base64 decodes in either alphabet, padded or not" {
     // A text that mixes the alphabets is neither.
     var mixed: wire.Writer = .{ .buffer = &buffer };
     try testing.expectError(error.InvalidBase64, write_base64_field("+_8=", &mixed));
+}
+
+test "bytes longer than one piece write the base64 that std.base64 writes, and read back" {
+    var octets: [200]u8 = undefined;
+    for (&octets, 0..) |*octet, index| octet.* = @truncate(index * 7);
+    // Lengths around the 45 octets one piece takes, and one of each remainder of 3.
+    for ([_]usize{ 0, 1, 44, 45, 46, 90, 91, 200 }) |len| {
+        var buffer: [300]u8 = undefined;
+        const text = try written(.bytes, []const u8, octets[0..len], &buffer);
+        var reference: [300]u8 = undefined;
+        const want = std.base64.standard.Encoder.encode(&reference, octets[0..len]);
+        try testing.expectEqualStrings(want, text[1 .. text.len - 1]);
+        var room: [300]u8 = undefined;
+        var writer: wire.Writer = .{ .buffer = &room };
+        try write_base64_field(want, &writer);
+        try testing.expectEqualSlices(u8, octets[0..len], writer.written()[writer.written().len - len ..]);
+    }
 }

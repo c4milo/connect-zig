@@ -65,6 +65,7 @@ fn modules(b: *std.Build, stdx: *std.Build.Dependency, colibri: *std.Build.Depen
         .imports = &.{
             .{ .name = "json", .module = stdx.module("json") },
             .{ .name = "codec", .module = stdx.module("codec") },
+            .{ .name = "base64", .module = stdx.module("base64") },
             .{ .name = "public_names", .module = public_names },
         },
     });
@@ -79,6 +80,7 @@ fn modules(b: *std.Build, stdx: *std.Build.Dependency, colibri: *std.Build.Depen
             .{ .name = "gzip", .module = stdx.module("gzip") },
             .{ .name = "zstd", .module = stdx.module("zstd") },
             .{ .name = "brotli", .module = stdx.module("brotli") },
+            .{ .name = "base64", .module = stdx.module("base64") },
             .{ .name = "public_names", .module = public_names },
         },
     });

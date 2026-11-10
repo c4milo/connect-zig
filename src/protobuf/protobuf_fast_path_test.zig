@@ -215,8 +215,9 @@ test "a string is UTF-8 as the standard library judges it, with each letter at e
     }
 }
 
-/// The bytes of a base64 text, decoded as `write_base64_field` decoded them before it tried the
-/// standard alphabet first: it chose the alphabet by a search for "-" and "_".
+/// The bytes of a base64 text, decoded as `write_base64_field` decoded them through
+/// `std.base64`, before stdx's decoder: it chose the alphabet by a search for "-" and "_". It
+/// stays the reference, a decoder written apart from stdx's.
 fn reference_base64(octets: []const u8, writer: *wire.Writer) json_scalar.DecodeError!void {
     const url_safe = std.mem.indexOfAny(u8, octets, "-_") != null;
     const padded = octets.len % base64_chars == 0 and octets.len != 0 and octets[octets.len - 1] == '=';
@@ -239,7 +240,7 @@ fn check_base64(octets: []const u8) !void {
     var got: wire.Writer = .{ .buffer = &got_room };
     const got_result = json_scalar.write_base64_field(octets, &got);
     if (want_result) |_| try got_result else |refusal| try testing.expectError(refusal, got_result);
-    try testing.expectEqual(want.len, got.len);
+    // A refusal fails the whole decode, which drops the writer, so what it holds then is no result.
     if (want_result) |_| try testing.expectEqualSlices(u8, want.written(), got.written()) else |_| {}
 }
 
