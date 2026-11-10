@@ -6,7 +6,9 @@
 //! - Chat and Sum are type handlers: they take each message as it arrives. Chat answers each one
 //!   at once, so over h2 a client reads answers while it still sends. `Counting` reports how
 //!   many messages a Chat read and wrote, in trailers.
-//! - Countdown is a server stream, and Divide fails with a typed detail.
+//! - Countdown is a server stream whose route asks it for one number at a time, so the stream
+//!   may be far longer than the router's response memory (decision 33). Divide fails with a
+//!   typed detail.
 const std = @import("std");
 const connect = @import("connect");
 const proto = @import("protobuf");
@@ -22,8 +24,9 @@ pub const bearer_prefix = "Bearer ";
 /// The response header `Logging` adds to each reply, and its value.
 pub const logged_header = "demo-logged";
 pub const logged_value = "yes";
-/// The largest `from` Countdown counts down from.
-pub const countdown_max = 64;
+/// The largest `from` Countdown counts down from. Its stream is then many times the router's
+/// response memory, which bounds the octets in flight alone.
+pub const countdown_max = 1_000_000;
 /// The trailer Chat adds once the client ends its stream: whether it answered any message.
 pub const turns_trailer = "chat-turns";
 /// The trailers `Counting` adds: the messages a call read and wrote.
@@ -126,16 +129,24 @@ const Sum = struct {
     }
 };
 
-/// Countdown sends `from`, `from - 1`, ... down to 1.
-fn countdown(_: *App, _: *rpc.Call, request: *const demo.CountdownRequest, sender: *rpc.Sender(demo.CountdownResponse)) ?connect.RpcError {
-    if (request.from < 0 or request.from > countdown_max) return .{ .code = .out_of_range, .message = "from must be between 0 and 64" };
-    const from: u32 = @intCast(request.from);
-    for (0..from) |index| {
-        const number: i32 = @intCast(from - index);
-        sender.send(&.{ .number = number }) catch return .{ .code = .resource_exhausted };
+/// Countdown sends `from`, `from - 1`, ... down to 1. Its route calls `next` for one number at
+/// a time, while the response memory has room.
+const Countdown = struct {
+    pub const State = struct { left: i32 = 0 };
+
+    pub fn on_request(_: *App, _: *rpc.Call, state: *State, request: *const demo.CountdownRequest) ?connect.RpcError {
+        if (request.from < 0 or request.from > countdown_max) return .{ .code = .out_of_range, .message = "from must be between 0 and 1000000" };
+        state.left = request.from;
+        return null;
     }
-    return null;
-}
+
+    pub fn next(_: *App, _: *rpc.Call, state: *State, response: *demo.CountdownResponse) rpc.Next {
+        if (state.left == 0) return .end;
+        response.* = .{ .number = state.left };
+        state.left -= 1;
+        return .message;
+    }
+};
 
 /// Divide fails with a DivisionByZero detail when the divisor is 0.
 fn divide(app: *App, _: *rpc.Call, request: *const demo.DivideRequest, response: *demo.DivideResponse) ?connect.RpcError {
@@ -168,6 +179,6 @@ pub const routes = .{
     rpc.get(App, Service.whoami, whoami, guarded),
     rpc.post(App, Service.chat, Chat, counted),
     rpc.post(App, Service.sum, Sum, plain),
-    rpc.post(App, Service.countdown, countdown, plain),
+    rpc.post(App, Service.countdown, Countdown, plain),
     rpc.post(App, Service.divide, divide, counted),
 };

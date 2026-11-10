@@ -156,6 +156,27 @@ for protocol in connect grpc grpcweb; do
         '{"code":"invalid_argument","message":"divisionbyzero","details":[{"type":"demo.v1.DivisionByZero","value":"CAc"}]}' \
         "$(demo "${protocol}" -d '{"dividend":7}' "${base}/Divide")"
 done
+# A server stream far longer than the router's response memory (decision 33): 200000 numbers are
+# about 1.6 MiB of envelopes, through 64 KiB of response memory. The check reads the first
+# number, the last one and the count, and requires each number to be one less than the one
+# before it. A stream this long gets its own time limit.
+countdown_long=200000
+long_seconds=120
+counted() {
+    tr -d ' ' | awk -F'[:}]' '
+        /"number"/ { count += 1; if (count == 1) first = $2; else if ($2 != last - 1) gaps += 1; last = $2 }
+        END { print first + 0, last + 0, count + 0, gaps + 0 }'
+}
+for protocol in connect grpc grpcweb; do
+    expect "${protocol} Countdown from ${countdown_long}" "${countdown_long} 1 ${countdown_long} 0" \
+        "$(timeout "${long_seconds}" "${buf}" curl --cacert "${ca}" --schema examples/proto --protocol "${protocol}" \
+            -d "{\"from\":${countdown_long}}" "${base}/Countdown" 2>&1 | unlogged | counted)"
+done
+# The same stream over h3, where the response memory frees only as the client acknowledges it
+# (RFC 9000 section 3.1).
+expect "grpc Countdown from ${countdown_long} over h3" "${countdown_long} 1 ${countdown_long} 0" \
+    "$(timeout "${long_seconds}" "${buf}" curl --http3 --cacert "${ca}" --schema examples/proto --protocol grpc \
+        -d "{\"from\":${countdown_long}}" "${base}/Countdown" 2>&1 | counted)"
 # A gRPC error before any message is Trailers-Only: one header section holds the status and the
 # call's own trailers, here Counting's.
 expect "grpc Trailers-Only carries trailers" 'call-received: 1|call-sent: 0|' \

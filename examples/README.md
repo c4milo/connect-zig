@@ -28,7 +28,8 @@ Start at the top: each example adds one layer to the one before it.
 - [services/demo.zig](services/demo.zig) serves `demo.v1.DemoService`, from
   [proto/demo/v1/demo.proto](proto/demo/v1/demo.proto): `Whoami` behind the `Logging` and `Auth`
   interceptors, `Chat` and `Sum` as type handlers that take each message as it arrives,
-  `Countdown`, and `Divide`, which fails with a `DivisionByZero` detail.
+  `Countdown`, a server stream of any length whose handler gives one number at a time
+  (`next`), and `Divide`, which fails with a `DivisionByZero` detail.
 - [services/github.zig](services/github.zig) and [services/github_issues.zig](services/github_issues.zig)
   serve `github.v1.RepositoryService` and `github.v1.IssueService`, from
   [proto/github/v1/github.proto](proto/github/v1/github.proto), over the fixed tables of
