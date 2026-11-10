@@ -60,9 +60,30 @@ pub const Reply = struct {
     sent: bool = false,
 
     /// Encodes a message into the scratch storage, compressing it when the response coding is
-    /// gzip and the message is long enough.
+    /// gzip and the message is long enough. An enveloped message leaves the octets of an envelope
+    /// prefix free before it, in `scratch.message` and in `scratch.work`, where `envelope_of`
+    /// writes the prefix.
     pub fn prepare(reply: *Reply, comptime T: type, message: *const T) Error!Prepared {
-        return message_codec.prepare(T, reply.accepted.speaks.codec, reply.accepted.response_coding, reply.encoders, message, reply.scratch);
+        const headroom: usize = if (reply.accepted.speaks.enveloped) constants.protocol.envelope_prefix_len else 0;
+        const scratch = reply.scratch;
+        if (scratch.message.len < headroom or scratch.work.len < headroom) return error.NoSpaceLeft;
+        const room: message_codec.Scratch = .{ .message = scratch.message[headroom..], .work = scratch.work[headroom..], .tokens = scratch.tokens };
+        return message_codec.prepare(T, reply.accepted.speaks.codec, reply.accepted.response_coding, reply.encoders, message, room);
+    }
+
+    /// The envelope of a message `prepare` encoded: the prefix, written into the octets `prepare`
+    /// left free, and the message after it, as one slice of the scratch storage. A writer that
+    /// takes one slice whole or not at all then never takes half an envelope. The slice lasts
+    /// until the next `prepare`.
+    pub fn envelope_of(reply: *const Reply, prepared: Prepared) []const u8 {
+        assert(reply.accepted.speaks.enveloped);
+        const prefix_len = constants.protocol.envelope_prefix_len;
+        const buffer = if (prepared.compressed) reply.scratch.work else reply.scratch.message;
+        assert(buffer.len >= prefix_len + prepared.octets.len);
+        // `prepare` wrote the message right after the prefix's octets. An empty message points nowhere.
+        assert(prepared.octets.len == 0 or prepared.octets.ptr == buffer.ptr + prefix_len);
+        envelope.write_prefix(.{ .compressed = prepared.compressed }, prepared.octets.len, buffer[0..prefix_len]);
+        return buffer[0 .. prefix_len + prepared.octets.len];
     }
 
     /// The head of a response that carries messages. `body` says whether a unary Connect body is
@@ -118,13 +139,11 @@ pub const Reply = struct {
         return message_codec.compress(reply.accepted.response_coding, reply.encoders, encoded, reply.scratch.work);
     }
 
-    /// Writes one message: the whole body of a Connect unary response, or one envelope.
+    /// Writes one message: the whole body of a Connect unary response, or one envelope. Either
+    /// goes to `body` as one slice, in one write.
     pub fn write_message(reply: *Reply, prepared: Prepared, body: *std.Io.Writer) Error!void {
+        try body.writeAll(if (reply.accepted.speaks.enveloped) reply.envelope_of(prepared) else prepared.octets);
         reply.sent = true;
-        if (!reply.accepted.speaks.enveloped) return body.writeAll(prepared.octets);
-        // The prefix is written in place, in the body writer's own buffer.
-        envelope.write_prefix(.{ .compressed = prepared.compressed }, prepared.octets.len, try body.writableArray(constants.protocol.envelope_prefix_len));
-        try body.writeAll(prepared.octets);
     }
 
     /// Whether `failure` is answered with `error_head` and `write_error_body` alone: a Connect
@@ -159,19 +178,29 @@ pub const Reply = struct {
         try body.writeAll(error_json.encode(&failure, reply.scratch.work) catch return error.NoSpaceLeft);
     }
 
-    /// Ends a response that carried messages. A Connect stream and gRPC-Web write their end into
-    /// the body; gRPC returns the trailers the HTTP library sends, with values in `storage`.
-    pub fn finish(reply: *const Reply, failure: ?RpcError, metadata: []const Header, body: *std.Io.Writer, storage: []u8, out: []Header) Error![]const Header {
+    /// How a response that carried messages ends: the octets its body still takes, as one slice,
+    /// and the trailers the HTTP library sends after them. Both point into the caller's storage.
+    pub const Ending = struct {
+        octets: []const u8 = "",
+        trailers: []const Header = &.{},
+    };
+
+    /// Builds the end of a response that carried messages, and writes nothing. A Connect stream
+    /// ends with an end-stream envelope and gRPC-Web with a trailers frame, each in the body;
+    /// gRPC ends with trailers, whose values are in `storage`.
+    pub fn ending(reply: *const Reply, failure: ?RpcError, metadata: []const Header, storage: []u8, out: []Header) Error!Ending {
         const speaks = reply.accepted.speaks;
         assert(speaks.enveloped);
         switch (speaks.protocol) {
             .connect => {
-                const text = end_stream.encode(&.{ .failure = failure, .metadata = metadata }, storage) catch return error.NoSpaceLeft;
-                envelope.write_prefix(.{ .end_stream = true }, text.len, try body.writableArray(constants.protocol.envelope_prefix_len));
-                try body.writeAll(text);
-                return out[0..0];
+                const prefix_len = constants.protocol.envelope_prefix_len;
+                if (storage.len < prefix_len) return error.NoSpaceLeft;
+                const text = end_stream.encode(&.{ .failure = failure, .metadata = metadata }, storage[prefix_len..]) catch return error.NoSpaceLeft;
+                assert(text.len == 0 or text.ptr == storage.ptr + prefix_len);
+                envelope.write_prefix(.{ .end_stream = true }, text.len, storage[0..prefix_len]);
+                return .{ .octets = storage[0 .. prefix_len + text.len] };
             },
-            .grpc => return trailers.write(failure, storage, out),
+            .grpc => return .{ .trailers = try trailers.write(failure, storage, out) },
             .grpc_web => {
                 const half = storage.len / constants.storage_halves;
                 const status = try trailers.write(failure, storage[0..half], out);
@@ -179,11 +208,17 @@ pub const Reply = struct {
                 // (PROTOCOL-WEB.md, "Message framing").
                 if (metadata.len > out.len - status.len) return error.NoSpaceLeft;
                 @memcpy(out[status.len..][0..metadata.len], metadata);
-                const frame = try trailers.write_web_frame(out[0 .. status.len + metadata.len], storage[half..]);
-                try body.writeAll(frame);
-                return out[0..0];
+                return .{ .octets = try trailers.write_web_frame(out[0 .. status.len + metadata.len], storage[half..]) };
             },
         }
+    }
+
+    /// Ends a response that carried messages: writes the octets `ending` builds into `body`, in
+    /// one write, and returns the trailers the HTTP library sends.
+    pub fn finish(reply: *const Reply, failure: ?RpcError, metadata: []const Header, body: *std.Io.Writer, storage: []u8, out: []Header) Error![]const Header {
+        const end = try reply.ending(failure, metadata, storage, out);
+        if (end.octets.len != 0) try body.writeAll(end.octets);
+        return end.trailers;
     }
 };
 
@@ -340,4 +375,78 @@ test "a long message is gzipped in its envelope, and a unary gzip reply is not w
     try testing.expectEqualStrings(&text, (try proto.decode(Greeting, octets)).text);
     reply.accepted.speaks = .{ .protocol = .connect, .codec = .proto, .enveloped = false };
     try testing.expect(!reply.writes_direct());
+}
+
+/// A writer with no buffer, which counts the slices it takes and takes at most `slices_max` of
+/// them: a writer that takes one slice whole or not at all. Test-only.
+const SliceWriter = struct {
+    writer: std.Io.Writer = .{ .vtable = &.{ .drain = drain }, .buffer = &.{} },
+    octets: [test_buffer_len]u8 = undefined,
+    len: usize = 0,
+    slices: usize = 0,
+    slices_max: usize,
+
+    fn drain(writer: *std.Io.Writer, data: []const []const u8, splat: usize) std.Io.Writer.Error!usize {
+        const sink: *SliceWriter = @alignCast(@fieldParentPtr("writer", writer));
+        assert(data.len == 1 and splat == 1);
+        if (sink.slices == sink.slices_max) return error.WriteFailed;
+        @memcpy(sink.octets[sink.len..][0..data[0].len], data[0]);
+        sink.len += data[0].len;
+        sink.slices += 1;
+        return data[0].len;
+    }
+};
+
+test "an envelope from scratch storage goes out as one slice, whole or not at all" {
+    var buffers: TestBuffers = .{};
+    var reply = reply_for(.{ .protocol = .grpc, .codec = .proto, .enveloped = true }, &buffers);
+    const prepared = try reply.prepare(Greeting, &.{ .text = "hi" });
+    // A writer with no room takes nothing, and the reply has then sent no message.
+    var full: SliceWriter = .{ .slices_max = 0 };
+    try testing.expectError(error.WriteFailed, reply.write_message(prepared, &full.writer));
+    try testing.expectEqual(@as(usize, 0), full.len);
+    try testing.expect(!reply.sent);
+    // The same envelope goes whole in a later write: its prefix and its message in one slice.
+    var sink: SliceWriter = .{ .slices_max = 1 };
+    try reply.write_message(prepared, &sink.writer);
+    try testing.expectEqualSlices(u8, &.{ 0, 0, 0, 0, 4, 0x0a, 2, 'h', 'i' }, sink.octets[0..sink.len]);
+    try testing.expect(reply.sent);
+}
+
+test "an enveloped message leaves room for its prefix, and a unary one takes the whole storage" {
+    var message: [16]u8 = undefined;
+    var work: [16]u8 = undefined;
+    var tokens: [16]u8 = undefined;
+    var reply: Reply = .{
+        .accepted = .{ .speaks = .{ .protocol = .grpc, .codec = .proto, .enveloped = true }, .request_coding = .identity, .response_coding = .identity, .timeout_ns = null },
+        .scratch = .{ .message = &message, .work = &work, .tokens = &tokens },
+    };
+    // A tag, a length and nine octets fill the storage after the prefix.
+    const fits = try reply.prepare(Greeting, &.{ .text = "123456789" });
+    try testing.expectEqual(message.len, reply.envelope_of(fits).len);
+    try testing.expectEqual(@as([*]const u8, &message), reply.envelope_of(fits).ptr);
+    try testing.expectError(error.NoSpaceLeft, reply.prepare(Greeting, &.{ .text = "1234567890" }));
+    reply.accepted.speaks = .{ .protocol = .connect, .codec = .proto, .enveloped = false };
+    try testing.expectEqual(@as(usize, 12), (try reply.prepare(Greeting, &.{ .text = "1234567890" })).octets.len);
+}
+
+test "the end of a stream is built before it is written, and goes out as one slice" {
+    var buffers: TestBuffers = .{};
+    var storage: [128]u8 = undefined;
+    var trailer_out: [trailers.trailers_max]Header = undefined;
+    const connect_reply = reply_for(.{ .protocol = .connect, .codec = .proto, .enveloped = true }, &buffers);
+    const end = try connect_reply.ending(.{ .code = .internal }, &.{}, &storage, &trailer_out);
+    try testing.expectEqual(@as(usize, 0), end.trailers.len);
+    try testing.expectEqualSlices(u8, &.{ 0x02, 0, 0, 0, 29 }, end.octets[0..constants.protocol.envelope_prefix_len]);
+    try testing.expectEqualStrings("{\"error\":{\"code\":\"internal\"}}", end.octets[constants.protocol.envelope_prefix_len..]);
+    var sink: SliceWriter = .{ .slices_max = 1 };
+    _ = try connect_reply.finish(.{ .code = .internal }, &.{}, &sink.writer, &storage, &trailer_out);
+    try testing.expectEqualSlices(u8, end.octets, sink.octets[0..sink.len]);
+    // gRPC ends in trailers alone, so its body takes no octets.
+    const grpc_reply = reply_for(.{ .protocol = .grpc, .codec = .proto, .enveloped = true }, &buffers);
+    const grpc_end = try grpc_reply.ending(null, &.{}, &storage, &trailer_out);
+    try testing.expectEqual(@as(usize, 0), grpc_end.octets.len);
+    try testing.expectEqualStrings("0", grpc_end.trailers[0].value);
+    var none: SliceWriter = .{ .slices_max = 0 };
+    _ = try grpc_reply.finish(null, &.{}, &none.writer, &storage, &trailer_out);
 }
