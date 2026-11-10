@@ -64,7 +64,7 @@ The first release.
 - A function handler writes its whole stream in one call, so the router's response memory
   bounds it (decision 12). A long stream takes a type handler with `next`.
 - A stream cannot wait for an event of the program once its request ended. colibri plans that
-  for v0.16.0 (colibri issue 130).
+  for v0.17.0, or for v0.16.1 if it adds names with no break (colibri issue 130).
 - connect-zig's JSON is slower than Buffa's on most messages, mostly inside stdx's JSON writer
   and reader. The work to close it is under way in stdx.
 - The library does not report a missing required field (decision 23).
