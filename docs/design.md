@@ -405,7 +405,7 @@ ran on Linux x86-64 with Zig 0.16.0.
   one envelope that found no room, and builds the stream's end once. connect-zig pins colibri
   v0.15.2 (`a2bda1e`) and the stdx commit it pins, `57a7040`, so the build holds one stdx
   (decision 10).
-  - `zig build test-connect-colibri` runs 21 tests of a route with `next` through colibri's
+  - `zig build test-connect-colibri` runs 22 tests of a route with `next` through colibri's
     router and an engine each test controls: 200 notes through 256 octets of response memory,
     over an engine that copies each run and over one that holds each run until its
     acknowledgment. A sweep of 40 stream lengths makes the stream's end find the memory full.

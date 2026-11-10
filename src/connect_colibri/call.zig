@@ -180,8 +180,8 @@ pub fn Sender(comptime T: type) type {
             try write_message(T, call, message, body);
             call.sent += 1;
             // The writer hands what it holds to the endpoint now, rather than at the end. A flush
-            // that finds the engine full keeps its octets in the writer, which sends them later
-            // (colibri's usage guide), so the message went all the same.
+            // that fails keeps its octets in the writer, which sends them later (colibri's usage
+            // guide), so the message went all the same.
             body.flush() catch {};
         }
     };

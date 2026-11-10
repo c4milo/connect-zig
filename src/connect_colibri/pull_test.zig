@@ -24,6 +24,12 @@ const echoes = 20;
 /// The longest stream of the sweep: its notes fill the response memory several times, so the
 /// end of some stream finds the memory full, whatever octets the head took.
 const sweep_max = 40;
+/// The notes a flooded chat sends: their echoes take more than the response memory.
+const flood_notes = 40;
+/// The longest first note of the flood's sweep. An echo of "0" takes 8 octets, and a first
+/// note of 1 to 8 digits gives an echo of 8 to 15, so some first note makes the echoes after it
+/// end exactly at the end of the memory, whatever octets the head took.
+const flood_first_len_max = 8;
 
 test "decision 33: a gRPC server stream many times response_bytes goes out whole and in order" {
     var fixture: Fixture = .{ .engine = .{} };
@@ -243,9 +249,10 @@ test "decision 33: a note from a Sender goes out after the note the call holds" 
 }
 
 /// Echoes `echoes` notes one by one over an engine that holds each run, and ends the request.
-/// Over h3 a response holds 16 runs at most until the client acknowledges them, and each flush
-/// cuts a run. So the flush of the seventeenth echo fails, its octets stay in the writer, which
-/// sends them later (colibri's usage guide), and the stream's end finds every run held too.
+/// colibri's writer has 16 slots for the runs the engine has not released, and each flush makes
+/// a run. This engine takes and holds every run, so the flushes after the sixteenth keep their
+/// octets in the writer, and the stream's end then finds each slot taken: `end` and `trailers`
+/// return `error.Full` (colibri's usage guide).
 fn echo_held(fixture: *Fixture, content_type: []const u8) !support.Notes {
     fixture.call("/test.Svc/Chat", content_type, 0, false);
     // The call sent the first note, and the last one ends the request.
@@ -272,6 +279,35 @@ test "decision 33: the end of a Connect stream waits while every run is held" {
     const end = (try notes.reader.next()).?;
     try testing.expect(end.flags.end_stream);
     try testing.expect(notes.at_end());
+}
+
+test "decision 33: a Sender's note whose flush fails still goes out, and is no error" {
+    // colibri's flush fails when its octets stay in the writer, every slot holds a run, and the
+    // writer's region has no room for one more octet. The octets go out later, so the note was
+    // sent: each note is delivered or reported unsent, never both.
+    const zeros = "0" ** flood_first_len_max;
+    for (1..flood_first_len_max + 1) |first_len| {
+        var fixture: Fixture = .{ .engine = .{ .holds = true }, .app = .{ .drop_unsent = true } };
+        fixture.open("/test.Svc/Chat", "application/grpc+proto");
+        fixture.send(zeros[0..first_len], false);
+        for (1..flood_notes) |_| fixture.send("0", false);
+        fixture.end_request();
+        try fixture.acknowledge_late();
+        var notes = fixture.notes();
+        var delivered: usize = 0;
+        // Bounded: the stream holds at most one echo for each note.
+        for (0..flood_notes + 1) |_| {
+            _ = (try notes.next()) orelse break;
+            delivered += 1;
+        }
+        try testing.expect(notes.at_end());
+        try testing.expect(fixture.app.unsent > 0);
+        try testing.expectEqual(@as(usize, flood_notes), delivered + fixture.app.unsent);
+        // The call counts each note it sent, for the interceptors.
+        try testing.expectEqual(delivered, fixture.app.sent);
+        try testing.expectEqualStrings("0", fixture.engine.status());
+        try testing.expectEqual(@as(usize, 0), fixture.engine.cancelled);
+    }
 }
 
 test "decision 33: each call of on_writable hands its notes to the engine, before the stream ends" {
@@ -314,6 +350,8 @@ test "decision 33: the interceptors run once around a stream with next" {
     try testing.expectEqual(@as(usize, 1), fixture.app.calls);
     try testing.expectEqual(@as(usize, 1), fixture.app.finishes);
     try testing.expectEqual(@as(?connect.Code, .aborted), fixture.app.outcome);
+    // The interceptors read the count of every note sent, those the route held among them.
+    try testing.expectEqual(@as(u32, 50), fixture.app.sent);
 }
 
 test "decision 33: a call the route refused at its head runs no interceptor at on_writable" {

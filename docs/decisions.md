@@ -328,8 +328,11 @@ first. Cite an entry by number in code and commits ("decision 6").
       them.
     - The route builds the stream's end once, when the handler ends the stream, and writes it
       when the memory has room. The handler's memory may change in between.
-    - Each call of `on_writable` ends with one flush, not one for each message, so a stream of
-      small messages stays under the runs an h3 response holds.
+    - Each call of `on_writable` ends with one flush, so the client reads the messages of a
+      call before the next call.
+    - colibri's `end` and `trailers` can return `error.Full` or `error.NoSpaceLeft`, which
+      leave the response as it was. The route then returns, and makes the call again at the
+      next `on_writable`.
 
     Limits. `.wait` is for a bidirectional stream whose client still sends: colibri cannot yet
     wake a route whose request ended (colibri issue 130), so the route answers `internal` there.

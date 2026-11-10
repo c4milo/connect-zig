@@ -63,10 +63,16 @@ pub const App = struct {
     note_len: usize = note_len,
     /// The bidirectional stream gives its notes while its client still sends.
     early: bool = false,
+    /// The bidirectional stream drops an echo its Sender could not send, and counts it, rather
+    /// than end the stream.
+    drop_unsent: bool = false,
+    unsent: usize = 0,
     /// What the interceptor saw: the calls it let in, and each call's outcome.
     calls: usize = 0,
     finishes: usize = 0,
     outcome: ?connect.Code = null,
+    /// The messages the call counted as sent when it finished.
+    sent: u32 = 0,
 };
 
 /// An interceptor that counts the calls and records how each ended.
@@ -76,8 +82,9 @@ pub const Watch = struct {
         return null;
     }
 
-    pub fn on_finish(app: *App, _: *rpc.Call, failure: ?connect.RpcError) ?connect.RpcError {
+    pub fn on_finish(app: *App, call: *rpc.Call, failure: ?connect.RpcError) ?connect.RpcError {
         app.finishes += 1;
+        app.sent = call.sent;
         app.outcome = if (failure) |rpc_failure| rpc_failure.code else null;
         return failure;
     }
@@ -133,9 +140,12 @@ pub const Chatter = struct {
         text: [note_len]u8 = undefined,
     };
 
-    pub fn on_message(_: *App, _: *rpc.Call, state: *State, request: *const Note, sender: *rpc.Sender(Note)) ?connect.RpcError {
+    pub fn on_message(app: *App, _: *rpc.Call, state: *State, request: *const Note, sender: *rpc.Sender(Note)) ?connect.RpcError {
         state.total = std.fmt.parseInt(u32, request.text, decimal) catch return .{ .code = .invalid_argument };
-        sender.send(request) catch return .{ .code = .resource_exhausted };
+        sender.send(request) catch {
+            if (!app.drop_unsent) return .{ .code = .resource_exhausted };
+            app.unsent += 1;
+        };
         return null;
     }
 
@@ -339,6 +349,13 @@ pub const Fixture = struct {
 
     /// Sends a request to `path` whose first note names `total`, and ends the request when `end`.
     pub fn call(fixture: *Fixture, path: []const u8, content_type: []const u8, total: u32, end: bool) void {
+        fixture.open(path, content_type);
+        var digits: [request_note_len]u8 = undefined;
+        fixture.send(std.fmt.bufPrint(&digits, "{d}", .{total}) catch unreachable, end);
+    }
+
+    /// Sends the head of a request to `path`, with no note yet.
+    pub fn open(fixture: *Fixture, path: []const u8, content_type: []const u8) void {
         test_section.init();
         test_section.append("content-type", content_type) catch unreachable;
         fixture.handle(.{ .request = .{
@@ -353,8 +370,6 @@ pub const Fixture = struct {
             .headers = .of(&test_section),
             .end = false,
         } });
-        var digits: [request_note_len]u8 = undefined;
-        fixture.send(std.fmt.bufPrint(&digits, "{d}", .{total}) catch unreachable, end);
     }
 
     /// Sends one more note of a request that `call` left open, and ends the request when `end`.
