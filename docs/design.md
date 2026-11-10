@@ -398,6 +398,4 @@ ran on Linux x86-64 with Zig 0.16.0.
 
 ### What a later step owes
 
-- The client cases of `conformance/client_known_failing.txt`: a status outside 100 to 599,
-  which colibri reads as malformed, needs a change in colibri.
 - Long server streams written at `on_writable` (decision 12).
