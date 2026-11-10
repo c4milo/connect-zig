@@ -24,10 +24,13 @@ if command -v "${cargo}" >/dev/null 2>&1; then
     # Cargo's build lives outside the repository, as interop/rust/run.sh keeps its own. It runs
     # from bench/rust, whose .cargo/config.toml builds for this machine's CPU, as Zig does.
     # The build targets this machine's CPU, and CI caches the directory across runners, so the
-    # directory is named for the CPU: a build from another CPU's runner would stop on an
-    # instruction this one lacks (SIGILL), as a build script did on CI run 62.
-    cpu_model="$(sed -n 's/^model name[[:space:]]*: //p' /proc/cpuinfo 2>/dev/null | head -n 1 | sha256sum | cut -c1-12)"
-    target="${XDG_CACHE_HOME:-${HOME}/.cache}/connect-zig/bench-rust-target-${cpu_model}"
+    # directory is named for the CPU's features: a build from a CPU with other features stops on
+    # an instruction this one lacks (SIGILL), as a build script did on CI run 62. The model name
+    # is not enough: runners that report the same model have different features. The features
+    # are the first CPU's `flags` line on x86-64, and its `Features` line on aarch64.
+    cpu_features="$(sed -n -e 's/^flags[[:space:]]*: //p' -e 's/^Features[[:space:]]*: //p' /proc/cpuinfo 2>/dev/null |
+        head -n 1 | sha256sum | cut -c1-12)"
+    target="${XDG_CACHE_HOME:-${HOME}/.cache}/connect-zig/bench-rust-target-${cpu_features}"
     (cd bench/rust && BENCH_DESCRIPTORS="${scratch}/bench.binpb" CARGO_TARGET_DIR="${target}" \
         "${cargo}" build --quiet --locked --release)
     "${target}/release/bench-rust" ${quick} --write "${scratch}/rust" >"${scratch}/rust.md"
