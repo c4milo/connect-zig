@@ -44,11 +44,19 @@ pub fn write_message(comptime T: type, message: *const T, text: *json.TextWriter
     try text.end_object();
 }
 
-/// Writes a message's fields as members of an object already open.
+/// Writes a message's fields as members of an object already open. A repeated or lazy field is
+/// read in place, through a pointer, so a recursive message is not copied at each level.
 fn write_fields(comptime T: type, message: *const T, text: *json.TextWriter, comptime registry: []const type) Error!void {
     inline for (T.protobuf.fields) |field| {
         if (field.oneof) |oneof| {
             try write_member(T, field, oneof, message, text, registry);
+            continue;
+        }
+        const F = @FieldType(T, field.name);
+        if (comptime repeated.is_repeated(F)) {
+            try write_repeated(field, F, &@field(message, field.name), text, registry);
+        } else if (comptime repeated.is_lazy(F)) {
+            try write_lazy(field, F, &@field(message, field.name), text, registry);
         } else {
             try write_field(field, @field(message, field.name), text, registry);
         }
@@ -167,21 +175,27 @@ fn write_camel_path(path: []const u8, text: *json.TextWriter) Error!void {
     if (upper_next) return error.InvalidFieldMask;
 }
 
+/// A repeated field: an array, or an object for a map, and nothing when it holds no element.
+fn write_repeated(comptime field: Field, comptime F: type, item: *const F, text: *json.TextWriter, comptime registry: []const type) Error!void {
+    if (item.is_empty()) return;
+    try text.name(field.json_name);
+    return if (comptime F.kind == .message and F.Element.protobuf.map_entry)
+        write_map(F, item, text, registry)
+    else
+        write_array(field, F, item, text, registry);
+}
+
+/// A singular message field, and nothing when it is absent.
+fn write_lazy(comptime field: Field, comptime F: type, item: *const F, text: *json.TextWriter, comptime registry: []const type) Error!void {
+    const child = try item.get() orelse return;
+    try text.name(field.json_name);
+    return write_message(F.Message, &child, text, registry);
+}
+
+/// A scalar or optional field, and nothing when it holds its default or is absent.
 fn write_field(comptime field: Field, item: anytype, text: *json.TextWriter, comptime registry: []const type) Error!void {
     const F = @TypeOf(item);
-    if (comptime repeated.is_repeated(F)) {
-        if (item.is_empty()) return;
-        try text.name(field.json_name);
-        return if (comptime F.kind == .message and F.Element.protobuf.map_entry)
-            write_map(F, &item, text, registry)
-        else
-            write_array(field, F, &item, text, registry);
-    }
-    if (comptime repeated.is_lazy(F)) {
-        const child = try item.get() orelse return;
-        try text.name(field.json_name);
-        return write_message(F.Message, &child, text, registry);
-    }
+    comptime assert(!repeated.is_repeated(F) and !repeated.is_lazy(F));
     switch (@typeInfo(F)) {
         .optional => |optional| {
             const set = item orelse return;
