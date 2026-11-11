@@ -6,13 +6,13 @@
     .dependencies = .{
         // The HTTP transport of `connect_colibri`, and through its `tls` module, chapulin.
         .colibri = .{
-            .url = "git+https://github.com/c4milo/colibri?ref=v0.15.2#a2bda1e1048202926d86f8c2c2d73df03aa64ded",
-            .hash = "colibri-0.10.0-Wo-AvqgaqgROOnfqt0-xvjDMi81wCbj3jG28vDjze-3R",
+            .url = "git+https://github.com/c4milo/colibri?ref=v0.16.0#b604972414f4a68ab52ef613522729a53dfb05c1",
+            .hash = "colibri-0.10.0-Wo-AvjeCrgQ2CoLmDuqHSEUVGxXqumzISRmI1N-u-yKe",
         },
         // JSON for proto3 JSON and the Connect error bodies, and the compression codecs.
         .stdx = .{
-            .url = "git+https://github.com/c4milo/stdx#57a7040072812cdcb52ad12b42d6b9ac6d0ef177",
-            .hash = "stdx-0.0.0-BD60tjzsNgB8R5mqmzdgCF0cx0xWQfvfjYMuXwF1qv1h",
+            .url = "git+https://github.com/c4milo/stdx#1d1b46f82fd09ae9703555eacab03bf8737dbecd",
+            .hash = "stdx-0.0.0-BD60tp9sOAC29iEwiUKXxXm64873d6D4J9lP5Q8uoM6G",
         },
         // Developer tooling only, never linked into the library (decision 15). Lazy, and requested
         // only when connect-zig is the root build.
@@ -21,11 +21,11 @@
             .hash = "pepegrillo-0.0.0-axiFUFeJDACO8UB_GWT7OSbSKD2QOChXCg68MdfzduJq",
             .lazy = true,
         },
-        // The event loop of the examples, at the commit colibri v0.14.1 pins: Rotor v0.9.0. Lazy, and requested
+        // The event loop of the examples, at the commit colibri v0.16.0 pins: Rotor v0.10.0. Lazy, and requested
         // only when connect-zig is the root build, like pepegrillo.
         .rotor = .{
-            .url = "git+https://github.com/c4milo/rotor#5a5d7d72d8ac4469a48b2a30d77380ac9dd7b90e",
-            .hash = "rotor-0.9.0-YZkxRHY2FQCOGvEpDOWDofpk-UhPMwgUpaU3GyaBzhda",
+            .url = "git+https://github.com/c4milo/rotor#933985882d693e4d8b876e1403618a3fc6d989ef",
+            .hash = "rotor-0.10.0-YZkxRFCxJABaRNenAUK5EC84mD-ZR3zmBesT76zmXoqu",
             .lazy = true,
         },
     },

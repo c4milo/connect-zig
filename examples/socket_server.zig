@@ -38,7 +38,7 @@ pub const protobuf_any_types: []const type = &.{ coverage.Everything, coverage.N
 
 /// 64 TCP connections and 8 QUIC connections at once. A connection past them is accepted and
 /// closed, so its client learns it at once.
-const Server = colibri.ServerOf(.{ .tcp_connections = 64, .quic_connections = 8 });
+const Server = colibri.Server(.{ .tcp_connections = 64, .quic_connections = 8 }, .private);
 
 /// What a program probes once and passes every TLS configuration. This one probes nothing, so
 /// each session runs ChaCha20 alone; a program that depends on stdx calls its `probe()` instead.
@@ -57,22 +57,29 @@ var gzip_encoder: connect.GzipEncoder align(@alignOf(connect.GzipEncoder)) = und
 var zstd_decoder: connect.ZstdDecoder align(@alignOf(connect.ZstdDecoder)) = undefined;
 var zstd_encoder: connect.ZstdEncoder align(@alignOf(connect.ZstdEncoder)) = undefined;
 
+/// The seconds since 1970, from the real-time clock: never before it.
+fn unix_seconds(io: std.Io) u64 {
+    return @intCast(@max(std.Io.Clock.real.now(io).toSeconds(), 0));
+}
+
 pub fn main(init: std.process.Init) !void {
     const port = try port_of(init);
     app.codings = .{
         .decoders = .{ .gzip = &gzip_decoder, .zstd = &zstd_decoder },
         .encoders = .{ .gzip = &gzip_encoder, .zstd = &zstd_encoder },
     };
-    try http_server.init(.{
+    try http_server.init(&.{
         .host = "127.0.0.1",
         .port = port,
         .identity = .{ .chain = identity.chain_pem, .key = identity.key_pem },
         .cpu = cpu,
-    });
+        // The Unix time when the server starts, which its TLS session tickets carry.
+        .unix_seconds = unix_seconds(init.io),
+    }, &router, &app);
     defer http_server.deinit();
     // A script that asked for port 0 reads the port from this line.
     std.debug.print("listening on port {d}\n", .{http_server.port()});
-    try http_server.run(&router, &app);
+    try http_server.run();
 }
 
 fn port_of(init: std.process.Init) !u16 {

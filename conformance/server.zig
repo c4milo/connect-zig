@@ -25,7 +25,7 @@ comptime {
 }
 
 /// TCP connections alone: config.yaml declares no TLS, so the server serves no h3.
-const Server = colibri.ServerOf(.{ .tcp_connections = constants.sockets_max, .quic_connections = 0 });
+const Server = colibri.Server(.{ .tcp_connections = constants.sockets_max, .quic_connections = 0 }, .private);
 
 /// The server speaks cleartext, so no TLS session runs on this CPU description.
 const cpu: tls.Cpu = .{
@@ -61,15 +61,17 @@ pub fn main(init: std.process.Init) !void {
         .decoders = .{ .gzip = &gzip_decoder, .zstd = &zstd_decoder },
         .encoders = .{ .gzip = &gzip_encoder, .zstd = &zstd_encoder },
     };
-    try http_server.init(.{
+    try http_server.init(&.{
         .host = host,
         .port = 0,
         .cpu = cpu,
-        .endpoint = .{ .timeouts = .{ .first_request_ns = constants.first_request_timeout_ns, .idle_ns = constants.idle_timeout_ns } },
-    });
+        // colibri issues TLS session tickets with it; this server runs no TLS, so 0 serves.
+        .unix_seconds = 0,
+        .engine = .{ .timeouts = .{ .first_request_ns = constants.first_request_timeout_ns, .idle_ns = constants.idle_timeout_ns } },
+    }, &router, &app);
     defer http_server.deinit();
     try write_response(init.io, http_server.port());
-    try http_server.run(&router, &app);
+    try http_server.run();
 }
 
 /// Reads the length-prefixed ServerCompatRequest from stdin.

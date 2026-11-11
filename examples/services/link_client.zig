@@ -160,10 +160,10 @@ pub fn begin(protocols: client.Protocols) !void {
         // QUIC always runs TLS. The receive pool is what makes the pool offer QUIC.
         const trust: tls.Trust = .{ .web_pki = .{ .anchors = anchors, .server_name = identity.server_name } };
         client_config = .{ .tls = .{ .trust = trust, .cpu = link_server.cpu }, .authority = identity.server_name, .protocols = protocols };
-        try pool.init(&pool_memory, &client_config, destination, receive_pool.storage());
+        try pool.init(&pool_memory, &client_config, &destination, receive_pool.storage());
     } else {
         client_config = .{ .authority = identity.server_name, .protocols = protocols };
-        try pool.init(&pool_memory, &client_config, destination, null);
+        try pool.init(&pool_memory, &client_config, &destination, null);
     }
     ended_before = link_server.ended();
     requested = 0;

@@ -22,7 +22,10 @@ pub fn build(b: *std.Build) void {
     const release = optimize == .ReleaseSafe;
 
     const stdx = b.dependency("stdx", .{ .target = target, .release = release });
-    const colibri = b.dependency("colibri", .{ .target = target, .release = release });
+    // colibri's `.private` kind of `colibri.Server`, which the example and conformance servers
+    // use, runs on Rotor (colibri decision 159). Only connect-zig's own build asks for it, as it
+    // asks for Rotor itself, so the library never needs Rotor (decision 32).
+    const colibri = b.dependency("colibri", .{ .target = target, .release = release, .rotor = b.pkg_hash.len == 0 });
     const graph = modules(b, stdx, colibri, target, optimize);
 
     const plugin = b.addExecutable(.{

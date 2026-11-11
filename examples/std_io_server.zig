@@ -111,6 +111,12 @@ const Entry = struct {
     closing: bool = false,
     /// The owner shut the socket down, which stops its reader.
     shut: bool = false,
+    /// The engine reported `half_close`: the socket's write side shuts once its octets are out,
+    /// and its reader goes on, since colibri discards what it reads (RFC 9112 §9.6, colibri
+    /// decision 160). The engine's `close`, or the peer's, ends it.
+    half_closing: bool = false,
+    /// The owner shut the socket's write side down.
+    write_shut: bool = false,
     /// The connection owes octets no `send_stream` has taken.
     send_owed: bool = false,
     held_len: usize = 0,
@@ -151,11 +157,11 @@ fn port_of(init: std.process.Init) !u16 {
     return std.fmt.parseInt(u16, text, 10);
 }
 
-/// The instant the engine is given: the monotonic clock, and the Unix time beside it.
-fn instant(io: Io) server.Instant {
+/// The time the engine is given: the Unix time, and the monotonic clock beside it.
+fn instant(io: Io) server.Timestamp {
     const awake = Io.Clock.awake.now(io).toNanoseconds();
     const real = Io.Clock.real.now(io).toSeconds();
-    return .{ .ns = @intCast(awake), .unix_seconds = @intCast(@max(real, 0)) };
+    return .{ .unix_seconds = @intCast(@max(real, 0)), .monotonic_ns = @intCast(awake) };
 }
 
 /// Starts the engine and the tasks that wait, then owns the engine until a task fails.
@@ -172,7 +178,7 @@ fn serve(io: Io, listener: *net.Server) !void {
     try group.concurrent(io, tick, .{io});
     for (0..messages_max) |_| {
         const message = try queue.getOne(io);
-        const now_ns = instant(io).ns;
+        const now_ns = instant(io).monotonic_ns;
         engine.on_instant(now_ns);
         switch (message) {
             .accepted => |stream| try start(io, &group, stream, now_ns),
@@ -296,6 +302,17 @@ fn service(io: Io, now_ns: u64) void {
         entry.stream.shutdown(io, .both) catch {};
         entry.shut = true;
     }
+    shut_writes(io);
+}
+
+/// Shuts the write side of each socket whose connection half-closed, once its octets are out.
+/// Its reader goes on until the engine's `close` or the peer's.
+fn shut_writes(io: Io) void {
+    for (&entries) |*entry| {
+        if (!entry.open or entry.shut or entry.write_shut or !entry.half_closing or entry.send_owed) continue;
+        entry.stream.shutdown(io, .send) catch {};
+        entry.write_shut = true;
+    }
 }
 
 /// Passes the connection its socket's octets, writes what it owes, and routes every event the
@@ -371,6 +388,9 @@ fn route(io: Io, event: server.Event) void {
         },
         .close => |handle| if (find(handle)) |entry| {
             entry.closing = true;
+        },
+        .half_close => |handle| if (find(handle)) |entry| {
+            entry.half_closing = true;
         },
         .ended => |over| if (find(over.connection)) |entry| {
             entry.attached = false;

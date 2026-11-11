@@ -50,7 +50,7 @@ The first release.
 ### Checked
 
 - connectrpc's conformance suite v1.0.4: the server passes 2714 of 2714 cases, and the client
-  8264 of 8264. One timing case on each side is listed as flaky, with its reason.
+  8264 of 8264. One timing case of the client is listed as flaky, with its reason.
 - Clients in other languages call connect-zig's server: connect-go, grpc-go, connect-es on Node,
   grpcio, tonic and connect-rust, across every protobuf type. connect-zig's client calls their
   servers too.

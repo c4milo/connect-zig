@@ -86,7 +86,7 @@ pub fn init(stream: *Link, datagrams: *DatagramLink) !void {
         .ticket_key = &ticket_key,
         .cpu = cpu,
     } };
-    try endpoint.init(&config, prng.random(), .{ .ns = link.now_ns(.server), .unix_seconds = now_seconds });
+    try endpoint.init(&config, prng.random(), .{ .unix_seconds = now_seconds, .monotonic_ns = link.now_ns(.server) });
 }
 
 /// Wipes the key's scalar, which no session uses any more.

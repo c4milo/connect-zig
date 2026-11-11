@@ -74,10 +74,10 @@ pub fn begin(host: []const u8, port: u16, protocols: client.Protocols, trust: ?t
     pool_config = .{ .tls = trust, .authority = written, .protocols = protocols, .tcp_connections = pool_counts.tcp_connections, .requests = pool_counts.requests };
     const destination: client.Destination = .{ .addresses = &addresses, .port = port };
     if (protocols.h3) {
-        try pool.init(&pool_memory, &pool_config, destination, receive_pool.storage());
+        try pool.init(&pool_memory, &pool_config, &destination, receive_pool.storage());
         try datagram.open(io, &peer);
     } else {
-        try pool.init(&pool_memory, &pool_config, destination, null);
+        try pool.init(&pool_memory, &pool_config, &destination, null);
     }
     input_len = 0;
     listener = null;

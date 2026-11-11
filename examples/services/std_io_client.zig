@@ -75,7 +75,7 @@ pub fn begin(io: Io, protocols: client.Protocols, server_port: u16) !void {
     random_source = .{ .io = io };
     port = server_port;
     client_config = .{ .authority = authority, .protocols = protocols };
-    try pool.init(&pool_memory, &client_config, .{ .addresses = &server_addresses, .port = port }, null);
+    try pool.init(&pool_memory, &client_config, &.{ .addresses = &server_addresses, .port = port }, null);
     held_len = 0;
     requested = 0;
     finished = 0;

@@ -444,6 +444,20 @@ ran on Linux x86-64 with Zig 0.16.0.
   - stdx's session takes the rest to the owner: a cheaper step for a brace or a bracket, and a
     name call for octets that need no escape.
 
+- **colibri v0.16.0.** connect-zig pins colibri v0.16.0 (`b6049724`), and the stdx (`1d1b46f8`)
+  and Rotor v0.10.0 (`93398588`) it pins, so the build holds one copy of each (decision 10). The
+  library's API does not change; the programs do:
+  - `colibri.Server(capacity, .private)` replaces `ServerOf`, and takes the router in `init`.
+    `.private` runs on Rotor, so `build.zig` passes `.rotor = true` to colibri only when
+    connect-zig is the root build, as it asks for Rotor itself (decision 32).
+  - `ServerConfig.unix_seconds`, which colibri's TLS session tickets carry, and `engine` for
+    `endpoint`. `server.Instant` is `server.Timestamp`. The pool and Rotor's loop take their
+    options by pointer.
+  - `std_io_server` shuts a socket's write side at the engine's `half_close` (colibri decision
+    160), and keeps reading.
+  - colibri's h11 server now reads, or closes in stages, a body it answered early, so the
+    conformance server's unexpected-verb case leaves `conformance/known_flaky.txt`.
+
 ### What a later step owes
 
 - A stream that waits for an event of the program once its request ended (colibri issue 130).
