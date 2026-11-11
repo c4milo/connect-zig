@@ -468,6 +468,12 @@ ran on Linux x86-64 with Zig 0.16.0.
   - stdx's reader returns a string with no escape as a slice of its input (stdx decision 74).
     connect-zig's readers do not change.
   - Mutations, 2, each CAUGHT: a bytes field written as hexadecimal, and as a plain string.
+  - The judge, CI's `perf` job on `ce62759`: JSON encode takes 42% to 70% fewer instructions on
+    each of the eight messages, and JSON decode 12% to 22% fewer. No binary operation moved.
+    `bench/instructions.txt` holds the new counts.
+  - CI's `bench-compare` job, run 86: connect-zig's JSON decode is faster than Buffa's on 7 of
+    8 messages, and its JSON encode on 5 of 8. The tree message's JSON encode still takes about
+    three times Buffa's time. The README's tables and chart come from this run.
 
 - **The package builds for a project that fetches it.** `build.zig` imports the helpers of
   `build/`, and `.paths` of `build.zig.zon` did not name that folder. `zig fetch` keeps only the

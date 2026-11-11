@@ -65,6 +65,8 @@ The first release.
   bounds it (decision 12). A long stream takes a type handler with `next`.
 - A stream cannot wait for an event of the program once its request ended. colibri plans that
   for v0.17.0 (colibri issue 130).
-- connect-zig's JSON is slower than Buffa's on most messages, mostly inside stdx's JSON writer
-  and reader. The work to close it is under way in stdx.
+- Buffa, connect-rust's protobuf runtime, encodes binary faster than connect-zig on most
+  messages. Its JSON encode is faster on three of eight: a message of small nested objects
+  takes connect-zig about three times as long. connect-zig decodes binary faster on all eight,
+  and JSON on seven. CI publishes the table with each run.
 - The library does not report a missing required field (decision 23).
