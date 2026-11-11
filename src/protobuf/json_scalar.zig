@@ -55,14 +55,6 @@ const float_text_len_max = 32;
 comptime {
     assert(float_text_len_max >= json_float.text_len_max);
 }
-/// The base64 letters one piece of a bytes field writes, under one cache line, so the staging
-/// buffer costs a few stores a call.
-const base64_piece_len = 60;
-/// The calls of the base64 encoder past one for each full piece: a part piece, and the end.
-const base64_calls_extra = 2;
-/// Base64 writes 4 characters for each 3 octets (RFC 4648 §4).
-const base64_chars = 4;
-const base64_octets = 3;
 const decimal_base = 10;
 /// Below this magnitude and at or above `float_exponent_above`, a float is written with an
 /// exponent, as the proto3 JSON writers of the reference implementations do.
@@ -81,7 +73,9 @@ pub fn write(comptime kind: Kind, comptime V: type, value: V, text: *json.TextWr
         // utf8_validation is NONE: JSON text is UTF-8 (RFC 8259 §8.1), and Go's protojson refuses
         // it too.
         .string, .unvalidated_string => try text.string(value),
-        .bytes => try write_base64(value, text),
+        // "JSON Mapping", bytes: standard base64 with padding, which stdx's encoder writes
+        // straight into the text.
+        .bytes => try text.base64(value),
         .@"enum" => try write_enum(V, value, text),
         .message, .group => unreachable,
     }
@@ -115,24 +109,6 @@ fn float_text(comptime V: type, value: V, buffer: *[float_text_len_max]u8) []con
     if (!plain) return std.fmt.bufPrint(buffer, "{e}", .{value}) catch unreachable;
     if (json_float.exact_text(V, value, buffer)) |digits| return digits;
     return std.fmt.bufPrint(buffer, "{d}", .{value}) catch unreachable;
-}
-
-/// Writes `octets` as one string of standard base64 with padding, in pieces. One encoder takes
-/// the whole field, and each call fills the staging buffer.
-pub fn write_base64(octets: []const u8, text: *json.TextWriter) EncodeError!void {
-    var buffer: [base64_piece_len]u8 = undefined;
-    var encoder: base64.Encoder = undefined;
-    encoder.init(.{ .alphabet = .standard, .padding = true }, codec.Features.target());
-    var start: usize = 0;
-    // Bounded: each call but the last fills the buffer, with 3 octets for each 4 letters.
-    for (0..octets.len / (base64_piece_len / base64_chars * base64_octets) + base64_calls_extra) |_| {
-        const progress = encoder.encode(octets[start..], &buffer, .finish);
-        start += progress.consumed;
-        const last = progress.status == .done;
-        try text.write(.{ .string = if (last) .last else .more }, buffer[0..progress.written]);
-        if (last) return;
-    }
-    unreachable;
 }
 
 /// Writes a map key as the JSON member name the mapping gives it: its decimal text, or "true".
@@ -350,7 +326,7 @@ test "64-bit integers are strings, floats use exponents only at the extremes" {
     try testing.expectEqualStrings("\"-Infinity\"", try written(.float, f32, -std.math.inf(f32), &buffer));
 }
 
-test "bytes are padded standard base64, written across pieces" {
+test "bytes are padded standard base64" {
     var buffer: [256]u8 = undefined;
     try testing.expectEqualStrings("\"AP8=\"", try written(.bytes, []const u8, &.{ 0, 255 }, &buffer));
     const long = [_]u8{'a'} ** 100;
@@ -418,10 +394,10 @@ test "base64 decodes in either alphabet, padded or not" {
     try testing.expectError(error.InvalidBase64, write_base64_field("+_8=", &mixed));
 }
 
-test "bytes longer than one piece write the base64 that std.base64 writes, and read back" {
+test "bytes of each length write the base64 that std.base64 writes, and read back" {
     var octets: [200]u8 = undefined;
     for (&octets, 0..) |*octet, index| octet.* = @truncate(index * 7);
-    // Lengths around the 45 octets one piece takes, and one of each remainder of 3.
+    // Short and long lengths, with each remainder of 3 among them.
     for ([_]usize{ 0, 1, 44, 45, 46, 90, 91, 200 }) |len| {
         var buffer: [300]u8 = undefined;
         const text = try written(.bytes, []const u8, octets[0..len], &buffer);

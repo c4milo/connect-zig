@@ -458,8 +458,19 @@ ran on Linux x86-64 with Zig 0.16.0.
   - colibri's h11 server now reads, or closes in stages, a body it answered early, so the
     conformance server's unexpected-verb case leaves `conformance/known_flaky.txt`.
 
+- **colibri v0.16.1.** connect-zig pins colibri v0.16.1 (`14ae68a9`) and the stdx it pins
+  (`89a021c3`). chapulin v0.5.0 and Rotor v0.10.0 stay, and colibri's API does not change. The
+  owner ruled on 2026-11-11 that v0.1.0 ships on this stdx.
+  - A bytes field's JSON goes through stdx's `TextWriter.base64` (stdx decision 73), which
+    writes the letters straight into the text. The loop of 60-letter pieces leaves
+    `json_scalar.zig`. Connect's error details keep their loop: they are unpadded, and the new
+    call pads.
+  - stdx's reader returns a string with no escape as a slice of its input (stdx decision 74).
+    connect-zig's readers do not change.
+  - Mutations, 2, each CAUGHT: a bytes field written as hexadecimal, and as a plain string.
+
 ### What a later step owes
 
 - A stream that waits for an event of the program once its request ended (colibri issue 130).
-  The owner ruled on 2026-11-10 that colibri v0.16.0 does not wait for it: it ships in v0.17.0,
-  or in v0.16.1 if its design adds names with no break.
+  The owner ruled on 2026-11-10 that colibri v0.16.0 does not wait for it. colibri v0.16.1 does
+  not hold it either: it ships in v0.17.0.
