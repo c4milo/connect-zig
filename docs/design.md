@@ -449,5 +449,3 @@ ran on Linux x86-64 with Zig 0.16.0.
 - A stream that waits for an event of the program once its request ended (colibri issue 130).
   The owner ruled on 2026-11-10 that colibri v0.16.0 does not wait for it: it ships in v0.17.0,
   or in v0.16.1 if its design adds names with no break.
-- The conformance server's streams, which still write through a `Sender` in one call. So
-  `conformance/constants.zig` keeps 640 KiB of response memory.
