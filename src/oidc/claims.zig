@@ -4,21 +4,54 @@ const assert = std.debug.assert;
 const constants = @import("constants.zig");
 const reader_file = @import("reader.zig");
 const Reader = reader_file.Reader;
+const lookup = @import("lookup.zig");
 
 pub const Error = error{Malformed};
 
-/// What a verified token states. The slices point into the verifier, and stay valid until its
-/// next `verify`.
+/// What a verified token states, in storage the caller owns: `Verifier.verify` fills it. A route
+/// keeps one in each call's request context, so each call reads its own (decisions 34 and 35).
 pub const Claims = struct {
-    /// "sub" (RFC 7519 §4.1.2): whom the token is about. Empty when the token names no one.
-    subject: []const u8,
-    /// "iss" (RFC 7519 §4.1.1): the verifier's issuer, which the token's equals.
-    issuer: []const u8,
+    /// "iss" (RFC 7519 §4.1.1): the verifier's issuer, which the token's equals. It points into
+    /// the verifier.
+    issuer: []const u8 = "",
     /// "exp" (RFC 7519 §4.1.4), in whole seconds since 1970-01-01T00:00:00Z.
-    expires_unix_seconds: i64,
-    /// The JWT Claims Set as the token carries it (RFC 7519 §3): the JSON text of one object. A
-    /// program reads its own claims from it.
-    payload: []const u8,
+    expires_unix_seconds: i64 = 0,
+    subject_len: usize = 0,
+    payload_len: usize = 0,
+    subject_storage: [constants.subject_bytes_max]u8 = undefined,
+    payload_storage: [constants.decoded_bytes_max]u8 = undefined,
+    /// The octets of the string the last lookup returned.
+    lookup_storage: [constants.claim_bytes_max]u8 = undefined,
+
+    pub const LookupError = lookup.Error;
+
+    /// "sub" (RFC 7519 §4.1.2): whom the token is about. Empty when the token names no one.
+    pub fn subject(claims: *const Claims) []const u8 {
+        return claims.subject_storage[0..claims.subject_len];
+    }
+
+    /// The JWT Claims Set as the token carries it (RFC 7519 §3): the JSON text of one object.
+    pub fn payload(claims: *const Claims) []const u8 {
+        return claims.payload_storage[0..claims.payload_len];
+    }
+
+    /// The string of the claim `name`, such as "email", or null when the token holds none. It
+    /// stays valid until the next lookup on these claims. A name the token holds twice reads
+    /// its last value (RFC 7519 §4).
+    pub fn string(claims: *Claims, name: []const u8) LookupError!?[]const u8 {
+        return lookup.string(claims.payload(), name, &claims.lookup_storage);
+    }
+
+    /// The integer of the claim `name`, such as "auth_time", or null when the token holds none.
+    pub fn integer(claims: *Claims, name: []const u8) LookupError!?i64 {
+        return lookup.integer(claims.payload(), name, &claims.lookup_storage);
+    }
+
+    /// Whether the claim `name` is the string `value`, or an array that holds it, such as
+    /// "admin" among "roles". False when the token holds no such claim.
+    pub fn holds(claims: *Claims, name: []const u8, value: []const u8) LookupError!bool {
+        return lookup.holds(claims.payload(), name, value, &claims.lookup_storage);
+    }
 };
 
 /// A NumericDate (RFC 7519 §2): seconds since 1970-01-01T00:00:00Z, which may hold a part of a

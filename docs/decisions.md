@@ -172,7 +172,8 @@ first. Cite an entry by number in code and commits ("decision 6").
     headers, and the response headers and trailers they add. Beaten: a runtime list of function
     pointers, which costs an indirect call and loses the `app` type; and, amended 2026-11-07, a
     `ClientCallWith(method, interceptors)` beside `ClientCall(method)`, which named two types for
-    one and left no room for a client option but interceptors.
+    one and left no room for a client option but interceptors. Amended 2026-11-11: a server
+    hook may take the call's request context as its third parameter (decision 35).
 
 20. **Examples share their services.** The programs in `examples/` import the ELIZA and demo
     services, the in-memory link and its client loop from `examples/services/`, so each program
@@ -375,11 +376,15 @@ first. Cite an entry by number in code and commits ("decision 6").
     - A name the module reads appears once in its object, in a header, a claims set and a JWK.
       The RFCs let a parser refuse a second one, and the refusal leaves no two readings of one
       text.
-    - The claims stay in the verifier until its next `verify`, and a handler reads them from
-      the context's field `oidc`. A function handler, and a `next` handler's `on_request`, run
-      straight after the interceptor, so they read their own call's claims. A callback that
-      runs later calls `verify` again with `bearer_token` of its call's header, or keeps what
-      its first callback copied. `Call` does not change.
+    - The claims belong to the call (amended 2026-11-11, decision 35). `verify` writes them
+      into a `Claims` the caller owns, which holds a copy of the subject and of the payload. The
+      interceptor verifies into its call's request context, the field `oidc`, a
+      `?oidc.Claims`, which stays null on an excluded path and after a refusal. A handler reads
+      `call.request_context(RequestContext).oidc` at any callback of its call, the tenth
+      message of a stream included.
+    - A program reads its own claims on demand, with `Claims.string`, `integer` and `holds`
+      over the payload's copy. A string a lookup returns stays valid until the next lookup on
+      the same `Claims`. A claim nobody asks for costs nothing.
     - `Interceptor(.{ .exclude = ... })` takes its list at compile time, because a generated
       `Routes` gives one interceptor list to each method of a service. An entry is a method's
       path, or a service's prefix that ends in "/". Its `on_call` takes any call type with
@@ -390,12 +395,46 @@ first. Cite an entry by number in code and commits ("decision 6").
 
     Limits. One issuer and one audience for each verifier, and 8 keys. An RSA key holds 2048
     to 4096 bits. A token holds 4096 characters at most, which is what a route copies of a
-    request's headers. A NumericDate with an exponent is refused. The module reads no "typ",
+    request's headers. A string a lookup returns holds `claim_bytes_max` octets at most. A
+    `Claims` takes about 4.4 KB of each call's request context. A NumericDate with an exponent
+    is refused.
+    The module reads no "typ",
     "nonce", "azp" or "at_hash": those belong to the client that ran the login, not to the
     server that takes the token. Beaten: Zig's `std.crypto`, which the owner refused for
     chapulin; one copy of the JWT code in colibri, which the owner refused for a copy in each
-    library; claims on `Call`, which would change `connect_colibri` for one interceptor; and an
-    exclusion list read at run time, which a comptime list makes free for a route with none.
+    library; claims in the verifier, valid until its next `verify`, which a later callback of a
+    stream read wrong (this decision's first form); a struct of claims the program declares,
+    which stdx's typed decoder cannot fill, since it refuses the members a struct does not name,
+    and which needs a bound for each string and array; and an exclusion list read at run time,
+    which a comptime list makes free for a route with none.
+
+35. **A call keeps a request context of the type the program declares.** Ruled by the owner on
+    2026-11-11. What an interceptor learns about a call belongs to that call: the claims of its
+    token, the user a rate limit counted, an identifier a log prints. Before this decision it
+    lived in the program's context, which every call shares. So a stream's later callback could
+    read what another call wrote in between.
+    - `RouteOptions.RequestContext` is a struct whose fields each have a default, `struct {}`
+      when the program names none. The route keeps one in each call's state. colibri sets that
+      state to its defaults at each request, so every call starts with `.{}`.
+    - An interceptor's hook may take it as its third parameter:
+      `on_call(app, *Call, *RequestContext)` and
+      `on_finish(app, *Call, *RequestContext, ?RpcError)`. A hook with no such parameter runs as
+      before.
+    - A handler reads it at any callback with `call.request_context(RequestContext)`. The call
+      keeps a pointer to it and the name of its type, and an assertion compares the name, so a
+      read with the wrong type fails at once.
+    - Each request entry of the router grows by `@sizeOf(RequestContext)`.
+    - Two contexts exist side by side, as Flask has an application context and a request
+      context. The program's context is the router's `Context`, which every call shares. The
+      request context belongs to one call. The documents name each one in full.
+
+    It holds the program's own values alone. The request's headers, path and timeout stay on
+    `Call`. Beaten: a `State` for each interceptor, read through the interceptor's type, which
+    needs a table keyed by type in `Call`, and gives two interceptors no slot they share; a
+    generic `CallWith(T)`, which changes the signature of every handler, every interceptor and
+    the generated code; and the names `Local`, which no framework uses for this, and `Locals`,
+    which Express, SvelteKit and Astro use. The owner chose `RequestContext`, the phrase of Go's
+    `Request.Context`, Flask, Spring and API Gateway's `requestContext`.
 
 ## Tooling
 

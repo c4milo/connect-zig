@@ -234,18 +234,33 @@ try app.oidc.init(&.{ .issuer = "https://accounts.example.com", .audience = "my-
 try app.oidc.set_keys(jwks_text); // again when app.oidc.keys_stale()
 app.oidc.set_time(unix_seconds); // when your clock moves
 
+// Each call keeps its own claims in its request context.
+const RequestContext = struct { oidc: ?oidc.Claims = null };
+
 // Each method of the service needs a valid token, except those you exclude.
 const Auth = oidc.Interceptor(.{ .exclude = &.{ "/grpc.health.v1.Health/", "/auth.v1.Auth/Login" } });
-pub const routes = Service.Routes(rpc, App, @This(), .{ .interceptors = &.{Auth} }).routes;
+const options: rpc.RouteOptions = .{ .interceptors = &.{Auth}, .RequestContext = RequestContext };
+pub const routes = Service.Routes(rpc, App, @This(), options).routes;
 
-// In a handler behind the interceptor:
-const claims = app.oidc.claims().?;
-std.debug.print("{s}\n", .{claims.subject});
+// In any callback of a call behind the interceptor, a stream's tenth message included:
+if (call.request_context(RequestContext).oidc) |*claims| {
+    std.debug.print("{s}\n", .{claims.subject()});
+    const email = try claims.string("email"); // ?[]const u8
+    const admin = try claims.holds("roles", "admin"); // in an array, or equal
+    const since = try claims.integer("auth_time"); // ?i64
+}
 ```
 
 The verifier checks the signature first, with the key the token's header names. It then checks
 the issuer, the audience, `exp` and `nbf` (decision 34). A call with no valid token gets
-`unauthenticated` and a `WWW-Authenticate: Bearer` header.
+`unauthenticated` and a `WWW-Authenticate: Bearer` header. On an excluded path, the call's
+`oidc` stays null.
+
+`RouteOptions.RequestContext` serves any interceptor, not `oidc` alone: it is a struct you
+declare, and each call starts with its defaults. An interceptor's `on_call` and `on_finish` may
+take it after the call, and a handler reads it with `call.request_context(RequestContext)`
+(decision 35). It holds your values alone: the request's headers, path and timeout stay on
+`Call`, and your app is still the context every call shares.
 
 > [!IMPORTANT]
 > `oidc` checks signatures with chapulin's `jws` calls, which chapulin v0.6.0 holds. colibri

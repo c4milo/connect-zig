@@ -24,6 +24,9 @@ The first release.
 - Connect's unary GET for methods marked `NO_SIDE_EFFECTS`.
 - gzip and zstd both ways. brotli is read, not written, until stdx has an encoder.
 - Interceptors on the server and the client, typed error details, timeouts, headers and trailers.
+- A request context for each call, of a struct the program declares in
+  `RouteOptions.RequestContext`. An interceptor writes it, and each callback of the call reads
+  it with `call.request_context` (decision 35).
 - A method Connect does not serve gets 405 with an `Allow` header, as connect-go answers.
 
 ### OpenID Connect
@@ -32,7 +35,9 @@ The first release.
   RS256, ES256 or EdDSA, then its issuer, its audience and its times (decision 34). The program
   passes the issuer's JWK Set and the time.
 - `oidc.Interceptor`, a server interceptor that refuses a call with no valid token, and lets
-  the paths a program excludes through.
+  the paths a program excludes through. It writes the claims into the call's request context.
+  `Claims.string`, `integer` and `holds` read a program's own claims, such as `email` or
+  `roles`.
 
 ### Protobuf
 

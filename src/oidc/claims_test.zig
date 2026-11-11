@@ -134,11 +134,11 @@ test "a token holds an expiration time, and its claims are the JSON the RFC requ
     for (refused) |payload| try testing.expectError(error.Malformed, fixture.check(payload));
 
     const longest = try fixture.check(head ++ ",\"exp\":999999999999,\"sub\":\"" ++ "s" ** constants.subject_bytes_max ++ "\"}");
-    try testing.expectEqualStrings("s" ** constants.subject_bytes_max, longest.subject);
+    try testing.expectEqualStrings("s" ** constants.subject_bytes_max, longest.subject());
     try testing.expectEqual(@as(i64, 999_999_999_999), longest.expires_unix_seconds);
     // A token that names no subject, and claims the verifier does not read.
     const bare = try fixture.check(head ++ ",\"exp\":1700003600,\"scope\":[\"a\",{\"exp\":1}],\"azp\":\"client\"}");
-    try testing.expectEqualStrings("", bare.subject);
+    try testing.expectEqualStrings("", bare.subject());
 }
 
 test "parse_numeric_date reads whole seconds and a fraction" {

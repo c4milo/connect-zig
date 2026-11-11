@@ -11,6 +11,21 @@ const rfc = @import("rfc_vectors.zig");
 const rsa = @import("rsa_vectors.zig");
 
 const kinds = [_]support.Kind{ .es256, .eddsa };
+
+/// Claims for the tests whose verifier stands alone; a test runs at a time.
+threadlocal var alone_claims: verifier_file.Claims align(@alignOf(verifier_file.Claims)) = .{};
+
+fn verify_into(verifier: *Verifier, token: []const u8) Error!*verifier_file.Claims {
+    try verifier.verify(token, &alone_claims);
+    return &alone_claims;
+}
+
+/// Claims after a refusal hold their defaults: nothing a handler reads.
+fn expect_empty(claims: *const verifier_file.Claims) !void {
+    try testing.expectEqualStrings("", claims.subject());
+    try testing.expectEqualStrings("", claims.payload());
+    try testing.expectEqual(@as(i64, 0), claims.expires_unix_seconds);
+}
 /// A letter of the signature that holds six of its bits: the last one holds fewer.
 const signature_letter_from_end = 2;
 
@@ -18,13 +33,11 @@ test "a token the issuer signed verifies in ES256 and EdDSA, and gives its claim
     for (kinds) |kind| {
         var fixture: Fixture = undefined;
         try fixture.init(kind);
-        try testing.expectEqual(@as(?*const verifier_file.Claims, null), fixture.verifier.claims());
         const claims = try fixture.check(support.good_claims);
-        try testing.expectEqualStrings("user-1", claims.subject);
+        try testing.expectEqualStrings("user-1", claims.subject());
         try testing.expectEqualStrings(support.issuer, claims.issuer);
         try testing.expectEqual(support.good_expires, claims.expires_unix_seconds);
-        try testing.expectEqualStrings(support.good_claims, claims.payload);
-        try testing.expectEqual(claims, fixture.verifier.claims().?);
+        try testing.expectEqualStrings(support.good_claims, claims.payload());
         try testing.expect(!fixture.verifier.keys_stale());
     }
 }
@@ -45,16 +58,16 @@ test "an RS256 token verifies under a key of 2048 bits and one of 4096 bits" {
     for (vectors) |vector| {
         var verifier: Verifier = undefined;
         try rsa_verifier(&verifier, vector[0], vector[2]);
-        const claims = try verifier.verify(vector[1]);
-        try testing.expectEqualStrings(rsa.subject, claims.subject);
+        const claims = try verify_into(&verifier, vector[1]);
+        try testing.expectEqualStrings(rsa.subject, claims.subject());
         try testing.expectEqual(@as(i64, rsa.expires_unix_seconds), claims.expires_unix_seconds);
         // One octet of the signed text changed: the signature no longer verifies.
         var changed: [constants.token_bytes_max]u8 = undefined;
         @memcpy(changed[0..vector[1].len], vector[1]);
         const payload_start = std.mem.indexOfScalar(u8, vector[1], '.').? + 1;
         changed[payload_start + 2] ^= 1;
-        try testing.expectError(error.InvalidSignature, verifier.verify(changed[0..vector[1].len]));
-        try testing.expectEqual(@as(?*const verifier_file.Claims, null), verifier.claims());
+        try testing.expectError(error.InvalidSignature, verify_into(&verifier, changed[0..vector[1].len]));
+        try expect_empty(&alone_claims);
     }
 }
 
@@ -63,7 +76,7 @@ test "a verifier keeps no RSA key under 2048 bits" {
     var verifier: Verifier = undefined;
     try testing.expectError(error.NoKeys, rsa_verifier(&verifier, rsa.rsa_1024_modulus, "rsa-1024"));
     verifier.set_time(support.now);
-    try testing.expectError(error.UnknownKey, verifier.verify(rsa.rsa_1024_token));
+    try testing.expectError(error.UnknownKey, verify_into(&verifier, rsa.rsa_1024_token));
 }
 
 /// The RFC's token passes its signature, and then fails on a claim: the RFC's claims name no
@@ -74,13 +87,13 @@ fn expect_known_answer(jwk: []const u8, token: []const u8, after_signature: Erro
     var buffer: [support.text_bytes]u8 = undefined;
     try verifier.set_keys(try std.fmt.bufPrint(&buffer, "{{\"keys\":[{s}]}}", .{jwk}));
     verifier.set_time(rfc.expires_unix_seconds - 1);
-    try testing.expectError(after_signature, verifier.verify(token));
+    try testing.expectError(after_signature, verify_into(&verifier, token));
 
     var changed: [constants.token_bytes_max]u8 = undefined;
     @memcpy(changed[0..token.len], token);
     const last = token.len - signature_letter_from_end;
     changed[last] = if (changed[last] == 'A') 'B' else 'A';
-    try testing.expectError(error.InvalidSignature, verifier.verify(changed[0..token.len]));
+    try testing.expectError(error.InvalidSignature, verify_into(&verifier, changed[0..token.len]));
 }
 
 test "the RFCs' tokens verify under the RFCs' keys" {
@@ -96,7 +109,7 @@ test "the RFC's claims pass the issuer and the time, and fail each alone" {
     try verifier.init(&.{ .issuer = "jo", .audience = "any" });
     try verifier.set_keys(jwk);
     verifier.set_time(rfc.expires_unix_seconds - 1);
-    try testing.expectError(error.WrongIssuer, verifier.verify(rfc.es256_token));
+    try testing.expectError(error.WrongIssuer, verify_into(&verifier, rfc.es256_token));
 }
 
 test "a token changed after its signature is refused" {
@@ -111,14 +124,14 @@ test "a token changed after its signature is refused" {
         for ([_]usize{ first + 1, second - 1, second + 1, token.len - 2 }) |at| {
             @memcpy(room[0..token.len], token);
             room[at] = if (room[at] == 'A') 'B' else 'A';
-            try testing.expectError(error.InvalidSignature, fixture.verifier.verify(room[0..token.len]));
-            try testing.expectEqual(@as(?*const verifier_file.Claims, null), fixture.verifier.claims());
+            try testing.expectError(error.InvalidSignature, fixture.verify(room[0..token.len]));
+            try expect_empty(&fixture.claims);
         }
         // A letter of the header changed: the header is refused, or the signature fails.
         for ([_]usize{ 0, first - 1 }) |at| {
             @memcpy(room[0..token.len], token);
             room[at] = if (room[at] == 'A') 'B' else 'A';
-            try testing.expect(std.meta.isError(fixture.verifier.verify(room[0..token.len])));
+            try testing.expect(std.meta.isError(fixture.verify(room[0..token.len])));
         }
         // The payload of another token under this token's signature.
         var other_buffer: [support.text_bytes]u8 = undefined;
@@ -126,10 +139,10 @@ test "a token changed after its signature is refused" {
         other.raw(token[0 .. first + 1]);
         other.base64url("{\"iss\":\"" ++ support.issuer ++ "\",\"sub\":\"admin\",\"aud\":\"" ++ support.audience ++ "\",\"exp\":1700003600}");
         other.raw(token[second..]);
-        try testing.expectError(error.InvalidSignature, fixture.verifier.verify(other.written()));
+        try testing.expectError(error.InvalidSignature, fixture.verify(other.written()));
         // A signature of 63 octets, and none.
-        try testing.expectError(error.InvalidSignature, fixture.verifier.verify(token[0 .. token.len - 2]));
-        try testing.expectError(error.InvalidSignature, fixture.verifier.verify(token[0 .. second + 1]));
+        try testing.expectError(error.InvalidSignature, fixture.verify(token[0 .. token.len - 2]));
+        try testing.expectError(error.InvalidSignature, fixture.verify(token[0 .. second + 1]));
     }
 }
 
@@ -141,7 +154,7 @@ test "a token signed by another key under the same identifier is refused" {
         var header_buffer: [128]u8 = undefined;
         var text: support.Text = .{ .buffer = &fixture.buffer };
         const token = support.mint(&text, &stranger, fixture.header(&header_buffer), support.good_claims);
-        try testing.expectError(error.InvalidSignature, fixture.verifier.verify(token));
+        try testing.expectError(error.InvalidSignature, fixture.verify(token));
     }
 }
 
@@ -153,14 +166,14 @@ test "the header's algorithm is one the verifier takes, and the key's own" {
     for (refused) |name| {
         var header: [96]u8 = undefined;
         const text = try std.fmt.bufPrint(&header, "{{\"alg\":\"{s}\",\"kid\":\"{s}\"}}", .{ name, support.key_id });
-        try testing.expectError(error.UnsupportedAlgorithm, fixture.verifier.verify(fixture.token_with(text, support.good_claims)));
+        try testing.expectError(error.UnsupportedAlgorithm, fixture.verify(fixture.token_with(text, support.good_claims)));
     }
     // RFC 8725 §3.1: the key signs with ES256 alone, so a header that names another algorithm
     // the verifier takes finds no key.
     for ([_][]const u8{ "EdDSA", "RS256" }) |name| {
         var header: [96]u8 = undefined;
         const text = try std.fmt.bufPrint(&header, "{{\"alg\":\"{s}\",\"kid\":\"{s}\"}}", .{ name, support.key_id });
-        try testing.expectError(error.UnknownKey, fixture.verifier.verify(fixture.token_with(text, support.good_claims)));
+        try testing.expectError(error.UnknownKey, fixture.verify(fixture.token_with(text, support.good_claims)));
     }
 }
 
@@ -184,7 +197,7 @@ test "the header's key identifier names the key" {
     try fixture.init(.eddsa);
     try testing.expect(!fixture.verifier.keys_stale());
     // A key the verifier does not hold: the issuer changed its keys.
-    try testing.expectError(error.UnknownKey, fixture.verifier.verify(fixture.token_with("{\"alg\":\"EdDSA\",\"kid\":\"key-2\"}", support.good_claims)));
+    try testing.expectError(error.UnknownKey, fixture.verify(fixture.token_with("{\"alg\":\"EdDSA\",\"kid\":\"key-2\"}", support.good_claims)));
     try testing.expect(fixture.verifier.keys_stale());
     // The same keys again clear the mark.
     var jwks_buffer: [support.text_bytes]u8 = undefined;
@@ -199,10 +212,10 @@ test "the header's key identifier names the key" {
     for (names) |name| {
         var header: [256]u8 = undefined;
         const text = try std.fmt.bufPrint(&header, "{{\"alg\":\"EdDSA\",\"kid\":\"{s}\"}}", .{name});
-        try testing.expectError(error.UnknownKey, fixture.verifier.verify(fixture.token_with(text, support.good_claims)));
+        try testing.expectError(error.UnknownKey, fixture.verify(fixture.token_with(text, support.good_claims)));
     }
     // With no identifier, the algorithm names the key while the set holds one key of it.
-    _ = try fixture.verifier.verify(fixture.token_with("{\"alg\":\"EdDSA\"}", support.good_claims));
+    _ = try fixture.verify(fixture.token_with("{\"alg\":\"EdDSA\"}", support.good_claims));
 }
 
 test "a token with no key identifier names no key among two of its algorithm" {
@@ -219,17 +232,17 @@ test "a token with no key identifier names no key among two of its algorithm" {
     jwks.raw("]}");
     // One ES256 key beside a key of another algorithm: the header's algorithm names it.
     try fixture.verifier.set_keys(jwks.written());
-    _ = try fixture.verifier.verify(fixture.token_with("{\"alg\":\"ES256\"}", support.good_claims));
+    _ = try fixture.verify(fixture.token_with("{\"alg\":\"ES256\"}", support.good_claims));
     jwks.len -= 2;
     jwks.raw(",");
     second.jwk(&jwks, "key-2", "");
     jwks.raw("]}");
     try fixture.verifier.set_keys(jwks.written());
-    try testing.expectError(error.UnknownKey, fixture.verifier.verify(fixture.token_with("{\"alg\":\"ES256\"}", support.good_claims)));
+    try testing.expectError(error.UnknownKey, fixture.verify(fixture.token_with("{\"alg\":\"ES256\"}", support.good_claims)));
     // Each key still verifies its own token by name.
     _ = try fixture.check(support.good_claims);
     var text: support.Text = .{ .buffer = &fixture.buffer };
-    _ = try fixture.verifier.verify(support.mint(&text, &second, "{\"alg\":\"ES256\",\"kid\":\"key-2\"}", support.good_claims));
+    _ = try fixture.verify(support.mint(&text, &second, "{\"alg\":\"ES256\",\"kid\":\"key-2\"}", support.good_claims));
 }
 
 test "a text that is no JWT is malformed" {
@@ -240,33 +253,33 @@ test "a text that is no JWT is malformed" {
     const second = std.mem.lastIndexOfScalar(u8, token, '.').?;
     var room: [support.text_bytes]u8 = undefined;
     // RFC 7515 §7.1: three parts.
-    for ([_][]const u8{ "", ".", "..", "a.b", token[0..second], "a.b.c.d.e" }) |text| try testing.expectError(error.Malformed, fixture.verifier.verify(text));
-    try testing.expectError(error.Malformed, fixture.verifier.verify(try std.fmt.bufPrint(&room, "{s}.x", .{token})));
+    for ([_][]const u8{ "", ".", "..", "a.b", token[0..second], "a.b.c.d.e" }) |text| try testing.expectError(error.Malformed, fixture.verify(text));
+    try testing.expectError(error.Malformed, fixture.verify(try std.fmt.bufPrint(&room, "{s}.x", .{token})));
     // RFC 7515 §2: base64url with no padding, and no other character, in the header and in the
     // signature. In the payload the signature fails first: no claim is read before it passed.
     for ([_]u8{ '=', '+', '/', ' ', '\n' }) |octet| {
         for ([_]usize{ first - 1, token.len - 1 }) |at| {
             @memcpy(room[0..token.len], token);
             room[at] = octet;
-            try testing.expectError(error.Malformed, fixture.verifier.verify(room[0..token.len]));
+            try testing.expectError(error.Malformed, fixture.verify(room[0..token.len]));
         }
         @memcpy(room[0..token.len], token);
         room[second - 1] = octet;
-        try testing.expectError(error.InvalidSignature, fixture.verifier.verify(room[0..token.len]));
+        try testing.expectError(error.InvalidSignature, fixture.verify(room[0..token.len]));
     }
-    try testing.expectError(error.Malformed, fixture.verifier.verify(try std.fmt.bufPrint(&room, "{s}=", .{token})));
-    try testing.expectError(error.Malformed, fixture.verifier.verify(try std.fmt.bufPrint(&room, "{s}=.{s}", .{ token[0..first], token[first + 1 ..] })));
+    try testing.expectError(error.Malformed, fixture.verify(try std.fmt.bufPrint(&room, "{s}=", .{token})));
+    try testing.expectError(error.Malformed, fixture.verify(try std.fmt.bufPrint(&room, "{s}=.{s}", .{ token[0..first], token[first + 1 ..] })));
     // A payload that is not base64url, under a true signature: "e30" is "{}", and each text
     // here is refused where RFC 4648 §3.5 and §5 refuse it.
     var header_part: [128]u8 = undefined;
     @memcpy(header_part[0..first], token[0..first]);
     for ([_][]const u8{ "e30=", "e3 0", "e30+", "e31", "e" }) |payload| {
         var text: support.Text = .{ .buffer = &fixture.buffer };
-        try testing.expectError(error.Malformed, fixture.verifier.verify(support.mint_parts(&text, &fixture.signer, header_part[0..first], payload)));
+        try testing.expectError(error.Malformed, fixture.verify(support.mint_parts(&text, &fixture.signer, header_part[0..first], payload)));
     }
     // A header that is not the JSON RFC 7515 §4 requires.
     for ([_][]const u8{ "", "[]", "{\"alg\":\"ES256\"", "{\"alg\":\"ES256\",\"crit\":[\"exp\"],\"kid\":\"key-1\"}", "{\"kid\":\"key-1\"}" }) |header| {
-        try testing.expectError(error.Malformed, fixture.verifier.verify(fixture.token_with(header, support.good_claims)));
+        try testing.expectError(error.Malformed, fixture.verify(fixture.token_with(header, support.good_claims)));
     }
 }
 
@@ -283,12 +296,12 @@ test "a token's length is bounded" {
         const payload = try std.fmt.bufPrint(&payload_buffer, "{{\"iss\":\"{s}\",\"aud\":\"{s}\",\"exp\":1700003600,\"p\":\"{s}\"}}", .{ support.issuer, support.audience, ("p" ** 3000)[0..padding] });
         const token = fixture.token_with(header, payload);
         if (token.len == constants.token_bytes_max) {
-            const claims = try fixture.verifier.verify(token);
-            try testing.expectEqualStrings(payload, claims.payload);
+            const claims = try fixture.verify(token);
+            try testing.expectEqualStrings(payload, claims.payload());
             longest = padding;
         }
         if (token.len > constants.token_bytes_max) {
-            try testing.expectError(error.TokenTooLong, fixture.verifier.verify(token));
+            try testing.expectError(error.TokenTooLong, fixture.verify(token));
             past += 1;
         }
     }
@@ -360,30 +373,40 @@ test "set_keys replaces the keys, and keeps the old ones after an error" {
         const last = support.mint(&text, &second, "{\"alg\":\"EdDSA\",\"kid\":\"k7\"}", support.good_claims);
         if (count > constants.keys_max) {
             try testing.expectError(error.TooManyKeys, fixture.verifier.set_keys(jwks.written()));
-            _ = try fixture.verifier.verify(last);
+            _ = try fixture.verify(last);
         } else {
             try fixture.verifier.set_keys(jwks.written());
-            _ = try fixture.verifier.verify(last);
+            _ = try fixture.verify(last);
             // The key the verifier held before is gone.
             try testing.expectError(error.UnknownKey, fixture.check(support.good_claims));
         }
     }
 }
 
-test "the claims stay valid until the next verify, across set_keys" {
+test "each caller's claims are its own: a later verify writes into other claims alone" {
     var fixture: Fixture = undefined;
     try fixture.init(.es256);
-    const claims = try fixture.check(support.good_claims);
+    const first = try fixture.check(support.good_claims);
+    var other: verifier_file.Claims = .{};
+    const later = "{\"iss\":\"" ++ support.issuer ++ "\",\"sub\":\"user-2\",\"aud\":\"" ++ support.audience ++ "\",\"exp\":1700009000}";
+    var text_buffer: [support.text_bytes]u8 = undefined;
+    var text: support.Text = .{ .buffer = &text_buffer };
+    var header_buffer: [128]u8 = undefined;
+    try fixture.verifier.verify(support.mint(&text, &fixture.signer, fixture.header(&header_buffer), later), &other);
+    // New keys, with a certificate chain past the reader's storage, leave both as they are.
     var jwks_buffer: [support.text_bytes]u8 = undefined;
     var jwks: support.Text = .{ .buffer = &jwks_buffer };
     jwks.raw("{\"keys\":[");
     support.Signer.init(.eddsa, 2).jwk(&jwks, "key-2", ",\"x5c\":[\"" ++ "M" ** (2 * constants.decoded_bytes_max) ++ "\"]");
     jwks.raw("]}");
     try fixture.verifier.set_keys(jwks.written());
-    try testing.expectEqualStrings("user-1", claims.subject);
-    try testing.expectEqualStrings(support.good_claims, claims.payload);
-    try testing.expectEqual(claims, fixture.verifier.claims().?);
-    // A refused token ends them.
-    try testing.expectError(error.UnknownKey, fixture.check(support.good_claims));
-    try testing.expectEqual(@as(?*const verifier_file.Claims, null), fixture.verifier.claims());
+    try testing.expectEqualStrings("user-1", first.subject());
+    try testing.expectEqualStrings(support.good_claims, first.payload());
+    try testing.expectEqualStrings("user-2", other.subject());
+    try testing.expectEqualStrings(later, other.payload());
+    try testing.expectEqual(@as(i64, 1_700_009_000), other.expires_unix_seconds);
+    // A refusal empties the claims it was given, and no others.
+    try testing.expectError(error.UnknownKey, fixture.verifier.verify(support.mint(&text, &fixture.signer, fixture.header(&header_buffer), later), &other));
+    try expect_empty(&other);
+    try testing.expectEqualStrings("user-1", first.subject());
 }

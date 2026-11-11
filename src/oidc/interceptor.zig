@@ -6,6 +6,7 @@ const connect = @import("connect");
 const constants = @import("constants.zig");
 const verifier_file = @import("verifier.zig");
 const Verifier = verifier_file.Verifier;
+const Claims = verifier_file.Claims;
 
 pub const InterceptorOptions = struct {
     /// The calls the interceptor lets through with no check: a method's path, as
@@ -37,27 +38,37 @@ pub fn bearer_token(authorization: []const u8) ?[]const u8 {
 }
 
 /// A server interceptor for `RouteOptions.interceptors`. Its `on_call` verifies the call's
-/// bearer token with the `Verifier` in the context's field `oidc`, and refuses the call with
-/// `unauthenticated` when the token is missing or not valid. A handler then reads the claims
-/// from `app.oidc.claims()`.
+/// bearer token with the `Verifier` in the program context's field `oidc`, into the request
+/// context's field `oidc`, a `?oidc.Claims` (decision 35). It refuses the call with
+/// `unauthenticated` when the token is missing or not valid. A handler reads
+/// `call.request_context(RequestContext).oidc` at any callback of its call, and finds null on
+/// an excluded path.
 ///
 /// `on_call` takes any call type with `path`, `request_header` and `add_header`, as
 /// `connect_colibri.Call` has them, so the module names no transport.
 pub fn Interceptor(comptime options: InterceptorOptions) type {
     comptime check(options);
     return struct {
-        pub fn on_call(app: anytype, call: anytype) ?connect.RpcError {
-            if (comptime !@hasField(@TypeOf(app.*), "oidc")) @compileError("oidc.Interceptor: the context needs a field `oidc`, an `oidc.Verifier`");
-            const verifier: *Verifier = &app.oidc;
-            // A call starts with no claims, so no handler reads those of another call.
-            verifier.verified = false;
+        pub fn on_call(app: anytype, call: anytype, request_context: anytype) ?connect.RpcError {
+            comptime check_types(@TypeOf(app.*), @TypeOf(request_context.*));
+            request_context.oidc = null;
             if (excluded(options.exclude, call.path)) return null;
             const authorization = call.request_header("authorization") orelse return refuse(call, .missing);
             const token = bearer_token(authorization) orelse return refuse(call, .missing);
-            _ = verifier.verify(token) catch |failure| return refuse(call, if (failure == error.Expired) .expired else .invalid);
+            request_context.oidc = .{};
+            app.oidc.verify(token, &request_context.oidc.?) catch |failure| {
+                request_context.oidc = null;
+                return refuse(call, if (failure == error.Expired) .expired else .invalid);
+            };
             return null;
         }
     };
+}
+
+/// The program's context holds the verifier, and the request context a slot for the claims.
+fn check_types(comptime App: type, comptime RequestContext: type) void {
+    if (!@hasField(App, "oidc") or @FieldType(App, "oidc") != Verifier) @compileError("oidc.Interceptor: the context needs a field `oidc: oidc.Verifier`");
+    if (!@hasField(RequestContext, "oidc") or @FieldType(RequestContext, "oidc") != ?Claims) @compileError("oidc.Interceptor: RouteOptions.RequestContext needs a field `oidc: ?oidc.Claims = null`");
 }
 
 /// An entry names a service and may name a method. An entry that named neither would exclude

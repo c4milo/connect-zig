@@ -31,6 +31,9 @@ pub const audience_bytes_max = 255;
 /// The longest subject, in octets: OpenID Connect Core 1.0 §2 holds "sub" to 255 ASCII
 /// characters.
 pub const subject_bytes_max = 255;
+/// The longest string a lookup of `Claims` returns, and the longest name it looks for. An email
+/// address holds 254 octets at most (RFC 5321 §4.5.3.1.3), and a role or a group far fewer.
+pub const claim_bytes_max = 1024;
 /// The longest leeway, in seconds, that `Verifier.init` takes for the time claims. RFC 7519
 /// §4.1.4 allows "no more than a few minutes" for clock skew.
 pub const leeway_s_max = 300;

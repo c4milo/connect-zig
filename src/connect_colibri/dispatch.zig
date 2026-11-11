@@ -16,6 +16,10 @@
 //! - `on_finish(app, *Call, ?connect.RpcError) ?connect.RpcError`, which runs after the handler
 //!   and returns the outcome the client reads.
 //!
+//! Either hook may take the call's request context after the call:
+//! `on_call(app, *Call, *RequestContext)` and
+//! `on_finish(app, *Call, *RequestContext, ?connect.RpcError)` (decision 35).
+//!
 //! `on_call` runs in the order the list names the interceptors, and `on_finish` in the reverse,
 //! so the first interceptor wraps the others.
 const std = @import("std");
@@ -27,12 +31,16 @@ const Call = call_file.Call;
 const Sender = call_file.Sender;
 const Receiver = call_file.Receiver;
 
-pub fn Interceptors(comptime list: []const type) type {
+/// The parameters of each hook, without and with the call's request context.
+const on_call_parameters = 2;
+const on_finish_parameters = 3;
+
+pub fn Interceptors(comptime list: []const type, comptime RequestContext: type) type {
     return struct {
         pub fn on_call(app: anytype, call: *Call) ?connect.RpcError {
             inline for (list) |Interceptor| {
                 if (comptime @hasDecl(Interceptor, "on_call")) {
-                    if (Interceptor.on_call(app, call)) |refusal| return refusal;
+                    if (call_hook(Interceptor, RequestContext, app, call)) |refusal| return refusal;
                 }
             }
             return null;
@@ -42,11 +50,31 @@ pub fn Interceptors(comptime list: []const type) type {
             var outcome = failure;
             inline for (0..list.len) |index| {
                 const Interceptor = list[list.len - 1 - index];
-                if (comptime @hasDecl(Interceptor, "on_finish")) outcome = Interceptor.on_finish(app, call, outcome);
+                if (comptime @hasDecl(Interceptor, "on_finish")) outcome = finish_hook(Interceptor, RequestContext, app, call, outcome);
             }
             return outcome;
         }
     };
+}
+
+/// Calls `Interceptor.on_call`, with the call's request context when the hook takes it.
+fn call_hook(comptime Interceptor: type, comptime RequestContext: type, app: anytype, call: *Call) ?connect.RpcError {
+    if (comptime takes_request_context(Interceptor.on_call, on_call_parameters)) return Interceptor.on_call(app, call, call.request_context(RequestContext));
+    return Interceptor.on_call(app, call);
+}
+
+/// Calls `Interceptor.on_finish`, with the call's request context when the hook takes it.
+fn finish_hook(comptime Interceptor: type, comptime RequestContext: type, app: anytype, call: *Call, failure: ?connect.RpcError) ?connect.RpcError {
+    if (comptime takes_request_context(Interceptor.on_finish, on_finish_parameters)) return Interceptor.on_finish(app, call, call.request_context(RequestContext), failure);
+    return Interceptor.on_finish(app, call, failure);
+}
+
+/// Whether `hook` takes the call's request context: one parameter past its `parameters`.
+/// A hook with another count fails the build.
+fn takes_request_context(comptime hook: anytype, comptime parameters: usize) bool {
+    const count = @typeInfo(@TypeOf(hook)).@"fn".params.len;
+    if (count != parameters and count != parameters + 1) @compileError("an interceptor's hook takes the program's context, the call and, after the call, the request context");
+    return count == parameters + 1;
 }
 
 /// Whether `handler` is a type that takes messages as they arrive.

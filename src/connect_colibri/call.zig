@@ -102,6 +102,18 @@ pub const Call = struct {
     /// call writes (`write_held`). It points into the reply's scratch storage, and is empty when
     /// the call holds none. Only a route with `next` holds one (`pull.zig`).
     held: []const u8 = "",
+    /// The call's request context in the route's state, and the name of its type (decision 35).
+    request_context_pointer: ?*anyopaque = null,
+    request_context_name: []const u8 = "",
+
+    /// The call's request context: the program's own values for this call, of the type
+    /// `RouteOptions.RequestContext` names (decision 35). Every call starts with `.{}`, and the
+    /// value lasts as long as the call: each callback of a stream reads the same one.
+    pub fn request_context(call: *const Call, comptime RequestContext: type) *RequestContext {
+        // A read with another type than the route's is a programmer error.
+        assert(std.mem.eql(u8, call.request_context_name, @typeName(RequestContext)));
+        return @ptrCast(@alignCast(call.request_context_pointer.?));
+    }
 
     /// The protocol the request spoke.
     pub fn protocol(call: *const Call) connect.Protocol {

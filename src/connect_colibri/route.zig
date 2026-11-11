@@ -23,6 +23,10 @@ pub const Options = struct {
     token_bytes: usize = constants.token_bytes_default,
     /// The interceptors around the handler, outermost first (`dispatch.zig`).
     interceptors: []const type = &.{},
+    /// The program's own values for each call: a struct whose fields each have a default. Every
+    /// call starts with `.{}`. An interceptor's hook may take it, and a handler reads it with
+    /// `Call.request_context` (decision 35).
+    RequestContext: type = struct {},
 };
 
 /// What a route keeps in its request's entry of the router pool. The request and the reply each
@@ -47,6 +51,9 @@ pub fn CallState(comptime options: Options, comptime handler: anytype) type {
         headers: call_file.RequestHeaders = .{},
         query: call_file.RequestQuery = .{},
         handler_state: dispatch.HandlerState(handler) = .{},
+        /// The call's request context (decision 35). colibri sets the state to its defaults at
+        /// each request, so each call starts with `.{}`.
+        request_context: options.RequestContext = .{},
         /// How far a route with `next` wrote its response.
         outgoing: if (pulls) pull.Outgoing else struct {} = .{},
 
@@ -107,6 +114,7 @@ fn receive_limit_of(app: anytype, comptime message_bytes: usize) usize {
 /// longer than it, once decompressed, fails the call with `resource_exhausted`.
 pub fn Route(comptime App: type, comptime method: connect.Method, comptime handler: anytype, comptime options: Options) type {
     comptime dispatch.check(method, handler);
+    comptime check_request_context(options.RequestContext);
     const Spec = RouteSpec{ .method = method, .options = options };
     const Whole = struct {
         pub const State = CallState(options, handler);
@@ -135,6 +143,15 @@ pub fn Route(comptime App: type, comptime method: connect.Method, comptime handl
             return serve_writable(Spec, handler, app, state, response);
         }
     };
+}
+
+/// Fails the build when `RequestContext` is not a struct whose fields each have a default, so
+/// each call can start with `.{}` (decision 35).
+fn check_request_context(comptime RequestContext: type) void {
+    if (@typeInfo(RequestContext) != .@"struct") @compileError("RouteOptions.RequestContext is a struct, not " ++ @typeName(RequestContext));
+    for (@typeInfo(RequestContext).@"struct".fields) |field| {
+        if (field.defaultValue() == null) @compileError("each field of RouteOptions.RequestContext has a default, and " ++ field.name ++ " has none");
+    }
 }
 
 /// What a route's free functions need to know about it at compile time.
@@ -178,6 +195,8 @@ fn begin(comptime spec: RouteSpec, comptime handler: anytype, app: anytype, stat
         .headers = &state.headers,
         .path = comptime spec.method.path(),
         .query = query orelse "",
+        .request_context_pointer = &state.request_context,
+        .request_context_name = @typeName(spec.options.RequestContext),
     };
 }
 
@@ -187,15 +206,15 @@ fn serve_whole(comptime spec: RouteSpec, comptime handler: anytype, app: anytype
     // A Connect unary body is the message itself, and an uncompressed one is read in place, so
     // its length is checked here; every other message is read into storage of `limit` octets.
     if (read_in_place(state.call.reply.accepted) and body.len > state.limit) {
-        return stop(dispatch.Interceptors(spec.options.interceptors), app, state, too_large);
+        return stop(dispatch.Interceptors(spec.options.interceptors, spec.options.RequestContext), app, state, too_large);
     }
     var messages = connect.server.Messages.init(&state.call.reply.accepted, body, &scratch_of(spec.options, handler, state, .request), &codings_of(app).decoders);
-    return dispatch.whole(spec.method, handler, dispatch.Interceptors(spec.options.interceptors), app, &state.call, &messages);
+    return dispatch.whole(spec.method, handler, dispatch.Interceptors(spec.options.interceptors, spec.options.RequestContext), app, &state.call, &messages);
 }
 
 /// Takes each whole envelope that arrived, and keeps a partial one for the next call.
 fn serve_streaming(comptime spec: RouteSpec, comptime handler: anytype, app: anytype, state: *CallState(spec.options, handler), body: *std.Io.Reader) !void {
-    const I = dispatch.Interceptors(spec.options.interceptors);
+    const I = dispatch.Interceptors(spec.options.interceptors, spec.options.RequestContext);
     const call = &state.call;
     if (start_once(I, app, state)) |refusal| return stop(I, app, state, refusal);
     const buffered = body.buffered();
@@ -227,7 +246,7 @@ fn serve_request(comptime spec: RouteSpec, comptime handler: anytype, app: anyty
     comptime assert(spec.method.stream_type == .server_stream);
     assert(!state.done);
     state.done = true;
-    const I = dispatch.Interceptors(spec.options.interceptors);
+    const I = dispatch.Interceptors(spec.options.interceptors, spec.options.RequestContext);
     const call = &state.call;
     if (start_once(I, app, state)) |refusal| return stop(I, app, state, refusal);
     var messages = connect.server.Messages.init(&call.reply.accepted, body, &scratch_of(spec.options, handler, state, .request), &codings_of(app).decoders);
@@ -242,7 +261,7 @@ fn serve_request(comptime spec: RouteSpec, comptime handler: anytype, app: anyty
 /// Sends what a stream with `next` has, while the response memory takes it (`pull.zig`).
 fn serve_writable(comptime spec: RouteSpec, comptime handler: anytype, app: anytype, state: *CallState(spec.options, handler), response: *server.ResponseWriter) !void {
     if (state.outgoing.phase == .done) return;
-    const I = dispatch.Interceptors(spec.options.interceptors);
+    const I = dispatch.Interceptors(spec.options.interceptors, spec.options.RequestContext);
     state.call.response = response;
     // A server stream sends nothing before its request arrived whole.
     if (comptime !dispatch.reads_pieces(spec.method, handler)) {

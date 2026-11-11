@@ -56,17 +56,13 @@ pub const Verifier = struct {
     now_unix_seconds: i64,
     time_set: bool,
     stale: bool,
-    /// Whether `current` holds the claims of the last token `verify` took.
-    verified: bool,
     /// The index in `sets` of the keys `verify` reads. `set_keys` reads into the other one.
     active: u1,
-    current: Claims,
     sets: [key_sets]jwks.KeySet,
     issuer_storage: [constants.issuer_bytes_max]u8,
     audience_storage: [constants.audience_bytes_max]u8,
-    subject_storage: [constants.subject_bytes_max]u8,
-    /// A token's parts after their base64url decoding, one at a time: the header, then the
-    /// signature, then the payload, which stays for `current`.
+    /// The header, then the signature, after their base64url decoding. The payload's goes to the
+    /// caller's `Claims`.
     decoded: [constants.decoded_bytes_max]u8,
     /// The storage of the JSON readers.
     scratch: [constants.decoded_bytes_max]u8,
@@ -94,13 +90,10 @@ pub const Verifier = struct {
             .now_unix_seconds = 0,
             .time_set = false,
             .stale = true,
-            .verified = false,
             .active = 0,
-            .current = undefined,
             .sets = .{ .{}, .{} },
             .issuer_storage = undefined,
             .audience_storage = undefined,
-            .subject_storage = undefined,
             .decoded = undefined,
             .scratch = undefined,
         };
@@ -140,27 +133,21 @@ pub const Verifier = struct {
         return verifier.stale;
     }
 
-    /// The claims of the last token `verify` took, or null when it refused the last one.
-    pub fn claims(verifier: *const Verifier) ?*const Claims {
-        return if (verifier.verified) &verifier.current else null;
-    }
-
     /// Checks `token`, a JWT in the JWS Compact Serialization, as RFC 7519 §7.2 orders the
     /// checks: its form, its header, its signature under the key the header names, then its
-    /// issuer, its audience and its times. The claims it returns stay valid until the next call.
-    /// The program calls `set_time` first.
-    pub fn verify(verifier: *Verifier, token: []const u8) Error!*const Claims {
+    /// issuer, its audience and its times. It writes what the token states into `claims`, which
+    /// the caller owns and which keeps no pointer to `token`. After an error, `claims` holds its
+    /// defaults. The program calls `set_time` first.
+    pub fn verify(verifier: *Verifier, token: []const u8, claims: *Claims) Error!void {
         assert(verifier.time_set);
-        verifier.verified = false;
+        errdefer claims.* = .{};
         if (token.len > constants.token_bytes_max) return error.TokenTooLong;
         const parts = try token_file.split(token);
         const key = try verifier.key_of(&parts);
-        const payload = try verifier.signed_payload(&parts, key);
-        try verifier.check(payload);
-        assert(verifier.current.payload.ptr == &verifier.decoded);
-        assert(verifier.current.expires_unix_seconds >= 0);
-        verifier.verified = true;
-        return &verifier.current;
+        try verifier.signed_payload(&parts, key, claims);
+        try verifier.check(claims);
+        assert(claims.payload_len <= constants.decoded_bytes_max);
+        assert(claims.expires_unix_seconds >= 0);
     }
 
     /// The key the token's header names, among the algorithms the verifier takes.
@@ -181,9 +168,9 @@ pub const Verifier = struct {
         };
     }
 
-    /// Checks the signature, and returns the payload after its base64url decoding. No claim is
-    /// read before the signature passed.
-    fn signed_payload(verifier: *Verifier, parts: *const token_file.Parts, key: *const jwks.Key) Error![]const u8 {
+    /// Checks the signature, and writes the payload after its base64url decoding into `claims`.
+    /// No claim is read before the signature passed.
+    fn signed_payload(verifier: *Verifier, parts: *const token_file.Parts, key: *const jwks.Key, claims: *Claims) Error!void {
         assert(parts.signing_input.len < constants.token_bytes_max);
         const signature = chapulin.jws.base64url_decode(&verifier.decoded, parts.signature) catch return error.Malformed;
         // RFC 7515 §5.2 step 8: the signature is over the JWS Signing Input. RFC 8725 §3.1: the
@@ -195,18 +182,19 @@ pub const Verifier = struct {
             .input = parts.signing_input,
             .signature = signature,
         }) catch return error.InvalidSignature;
-        return chapulin.jws.base64url_decode(&verifier.decoded, parts.payload) catch return error.Malformed;
+        const payload = chapulin.jws.base64url_decode(&claims.payload_storage, parts.payload) catch return error.Malformed;
+        claims.payload_len = payload.len;
     }
 
-    /// Checks the claims of `payload`, and keeps them as `current`.
-    fn check(verifier: *Verifier, payload: []const u8) Error!void {
+    /// Checks the claims of the payload in `claims`, and writes those it reads there.
+    fn check(verifier: *Verifier, claims: *Claims) Error!void {
         const issuer = verifier.issuer_storage[0..verifier.issuer_len];
         var reader: Reader = undefined;
-        reader.init(payload, &verifier.scratch);
+        reader.init(claims.payload(), &verifier.scratch);
         const found = try claims_file.read(&reader, &.{
             .issuer = issuer,
             .audience = verifier.audience_storage[0..verifier.audience_len],
-        }, &verifier.subject_storage);
+        }, &claims.subject_storage);
         // RFC 7519 §4.1.1 and OpenID Connect Core 1.0 §3.1.3.7 rule 2.
         if (!found.issuer_matches) return error.WrongIssuer;
         // RFC 7519 §4.1.3: a token that does not name this service among its audiences MUST be
@@ -223,11 +211,8 @@ pub const Verifier = struct {
         if (found.not_before) |not_before| {
             if (now + leeway < not_before.ceiling()) return error.NotYetValid;
         }
-        verifier.current = .{
-            .subject = found.subject,
-            .issuer = issuer,
-            .expires_unix_seconds = found.expires.seconds,
-            .payload = payload,
-        };
+        claims.issuer = issuer;
+        claims.expires_unix_seconds = found.expires.seconds;
+        claims.subject_len = found.subject.len;
     }
 };

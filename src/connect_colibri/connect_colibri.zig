@@ -62,4 +62,5 @@ test {
     _ = @import("connect_colibri_test.zig");
     _ = @import("client_stream_test.zig");
     _ = @import("pull_test.zig");
+    _ = @import("request_context_test.zig");
 }

@@ -132,6 +132,7 @@ fn sealed(text: *Text, signer: *const Signer, start: usize) []const u8 {
 /// A verifier for `issuer` and `audience` at the time `now`, which holds one key, `key_id`.
 pub const Fixture = struct {
     verifier: Verifier,
+    claims: verifier_file.Claims,
     signer: Signer,
     buffer: [text_bytes]u8,
 
@@ -141,6 +142,7 @@ pub const Fixture = struct {
 
     pub fn init_with(fixture: *Fixture, kind: Kind, options: *const verifier_file.VerifierOptions) !void {
         fixture.signer = Signer.init(kind, 1);
+        fixture.claims = .{};
         try fixture.verifier.init(options);
         var text: Text = .{ .buffer = &fixture.buffer };
         text.raw("{\"keys\":[");
@@ -166,9 +168,15 @@ pub const Fixture = struct {
         return mint(&text, &fixture.signer, header_text, payload);
     }
 
+    /// Verifies `text`, a token, into the fixture's claims, and returns them.
+    pub fn verify(fixture: *Fixture, text: []const u8) verifier_file.Error!*verifier_file.Claims {
+        try fixture.verifier.verify(text, &fixture.claims);
+        return &fixture.claims;
+    }
+
     /// What `verify` answers for a token of `payload`.
-    pub fn check(fixture: *Fixture, payload: []const u8) verifier_file.Error!*const verifier_file.Claims {
-        return fixture.verifier.verify(fixture.token(payload));
+    pub fn check(fixture: *Fixture, payload: []const u8) verifier_file.Error!*verifier_file.Claims {
+        return fixture.verify(fixture.token(payload));
     }
 };
 

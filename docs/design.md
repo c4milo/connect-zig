@@ -141,6 +141,15 @@ Each step names the check that proves it. A step is done when its check passes i
     public names, all in `oidc`: `Verifier`, `VerifierOptions`, `Claims`, `Error`, `Interceptor`,
     `InterceptorOptions`, `bearer_token` and `constants`. Check: `zig build test-oidc` holds the
     RFCs' known answers for each algorithm and each refusal, with each check's mutation caught.
+12. **A request context for each call.** `RouteOptions.RequestContext`, a struct the program
+    declares, which the route keeps for each call; `Call.request_context` reads it, and an
+    interceptor's hook may take it (decision 35). `oidc.Claims` holds its own storage,
+    `Verifier.verify` writes into it, and `Claims.string`, `integer` and `holds` read a
+    program's own claims. New public names: none at a module's root; a field of `RouteOptions`,
+    a method of `Call`, and the methods of `oidc.Claims`. `Verifier.claims` goes. Check: `zig
+    build test-connect-colibri` runs two interleaved streams through colibri's router, and each
+    callback reads its own call's request context; `zig build test-oidc` holds each lookup and
+    each claims' owner.
 
 ### Step records
 
@@ -522,6 +531,36 @@ ran on Linux x86-64 with Zig 0.16.0.
   - `oidc` links chapulin's main, and colibri v0.16.1 links chapulin v0.5.0. So no program links
     `oidc` beside a colibri module yet, and the module's tests give the interceptor a call type
     of their own.
+
+- **A request context for each call** (step 12, decision 35). The owner asked how a handler
+  reads the claims, and chose on 2026-11-11 a typed value on the route over a `State` for each
+  interceptor and over a generic `Call`. The owner then named it `RequestContext`, over `Local`
+  and `Locals`.
+  - `RouteOptions.RequestContext` is a struct whose fields each have a default. Each call's
+    state holds one, and colibri sets that state to its defaults at each request, so each call
+    starts with `.{}`. `Call.request_context(T)` returns it, after an assertion compares `T`'s
+    name with the route's.
+  - An interceptor's `on_call` or `on_finish` takes the request context when it declares one
+    more parameter. The chain counts a hook's parameters at compile time. A hook with two, or three
+    for `on_finish`, runs as before.
+  - `oidc.Claims` owns a copy of the subject and of the payload, and room for a lookup's
+    string: about 4.4 KB, 1.3% of a call's 326 KB with the default sizes. `verify(token,
+    *Claims)` writes into it, and empties it after a refusal. The interceptor verifies into
+    `request_context.oidc`, and leaves it null on an excluded path or a refusal.
+  - `Claims.string`, `integer` and `holds` read one member of the payload when asked, and the
+    last of a name that appears twice (RFC 7519 §4). stdx's typed decoder refuses the members
+    a struct does not name, which every token holds, so a struct of claims would need a walker
+    of its own.
+  - Tests: two bidirectional streams interleave through colibri's router, and each of six
+    callbacks reads its own call's value; each entry of the router serves two calls, and each
+    starts with the defaults; a function handler reads the value its interceptor wrote. In
+    `oidc`: two calls keep their own claims beside a refused third, and each lookup, its
+    types, its bounds and its duplicates.
+  - Mutations, 29, each CAUGHT by a test: the hooks with and without the request context, the
+    pointer and the type check of `Call.request_context`, each lookup's types, bounds and
+    duplicates,
+    the claims `verify` writes and empties, and the interceptor's clears. A test that puts the
+    value only in a nested array came from the one a first run did not catch.
 
 ### What a later step owes
 

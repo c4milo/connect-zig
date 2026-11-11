@@ -10,11 +10,17 @@
 //! try app.oidc.set_keys(jwks_text); // again when `app.oidc.keys_stale()`
 //! app.oidc.set_time(unix_seconds); // when the program's clock moves
 //!
+//! // Each call keeps its own claims, in its request context (decision 35).
+//! const RequestContext = struct { oidc: ?oidc.Claims = null };
 //! const Auth = oidc.Interceptor(.{ .exclude = &.{ "/grpc.health.v1.Health/", "/auth.v1.Auth/Login" } });
-//! pub const routes = Service.Routes(rpc, App, @This(), .{ .interceptors = &.{Auth} }).routes;
+//! const options: rpc.RouteOptions = .{ .interceptors = &.{Auth}, .RequestContext = RequestContext };
+//! pub const routes = Service.Routes(rpc, App, @This(), options).routes;
 //!
-//! // In a handler behind the interceptor:
-//! const claims = app.oidc.claims().?;
+//! // In any callback of a call behind the interceptor:
+//! if (call.request_context(RequestContext).oidc) |*claims| {
+//!     const email = try claims.string("email");
+//!     const admin = try claims.holds("roles", "admin");
+//! }
 //! ```
 const std = @import("std");
 const builtin = @import("builtin");
@@ -56,6 +62,7 @@ test {
     _ = @import("reader.zig");
     _ = @import("token.zig");
     _ = @import("claims.zig");
+    _ = @import("lookup.zig");
     _ = @import("jwks.zig");
     _ = files.verifier;
     _ = files.interceptor;
@@ -63,4 +70,5 @@ test {
     _ = @import("claims_test.zig");
     _ = @import("jwks_test.zig");
     _ = @import("interceptor_test.zig");
+    _ = @import("lookup_test.zig");
 }
