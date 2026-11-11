@@ -469,6 +469,17 @@ ran on Linux x86-64 with Zig 0.16.0.
     connect-zig's readers do not change.
   - Mutations, 2, each CAUGHT: a bytes field written as hexadecimal, and as a plain string.
 
+- **The package builds for a project that fetches it.** `build.zig` imports the helpers of
+  `build/`, and `.paths` of `build.zig.zon` did not name that folder. `zig fetch` keeps only the
+  files the list names, so a project that depended on connect-zig by URL could not compile its
+  build script. No check saw it: each one built the whole tree.
+  - `.paths` names `build`.
+  - `tools/package_check.sh`, the `package` check of `tools/ci.sh`, packs the tracked files,
+    fetches them into a new project, and builds it. The project imports `protobuf`, `connect`
+    and `connect_colibri`, and installs the plugin.
+  - Mutation, 1, CAUGHT: with `build` out of `.paths`, the check fails with
+    "unable to load 'lint.zig'".
+
 ### What a later step owes
 
 - A stream that waits for an event of the program once its request ended (colibri issue 130).

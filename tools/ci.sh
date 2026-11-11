@@ -12,7 +12,7 @@
 # job of its own, so each shows apart in GitHub.
 set -eu
 cd "$(dirname "$0")/.."
-checks="format commits test release bench costs bench-compare perf generated interop interop-languages interop-servers coverage conformance"
+checks="format commits test release package bench costs bench-compare perf generated interop interop-languages interop-servers coverage conformance"
 only=""
 case "${1:-}" in
     --list)
@@ -56,6 +56,8 @@ check() {
         # The lint, every module's tests, the examples and the hook check.
         test) zig build test --summary all ;;
         release) zig build -Drelease ;;
+        # A project that fetches connect-zig as a package builds against it.
+        package) tools/package_check.sh ;;
         # The benchmark's smoke run: every operation on every message, a few short batches each.
         # The full run, and the comparison with Go, is tools/bench_check.sh.
         bench) zig build bench -- --quick ;;

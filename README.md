@@ -331,6 +331,7 @@ report a vulnerability. The rules of the tree are in [CLAUDE.md](CLAUDE.md), the
 ```sh
 tools/ci.sh               # every check below, as CI runs them
 zig build test            # the lint, every module's tests and the examples
+tools/package_check.sh    # a project that fetches connect-zig builds against it
 tools/generate_check.sh   # buf generate still writes examples/gen and bench/gen
 tools/interop_check.sh    # buf curl and curl against the example server
 tools/coverage_check.sh   # every protobuf type against Go's runtime

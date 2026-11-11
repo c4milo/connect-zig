@@ -131,6 +131,9 @@ confirm a test fails. Report `CAUGHT` or `NOT CAUGHT` per mutation in the commit
   `zig build interop-client`, against each in every protocol it speaks; `interop/README.md`,
   "The server side", holds their contract. It needs buf, go, node with npm, python3 with venv,
   and cargo.
+- Package: `tools/package_check.sh` builds a small project against connect-zig as `zig fetch`
+  keeps it: the files `.paths` of `build.zig.zon` names, and no other. A new folder that
+  `build.zig` imports joins that list. It needs the network.
 - Guide: `zig build guide` installs pepegrillo's performance method and API guide to
   `zig-out/docs`, at the commit `build.zig.zon` pins.
 - Performance: `tools/perf_check.sh` counts each benchmark operation's instructions under

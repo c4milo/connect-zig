@@ -29,5 +29,7 @@
             .lazy = true,
         },
     },
-    .paths = .{ "build.zig", "build.zig.zon", "src", "LICENSE", "README.md" },
+    // What a project that depends on connect-zig fetches. `build.zig` imports `build/`, so the
+    // list names it; `tools/package_check.sh` builds a project against these files alone.
+    .paths = .{ "build.zig", "build.zig.zon", "build", "src", "LICENSE", "README.md" },
 }
