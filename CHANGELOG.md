@@ -26,6 +26,14 @@ The first release.
 - Interceptors on the server and the client, typed error details, timeouts, headers and trailers.
 - A method Connect does not serve gets 405 with an `Allow` header, as connect-go answers.
 
+### OpenID Connect
+
+- `oidc`, a module that checks an OpenID Connect bearer token with no I/O: a JWT signed with
+  RS256, ES256 or EdDSA, then its issuer, its audience and its times (decision 34). The program
+  passes the issuer's JWK Set and the time.
+- `oidc.Interceptor`, a server interceptor that refuses a call with no valid token, and lets
+  the paths a program excludes through.
+
 ### Protobuf
 
 - A runtime with no allocator: decoding leaves strings, bytes and repeated fields pointing into
@@ -69,4 +77,7 @@ The first release.
   messages. Its JSON encode is faster on three of eight: a message of small nested objects
   takes connect-zig about three times as long. connect-zig decodes binary faster on all eight,
   and JSON on seven. CI publishes the table with each run.
+- A program cannot link `oidc` beside `connect_colibri` yet. `oidc` needs chapulin's `jws`
+  calls, which chapulin v0.6.0 holds, and colibri v0.16.1 links chapulin v0.5.0. A colibri
+  release on chapulin v0.6.0 removes the limit.
 - The library does not report a missing required field (decision 23).

@@ -5,6 +5,8 @@ pub const Graph = struct {
     protobuf: *std.Build.Module,
     connect: *std.Build.Module,
     connect_colibri: *std.Build.Module,
+    /// Null off a host target, where chapulin builds no `jws` calls (decision 34).
+    oidc: ?*std.Build.Module,
     public_names: *std.Build.Module,
     colibri: *std.Build.Dependency,
     target: std.Build.ResolvedTarget,

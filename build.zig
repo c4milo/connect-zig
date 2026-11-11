@@ -2,7 +2,8 @@
 //! examples and the tooling. Helpers live in build/.
 //!
 //! A project that depends on connect-zig reaches the library modules by name:
-//! `dependency.module("protobuf")`, `"connect"` and `"connect_colibri"`.
+//! `dependency.module("protobuf")`, `"connect"`, `"connect_colibri"` and, on a host target,
+//! `"oidc"`.
 const std = @import("std");
 const assert = std.debug.assert;
 const lint = @import("build/lint.zig");
@@ -10,6 +11,7 @@ const examples = @import("build/examples.zig");
 const generate = @import("build/generate.zig");
 const bench = @import("build/bench.zig");
 const conformance = @import("build/conformance.zig");
+const chapulin = @import("build/chapulin.zig");
 
 const Graph = @import("build/graph.zig").Graph;
 
@@ -106,6 +108,7 @@ fn modules(b: *std.Build, stdx: *std.Build.Dependency, colibri: *std.Build.Depen
         .protobuf = protobuf,
         .connect = connect,
         .connect_colibri = connect_colibri,
+        .oidc = oidc_module(b, stdx, connect, public_names, target, optimize),
         .public_names = public_names,
         .colibri = colibri,
         .target = target,
@@ -113,16 +116,37 @@ fn modules(b: *std.Build, stdx: *std.Build.Dependency, colibri: *std.Build.Depen
     };
 }
 
+/// Decision 34: the `oidc` module, which checks a token's signature with chapulin's `jws` calls.
+/// It names no colibri module, so its interceptor serves any call type. chapulin builds those
+/// calls for a host target alone, so another target has no `oidc` module.
+fn oidc_module(b: *std.Build, stdx: *std.Build.Dependency, connect: *std.Build.Module, public_names: *std.Build.Module, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode) ?*std.Build.Module {
+    if (!chapulin.host_object(target)) return null;
+    return b.addModule("oidc", .{
+        .root_source_file = b.path("src/oidc/oidc.zig"),
+        .target = target,
+        .optimize = optimize,
+        .imports = &.{
+            .{ .name = "connect", .module = connect },
+            .{ .name = "json", .module = stdx.module("json") },
+            .{ .name = "codec", .module = stdx.module("codec") },
+            .{ .name = "chapulin", .module = chapulin.object(b, target).module("chapulin") },
+            .{ .name = "public_names", .module = public_names },
+        },
+    });
+}
+
 fn add_unit_tests(b: *std.Build, graph: Graph, plugin: *std.Build.Step.Compile, test_step: *std.Build.Step) void {
-    const targets = [_]struct { name: []const u8, module: *std.Build.Module }{
+    const targets = [_]struct { name: []const u8, module: ?*std.Build.Module }{
         .{ .name = "protobuf", .module = graph.protobuf },
         .{ .name = "connect", .module = graph.connect },
         .{ .name = "connect-colibri", .module = graph.connect_colibri },
+        .{ .name = "oidc", .module = graph.oidc },
         .{ .name = "public-names", .module = graph.public_names },
         .{ .name = "plugin", .module = plugin.root_module },
     };
     for (targets) |each| {
-        const unit = b.addTest(.{ .name = each.name, .root_module = each.module });
+        const module = each.module orelse continue;
+        const unit = b.addTest(.{ .name = each.name, .root_module = module });
         const run = b.addRunArtifact(unit);
         const step = b.step(b.fmt("test-{s}", .{each.name}), b.fmt("Run the {s} tests alone", .{each.name}));
         step.dependOn(&run.step);

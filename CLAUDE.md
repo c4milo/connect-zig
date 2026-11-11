@@ -1,7 +1,8 @@
 # connect-zig rules
 
 connect-zig is Connect RPC for Zig 0.16: a protobuf runtime, a protocol core for Connect, gRPC
-and gRPC-Web, `connect_colibri` over colibri, and the protoc plugin `protoc-gen-connect-zig`.
+and gRPC-Web, `connect_colibri` over colibri, `oidc` for OpenID Connect bearer tokens, and the
+protoc plugin `protoc-gen-connect-zig`.
 Home: github.com/c4milo/connect-zig.
 
 It follows the conventions of the libraries it builds on: colibri, stdx and pepegrillo. Read their
@@ -69,7 +70,7 @@ confirm a test fails. Report `CAUGHT` or `NOT CAUGHT` per mutation in the commit
 
 - A Conventional Commit: `type(scope)!: description`. Types: `feat`, `fix`, `docs`, `test`,
   `refactor`, `perf`, `build`, `ci`, `chore`. Scopes: `protobuf`, `connect`, `connect-colibri`,
-  `plugin`, `examples`, `build`, `ci`, `docs`.
+  `oidc`, `plugin`, `examples`, `build`, `ci`, `docs`.
 - The description is imperative, lowercase, with no final period, and the subject stays at or
   under 72 columns. The body says why, in at most 3 paragraphs and 100 words, lines at or under
   100 columns.
@@ -134,6 +135,10 @@ confirm a test fails. Report `CAUGHT` or `NOT CAUGHT` per mutation in the commit
 - Package: `tools/package_check.sh` builds a small project against connect-zig as `zig fetch`
   keeps it: the files `.paths` of `build.zig.zon` names, and no other. A new folder that
   `build.zig` imports joins that list. It needs the network.
+- OIDC: `zig build test-oidc` runs the `oidc` module's tests, which link chapulin with `JWS=on`
+  and no colibri module (decision 34). `python3 tools/oidc_vectors.py` writes
+  `src/oidc/rsa_vectors.zig` again: RS256 tokens that OpenSSL signs with new keys. It needs
+  openssl.
 - Guide: `zig build guide` installs pepegrillo's performance method and API guide to
   `zig-out/docs`, at the commit `build.zig.zon` pins.
 - Performance: `tools/perf_check.sh` counts each benchmark operation's instructions under

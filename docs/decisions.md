@@ -349,6 +349,54 @@ first. Cite an entry by number in code and commits ("decision 6").
     a function handler that blocks in `send`, which needs a thread or a coroutine the library
     does not have (decision 18).
 
+34. **OpenID Connect tokens are checked in a module of their own, `oidc`, on chapulin.** Ruled
+    by the owner on 2026-11-11. A server that takes bearer tokens from an OpenID provider is
+    common, so the library holds the check: a `Verifier` with no I/O, and a server interceptor
+    that lets the paths a program names through.
+    - The signature check and base64url are chapulin's `jws` calls: RS256, ES256 and EdDSA
+      with Ed25519. The module reads the JSON with stdx, and checks the claims itself. It names
+      no colibri module, and colibri exports no crypto of chapulin's: the owner refused both a
+      path through colibri's `dnssec` module and a signature module in colibri.
+    - connect-zig names chapulin in its own `build.zig.zon`, with colibri's request for its TCP
+      object and `JWS=on` beside it (`build/chapulin.zig`). A program that links colibri and
+      `oidc` links one chapulin object only while the two pins and the two requests are equal
+      (decision 10). chapulin builds `jws` for a host target alone, so another target has no
+      `oidc` module.
+    - The program fetches the issuer's JWK Set, and passes its text to `set_keys` and the time
+      to `set_time` (decisions 3 and 4). `keys_stale` says when a token named a key the
+      verifier does not hold.
+    - Each key verifies with one algorithm, which its JWK fixes (RFC 8725 §3.1). The key comes
+      from the verifier's set, never from the token. `VerifierOptions.algorithms` takes all three by
+      default, because no token can move a key to another algorithm.
+    - The order of the checks is RFC 7519 §7.2's: the form, the header, the signature, then
+      the issuer, the audience, "exp" and "nbf". No claim is read before the signature passed.
+      A token with no "exp" is refused, as OpenID Connect Core 1.0 §2 and RFC 9068 §2.2
+      require one.
+    - A name the module reads appears once in its object, in a header, a claims set and a JWK.
+      The RFCs let a parser refuse a second one, and the refusal leaves no two readings of one
+      text.
+    - The claims stay in the verifier until its next `verify`, and a handler reads them from
+      the context's field `oidc`. A function handler, and a `next` handler's `on_request`, run
+      straight after the interceptor, so they read their own call's claims. A callback that
+      runs later calls `verify` again with `bearer_token` of its call's header, or keeps what
+      its first callback copied. `Call` does not change.
+    - `Interceptor(.{ .exclude = ... })` takes its list at compile time, because a generated
+      `Routes` gives one interceptor list to each method of a service. An entry is a method's
+      path, or a service's prefix that ends in "/". Its `on_call` takes any call type with
+      `path`, `request_header` and `add_header`, so the module serves another transport too.
+    - A refused call gets `unauthenticated`, which Connect writes as HTTP 401, and RFC 6750
+      §3's `WWW-Authenticate: Bearer` challenge, with `error="invalid_token"` when the call
+      carried a token.
+
+    Limits. One issuer and one audience for each verifier, and 8 keys. An RSA key holds 2048
+    to 4096 bits. A token holds 4096 characters at most, which is what a route copies of a
+    request's headers. A NumericDate with an exponent is refused. The module reads no "typ",
+    "nonce", "azp" or "at_hash": those belong to the client that ran the login, not to the
+    server that takes the token. Beaten: Zig's `std.crypto`, which the owner refused for
+    chapulin; one copy of the JWT code in colibri, which the owner refused for a copy in each
+    library; claims on `Call`, which would change `connect_colibri` for one interceptor; and an
+    exclusion list read at run time, which a comptime list makes free for a route with none.
+
 ## Tooling
 
 15. **pepegrillo is lazy.** `build.zig` requests it only when `b.pkg_hash.len == 0`, so a project

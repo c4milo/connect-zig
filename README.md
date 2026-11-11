@@ -54,6 +54,7 @@ buf curl --cacert examples/testdata/tls/ca.pem --protocol grpc --schema examples
 | `protobuf` | The binary encoding and the proto3 JSON mapping, over generated structs. |
 | `connect` | The Connect, gRPC and gRPC-Web rules, as functions over headers and bytes. |
 | `connect_colibri` | Routes for colibri's server, and calls for colibri's client. Programs import it as `rpc`. |
+| `oidc` | The check of an OpenID Connect bearer token, and a server interceptor that requires one. |
 | `protoc-gen-connect-zig` | The plugin `buf generate` runs to write your `.pb.zig` files. |
 
 ### What works today
@@ -219,6 +220,39 @@ try sender.send(&.{ .text = "hello" });
 var response = chat.read(storage);
 ```
 
+### 6. Require a bearer token
+
+The `oidc` module checks the token an OpenID Connect provider issued: a JWT signed with RS256,
+ES256 or EdDSA. It does no I/O and reads no clock. Your program fetches the provider's JWK Set,
+and passes its text and the time:
+
+```zig
+const oidc = @import("oidc");
+
+// The context of your routes holds the verifier, as `app.oidc`.
+try app.oidc.init(&.{ .issuer = "https://accounts.example.com", .audience = "my-service" });
+try app.oidc.set_keys(jwks_text); // again when app.oidc.keys_stale()
+app.oidc.set_time(unix_seconds); // when your clock moves
+
+// Each method of the service needs a valid token, except those you exclude.
+const Auth = oidc.Interceptor(.{ .exclude = &.{ "/grpc.health.v1.Health/", "/auth.v1.Auth/Login" } });
+pub const routes = Service.Routes(rpc, App, @This(), .{ .interceptors = &.{Auth} }).routes;
+
+// In a handler behind the interceptor:
+const claims = app.oidc.claims().?;
+std.debug.print("{s}\n", .{claims.subject});
+```
+
+The verifier checks the signature first, with the key the token's header names. It then checks
+the issuer, the audience, `exp` and `nbf` (decision 34). A call with no valid token gets
+`unauthenticated` and a `WWW-Authenticate: Bearer` header.
+
+> [!IMPORTANT]
+> `oidc` checks signatures with chapulin's `jws` calls, which chapulin v0.6.0 holds. colibri
+> v0.16.1 links chapulin v0.5.0, and one program cannot link both. So a server on
+> `connect_colibri` cannot import `oidc` until a colibri release pins chapulin v0.6.0. Until
+> then the module's own tests prove it: `zig build test-oidc`.
+
 [examples/](examples) holds ten programs, from generated messages alone to streaming,
 interceptors, error details, a GitHub-style API with tokens, rate limits, pages and field masks,
 and a server on a socket. Each checks itself, and
@@ -328,7 +362,9 @@ Still to come:
 - [x] A gRPC client, over h11, h2 and h3
 - [x] Full-duplex streams on the client side, over h2 and h3
 - [x] The client against servers in Go, TypeScript, Python and Rust
-- [ ] Long server streams
+- [x] Long server streams
+- [x] OpenID Connect bearer tokens, checked on the server
+- [ ] `oidc` beside `connect_colibri` in one program, once colibri pins chapulin v0.6.0
 - [x] HTTP/3 in the in-memory examples, with a test-only TLS identity
 - [x] Full-duplex streams on the server, interceptors and error details
 - [x] `Any`, `Struct`, `Value` and `ListValue` in JSON

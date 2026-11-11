@@ -15,6 +15,9 @@ Each rule in the code cites the document that states it:
 - The protobuf encoding: <https://protobuf.dev/programming-guides/encoding/>.
 - The proto3 JSON mapping: <https://protobuf.dev/programming-guides/json/>.
 - The gRPC status codes: <https://grpc.github.io/grpc/core/md_doc_statuscodes.html>.
+- For `oidc`: RFC 7515 (JWS), RFC 7517 (JWK), RFC 7518 (JWA), RFC 7519 (JWT), RFC 8037
+  (EdDSA in JOSE), RFC 8725 (JWT best practices), RFC 6750 (bearer tokens) and OpenID Connect
+  Core 1.0: <https://openid.net/specs/openid-connect-core-1_0.html>.
 
 ## 2. Rules
 
@@ -28,10 +31,12 @@ production and cover programmer error alone. Hostile input returns an error valu
 protobuf          <- stdx json, stdx codec
 connect           <- protobuf, stdx json, codec, gzip, zstd, brotli
 connect_colibri   <- connect, protobuf, colibri server, client, http
+oidc              <- connect, stdx json, codec, chapulin
 protoc-gen-connect-zig (executable) <- protobuf
 ```
 
-`connect` imports no HTTP library (decision 2). Only `connect_colibri` imports colibri.
+`connect` imports no HTTP library (decision 2). Only `connect_colibri` imports colibri. `oidc`
+imports chapulin for its `jws` calls, and no colibri module (decision 34).
 
 ## 4. The protobuf runtime
 
@@ -130,6 +135,12 @@ Each step names the check that proves it. A step is done when its check passes i
     in-memory link, beside its cleartext rounds (decision 25). Check: `zig build examples` runs
     `eliza`, `streaming`, `interceptors` and `errors` over h3, with the checks of their other
     rounds.
+
+11. **OpenID Connect tokens.** The `oidc` module: a `Verifier` of a JWT bearer token on
+    chapulin's `jws` calls, and a server interceptor with excluded paths (decision 34). New
+    public names, all in `oidc`: `Verifier`, `VerifierOptions`, `Claims`, `Error`, `Interceptor`,
+    `InterceptorOptions`, `bearer_token` and `constants`. Check: `zig build test-oidc` holds the
+    RFCs' known answers for each algorithm and each refusal, with each check's mutation caught.
 
 ### Step records
 
@@ -486,8 +497,42 @@ ran on Linux x86-64 with Zig 0.16.0.
   - Mutation, 1, CAUGHT: with `build` out of `.paths`, the check fails with
     "unable to load 'lint.zig'".
 
+- **The `oidc` module** (step 11, decision 34). The owner ruled on 2026-11-11 that it ships in
+  v0.1.0, and named its two option types `VerifierOptions` and `InterceptorOptions`. A `Verifier`
+  checks a JWT bearer token with chapulin's `jws` calls, at chapulin's main (`17fd1f0b`) with
+  `JWS=on`, and `Interceptor` refuses a call with no valid token.
+  - Files: `token.zig` splits a token and reads its header, `jwks.zig` reads a JWK Set into the
+    key forms chapulin takes, `claims.zig` reads the claims, `verifier.zig` orders the checks,
+    and `interceptor.zig` holds the interceptor and `bearer_token`. `reader.zig` is stdx's JSON
+    decoder with one difference from `json.TextReader`: a string longer than its storage is an
+    item, not an error, so a JWK Set with a certificate chain reads.
+  - Known answers: RFC 7515 appendix A.2 (RS256) and A.3 (ES256), and RFC 8037 appendix A.4
+    (EdDSA), each through `Verifier.verify` under the RFC's key. `tools/oidc_vectors.py` signs
+    RS256 tokens with OpenSSL under keys of 1024, 2048 and 4096 bits; the verifier does not keep
+    the first. The tests sign ES256 and EdDSA tokens with Zig's standard library, so each
+    signature chapulin checks comes from another implementation.
+  - Tests, 46, for each refusal: the form, the header, the key a header names, the
+    signature, the issuer, the audience, "exp" and "nbf" with the leeway at each side of its
+    bound, each rule of a JWK, the paths the interceptor excludes and its challenge.
+  - Mutations, 103, each CAUGHT by a test, on each check of the six files. Five more only
+    stopped the compiler, and each has a form among the 103 that compiles.
+  - One `verify` took about 32 µs with RS256 under a 2048-bit key, 41 µs with ES256, 88 µs with
+    EdDSA, and 153 µs with RS256 under a 4096-bit key. That is ReleaseSafe on an arm64 Mac that
+    ran other builds, so each number is an upper bound there.
+  - `oidc` links chapulin's main, and colibri v0.16.1 links chapulin v0.5.0. So no program links
+    `oidc` beside a colibri module yet, and the module's tests give the interceptor a call type
+    of their own.
+
 ### What a later step owes
 
 - A stream that waits for an event of the program once its request ended (colibri issue 130).
   The owner ruled on 2026-11-10 that colibri v0.16.0 does not wait for it. colibri v0.16.1 does
   not hold it either: it ships in v0.17.0.
+- For `oidc`, once a colibri release pins chapulin v0.6.0 with `JWS=on`: the same pin and the
+  same request here (`build/chapulin.zig`), an example that serves a route behind the
+  interceptor over colibri, and the module in `tools/package_check.sh`. The README and the
+  changelog then drop the limit they state. colibri's session sends the tag, the chapulin
+  commit and the request.
+- For `oidc`, a measurement before any change: a client sends one token with each call, and
+  the verifier checks its signature each time. If that cost shows in a server's profile, a
+  verifier may keep the last tokens it took.

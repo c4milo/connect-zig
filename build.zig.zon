@@ -28,6 +28,13 @@
             .hash = "rotor-0.10.0-YZkxRFCxJABaRNenAUK5EC84mD-ZR3zmBesT76zmXoqu",
             .lazy = true,
         },
+        // The `jws` calls of the `oidc` module (decision 34). colibri pins chapulin v0.5.0, which
+        // has none, so this pin is chapulin's main until a colibri release pins v0.6.0. Until
+        // then no program links `oidc` beside a colibri module.
+        .chapulin = .{
+            .url = "git+https://github.com/c4milo/chapulin#17fd1f0ba108232403cbeff6c6e00a017294c857",
+            .hash = "chapulin-0.6.0-btv9NkNbPADn8A1IcLoK3ZId48MfIeXkUxBtKK9u06Mq",
+        },
     },
     // What a project that depends on connect-zig fetches. `build.zig` imports `build/`, so the
     // list names it; `tools/package_check.sh` builds a project against these files alone.

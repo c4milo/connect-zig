@@ -4,7 +4,7 @@ const std = @import("std");
 const pepegrillo = @import("pepegrillo");
 
 /// The scopes of CLAUDE.md, Commits: the module graph of docs/design.md §3, and the tooling.
-const scopes = [_][]const u8{ "protobuf", "connect", "connect-colibri", "plugin", "examples", "build", "ci", "docs" };
+const scopes = [_][]const u8{ "protobuf", "connect", "connect-colibri", "oidc", "plugin", "examples", "build", "ci", "docs" };
 
 pub const config: pepegrillo.commit.Config = .{
     .scope_admits_digits = false,
