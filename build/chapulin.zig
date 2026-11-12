@@ -2,11 +2,13 @@
 const std = @import("std");
 const assert = std.debug.assert;
 
-/// colibri's request for its TCP object (colibri's `build/modules_chapulin.zig`), with `JWS=on`
-/// beside it. A program that links colibri and `oidc` links one chapulin object only when the two
-/// requests and the two pins are equal: one different option builds a second object, which
-/// defines every public name again. chapulin refuses `JWS=on` off a host target, so the caller
-/// asks `host_object` first.
+/// colibri's own request for its TCP object on a host target, key for key (colibri's
+/// `build/modules_chapulin.zig`, and its docs/usage.md, "Naming chapulin beside colibri"). Zig
+/// keys a dependency by its package and its options, so the two requests give one object. A
+/// request that differs in one value builds a second object, which defines every public name
+/// again, and the link fails with a duplicate symbol. So a release of colibri that changes its
+/// request changes this one. chapulin refuses `JWS=on` off a host target, so the caller asks
+/// `host_object` first.
 pub fn object(b: *std.Build, target: std.Build.ResolvedTarget) *std.Build.Dependency {
     assert(host_object(target));
     return b.dependency("chapulin", .{
@@ -21,6 +23,7 @@ pub fn object(b: *std.Build, target: std.Build.ResolvedTarget) *std.Build.Depend
         .KEYLOG = .off,
         .DNSSEC = .on,
         .JWS = .on,
+        .SCRAM = .on,
     });
 }
 

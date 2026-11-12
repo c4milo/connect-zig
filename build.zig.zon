@@ -6,8 +6,8 @@
     .dependencies = .{
         // The HTTP transport of `connect_colibri`, and through its `tls` module, chapulin.
         .colibri = .{
-            .url = "git+https://github.com/c4milo/colibri?ref=v0.16.1#14ae68a99e171b5547e4a172968c668160a12c94",
-            .hash = "colibri-0.10.0-Wo-AvneJrgTz3ktOUj8iEpa-KotDoQofp4PM6KRCZwHi",
+            .url = "git+https://github.com/c4milo/colibri?ref=v0.16.2#03d562236ae5d7e357ed7b43eafeeaef7a6f2c3e",
+            .hash = "colibri-0.10.0-Wo-Avv3DrgS9KfA01W6VRhqvl_xy3BM7peVPqdgTmpwd",
         },
         // JSON for proto3 JSON and the Connect error bodies, and the compression codecs.
         .stdx = .{
@@ -21,16 +21,16 @@
             .hash = "pepegrillo-0.0.0-axiFUFeJDACO8UB_GWT7OSbSKD2QOChXCg68MdfzduJq",
             .lazy = true,
         },
-        // The event loop of the examples, at the commit colibri v0.16.1 pins: Rotor v0.10.0. Lazy, and requested
+        // The event loop of the examples, at the commit colibri v0.16.2 pins: Rotor v0.10.0. Lazy, and requested
         // only when connect-zig is the root build, like pepegrillo.
         .rotor = .{
             .url = "git+https://github.com/c4milo/rotor#933985882d693e4d8b876e1403618a3fc6d989ef",
             .hash = "rotor-0.10.0-YZkxRFCxJABaRNenAUK5EC84mD-ZR3zmBesT76zmXoqu",
             .lazy = true,
         },
-        // The `jws` calls of the `oidc` module (decision 34). colibri pins chapulin v0.5.0, which
-        // has none, so this pin is chapulin's main until a colibri release pins v0.6.0. Until
-        // then no program links `oidc` beside a colibri module.
+        // The `jws` calls of the `oidc` module (decision 34): chapulin v0.6.0, at the commit colibri
+        // pins. `build/chapulin.zig` asks for its object with colibri's own request, so a program
+        // that links colibri and `oidc` links one chapulin.
         .chapulin = .{
             .url = "git+https://github.com/c4milo/chapulin#17fd1f0ba108232403cbeff6c6e00a017294c857",
             .hash = "chapulin-0.6.0-btv9NkNbPADn8A1IcLoK3ZId48MfIeXkUxBtKK9u06Mq",
