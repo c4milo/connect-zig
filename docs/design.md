@@ -601,6 +601,14 @@ ran on Linux x86-64 with Zig 0.16.0.
     strings, 28.27% on small, 21.13% on deep, 16.96% on large, 16.25% on varints, 15.09% on
     medium, 3.02% on tree and 0.30% on packed. No other operation moved past 0.03%.
     `bench/instructions.txt` holds the new counts.
+  - A second change followed from the same disassembly (commit `764ee37`). Each scalar field
+    built its tag at run time: the wire type went to a stack slot and came back before it
+    joined the field's number. `Sink.tag` now takes both at compile time, and writes one
+    constant varint. The judge on `764ee37`: binary encode takes 5.11% fewer instructions on
+    small, 3.86% on strings, 3.55% on varints, 3.37% on large, 3.28% on deep and 3.00% on
+    medium; tree did not move. From the baseline before both changes, small went from 382
+    to 260 instructions, and strings from 1125 to 722. Mutations, 5 on the two tag paths, each
+    CAUGHT.
   - CI's `bench-compare` of that run, on an EPYC 7763: connect-zig's binary encode is faster
     than Buffa's on small, deep, varints, tree and packed, and slower on medium, large and
     strings. The README's tables come from another machine, an EPYC 9V74, so they keep run
