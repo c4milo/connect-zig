@@ -611,8 +611,10 @@ ran on Linux x86-64 with Zig 0.16.0.
     CAUGHT.
   - CI's `bench-compare` of that run, on an EPYC 7763: connect-zig's binary encode is faster
     than Buffa's on small, deep, varints, tree and packed, and slower on medium, large and
-    strings. The README's tables come from another machine, an EPYC 9V74, so they keep run
-    86's numbers until one run refreshes each cell.
+    strings. The README's tables came from another machine, an EPYC 9V74, so one later run
+    refreshed each cell: run 97, on `52fc27a` and an EPYC 7763. Buffa is faster in 6 of the
+    README's 16 cells there, and was in 7 in run 86. The three runs of that day ran on three
+    CPUs, and Buffa's ratios moved with each, so the README names its run's machine.
   - A trial that copied a string of up to 32 octets with two loads and no call did not pay on
     a local counter: 1.6% fewer instructions on strings, 3.7% more on deep. It was dropped.
   - Mutations, 7, each CAUGHT: each count of the counting walk, the write of a value, and the
