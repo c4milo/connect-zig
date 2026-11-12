@@ -181,12 +181,20 @@ pub fn say(app: *App, ctx: *rpc.Context, request: *const rpc.Request(eliza.SayRe
 pub fn introduce(...) ?connect.RpcError { ... }
 pub fn converse(...) ?connect.RpcError { ... }
 
+/// The longest message a method reads or writes.
+const route_options: rpc.RouteOptions = .{ .message_bytes = 4096 };
+
 pub const Router = server.Router(App, .{
     .error_handler = on_error,
     .routes = Service.Routes(rpc, App, @This(), route_options).routes ++
         rpc.Refusals(App, Service.say).routes,
-}, .{ .requests = 8 });
+}, .{ .requests = 8, .body_bytes = 8192, .response_bytes = 8192 });
 ```
+
+The router's pool holds the memory of each call it answers at once. `body_bytes` holds a call's
+request body, and `response_bytes` holds a reply with its headers. Set both above the routes'
+`message_bytes`. colibri's defaults are 0 and 256 octets: with them a POST gets 413, and a reply
+past 256 octets gets 500.
 
 `rpc.Refusals` makes a method Connect does not serve, such as DELETE, get 405 with an Allow
 header on every path, as connect-go answers. A table names it once, for any one method.
