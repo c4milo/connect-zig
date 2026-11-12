@@ -35,16 +35,17 @@ pub const Room = struct {
     details: [1]connect.Detail = undefined,
 };
 
-fn echo(_: *App, _: *rpc.Call, request: *const coverage.Everything, response: *coverage.Everything) ?connect.RpcError {
-    response.* = request.*;
+fn echo(_: *App, _: *rpc.Context, request: *const rpc.Request(coverage.Everything), response: *rpc.Response(coverage.Everything)) ?connect.RpcError {
+    response.message = request.message;
     return null;
 }
 
-fn repeat(_: *App, _: *rpc.Call, request: *const interop.RepeatRequest, sender: *rpc.Sender(coverage.Everything)) ?connect.RpcError {
-    if (request.count < 0 or request.count > repeat_max) return .{ .code = .out_of_range, .message = "count must be between 0 and 16" };
-    const message = request.message orelse coverage.Everything{};
-    for (0..@as(usize, @intCast(request.count))) |_| {
-        sender.send(&message) catch return .{ .code = .resource_exhausted, .message = "no room to send" };
+fn repeat(_: *App, _: *rpc.Context, request: *const rpc.Request(interop.RepeatRequest), response: *rpc.ResponseStream(coverage.Everything)) ?connect.RpcError {
+    const asked = &request.message;
+    if (asked.count < 0 or asked.count > repeat_max) return .{ .code = .out_of_range, .message = "count must be between 0 and 16" };
+    const message = asked.message orelse coverage.Everything{};
+    for (0..@as(usize, @intCast(asked.count))) |_| {
+        response.send(&message) catch return .{ .code = .resource_exhausted, .message = "no room to send" };
     }
     return null;
 }
@@ -58,16 +59,16 @@ const Collect = struct {
         last_len: usize = 0,
     };
 
-    pub fn on_message(_: *App, _: *rpc.Call, state: *State, request: *const coverage.Everything) ?connect.RpcError {
-        const kept = proto.encode(coverage.Everything, request, &state.last) catch return .{ .code = .resource_exhausted, .message = "message too large" };
+    pub fn on_message(_: *App, _: *rpc.Context, state: *State, request: *const rpc.Request(coverage.Everything)) ?connect.RpcError {
+        const kept = proto.encode(coverage.Everything, &request.message, &state.last) catch return .{ .code = .resource_exhausted, .message = "message too large" };
         state.last_len = kept.len;
         state.count += 1;
         return null;
     }
 
-    pub fn on_end(_: *App, _: *rpc.Call, state: *State, response: *interop.CollectResponse) ?connect.RpcError {
+    pub fn on_end(_: *App, _: *rpc.Context, state: *State, _: *const rpc.AnyRequest, response: *rpc.Response(interop.CollectResponse)) ?connect.RpcError {
         const last = proto.decode(coverage.Everything, state.last[0..state.last_len]) catch return .{ .code = .internal };
-        response.* = .{ .count = state.count, .last = if (state.count == 0) null else last };
+        response.message = .{ .count = state.count, .last = if (state.count == 0) null else last };
         return null;
     }
 };
@@ -76,32 +77,33 @@ const Collect = struct {
 const Chat = struct {
     pub const State = struct {};
 
-    pub fn on_message(_: *App, _: *rpc.Call, _: *State, request: *const coverage.Everything, sender: *rpc.Sender(coverage.Everything)) ?connect.RpcError {
-        sender.send(request) catch return .{ .code = .resource_exhausted, .message = "no room to send" };
+    pub fn on_message(_: *App, _: *rpc.Context, _: *State, request: *const rpc.Request(coverage.Everything), response: *rpc.ResponseStream(coverage.Everything)) ?connect.RpcError {
+        response.send(&request.message) catch return .{ .code = .resource_exhausted, .message = "no room to send" };
         return null;
     }
 
-    pub fn on_end(_: *App, _: *rpc.Call, _: *State, _: *rpc.Sender(coverage.Everything)) ?connect.RpcError {
+    pub fn on_end(_: *App, _: *rpc.Context, _: *State, _: *const rpc.AnyRequest, _: *rpc.ResponseStream(coverage.Everything)) ?connect.RpcError {
         return null;
     }
 };
 
-fn fail(app: *App, _: *rpc.Call, request: *const interop.FailRequest, _: *coverage.Everything) ?connect.RpcError {
+fn fail(app: *App, _: *rpc.Context, request: *const rpc.Request(interop.FailRequest), _: *rpc.Response(coverage.Everything)) ?connect.RpcError {
+    const asked = &request.message;
     // statuscodes.md: the codes are 1 to 16; 0 is success, which is no failure.
-    if (request.code < @intFromEnum(connect.Code.canceled) or request.code > @intFromEnum(connect.Code.unauthenticated)) {
+    if (asked.code < @intFromEnum(connect.Code.canceled) or asked.code > @intFromEnum(connect.Code.unauthenticated)) {
         return .{ .code = .invalid_argument, .message = "code must be between 1 and 16" };
     }
     const room = &app.interop;
-    const bytes = proto.encode(interop.FailRequest, request, &room.detail_bytes) catch return .{ .code = .internal };
+    const bytes = proto.encode(interop.FailRequest, asked, &room.detail_bytes) catch return .{ .code = .internal };
     room.details[0] = .{ .type_name = interop.FailRequest.protobuf.full_name, .value = bytes };
-    return .{ .code = @enumFromInt(request.code), .message = request.message, .details = &room.details };
+    return .{ .code = @enumFromInt(asked.code), .message = asked.message, .details = &room.details };
 }
 
-fn inspect(app: *App, call: *rpc.Call, _: *const interop.InspectRequest, response: *interop.InspectResponse) ?connect.RpcError {
+fn inspect(app: *App, ctx: *rpc.Context, request: *const rpc.Request(interop.InspectRequest), response: *rpc.Response(interop.InspectResponse)) ?connect.RpcError {
     const room = &app.interop;
     var count: usize = 0;
     var used: usize = 0;
-    for (call.request_headers()) |header| {
+    for (request.headers()) |header| {
         if (!std.ascii.startsWithIgnoreCase(header.name, inspected_prefix)) continue;
         if (count == inspected_max) return .{ .code = .resource_exhausted, .message = "too many x-interop headers" };
         const line = std.fmt.bufPrint(room.line_octets[used..], "{s}: {s}", .{ header.name, header.value }) catch
@@ -109,11 +111,11 @@ fn inspect(app: *App, call: *rpc.Call, _: *const interop.InspectRequest, respons
         room.lines[count] = line;
         count += 1;
         used += line.len;
-        call.add_header(header.name, header.value) catch return .{ .code = .internal, .message = "no room for a header" };
-        call.add_trailer(header.name, header.value) catch return .{ .code = .internal, .message = "no room for a trailer" };
+        response.add_header(header.name, header.value) catch return .{ .code = .internal, .message = "no room for a header" };
+        response.add_trailer(header.name, header.value) catch return .{ .code = .internal, .message = "no room for a trailer" };
     }
-    const timeout_ms: i64 = if (call.timeout_ns()) |timeout| @intCast(timeout / nanoseconds_per_millisecond) else 0;
-    response.* = .{ .timeout_ms = timeout_ms, .headers = .of(room.lines[0..count]) };
+    const timeout_ms: i64 = if (ctx.timeout_ns()) |timeout| @intCast(timeout / nanoseconds_per_millisecond) else 0;
+    response.message = .{ .timeout_ms = timeout_ms, .headers = .of(room.lines[0..count]) };
     return null;
 }
 

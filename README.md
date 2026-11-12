@@ -130,35 +130,43 @@ plugins:
 
 ### 3. Write a handler
 
-A handler fills its response and returns `null`, or returns the error the client reads:
+A handler takes the call's context, its request and its response, as connect-go splits them. It
+fills its response and returns `null`, or returns the error the client reads:
 
 ```zig
 const connect = @import("connect");
 const rpc = @import("connect_colibri");
 
-pub fn say(app: *App, _: *rpc.Call, request: *const eliza.SayRequest, response: *eliza.SayResponse) ?connect.RpcError {
-    if (request.sentence.len == 0) return .{ .code = .invalid_argument, .message = "say something" };
-    response.sentence = reply(app, "You said \"{s}\". How does that make you feel?", .{request.sentence});
+pub fn say(app: *App, ctx: *rpc.Context, request: *const rpc.Request(eliza.SayRequest), response: *rpc.Response(eliza.SayResponse)) ?connect.RpcError {
+    if (request.message.sentence.len == 0) return .{ .code = .invalid_argument, .message = "say something" };
+    response.message.sentence = reply(app, "You said \"{s}\". How does that make you feel?", .{request.message.sentence});
+    response.add_header("x-mood", "calm") catch {};
+    _ = ctx.timeout_ns();
     return null;
 }
 ```
 
-Streams get a `Sender` to write messages and a `Receiver` to read them:
+- `ctx: *rpc.Context` is the call: `path()`, `protocol()`, `codec()`, `timeout_ns()`, the
+  counts `received()` and `sent()`, and `values(T)`, your own values for this call.
+- `request` holds the message, and `header(name)`, `headers()` and `query()`.
+- `response` holds the message to fill, and `add_header` and `add_trailer`.
+
+Each stream type takes the request and the response that fit it:
 
 | Stream type | Handler takes |
 | --- | --- |
-| Unary | `*const Request`, `*Response` |
-| Server stream | `*const Request`, `*Sender(Response)` |
-| Client stream | `*Receiver(Request)`, `*Response` |
-| Bidirectional | `*Receiver(Request)`, `*Sender(Response)` |
+| Unary | `*const Request(Req)`, `*Response(Res)` |
+| Server stream | `*const Request(Req)`, `*ResponseStream(Res)`, which sends each message |
+| Client stream | `*RequestStream(Req)`, which reads each message, `*Response(Res)` |
+| Bidirectional | `*RequestStream(Req)`, `*ResponseStream(Res)` |
 
 A function handler takes a client stream whole. To answer each message as it arrives, write the
-handler as a type with `on_message` and `on_end`: over h2 the stream is then full-duplex. A
-handler reads its call through `rpc.Call`: the protocol, the timeout, the request headers,
-and the response headers and trailers it adds.
+handler as a type with `on_message` and `on_end`: over h2 the stream is then full-duplex.
 
-Interceptors are types a route lists in its options: `on_call` runs before the handler and may
-refuse the call, and `on_finish` sees the outcome. A client's `rpc.ClientCall` lists its own in
+Interceptors are types a route lists in its options: `on_call(app, ctx, request, response)`
+runs before the handler and may refuse the call, and `on_finish(app, ctx, response, failure)`
+sees the outcome. Their request and response are `rpc.AnyRequest` and `rpc.AnyResponse`: the
+headers, the query and the trailers, with no message. A client's `rpc.ClientCall` lists its own in
 its options, with `on_request`, which may add headers, and `on_response`.
 
 ### 4. Route it
@@ -169,7 +177,7 @@ GET too. A method you have no handler for fails to compile. One route answers ev
 codec:
 
 ```zig
-pub fn say(app: *App, call: *rpc.Call, request: *const eliza.SayRequest, response: *eliza.SayResponse) ?connect.RpcError { ... }
+pub fn say(app: *App, ctx: *rpc.Context, request: *const rpc.Request(eliza.SayRequest), response: *rpc.Response(eliza.SayResponse)) ?connect.RpcError { ... }
 pub fn introduce(...) ?connect.RpcError { ... }
 pub fn converse(...) ?connect.RpcError { ... }
 
@@ -234,16 +242,16 @@ try app.oidc.init(&.{ .issuer = "https://accounts.example.com", .audience = "my-
 try app.oidc.set_keys(jwks_text); // again when app.oidc.keys_stale()
 app.oidc.set_time(unix_seconds); // when your clock moves
 
-// Each call keeps its own claims in its request context.
-const RequestContext = struct { oidc: ?oidc.Claims = null };
+// Each call keeps its own claims in its values.
+const Values = struct { oidc: ?oidc.Claims = null };
 
 // Each method of the service needs a valid token, except those you exclude.
-const Auth = oidc.Interceptor(.{ .exclude = &.{ "/grpc.health.v1.Health/", "/auth.v1.Auth/Login" } });
-const options: rpc.RouteOptions = .{ .interceptors = &.{Auth}, .RequestContext = RequestContext };
+const Auth = oidc.Interceptor(Values, .{ .exclude = &.{ "/grpc.health.v1.Health/", "/auth.v1.Auth/Login" } });
+const options: rpc.RouteOptions = .{ .interceptors = &.{Auth}, .Values = Values };
 pub const routes = Service.Routes(rpc, App, @This(), options).routes;
 
 // In any callback of a call behind the interceptor, a stream's tenth message included:
-if (call.request_context(RequestContext).oidc) |*claims| {
+if (ctx.values(Values).oidc) |*claims| {
     std.debug.print("{s}\n", .{claims.subject()});
     const email = try claims.string("email"); // ?[]const u8
     const admin = try claims.holds("roles", "admin"); // in an array, or equal
@@ -256,11 +264,11 @@ the issuer, the audience, `exp` and `nbf` (decision 34). A call with no valid to
 `unauthenticated` and a `WWW-Authenticate: Bearer` header. On an excluded path, the call's
 `oidc` stays null.
 
-`RouteOptions.RequestContext` serves any interceptor, not `oidc` alone: it is a struct you
-declare, and each call starts with its defaults. An interceptor's `on_call` and `on_finish` may
-take it after the call, and a handler reads it with `call.request_context(RequestContext)`
-(decision 35). It holds your values alone: the request's headers, path and timeout stay on
-`Call`, and your app is still the context every call shares.
+`RouteOptions.Values` serves any interceptor, not `oidc` alone: it is a struct you declare, and
+each call starts with its defaults. An interceptor and a handler read it with
+`ctx.values(Values)` (decision 35). It holds your values alone: the call's path and timeout
+are on `ctx`, and the headers on the request. Your `App` is still the one value every call
+shares.
 
 > [!IMPORTANT]
 > `oidc` checks signatures with chapulin's `jws` calls, which chapulin v0.6.0 holds. colibri

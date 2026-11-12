@@ -141,15 +141,20 @@ Each step names the check that proves it. A step is done when its check passes i
     public names, all in `oidc`: `Verifier`, `VerifierOptions`, `Claims`, `Error`, `Interceptor`,
     `InterceptorOptions`, `bearer_token` and `constants`. Check: `zig build test-oidc` holds the
     RFCs' known answers for each algorithm and each refusal, with each check's mutation caught.
-12. **A request context for each call.** `RouteOptions.RequestContext`, a struct the program
-    declares, which the route keeps for each call; `Call.request_context` reads it, and an
-    interceptor's hook may take it (decision 35). `oidc.Claims` holds its own storage,
+12. **Values for each call.** `RouteOptions.Values`, a struct the program declares, which the
+    route keeps for each call; `Context.values` reads it (decision 35, in its final form after
+    step 13). `oidc.Claims` holds its own storage,
     `Verifier.verify` writes into it, and `Claims.string`, `integer` and `holds` read a
     program's own claims. New public names: none at a module's root; a field of `RouteOptions`,
-    a method of `Call`, and the methods of `oidc.Claims`. `Verifier.claims` goes. Check: `zig
+    a method of the call, and the methods of `oidc.Claims`. `Verifier.claims` goes. Check: `zig
     build test-connect-colibri` runs two interleaved streams through colibri's router, and each
-    callback reads its own call's request context; `zig build test-oidc` holds each lookup and
-    each claims' owner.
+    callback reads its own call's values; `zig build test-oidc` holds each lookup and each
+    claims' owner.
+13. **A handler takes ctx, request and response.** `Call`, `Sender` and `Receiver` go; a handler
+    and an interceptor take `Context`, a request and a response (decision 36). New public names
+    in `connect_colibri`: `Context`, `Request`, `RequestStream`, `Response`, `ResponseStream`,
+    `AnyRequest` and `AnyResponse`. Check: every module's tests, the examples and the
+    conformance server build and pass on the new signatures.
 
 ### Step records
 
@@ -535,7 +540,8 @@ ran on Linux x86-64 with Zig 0.16.0.
 - **A request context for each call** (step 12, decision 35). The owner asked how a handler
   reads the claims, and chose on 2026-11-11 a typed value on the route over a `State` for each
   interceptor and over a generic `Call`. The owner then named it `RequestContext`, over `Local`
-  and `Locals`.
+  and `Locals`. Step 13 renamed it `Values`, read with `ctx.values`, and ended the hook's extra
+  parameter; this record keeps the names of its day.
   - `RouteOptions.RequestContext` is a struct whose fields each have a default. Each call's
     state holds one, and colibri sets that state to its defaults at each request, so each call
     starts with `.{}`. `Call.request_context(T)` returns it, after an assertion compares `T`'s
@@ -561,6 +567,30 @@ ran on Linux x86-64 with Zig 0.16.0.
     duplicates,
     the claims `verify` writes and empties, and the interceptor's clears. A test that puts the
     value only in a nested array came from the one a first run did not catch.
+
+- **A handler takes ctx, request and response** (step 13, decision 36). The owner found the
+  split of connect-go cleaner than one object for the call, and approved each signature by
+  card on 2026-11-11. `Call`, `Sender` and `Receiver` go from the root.
+  - `context.zig` holds the views: `Context`, `AnyRequest`, `AnyResponse`, `Request(T)`,
+    `RequestStream(T)`, `Response(T)` and `ResponseStream(T)`. Each holds a pointer to the
+    call the route keeps, which `call.zig` still writes, so no write path changed.
+  - The per-call values of step 12 move to `ctx.values(T)`, and `RouteOptions.RequestContext`
+    becomes `RouteOptions.Values`. A hook takes no extra parameter for them: a library's
+    interceptor names the program's type, as `oidc.Interceptor(Values, options)` does.
+  - One change from the approved cards: a stream's `on_end` takes the request with no
+    message too, `(app, ctx, state, request, response)`. The conformance server echoes the
+    request headers at a client stream's end, one with no message among them, and connect-go
+    keeps the request headers readable to the end as well.
+  - The examples, the conformance server and the tests move to the new signatures. The
+    conformance helpers take the context, the request or the response each needs, no longer
+    the whole call.
+  - `context_test.zig` drives a unary call, a GET, a client stream, a server stream and a type
+    handler's `on_end` through colibri's router. Its engine keeps each response header and
+    trailer, so each view's reads and writes are checked where the client would see them.
+  - Mutations, 24, each CAUGHT by a test: each member of each view, the counts, and the
+    outcome `on_finish` sees. A test of the response stream's headers and trailers came from
+    the two a first run did not catch. One more gave a hook a second view of the same call,
+    which behaves the same, so it is no mutation and is not counted.
 
 ### What a later step owes
 

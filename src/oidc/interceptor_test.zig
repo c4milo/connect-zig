@@ -7,36 +7,68 @@ const interceptor = @import("interceptor.zig");
 const verifier_file = @import("verifier.zig");
 const support = @import("test_support.zig");
 
-/// What the interceptor reads of a call, as `connect_colibri.Call` names it.
+/// The call a test runs: its path, its token and the room for a header. `run` gives the
+/// interceptor views of it, as `connect_colibri` gives `Context`, `AnyRequest` and
+/// `AnyResponse`.
 const Call = struct {
     path: []const u8,
     authorization: ?[]const u8 = null,
     challenge: ?[]const u8 = null,
     /// Whether the call has room for one more header.
     room: bool = true,
-
-    pub fn request_header(call: *const Call, name: []const u8) ?[]const u8 {
-        return if (std.mem.eql(u8, name, "authorization")) call.authorization else null;
-    }
-
-    pub fn add_header(call: *Call, name: []const u8, value: []const u8) error{TooManyHeaders}!void {
-        if (!call.room) return error.TooManyHeaders;
-        std.debug.assert(std.mem.eql(u8, name, "www-authenticate"));
-        call.challenge = value;
-    }
 };
 
 const App = struct {
     oidc: verifier_file.Verifier,
 };
 
-/// The call's request context, as a program declares it in `RouteOptions.RequestContext`.
-const RequestContext = struct {
+/// The call's values, as a program declares them in `RouteOptions.Values`.
+const Values = struct {
     oidc: ?verifier_file.Claims = null,
 };
 
-const Auth = interceptor.Interceptor(.{ .exclude = &.{ "/auth.v1.Auth/Login", "/grpc.health.v1.Health/" } });
-const Strict = interceptor.Interceptor(.{});
+const Context = struct {
+    call: *Call,
+    values_storage: *Values,
+
+    pub fn path(ctx: *const Context) []const u8 {
+        return ctx.call.path;
+    }
+
+    pub fn values(ctx: *const Context, comptime T: type) *T {
+        comptime std.debug.assert(T == Values);
+        return ctx.values_storage;
+    }
+};
+
+const Request = struct {
+    call: *const Call,
+
+    pub fn header(request: *const Request, name: []const u8) ?[]const u8 {
+        return if (std.mem.eql(u8, name, "authorization")) request.call.authorization else null;
+    }
+};
+
+const Response = struct {
+    call: *Call,
+
+    pub fn add_header(response: *Response, name: []const u8, value: []const u8) error{TooManyHeaders}!void {
+        if (!response.call.room) return error.TooManyHeaders;
+        std.debug.assert(std.mem.eql(u8, name, "www-authenticate"));
+        response.call.challenge = value;
+    }
+};
+
+/// Runs `I`'s `on_call` on `call`, whose values are `values`.
+fn run(comptime I: type, app: *App, call: *Call, values: *Values) ?connect.RpcError {
+    var ctx: Context = .{ .call = call, .values_storage = values };
+    const request: Request = .{ .call = call };
+    var response: Response = .{ .call = call };
+    return I.on_call(app, &ctx, &request, &response);
+}
+
+const Auth = interceptor.Interceptor(Values, .{ .exclude = &.{ "/auth.v1.Auth/Login", "/grpc.health.v1.Health/" } });
+const Strict = interceptor.Interceptor(Values, .{});
 
 const Bench = struct {
     fixture: support.Fixture,
@@ -62,31 +94,31 @@ fn expect_refused(refusal: ?connect.RpcError, call: *const Call, message: []cons
 
 const head = "{\"iss\":\"" ++ support.issuer ++ "\",\"aud\":\"";
 
-test "a call with a valid token passes, and its request context holds the claims" {
+test "a call with a valid token passes, and its values hold the claims" {
     var bench: Bench = undefined;
     try bench.init();
     var call: Call = .{ .path = "/demo.v1.Demo/Add", .authorization = bench.bearer(support.good_claims) };
-    var context: RequestContext = .{};
-    try testing.expectEqual(@as(?connect.RpcError, null), Auth.on_call(&bench.app, &call, &context));
+    var values: Values = .{};
+    try testing.expectEqual(@as(?connect.RpcError, null), run(Auth, &bench.app, &call, &values));
     try testing.expectEqual(@as(?[]const u8, null), call.challenge);
-    try testing.expectEqualStrings("user-1", context.oidc.?.subject());
-    try testing.expectEqualStrings(support.good_claims, context.oidc.?.payload());
+    try testing.expectEqualStrings("user-1", values.oidc.?.subject());
+    try testing.expectEqualStrings(support.good_claims, values.oidc.?.payload());
 }
 
 test "two calls keep their own claims, whatever the order of their callbacks" {
     var bench: Bench = undefined;
     try bench.init();
     var first_call: Call = .{ .path = "/demo.v1.Demo/Chat", .authorization = bench.bearer(support.good_claims) };
-    var first: RequestContext = .{};
-    try testing.expectEqual(@as(?connect.RpcError, null), Auth.on_call(&bench.app, &first_call, &first));
+    var first: Values = .{};
+    try testing.expectEqual(@as(?connect.RpcError, null), run(Auth, &bench.app, &first_call, &first));
     const later = head ++ support.audience ++ "\",\"sub\":\"user-2\",\"exp\":1700003600}";
     var second_call: Call = .{ .path = "/demo.v1.Demo/Chat", .authorization = bench.bearer(later) };
-    var second: RequestContext = .{};
-    try testing.expectEqual(@as(?connect.RpcError, null), Auth.on_call(&bench.app, &second_call, &second));
+    var second: Values = .{};
+    try testing.expectEqual(@as(?connect.RpcError, null), run(Auth, &bench.app, &second_call, &second));
     // A third call that the verifier refuses leaves the first two as they were.
     var third_call: Call = .{ .path = "/demo.v1.Demo/Chat", .authorization = "Bearer a.b.c" };
-    var third: RequestContext = .{};
-    try testing.expect(Auth.on_call(&bench.app, &third_call, &third) != null);
+    var third: Values = .{};
+    try testing.expect(run(Auth, &bench.app, &third_call, &third) != null);
     try testing.expectEqualStrings("user-1", first.oidc.?.subject());
     try testing.expectEqualStrings("user-2", second.oidc.?.subject());
     try testing.expectEqual(@as(?verifier_file.Claims, null), third.oidc);
@@ -96,12 +128,12 @@ test "a call with no bearer credentials is refused with a bare challenge" {
     var bench: Bench = undefined;
     try bench.init();
     // RFC 6750 §3.1: a request with no authentication information gets no error code.
-    const values = [_]?[]const u8{ null, "", "Basic dXNlcjpwYXNz", "Bearer", "Bearer ", "Token abc" };
-    for (values) |value| {
+    const authorizations = [_]?[]const u8{ null, "", "Basic dXNlcjpwYXNz", "Bearer", "Bearer ", "Token abc" };
+    for (authorizations) |value| {
         var call: Call = .{ .path = "/demo.v1.Demo/Add", .authorization = value };
-        var context: RequestContext = .{};
-        try expect_refused(Auth.on_call(&bench.app, &call, &context), &call, "missing bearer token", "Bearer");
-        try testing.expectEqual(@as(?verifier_file.Claims, null), context.oidc);
+        var values: Values = .{};
+        try expect_refused(run(Auth, &bench.app, &call, &values), &call, "missing bearer token", "Bearer");
+        try testing.expectEqual(@as(?verifier_file.Claims, null), values.oidc);
     }
 }
 
@@ -117,21 +149,21 @@ test "a call whose token the verifier refuses is refused with invalid_token" {
     };
     for (cases) |case| {
         var call: Call = .{ .path = "/demo.v1.Demo/Add", .authorization = bench.bearer(case[0]) };
-        var context: RequestContext = .{};
-        try expect_refused(Auth.on_call(&bench.app, &call, &context), &call, case[1], "Bearer error=\"invalid_token\"");
-        try testing.expectEqual(@as(?verifier_file.Claims, null), context.oidc);
+        var values: Values = .{};
+        try expect_refused(run(Auth, &bench.app, &call, &values), &call, case[1], "Bearer error=\"invalid_token\"");
+        try testing.expectEqual(@as(?verifier_file.Claims, null), values.oidc);
     }
     var call: Call = .{ .path = "/demo.v1.Demo/Add", .authorization = "Bearer not-a-token" };
-    var context: RequestContext = .{};
-    try expect_refused(Auth.on_call(&bench.app, &call, &context), &call, "invalid token", "Bearer error=\"invalid_token\"");
+    var values: Values = .{};
+    try expect_refused(run(Auth, &bench.app, &call, &values), &call, "invalid token", "Bearer error=\"invalid_token\"");
 }
 
 test "a call with no room for a header is still refused" {
     var bench: Bench = undefined;
     try bench.init();
     var call: Call = .{ .path = "/demo.v1.Demo/Add", .room = false };
-    var context: RequestContext = .{};
-    try testing.expectEqual(connect.Code.unauthenticated, Auth.on_call(&bench.app, &call, &context).?.code);
+    var values: Values = .{};
+    try testing.expectEqual(connect.Code.unauthenticated, run(Auth, &bench.app, &call, &values).?.code);
     try testing.expectEqual(@as(?[]const u8, null), call.challenge);
 }
 
@@ -142,12 +174,12 @@ test "an excluded path passes with no token and no claims, and each other path i
     for (excluded) |path| {
         // A token on an excluded path is not read: the claims stay null.
         var call: Call = .{ .path = path, .authorization = bench.bearer(support.good_claims) };
-        var context: RequestContext = .{};
-        try testing.expectEqual(@as(?connect.RpcError, null), Auth.on_call(&bench.app, &call, &context));
-        try testing.expectEqual(@as(?verifier_file.Claims, null), context.oidc);
+        var values: Values = .{};
+        try testing.expectEqual(@as(?connect.RpcError, null), run(Auth, &bench.app, &call, &values));
+        try testing.expectEqual(@as(?verifier_file.Claims, null), values.oidc);
         // With no list, the same path is checked.
         var bare: Call = .{ .path = path };
-        try testing.expectEqual(connect.Code.unauthenticated, Strict.on_call(&bench.app, &bare, &context).?.code);
+        try testing.expectEqual(connect.Code.unauthenticated, run(Strict, &bench.app, &bare, &values).?.code);
     }
     // A method beside the excluded one, a path the entry is a prefix of, and a service whose
     // name the excluded service's starts.
@@ -158,24 +190,24 @@ test "an excluded path passes with no token and no claims, and each other path i
     };
     for (checked) |path| {
         var call: Call = .{ .path = path };
-        var context: RequestContext = .{};
-        try testing.expectEqual(connect.Code.unauthenticated, Auth.on_call(&bench.app, &call, &context).?.code);
+        var values: Values = .{};
+        try testing.expectEqual(connect.Code.unauthenticated, run(Auth, &bench.app, &call, &values).?.code);
     }
 }
 
-test "the interceptor clears a request context that held claims" {
+test "the interceptor clears values that held claims" {
     var bench: Bench = undefined;
     try bench.init();
     var call: Call = .{ .path = "/demo.v1.Demo/Add", .authorization = bench.bearer(support.good_claims) };
-    var context: RequestContext = .{};
-    try testing.expectEqual(@as(?connect.RpcError, null), Auth.on_call(&bench.app, &call, &context));
+    var values: Values = .{};
+    try testing.expectEqual(@as(?connect.RpcError, null), run(Auth, &bench.app, &call, &values));
     var login: Call = .{ .path = "/auth.v1.Auth/Login" };
-    try testing.expectEqual(@as(?connect.RpcError, null), Auth.on_call(&bench.app, &login, &context));
-    try testing.expectEqual(@as(?verifier_file.Claims, null), context.oidc);
-    try testing.expectEqual(@as(?connect.RpcError, null), Auth.on_call(&bench.app, &call, &context));
+    try testing.expectEqual(@as(?connect.RpcError, null), run(Auth, &bench.app, &login, &values));
+    try testing.expectEqual(@as(?verifier_file.Claims, null), values.oidc);
+    try testing.expectEqual(@as(?connect.RpcError, null), run(Auth, &bench.app, &call, &values));
     var bare: Call = .{ .path = "/demo.v1.Demo/Add" };
-    try testing.expect(Auth.on_call(&bench.app, &bare, &context) != null);
-    try testing.expectEqual(@as(?verifier_file.Claims, null), context.oidc);
+    try testing.expect(run(Auth, &bench.app, &bare, &values) != null);
+    try testing.expectEqual(@as(?verifier_file.Claims, null), values.oidc);
 }
 
 test "bearer_token reads the credentials RFC 6750 writes" {

@@ -77,7 +77,7 @@ Each program over the links runs its calls in rounds, one `client.ConnectionPool
 
 Over h3 every protocol answers as it does over h2: Connect POST and GET, gRPC-Web, and gRPC,
 whose status the client reads from the response's trailers (decision 11). The streamed calls of
-`streaming`, in `streaming_duplex.zig`, send each message with a `Sender`. Over h2 and h3 Chat
+`streaming`, in `streaming_duplex.zig`, send each message with the client call's `Sender`. Over h2 and h3 Chat
 reads each answer before it sends the next line, in Connect, gRPC and gRPC-Web. Over h11 it sends
 every line first, since a stream there is half-duplex.
 
@@ -90,13 +90,13 @@ arrives, so it answers while the client still sends: over h2 the stream is full-
 const Chat = struct {
     pub const State = struct { turns: u32 = 0 };
 
-    pub fn on_message(_: *App, _: *rpc.Call, state: *State, request: *const demo.ChatMessage, sender: *rpc.Sender(demo.ChatMessage)) ?connect.RpcError {
+    pub fn on_message(_: *App, _: *rpc.Context, state: *State, request: *const rpc.Request(demo.ChatMessage), response: *rpc.ResponseStream(demo.ChatMessage)) ?connect.RpcError {
         state.turns += 1;
-        sender.send(&.{ .text = request.text }) catch return .{ .code = .resource_exhausted };
+        response.send(&.{ .text = request.message.text }) catch return .{ .code = .resource_exhausted };
         return null;
     }
 
-    pub fn on_end(_: *App, _: *rpc.Call, _: *State, _: *rpc.Sender(demo.ChatMessage)) ?connect.RpcError {
+    pub fn on_end(_: *App, _: *rpc.Context, _: *State, _: *const rpc.AnyRequest, _: *rpc.ResponseStream(demo.ChatMessage)) ?connect.RpcError {
         return null;
     }
 };
@@ -105,12 +105,13 @@ const Chat = struct {
 ### An interceptor
 
 An interceptor is a type that a route lists in its options. `on_call` runs before the handler and
-may refuse the call; `on_finish` runs after it and returns the outcome the client reads.
+may refuse the call; `on_finish` runs after it and returns the outcome the client reads. Each
+takes the call's context, and the request and the response with no message.
 
 ```zig
 pub const Auth = struct {
-    pub fn on_call(_: *App, call: *rpc.Call) ?connect.RpcError {
-        _ = caller_of(call) orelse return .{ .code = .unauthenticated, .message = "a bearer token is required" };
+    pub fn on_call(_: *App, _: *rpc.Context, request: *const rpc.AnyRequest, _: *rpc.AnyResponse) ?connect.RpcError {
+        _ = caller_of(request) orelse return .{ .code = .unauthenticated, .message = "a bearer token is required" };
         return null;
     }
 };

@@ -9,6 +9,7 @@ const connect = @import("connect");
 const constants = @import("constants.zig");
 const call_file = @import("call.zig");
 const Call = call_file.Call;
+const context_file = @import("context.zig");
 
 /// What a type handler's `next` answers when its route asks for the stream's next message.
 pub const Next = union(enum) {
@@ -77,11 +78,12 @@ const end_passes_max = 3;
 /// Asks the handler for the stream's next message, and sends it or ends the stream.
 fn send_next(comptime method: connect.Method, comptime handler: type, comptime I: type, app: anytype, call: *Call, outgoing: *Outgoing, handler_state: anytype, input_open: bool) !Pass {
     assert(call.held.len == 0);
-    var message: method.Response = .{};
-    switch (handler.next(app, call, handler_state, &message)) {
+    var ctx: context_file.Context = .{ .call = call };
+    var response: context_file.Response(method.Response) = .{ .any = .{ .call = call } };
+    switch (handler.next(app, &ctx, handler_state, &response)) {
         .message => {
             try call_file.write_head_once(call, .plain);
-            write_or_hold(method.Response, call, &message) catch |failure| try begin_end(I, app, call, outgoing, failure_of(failure));
+            write_or_hold(method.Response, call, &response.message) catch |failure| try begin_end(I, app, call, outgoing, failure_of(failure));
         },
         .wait => {
             if (input_open) return .wait;

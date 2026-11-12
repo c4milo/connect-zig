@@ -1,6 +1,6 @@
-//! The call's request context (decision 35), through colibri's router: two bidirectional streams
-//! interleave, and each callback reads its own call's; a call starts with the defaults; a hook
-//! that takes no request context runs beside one that takes it.
+//! The program's values for each call (decision 35), through colibri's router: two
+//! bidirectional streams interleave, and each callback reads its own call's; a call starts with
+//! the defaults; an interceptor that never reads them runs beside one that writes them.
 const std = @import("std");
 const testing = std.testing;
 const connect = @import("connect");
@@ -14,7 +14,7 @@ const Note = support.Note;
 const say: connect.Method = .{ .service = "test.Svc", .name = "Say", .Request = Note, .Response = Note, .stream_type = .unary, .idempotency = .unknown };
 
 /// The values each call keeps.
-const RequestContext = struct {
+const Values = struct {
     /// The number the interceptor gave the call.
     caller: u32 = 0,
     /// Set by the interceptor. A call that starts with it set started with another call's value.
@@ -30,7 +30,7 @@ const note_bytes = 16;
 
 const App = struct {
     callers: u32 = 0,
-    /// The calls whose request context was not the defaults when the interceptor first saw it.
+    /// The calls whose values were not the defaults when the interceptor first saw them.
     dirty_starts: u32 = 0,
     plain_calls: u32 = 0,
     /// The caller each handler callback read, in order.
@@ -40,31 +40,32 @@ const App = struct {
     finished: [records_max]u32 = @splat(0),
     finished_len: usize = 0,
 
-    fn saw(app: *App, call: *rpc.Call) void {
-        app.seen[app.seen_len] = call.request_context(RequestContext).caller;
+    fn saw(app: *App, ctx: *rpc.Context) void {
+        app.seen[app.seen_len] = ctx.values(Values).caller;
         app.seen_len += 1;
     }
 };
 
-/// Gives each call the next number, in the call's request context.
+/// Gives each call the next number, in the call's values.
 const Stamp = struct {
-    pub fn on_call(app: *App, _: *rpc.Call, context: *RequestContext) ?connect.RpcError {
-        if (context.written or context.caller != 0) app.dirty_starts += 1;
+    pub fn on_call(app: *App, ctx: *rpc.Context, _: *const rpc.AnyRequest, _: *rpc.AnyResponse) ?connect.RpcError {
+        const values = ctx.values(Values);
+        if (values.written or values.caller != 0) app.dirty_starts += 1;
         app.callers += 1;
-        context.* = .{ .caller = app.callers, .written = true };
+        values.* = .{ .caller = app.callers, .written = true };
         return null;
     }
 
-    pub fn on_finish(app: *App, _: *rpc.Call, context: *RequestContext, failure: ?connect.RpcError) ?connect.RpcError {
-        app.finished[app.finished_len] = context.caller;
+    pub fn on_finish(app: *App, ctx: *rpc.Context, _: *rpc.AnyResponse, failure: ?connect.RpcError) ?connect.RpcError {
+        app.finished[app.finished_len] = ctx.values(Values).caller;
         app.finished_len += 1;
         return failure;
     }
 };
 
-/// A hook that takes no request context.
+/// An interceptor that never reads the values.
 const Plain = struct {
-    pub fn on_call(app: *App, _: *rpc.Call) ?connect.RpcError {
+    pub fn on_call(app: *App, _: *rpc.Context, _: *const rpc.AnyRequest, _: *rpc.AnyResponse) ?connect.RpcError {
         app.plain_calls += 1;
         return null;
     }
@@ -74,19 +75,19 @@ const Plain = struct {
 const Listener = struct {
     pub const State = struct {};
 
-    pub fn on_message(app: *App, call: *rpc.Call, _: *State, _: *const Note, _: *rpc.Sender(Note)) ?connect.RpcError {
-        app.saw(call);
+    pub fn on_message(app: *App, ctx: *rpc.Context, _: *State, _: *const rpc.Request(Note), _: *rpc.ResponseStream(Note)) ?connect.RpcError {
+        app.saw(ctx);
         return null;
     }
 
-    pub fn on_end(app: *App, call: *rpc.Call, _: *State, _: *rpc.Sender(Note)) ?connect.RpcError {
-        app.saw(call);
+    pub fn on_end(app: *App, ctx: *rpc.Context, _: *State, _: *const rpc.AnyRequest, _: *rpc.ResponseStream(Note)) ?connect.RpcError {
+        app.saw(ctx);
         return null;
     }
 };
 
-fn on_say(app: *App, call: *rpc.Call, _: *const Note, _: *Note) ?connect.RpcError {
-    app.saw(call);
+fn on_say(app: *App, ctx: *rpc.Context, _: *const rpc.Request(Note), _: *rpc.Response(Note)) ?connect.RpcError {
+    app.saw(ctx);
     return null;
 }
 
@@ -98,7 +99,7 @@ const options: rpc.RouteOptions = .{
     .message_bytes = message_bytes,
     .token_bytes = token_bytes,
     .interceptors = &.{ Plain, Stamp },
-    .RequestContext = RequestContext,
+    .Values = Values,
 };
 
 const Router = server.Router(App, .{
@@ -210,7 +211,7 @@ const chat_path = "/test.Svc/Chat";
 const say_path = "/test.Svc/Say";
 const stream_type = "application/connect+proto";
 
-test "each callback of a stream reads its own call's request context, while another call runs" {
+test "each callback of a stream reads its own call's values, while another call runs" {
     var fixture: Fixture = .{};
     fixture.open(0, chat_path, stream_type);
     fixture.send(0, false);
@@ -223,12 +224,12 @@ test "each callback of a stream reads its own call's request context, while anot
     try fixture.expect_seen(&.{ 1, 2, 1, 1, 2, 2 });
     try testing.expectEqualSlices(u32, &.{ 1, 2 }, fixture.app.finished[0..fixture.app.finished_len]);
     try testing.expect(fixture.engine.ended[0] and fixture.engine.ended[1]);
-    // The hook that takes no request context ran for each call too.
+    // The interceptor that never reads the values ran for each call too.
     try testing.expectEqual(@as(u32, 2), fixture.app.plain_calls);
     try testing.expectEqual(@as(u32, 0), fixture.app.dirty_starts);
 }
 
-test "a call starts with the request context's defaults, after another call wrote it" {
+test "a call starts with the values' defaults, after another call wrote them" {
     var fixture: Fixture = .{};
     // Each entry of the router serves two calls, one after the other.
     for (0..requests) |round| {
@@ -246,7 +247,7 @@ test "a call starts with the request context's defaults, after another call wrot
     try fixture.expect_seen(&.{ 1, 1, 2, 2, 3, 3, 4, 4 });
 }
 
-test "a function handler reads the request context its interceptor wrote" {
+test "a function handler reads the values its interceptor wrote" {
     var fixture: Fixture = .{};
     fixture.open(0, chat_path, stream_type);
     fixture.send(0, false);

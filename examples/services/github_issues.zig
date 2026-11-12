@@ -52,32 +52,33 @@ fn event_message(event: *const store_file.Event) github.Event {
 
 /// Opens an issue on a repository the caller may see, which the caller's token names the author
 /// of. CreateIssue and each message of ImportIssues come here.
-fn open(app: *App, call: *const rpc.Call, request: *const github.CreateIssueRequest) union(enum) { issue: *store_file.Issue, failure: connect.RpcError } {
+fn open(app: *App, request: *const rpc.Request(github.CreateIssueRequest)) union(enum) { issue: *store_file.Issue, failure: connect.RpcError } {
     const room = &app.github;
-    const index = switch (service.visible_repository(room, call, request.owner, request.repository)) {
+    const asked = &request.message;
+    const index = switch (service.visible_repository(room, &request.any, asked.owner, asked.repository)) {
         .index => |index| index,
         .failure => |failure| return .{ .failure = failure },
     };
-    if (request.title.len == 0) return .{ .failure = service.bad_field(room, "title", "must not be empty") };
+    if (asked.title.len == 0) return .{ .failure = service.bad_field(room, "title", "must not be empty") };
     // `Auth(true)` let the call through, so its token names a user.
-    const author = service.caller(call).?;
-    const entry = room.store.add_issue(index, author, request) catch |failure| return .{ .failure = service.store_failure(room, failure, "labels") };
+    const author = service.caller(&request.any).?;
+    const entry = room.store.add_issue(index, author, asked) catch |failure| return .{ .failure = service.store_failure(room, failure, "labels") };
     return .{ .issue = entry };
 }
 
-pub fn create_issue(app: *App, call: *rpc.Call, request: *const github.CreateIssueRequest, response: *github.Issue) ?connect.RpcError {
-    const entry = switch (open(app, call, request)) {
+pub fn create_issue(app: *App, _: *rpc.Context, request: *const rpc.Request(github.CreateIssueRequest), response: *rpc.Response(github.Issue)) ?connect.RpcError {
+    const entry = switch (open(app, request)) {
         .issue => |entry| entry,
         .failure => |failure| return failure,
     };
-    response.* = issue_message(&app.github, entry);
+    response.message = issue_message(&app.github, entry);
     return null;
 }
 
 const FoundIssue = union(enum) { issue: *store_file.Issue, failure: connect.RpcError };
 
-fn visible_issue(room: *Room, call: *const rpc.Call, owner: []const u8, repository: []const u8, number: i32) FoundIssue {
-    const index = switch (service.visible_repository(room, call, owner, repository)) {
+fn visible_issue(room: *Room, request: *const rpc.AnyRequest, owner: []const u8, repository: []const u8, number: i32) FoundIssue {
+    const index = switch (service.visible_repository(room, request, owner, repository)) {
         .index => |index| index,
         .failure => |failure| return .{ .failure = failure },
     };
@@ -86,36 +87,38 @@ fn visible_issue(room: *Room, call: *const rpc.Call, owner: []const u8, reposito
     return .{ .issue = entry };
 }
 
-pub fn get_issue(app: *App, call: *rpc.Call, request: *const github.GetIssueRequest, response: *github.Issue) ?connect.RpcError {
-    const entry = switch (visible_issue(&app.github, call, request.owner, request.repository, request.number)) {
+pub fn get_issue(app: *App, _: *rpc.Context, request: *const rpc.Request(github.GetIssueRequest), response: *rpc.Response(github.Issue)) ?connect.RpcError {
+    const asked = &request.message;
+    const entry = switch (visible_issue(&app.github, &request.any, asked.owner, asked.repository, asked.number)) {
         .issue => |entry| entry,
         .failure => |failure| return failure,
     };
-    response.* = issue_message(&app.github, entry);
+    response.message = issue_message(&app.github, entry);
     return null;
 }
 
-pub fn list_issues(app: *App, call: *rpc.Call, request: *const github.ListIssuesRequest, response: *github.ListIssuesResponse) ?connect.RpcError {
+pub fn list_issues(app: *App, _: *rpc.Context, request: *const rpc.Request(github.ListIssuesRequest), response: *rpc.Response(github.ListIssuesResponse)) ?connect.RpcError {
     const room = &app.github;
-    const index = switch (service.visible_repository(room, call, request.owner, request.repository)) {
+    const asked = &request.message;
+    const index = switch (service.visible_repository(room, &request.any, asked.owner, asked.repository)) {
         .index => |index| index,
         .failure => |failure| return failure,
     };
-    const page = switch (service.page_of(room, request.page_size, request.page_token)) {
+    const page = switch (service.page_of(room, asked.page_size, asked.page_token)) {
         .page => |page| page,
         .failure => |failure| return failure,
     };
     var total: usize = 0;
     var count: usize = 0;
     for (room.store.issues[0..room.store.issues_len]) |*entry| {
-        if (entry.repository != index or !matches(entry, request)) continue;
+        if (entry.repository != index or !matches(entry, asked)) continue;
         if (total >= page.offset and count < page.size) {
             room.issues[count] = issue_message(room, entry);
             count += 1;
         }
         total += 1;
     }
-    response.* = .{ .issues = .of(room.issues[0..count]), .next_page_token = page.next_token(room, total), .total_count = @intCast(total) };
+    response.message = .{ .issues = .of(room.issues[0..count]), .next_page_token = page.next_token(room, total), .total_count = @intCast(total) };
     return null;
 }
 
@@ -129,27 +132,28 @@ fn matches(entry: *const store_file.Issue, request: *const github.ListIssuesRequ
     return false;
 }
 
-pub fn update_issue(app: *App, call: *rpc.Call, request: *const github.UpdateIssueRequest, response: *github.Issue) ?connect.RpcError {
+pub fn update_issue(app: *App, _: *rpc.Context, request: *const rpc.Request(github.UpdateIssueRequest), response: *rpc.Response(github.Issue)) ?connect.RpcError {
     const room = &app.github;
-    const entry = switch (visible_issue(room, call, request.owner, request.repository, request.number)) {
+    const asked = &request.message;
+    const entry = switch (visible_issue(room, &request.any, asked.owner, asked.repository, asked.number)) {
         .issue => |entry| entry,
         .failure => |failure| return failure,
     };
-    const actor = service.caller(call).?;
+    const actor = service.caller(&request.any).?;
     if (actor != entry.author and actor != room.store.repositories[entry.repository].owner) {
         return .{ .code = .permission_denied, .message = "Must be the issue's author or the repository's owner" };
     }
-    const paths = switch (paths_of(room, request)) {
+    const paths = switch (paths_of(room, asked)) {
         .paths => |paths| paths,
         .failure => |failure| return failure,
     };
-    const values = request.issue orelse github.Issue{};
+    const values = asked.issue orelse github.Issue{};
     if (paths.contains(.title) and values.title.len == 0) return service.bad_field(room, "issue.title", "must not be empty");
     if (paths.contains(.state) and values.state != .issue_state_open and values.state != .issue_state_closed) {
         return service.bad_field(room, "issue.state", "must be ISSUE_STATE_OPEN or ISSUE_STATE_CLOSED");
     }
     apply(room, entry, actor, paths, &values) catch |failure| return service.store_failure(room, failure, "issue.labels");
-    response.* = issue_message(room, entry);
+    response.message = issue_message(room, entry);
     return null;
 }
 
@@ -186,10 +190,10 @@ pub const ImportIssues = struct {
         count: usize = 0,
     };
 
-    pub fn on_message(app: *App, call: *rpc.Call, state: *State, request: *const github.CreateIssueRequest) ?connect.RpcError {
+    pub fn on_message(app: *App, _: *rpc.Context, state: *State, request: *const rpc.Request(github.CreateIssueRequest)) ?connect.RpcError {
         // An error ends the call: the issues opened before it stay open, as GitHub's own imports
         // leave them.
-        const entry = switch (open(app, call, request)) {
+        const entry = switch (open(app, request)) {
             .issue => |entry| entry,
             .failure => |failure| return failure,
         };
@@ -199,21 +203,22 @@ pub const ImportIssues = struct {
         return null;
     }
 
-    pub fn on_end(_: *App, _: *rpc.Call, state: *State, response: *github.ImportIssuesResponse) ?connect.RpcError {
-        response.* = .{ .created = @intCast(state.count), .numbers = .of(state.numbers[0..state.count]) };
+    pub fn on_end(_: *App, _: *rpc.Context, state: *State, _: *const rpc.AnyRequest, response: *rpc.Response(github.ImportIssuesResponse)) ?connect.RpcError {
+        response.message = .{ .created = @intCast(state.count), .numbers = .of(state.numbers[0..state.count]) };
         return null;
     }
 };
 
-pub fn watch_events(app: *App, call: *rpc.Call, request: *const github.WatchEventsRequest, sender: *rpc.Sender(github.Event)) ?connect.RpcError {
+pub fn watch_events(app: *App, _: *rpc.Context, request: *const rpc.Request(github.WatchEventsRequest), response: *rpc.ResponseStream(github.Event)) ?connect.RpcError {
     const room = &app.github;
-    const index = switch (service.visible_repository(room, call, request.owner, request.repository)) {
+    const asked = &request.message;
+    const index = switch (service.visible_repository(room, &request.any, asked.owner, asked.repository)) {
         .index => |index| index,
         .failure => |failure| return failure,
     };
     for (room.store.events[0..room.store.events_len]) |*event| {
-        if (event.repository != index or event.id <= request.after_id) continue;
-        sender.send(&event_message(event)) catch return .{ .code = .resource_exhausted, .message = "no room to send an event" };
+        if (event.repository != index or event.id <= asked.after_id) continue;
+        response.send(&event_message(event)) catch return .{ .code = .resource_exhausted, .message = "no room to send an event" };
     }
     return null;
 }

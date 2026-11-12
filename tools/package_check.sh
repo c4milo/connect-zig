@@ -63,7 +63,7 @@ pub fn main() !void {
     var buffer: [32]u8 = undefined;
     const stamp: protobuf.wkt.Timestamp = .{ .seconds = 7 };
     const octets = try protobuf.encode(protobuf.wkt.Timestamp, &stamp, &buffer);
-    const sizes = [_]usize{ octets.len, @sizeOf(connect.server.Reply), @sizeOf(rpc.Call) };
+    const sizes = [_]usize{ octets.len, @sizeOf(connect.server.Reply), @sizeOf(rpc.Context) };
     for (sizes) |size| std.debug.assert(size != 0);
     std.debug.print("the package builds: {d} modules\n", .{sizes.len});
 }

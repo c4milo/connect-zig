@@ -24,9 +24,13 @@ The first release.
 - Connect's unary GET for methods marked `NO_SIDE_EFFECTS`.
 - gzip and zstd both ways. brotli is read, not written, until stdx has an encoder.
 - Interceptors on the server and the client, typed error details, timeouts, headers and trailers.
-- A request context for each call, of a struct the program declares in
-  `RouteOptions.RequestContext`. An interceptor writes it, and each callback of the call reads
-  it with `call.request_context` (decision 35).
+- A handler takes the call's context, its request and its response, as connect-go splits them:
+  `rpc.Context`, `rpc.Request(T)` or `RequestStream(T)`, and `rpc.Response(T)` or
+  `ResponseStream(T)`. An interceptor takes `rpc.AnyRequest` and `rpc.AnyResponse`, with no
+  message (decision 36).
+- Values for each call, of a struct the program declares in `RouteOptions.Values`. An
+  interceptor writes them, and each callback of the call reads them with `ctx.values`
+  (decision 35).
 - A method Connect does not serve gets 405 with an `Allow` header, as connect-go answers.
 
 ### OpenID Connect

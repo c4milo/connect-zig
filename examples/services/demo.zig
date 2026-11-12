@@ -39,14 +39,14 @@ pub const caller_trailer = "whoami-caller";
 /// Counts each call, and each GET among them, and marks its reply. It wraps `Auth`, so it also
 /// sees the calls `Auth` refuses, and counts them as failed.
 pub const Logging = struct {
-    pub fn on_call(app: *App, call: *rpc.Call) ?connect.RpcError {
+    pub fn on_call(app: *App, _: *rpc.Context, request: *const rpc.AnyRequest, response: *rpc.AnyResponse) ?connect.RpcError {
         app.logged += 1;
-        if (call.request_query().len != 0) app.queried += 1;
-        call.add_header(logged_header, logged_value) catch return .{ .code = .internal, .message = "no room for a header" };
+        if (request.query().len != 0) app.queried += 1;
+        response.add_header(logged_header, logged_value) catch return .{ .code = .internal, .message = "no room for a header" };
         return null;
     }
 
-    pub fn on_finish(app: *App, _: *rpc.Call, failure: ?connect.RpcError) ?connect.RpcError {
+    pub fn on_finish(app: *App, _: *rpc.Context, _: *rpc.AnyResponse, failure: ?connect.RpcError) ?connect.RpcError {
         if (failure != null) app.failed += 1;
         return failure;
     }
@@ -54,15 +54,15 @@ pub const Logging = struct {
 
 /// Refuses a call whose request has no "authorization: Bearer <name>" header.
 pub const Auth = struct {
-    pub fn on_call(_: *App, call: *rpc.Call) ?connect.RpcError {
-        _ = caller_of(call) orelse return .{ .code = .unauthenticated, .message = "a bearer token is required" };
+    pub fn on_call(_: *App, _: *rpc.Context, request: *const rpc.AnyRequest, _: *rpc.AnyResponse) ?connect.RpcError {
+        _ = caller_of(request) orelse return .{ .code = .unauthenticated, .message = "a bearer token is required" };
         return null;
     }
 };
 
 /// The name a request's bearer token carries, or null.
-pub fn caller_of(call: *const rpc.Call) ?[]const u8 {
-    const value = call.request_header("authorization") orelse return null;
+pub fn caller_of(request: *const rpc.AnyRequest) ?[]const u8 {
+    const value = request.header("authorization") orelse return null;
     if (!std.mem.startsWith(u8, value, bearer_prefix)) return null;
     const name = value[bearer_prefix.len..];
     if (name.len == 0) return null;
@@ -72,11 +72,11 @@ pub fn caller_of(call: *const rpc.Call) ?[]const u8 {
 /// Adds trailers that count the messages a call read and wrote, once it ends. The trailers go
 /// out as soon as `on_finish` returns, so one room in `app` serves every call.
 pub const Counting = struct {
-    pub fn on_finish(app: *App, call: *rpc.Call, failure: ?connect.RpcError) ?connect.RpcError {
-        const received = std.fmt.bufPrint(app.counts[0..count_len_max], "{d}", .{call.received}) catch unreachable;
-        const sent = std.fmt.bufPrint(app.counts[count_len_max..], "{d}", .{call.sent}) catch unreachable;
-        call.add_trailer(received_trailer, received) catch {};
-        call.add_trailer(sent_trailer, sent) catch {};
+    pub fn on_finish(app: *App, ctx: *rpc.Context, response: *rpc.AnyResponse, failure: ?connect.RpcError) ?connect.RpcError {
+        const received = std.fmt.bufPrint(app.counts[0..count_len_max], "{d}", .{ctx.received()}) catch unreachable;
+        const sent = std.fmt.bufPrint(app.counts[count_len_max..], "{d}", .{ctx.sent()}) catch unreachable;
+        response.add_trailer(received_trailer, received) catch {};
+        response.add_trailer(sent_trailer, sent) catch {};
         return failure;
     }
 };
@@ -85,11 +85,11 @@ pub const Counting = struct {
 const count_len_max = 10;
 
 /// Whoami answers with the caller's name, which `Auth` already checked.
-fn whoami(app: *App, call: *rpc.Call, _: *const demo.WhoamiRequest, response: *demo.WhoamiResponse) ?connect.RpcError {
-    response.name = caller_of(call).?;
-    call.add_trailer(caller_trailer, response.name) catch {};
+fn whoami(app: *App, _: *rpc.Context, request: *const rpc.Request(demo.WhoamiRequest), response: *rpc.Response(demo.WhoamiResponse)) ?connect.RpcError {
+    response.message.name = caller_of(&request.any).?;
+    response.add_trailer(caller_trailer, response.message.name) catch {};
     // `Logging` counted this call before the handler ran.
-    response.calls_before = app.logged - 1;
+    response.message.calls_before = app.logged - 1;
     return null;
 }
 
@@ -97,18 +97,18 @@ fn whoami(app: *App, call: *rpc.Call, _: *const demo.WhoamiRequest, response: *d
 const Chat = struct {
     pub const State = struct { turns: u32 = 0 };
 
-    pub fn on_message(app: *App, _: *rpc.Call, state: *State, request: *const demo.ChatMessage, sender: *rpc.Sender(demo.ChatMessage)) ?connect.RpcError {
+    pub fn on_message(app: *App, _: *rpc.Context, state: *State, request: *const rpc.Request(demo.ChatMessage), response: *rpc.ResponseStream(demo.ChatMessage)) ?connect.RpcError {
         // An error from `on_message` ends the call at once, after the answers already sent.
-        if (request.text.len == 0) return .{ .code = .invalid_argument, .message = "empty message" };
+        if (request.message.text.len == 0) return .{ .code = .invalid_argument, .message = "empty message" };
         state.turns += 1;
         // `send` writes the message out before it returns, so `app.text` is free again after.
-        sender.send(&.{ .text = text_of(app, "echo: {s}", .{request.text}) }) catch return .{ .code = .resource_exhausted };
+        response.send(&.{ .text = text_of(app, "echo: {s}", .{request.message.text}) }) catch return .{ .code = .resource_exhausted };
         return null;
     }
 
-    pub fn on_end(app: *App, call: *rpc.Call, state: *State, sender: *rpc.Sender(demo.ChatMessage)) ?connect.RpcError {
-        sender.send(&.{ .text = text_of(app, "bye after {d}", .{state.turns}) }) catch return .{ .code = .resource_exhausted };
-        call.add_trailer(turns_trailer, if (state.turns == 0) "none" else "some") catch {};
+    pub fn on_end(app: *App, _: *rpc.Context, state: *State, _: *const rpc.AnyRequest, response: *rpc.ResponseStream(demo.ChatMessage)) ?connect.RpcError {
+        response.send(&.{ .text = text_of(app, "bye after {d}", .{state.turns}) }) catch return .{ .code = .resource_exhausted };
+        response.add_trailer(turns_trailer, if (state.turns == 0) "none" else "some") catch {};
         return null;
     }
 };
@@ -117,14 +117,14 @@ const Chat = struct {
 const Sum = struct {
     pub const State = struct { sum: i64 = 0, count: i64 = 0 };
 
-    pub fn on_message(_: *App, _: *rpc.Call, state: *State, request: *const demo.SumRequest) ?connect.RpcError {
-        state.sum +|= request.number;
+    pub fn on_message(_: *App, _: *rpc.Context, state: *State, request: *const rpc.Request(demo.SumRequest)) ?connect.RpcError {
+        state.sum +|= request.message.number;
         state.count += 1;
         return null;
     }
 
-    pub fn on_end(_: *App, _: *rpc.Call, state: *State, response: *demo.SumResponse) ?connect.RpcError {
-        response.* = .{ .sum = state.sum, .count = state.count };
+    pub fn on_end(_: *App, _: *rpc.Context, state: *State, _: *const rpc.AnyRequest, response: *rpc.Response(demo.SumResponse)) ?connect.RpcError {
+        response.message = .{ .sum = state.sum, .count = state.count };
         return null;
     }
 };
@@ -134,31 +134,32 @@ const Sum = struct {
 const Countdown = struct {
     pub const State = struct { left: i32 = 0 };
 
-    pub fn on_request(_: *App, _: *rpc.Call, state: *State, request: *const demo.CountdownRequest) ?connect.RpcError {
-        if (request.from < 0 or request.from > countdown_max) return .{ .code = .out_of_range, .message = "from must be between 0 and 1000000" };
-        state.left = request.from;
+    pub fn on_request(_: *App, _: *rpc.Context, state: *State, request: *const rpc.Request(demo.CountdownRequest)) ?connect.RpcError {
+        if (request.message.from < 0 or request.message.from > countdown_max) return .{ .code = .out_of_range, .message = "from must be between 0 and 1000000" };
+        state.left = request.message.from;
         return null;
     }
 
-    pub fn next(_: *App, _: *rpc.Call, state: *State, response: *demo.CountdownResponse) rpc.Next {
+    pub fn next(_: *App, _: *rpc.Context, state: *State, response: *rpc.Response(demo.CountdownResponse)) rpc.Next {
         if (state.left == 0) return .end;
-        response.* = .{ .number = state.left };
+        response.message = .{ .number = state.left };
         state.left -= 1;
         return .message;
     }
 };
 
 /// Divide fails with a DivisionByZero detail when the divisor is 0.
-fn divide(app: *App, _: *rpc.Call, request: *const demo.DivideRequest, response: *demo.DivideResponse) ?connect.RpcError {
-    if (request.divisor == 0) {
-        const detail: demo.DivisionByZero = .{ .dividend = request.dividend };
+fn divide(app: *App, _: *rpc.Context, request: *const rpc.Request(demo.DivideRequest), response: *rpc.Response(demo.DivideResponse)) ?connect.RpcError {
+    const operands = &request.message;
+    if (operands.divisor == 0) {
+        const detail: demo.DivisionByZero = .{ .dividend = operands.dividend };
         const bytes = proto.encode(demo.DivisionByZero, &detail, &app.detail_bytes) catch return .{ .code = .internal };
         app.details[0] = .{ .type_name = demo.DivisionByZero.protobuf.full_name, .value = bytes };
         return .{ .code = .invalid_argument, .message = "division by zero", .details = &app.details };
     }
     // The divisor is not 0, so only the one overflow remains: the least i64 divided by -1.
-    if (request.dividend == std.math.minInt(i64) and request.divisor == -1) return .{ .code = .out_of_range, .message = "quotient overflows" };
-    response.* = .{ .quotient = @divTrunc(request.dividend, request.divisor), .remainder = @rem(request.dividend, request.divisor) };
+    if (operands.dividend == std.math.minInt(i64) and operands.divisor == -1) return .{ .code = .out_of_range, .message = "quotient overflows" };
+    response.message = .{ .quotient = @divTrunc(operands.dividend, operands.divisor), .remainder = @rem(operands.dividend, operands.divisor) };
     return null;
 }
 

@@ -9,16 +9,13 @@
 //! for one message at a time while the response memory has room (`pull.zig`, decision 33). A
 //! server stream's type handler takes its one request in `on_request`.
 //!
-//! An interceptor is a type with any of:
+//! A handler takes the call's `Context`, its request and its response (`context.zig`, decision
+//! 36). An interceptor is a type with any of:
 //!
-//! - `on_call(app, *Call) ?connect.RpcError`, which runs before the handler and refuses the call
-//!   when it returns an error;
-//! - `on_finish(app, *Call, ?connect.RpcError) ?connect.RpcError`, which runs after the handler
-//!   and returns the outcome the client reads.
-//!
-//! Either hook may take the call's request context after the call:
-//! `on_call(app, *Call, *RequestContext)` and
-//! `on_finish(app, *Call, *RequestContext, ?connect.RpcError)` (decision 35).
+//! - `on_call(app, *Context, *const AnyRequest, *AnyResponse) ?connect.RpcError`, which runs
+//!   before the handler and refuses the call when it returns an error;
+//! - `on_finish(app, *Context, *AnyResponse, ?connect.RpcError) ?connect.RpcError`, which runs
+//!   after the handler and returns the outcome the client reads.
 //!
 //! `on_call` runs in the order the list names the interceptors, and `on_finish` in the reverse,
 //! so the first interceptor wraps the others.
@@ -26,55 +23,42 @@ const std = @import("std");
 const assert = std.debug.assert;
 const connect = @import("connect");
 const call_file = @import("call.zig");
+const context_file = @import("context.zig");
 const constants = @import("constants.zig");
 const Call = call_file.Call;
-const Sender = call_file.Sender;
-const Receiver = call_file.Receiver;
+const Context = context_file.Context;
+const AnyRequest = context_file.AnyRequest;
+const AnyResponse = context_file.AnyResponse;
+const Request = context_file.Request;
+const RequestStream = context_file.RequestStream;
+const Response = context_file.Response;
+const ResponseStream = context_file.ResponseStream;
 
-/// The parameters of each hook, without and with the call's request context.
-const on_call_parameters = 2;
-const on_finish_parameters = 3;
-
-pub fn Interceptors(comptime list: []const type, comptime RequestContext: type) type {
+pub fn Interceptors(comptime list: []const type) type {
     return struct {
         pub fn on_call(app: anytype, call: *Call) ?connect.RpcError {
+            var ctx: Context = .{ .call = call };
+            const request: AnyRequest = .{ .call = call };
+            var response: AnyResponse = .{ .call = call };
             inline for (list) |Interceptor| {
                 if (comptime @hasDecl(Interceptor, "on_call")) {
-                    if (call_hook(Interceptor, RequestContext, app, call)) |refusal| return refusal;
+                    if (Interceptor.on_call(app, &ctx, &request, &response)) |refusal| return refusal;
                 }
             }
             return null;
         }
 
         pub fn on_finish(app: anytype, call: *Call, failure: ?connect.RpcError) ?connect.RpcError {
+            var ctx: Context = .{ .call = call };
+            var response: AnyResponse = .{ .call = call };
             var outcome = failure;
             inline for (0..list.len) |index| {
                 const Interceptor = list[list.len - 1 - index];
-                if (comptime @hasDecl(Interceptor, "on_finish")) outcome = finish_hook(Interceptor, RequestContext, app, call, outcome);
+                if (comptime @hasDecl(Interceptor, "on_finish")) outcome = Interceptor.on_finish(app, &ctx, &response, outcome);
             }
             return outcome;
         }
     };
-}
-
-/// Calls `Interceptor.on_call`, with the call's request context when the hook takes it.
-fn call_hook(comptime Interceptor: type, comptime RequestContext: type, app: anytype, call: *Call) ?connect.RpcError {
-    if (comptime takes_request_context(Interceptor.on_call, on_call_parameters)) return Interceptor.on_call(app, call, call.request_context(RequestContext));
-    return Interceptor.on_call(app, call);
-}
-
-/// Calls `Interceptor.on_finish`, with the call's request context when the hook takes it.
-fn finish_hook(comptime Interceptor: type, comptime RequestContext: type, app: anytype, call: *Call, failure: ?connect.RpcError) ?connect.RpcError {
-    if (comptime takes_request_context(Interceptor.on_finish, on_finish_parameters)) return Interceptor.on_finish(app, call, call.request_context(RequestContext), failure);
-    return Interceptor.on_finish(app, call, failure);
-}
-
-/// Whether `hook` takes the call's request context: one parameter past its `parameters`.
-/// A hook with another count fails the build.
-fn takes_request_context(comptime hook: anytype, comptime parameters: usize) bool {
-    const count = @typeInfo(@TypeOf(hook)).@"fn".params.len;
-    if (count != parameters and count != parameters + 1) @compileError("an interceptor's hook takes the program's context, the call and, after the call, the request context");
-    return count == parameters + 1;
 }
 
 /// Whether `handler` is a type that takes messages as they arrive.
@@ -120,30 +104,32 @@ pub fn whole(comptime method: connect.Method, comptime handler: anytype, comptim
     if (I.on_call(app, call)) |refusal| return call_file.finish(call, I.on_finish(app, call, refusal));
     switch (comptime method.stream_type) {
         .unary, .client_stream => {
-            var response: method.Response = .{};
+            var response: Response(method.Response) = .{ .any = .{ .call = call } };
             const failure = invoke(method, handler, app, call, messages, &response);
-            return respond_one(method.Response, I, app, call, failure, &response);
+            return respond_one(method.Response, I, app, call, failure, &response.message);
         },
         .server_stream, .bidi_stream => {
-            var sender: Sender(method.Response) = .{ .call = call };
-            const failure = invoke(method, handler, app, call, messages, &sender);
+            var stream: ResponseStream(method.Response) = .{ .any = .{ .call = call } };
+            const failure = invoke(method, handler, app, call, messages, &stream);
             return call_file.finish(call, I.on_finish(app, call, failure));
         },
     }
 }
 
-/// Calls a function handler with the request as its stream type takes it: one message, or a
-/// `Receiver`. `reply` is the `*Response` or the `*Sender` the handler writes to.
-fn invoke(comptime method: connect.Method, comptime handler: anytype, app: anytype, call: *Call, messages: *connect.server.Messages, reply: anytype) ?connect.RpcError {
+/// Calls a function handler with the request as its stream type takes it: a `Request` of one
+/// message, or a `RequestStream`. `response` is the `*Response` or the `*ResponseStream` the
+/// handler writes to.
+fn invoke(comptime method: connect.Method, comptime handler: anytype, app: anytype, call: *Call, messages: *connect.server.Messages, response: anytype) ?connect.RpcError {
+    var ctx: Context = .{ .call = call };
     if (comptime method.stream_type == .unary or method.stream_type == .server_stream) {
-        var request: method.Request = .{};
-        return switch (call_file.read_one(method.Request, call, messages, &request)) {
+        var request: Request(method.Request) = .{ .message = .{}, .any = .{ .call = call } };
+        return switch (call_file.read_one(method.Request, call, messages, &request.message)) {
             .failure => |failure| failure,
-            .message => handler(app, call, &request, reply),
+            .message => handler(app, &ctx, &request, response),
         };
     }
-    var receiver: Receiver(method.Request) = .{ .messages = messages, .call = call };
-    return handler(app, call, &receiver, reply) orelse receiver.failure;
+    var stream: RequestStream(method.Request) = .{ .messages = messages, .any = .{ .call = call } };
+    return handler(app, &ctx, &stream, response) orelse stream.failure;
 }
 
 /// Ends a call answered with one message. The interceptors see the outcome before the message
@@ -175,12 +161,13 @@ pub fn whole_envelopes_len(bytes: []const u8, payload_len_max: usize) connect.en
 pub fn each_message(comptime method: connect.Method, comptime handler: type, app: anytype, call: *Call, state: *HandlerState(handler), messages: *connect.server.Messages) ?connect.RpcError {
     for (0..constants.messages_per_read_max) |_| {
         const message = messages.next(method.Request) catch |failure| return connect.server.failure_of(failure);
-        const request = message orelse return null;
+        const request: Request(method.Request) = .{ .message = message orelse return null, .any = .{ .call = call } };
         call.received += 1;
+        var ctx: Context = .{ .call = call };
         const failure = if (comptime method.stream_type == .bidi_stream) bidi: {
-            var sender: Sender(method.Response) = .{ .call = call };
-            break :bidi handler.on_message(app, call, state, &request, &sender);
-        } else handler.on_message(app, call, state, &request);
+            var stream: ResponseStream(method.Response) = .{ .any = .{ .call = call } };
+            break :bidi handler.on_message(app, &ctx, state, &request, &stream);
+        } else handler.on_message(app, &ctx, state, &request);
         if (failure) |rpc_failure| return rpc_failure;
     }
     return null;
@@ -191,19 +178,23 @@ pub fn each_message(comptime method: connect.Method, comptime handler: type, app
 /// stream otherwise.
 pub fn end_input(comptime method: connect.Method, comptime handler: type, app: anytype, call: *Call, state: *HandlerState(handler)) ?connect.RpcError {
     comptime assert(method.stream_type == .bidi_stream and pulls(handler));
-    var sender: Sender(method.Response) = .{ .call = call };
-    return handler.on_end(app, call, state, &sender);
+    var ctx: Context = .{ .call = call };
+    const request: AnyRequest = .{ .call = call };
+    var stream: ResponseStream(method.Response) = .{ .any = .{ .call = call } };
+    return handler.on_end(app, &ctx, state, &request, &stream);
 }
 
 /// Runs a type handler's `on_end` once the client ended its stream, then ends the call.
 pub fn end_stream(comptime method: connect.Method, comptime handler: type, comptime I: type, app: anytype, call: *Call, state: *HandlerState(handler)) !void {
+    var ctx: Context = .{ .call = call };
+    const request: AnyRequest = .{ .call = call };
     if (comptime method.stream_type == .bidi_stream) {
-        var sender: Sender(method.Response) = .{ .call = call };
-        const failure = handler.on_end(app, call, state, &sender);
+        var stream: ResponseStream(method.Response) = .{ .any = .{ .call = call } };
+        const failure = handler.on_end(app, &ctx, state, &request, &stream);
         return call_file.finish(call, I.on_finish(app, call, failure));
     }
-    var response: method.Response = .{};
-    return respond_one(method.Response, I, app, call, handler.on_end(app, call, state, &response), &response);
+    var response: Response(method.Response) = .{ .any = .{ .call = call } };
+    return respond_one(method.Response, I, app, call, handler.on_end(app, &ctx, state, &request, &response), &response.message);
 }
 
 test "whole envelopes stop before a partial one, and refuse one too long or with reserved flags" {

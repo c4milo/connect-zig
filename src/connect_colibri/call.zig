@@ -1,5 +1,6 @@
-//! One call a route serves: what the handler and its interceptors read about it, the streams it
-//! reads and writes, and the writing of the reply through colibri's `server.ResponseWriter`.
+//! One call a route serves: what it read of the request, what it wrote of the reply, and the
+//! writing of the reply through colibri's `server.ResponseWriter`. A handler and an interceptor
+//! see it through the views of `context.zig` (decision 36).
 const std = @import("std");
 const assert = std.debug.assert;
 const connect = @import("connect");
@@ -102,17 +103,16 @@ pub const Call = struct {
     /// call writes (`write_held`). It points into the reply's scratch storage, and is empty when
     /// the call holds none. Only a route with `next` holds one (`pull.zig`).
     held: []const u8 = "",
-    /// The call's request context in the route's state, and the name of its type (decision 35).
-    request_context_pointer: ?*anyopaque = null,
-    request_context_name: []const u8 = "",
+    /// The program's values for the call in the route's state, and the name of their type
+    /// (decision 35).
+    values_pointer: ?*anyopaque = null,
+    values_name: []const u8 = "",
 
-    /// The call's request context: the program's own values for this call, of the type
-    /// `RouteOptions.RequestContext` names (decision 35). Every call starts with `.{}`, and the
-    /// value lasts as long as the call: each callback of a stream reads the same one.
-    pub fn request_context(call: *const Call, comptime RequestContext: type) *RequestContext {
+    /// The program's values for the call, of the type `RouteOptions.Values` names (decision 35).
+    pub fn values(call: *const Call, comptime Values: type) *Values {
         // A read with another type than the route's is a programmer error.
-        assert(std.mem.eql(u8, call.request_context_name, @typeName(RequestContext)));
-        return @ptrCast(@alignCast(call.request_context_pointer.?));
+        assert(std.mem.eql(u8, call.values_name, @typeName(Values)));
+        return @ptrCast(@alignCast(call.values_pointer.?));
     }
 
     /// The protocol the request spoke.
@@ -177,45 +177,19 @@ pub const Call = struct {
     }
 };
 
-/// Writes the messages of a server or bidirectional stream. Each message goes out as it is
-/// written, so a client reads it before the stream ends.
-pub fn Sender(comptime T: type) type {
-    return struct {
-        call: *Call,
-
-        pub fn send(sender: *@This(), message: *const T) !void {
-            const call = sender.call;
-            try write_head_once(call, .plain);
-            // A message the call holds was written first, so it goes out first.
-            if (!write_held(call)) return error.WriteFailed;
-            const body = call.response.body();
-            try write_message(T, call, message, body);
-            call.sent += 1;
-            // The writer hands what it holds to the endpoint now, rather than at the end. A flush
-            // that fails keeps its octets in the writer, which sends them later (colibri's usage
-            // guide), so the message went all the same.
-            body.flush() catch {};
-        }
-    };
-}
-
-/// Reads the messages of a client stream a function handler takes whole. A message that does not
-/// decode ends the stream, and the call then fails with `failure`.
-pub fn Receiver(comptime T: type) type {
-    return struct {
-        messages: *connect.server.Messages,
-        call: *Call,
-        failure: ?connect.RpcError = null,
-
-        pub fn next(receiver: *@This()) ?T {
-            const message = receiver.messages.next(T) catch |failure| {
-                receiver.failure = connect.server.failure_of(failure);
-                return null;
-            };
-            if (message != null) receiver.call.received += 1;
-            return message;
-        }
-    };
+/// Sends one message of a server or bidirectional stream, as `ResponseStream.send` does: at once,
+/// so a client reads it before the stream ends.
+pub fn send_message(comptime T: type, call: *Call, message: *const T) !void {
+    try write_head_once(call, .plain);
+    // A message the call holds was written first, so it goes out first.
+    if (!write_held(call)) return error.WriteFailed;
+    const body = call.response.body();
+    try write_message(T, call, message, body);
+    call.sent += 1;
+    // The writer hands what it holds to the endpoint now, rather than at the end. A flush that
+    // fails keeps its octets in the writer, which sends them later (colibri's usage guide), so
+    // the message went all the same.
+    body.flush() catch {};
 }
 
 fn apply_head(call: *Call, head: *const connect.server.Head) !void {

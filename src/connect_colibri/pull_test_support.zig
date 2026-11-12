@@ -77,14 +77,14 @@ pub const App = struct {
 
 /// An interceptor that counts the calls and records how each ended.
 pub const Watch = struct {
-    pub fn on_call(app: *App, _: *rpc.Call) ?connect.RpcError {
+    pub fn on_call(app: *App, _: *rpc.Context, _: *const rpc.AnyRequest, _: *rpc.AnyResponse) ?connect.RpcError {
         app.calls += 1;
         return null;
     }
 
-    pub fn on_finish(app: *App, call: *rpc.Call, failure: ?connect.RpcError) ?connect.RpcError {
+    pub fn on_finish(app: *App, ctx: *rpc.Context, _: *rpc.AnyResponse, failure: ?connect.RpcError) ?connect.RpcError {
         app.finishes += 1;
-        app.sent = call.sent;
+        app.sent = ctx.sent();
         app.outcome = if (failure) |rpc_failure| rpc_failure.code else null;
         return failure;
     }
@@ -106,27 +106,27 @@ pub const Counter = struct {
         text: [note_len_long]u8 = undefined,
     };
 
-    pub fn on_request(app: *App, _: *rpc.Call, state: *State, request: *const Note) ?connect.RpcError {
+    pub fn on_request(app: *App, _: *rpc.Context, state: *State, request: *const rpc.Request(Note)) ?connect.RpcError {
         if (app.refuse_request) return .{ .code = .permission_denied };
-        state.total = std.fmt.parseInt(u32, request.text, decimal) catch return .{ .code = .invalid_argument };
+        state.total = std.fmt.parseInt(u32, request.message.text, decimal) catch return .{ .code = .invalid_argument };
         return null;
     }
 
-    pub fn next(app: *App, _: *rpc.Call, state: *State, response: *Note) rpc.Next {
+    pub fn next(app: *App, _: *rpc.Context, state: *State, response: *rpc.Response(Note)) rpc.Next {
         app.next_calls += 1;
         if (app.fail_after == state.given) return .{ .failure = .{ .code = .aborted, .message = app.fail_message } };
         if (app.wait_after == state.given) return .wait;
         if (state.given == state.total) return .end;
         const len: usize = if (app.long_after == state.given) note_len_long else app.note_len;
-        response.text = note_text(state.given, state.text[0..len]);
+        response.message.text = note_text(state.given, state.text[0..len]);
         state.given += 1;
         return .message;
     }
 };
 
-/// The same stream as a function, which writes through a `Sender` in one call.
-pub fn on_count(_: *App, _: *rpc.Call, request: *const Note, sender: *rpc.Sender(Note)) ?connect.RpcError {
-    sender.send(request) catch return .{ .code = .resource_exhausted };
+/// The same stream as a function, which writes through a `ResponseStream` in one call.
+pub fn on_count(_: *App, _: *rpc.Context, request: *const rpc.Request(Note), response: *rpc.ResponseStream(Note)) ?connect.RpcError {
+    response.send(&request.message) catch return .{ .code = .resource_exhausted };
     return null;
 }
 
@@ -140,25 +140,25 @@ pub const Chatter = struct {
         text: [note_len]u8 = undefined,
     };
 
-    pub fn on_message(app: *App, _: *rpc.Call, state: *State, request: *const Note, sender: *rpc.Sender(Note)) ?connect.RpcError {
-        state.total = std.fmt.parseInt(u32, request.text, decimal) catch return .{ .code = .invalid_argument };
-        sender.send(request) catch {
+    pub fn on_message(app: *App, _: *rpc.Context, state: *State, request: *const rpc.Request(Note), response: *rpc.ResponseStream(Note)) ?connect.RpcError {
+        state.total = std.fmt.parseInt(u32, request.message.text, decimal) catch return .{ .code = .invalid_argument };
+        response.send(&request.message) catch {
             if (!app.drop_unsent) return .{ .code = .resource_exhausted };
             app.unsent += 1;
         };
         return null;
     }
 
-    pub fn on_end(_: *App, _: *rpc.Call, state: *State, _: *rpc.Sender(Note)) ?connect.RpcError {
+    pub fn on_end(_: *App, _: *rpc.Context, state: *State, _: *const rpc.AnyRequest, _: *rpc.ResponseStream(Note)) ?connect.RpcError {
         state.ended = true;
         return null;
     }
 
-    pub fn next(app: *App, _: *rpc.Call, state: *State, response: *Note) rpc.Next {
+    pub fn next(app: *App, _: *rpc.Context, state: *State, response: *rpc.Response(Note)) rpc.Next {
         app.next_calls += 1;
         if (!state.ended and !app.early) return .wait;
         if (state.given == state.total) return if (state.ended) .end else .wait;
-        response.text = note_text(state.given, &state.text);
+        response.message.text = note_text(state.given, &state.text);
         state.given += 1;
         return .message;
     }

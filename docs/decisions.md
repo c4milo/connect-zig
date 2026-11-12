@@ -173,7 +173,8 @@ first. Cite an entry by number in code and commits ("decision 6").
     pointers, which costs an indirect call and loses the `app` type; and, amended 2026-11-07, a
     `ClientCallWith(method, interceptors)` beside `ClientCall(method)`, which named two types for
     one and left no room for a client option but interceptors. Amended 2026-11-11: a server
-    hook may take the call's request context as its third parameter (decision 35).
+    hook takes the call's `Context`, `AnyRequest` and `AnyResponse`, and `Call` goes (decision
+    36).
 
 20. **Examples share their services.** The programs in `examples/` import the ELIZA and demo
     services, the in-memory link and its client loop from `examples/services/`, so each program
@@ -378,10 +379,10 @@ first. Cite an entry by number in code and commits ("decision 6").
       text.
     - The claims belong to the call (amended 2026-11-11, decision 35). `verify` writes them
       into a `Claims` the caller owns, which holds a copy of the subject and of the payload. The
-      interceptor verifies into its call's request context, the field `oidc`, a
+      interceptor verifies into its call's values, the field `oidc`, a
       `?oidc.Claims`, which stays null on an excluded path and after a refusal. A handler reads
-      `call.request_context(RequestContext).oidc` at any callback of its call, the tenth
-      message of a stream included.
+      `ctx.values(Values).oidc` at any callback of its call, the tenth message of a stream
+      included.
     - A program reads its own claims on demand, with `Claims.string`, `integer` and `holds`
       over the payload's copy. A string a lookup returns stays valid until the next lookup on
       the same `Claims`. A claim nobody asks for costs nothing.
@@ -396,7 +397,7 @@ first. Cite an entry by number in code and commits ("decision 6").
     Limits. One issuer and one audience for each verifier, and 8 keys. An RSA key holds 2048
     to 4096 bits. A token holds 4096 characters at most, which is what a route copies of a
     request's headers. A string a lookup returns holds `claim_bytes_max` octets at most. A
-    `Claims` takes about 4.4 KB of each call's request context. A NumericDate with an exponent
+    `Claims` takes about 4.4 KB of each call's values. A NumericDate with an exponent
     is refused.
     The module reads no "typ",
     "nonce", "azp" or "at_hash": those belong to the client that ran the login, not to the
@@ -408,33 +409,54 @@ first. Cite an entry by number in code and commits ("decision 6").
     and which needs a bound for each string and array; and an exclusion list read at run time,
     which a comptime list makes free for a route with none.
 
-35. **A call keeps a request context of the type the program declares.** Ruled by the owner on
+35. **A call keeps values of the type the program declares.** Ruled by the owner on
     2026-11-11. What an interceptor learns about a call belongs to that call: the claims of its
     token, the user a rate limit counted, an identifier a log prints. Before this decision it
-    lived in the program's context, which every call shares. So a stream's later callback could
+    lived in the program's `App`, which every call shares. So a stream's later callback could
     read what another call wrote in between.
-    - `RouteOptions.RequestContext` is a struct whose fields each have a default, `struct {}`
-      when the program names none. The route keeps one in each call's state. colibri sets that
-      state to its defaults at each request, so every call starts with `.{}`.
-    - An interceptor's hook may take it as its third parameter:
-      `on_call(app, *Call, *RequestContext)` and
-      `on_finish(app, *Call, *RequestContext, ?RpcError)`. A hook with no such parameter runs as
-      before.
-    - A handler reads it at any callback with `call.request_context(RequestContext)`. The call
-      keeps a pointer to it and the name of its type, and an assertion compares the name, so a
-      read with the wrong type fails at once.
-    - Each request entry of the router grows by `@sizeOf(RequestContext)`.
-    - Two contexts exist side by side, as Flask has an application context and a request
-      context. The program's context is the router's `Context`, which every call shares. The
-      request context belongs to one call. The documents name each one in full.
+    - `RouteOptions.Values` is a struct whose fields each have a default, `struct {}` when the
+      program names none. The route keeps one in each call's state. colibri sets that state to
+      its defaults at each request, so every call starts with `.{}`.
+    - An interceptor and a handler read it at any callback with `ctx.values(Values)` (decision
+      36). The call keeps a pointer to it and the name of its type, and an assertion compares
+      the name, so a read with the wrong type fails at once. A library's interceptor that
+      writes into it takes the program's type as a parameter, as `oidc.Interceptor(Values, ...)`
+      does.
+    - Each request entry of the router grows by `@sizeOf(Values)`.
 
-    It holds the program's own values alone. The request's headers, path and timeout stay on
-    `Call`. Beaten: a `State` for each interceptor, read through the interceptor's type, which
-    needs a table keyed by type in `Call`, and gives two interceptors no slot they share; a
-    generic `CallWith(T)`, which changes the signature of every handler, every interceptor and
-    the generated code; and the names `Local`, which no framework uses for this, and `Locals`,
-    which Express, SvelteKit and Astro use. The owner chose `RequestContext`, the phrase of Go's
-    `Request.Context`, Flask, Spring and API Gateway's `requestContext`.
+    Beaten: a `State` for each interceptor, read through the interceptor's type, which needs a
+    table keyed by type in the call, and gives two interceptors no slot they share; a generic
+    `CallWith(T)`, which changes every signature for one type; a hook that takes the values as
+    a parameter of its own, which gave each hook two signatures (this decision's first form);
+    and the names `Local`, `Locals` and `RequestContext`, before the call's own object took the
+    name `Context`. The owner chose `Values`, connect-es's word for the same values.
+
+36. **A handler takes the call's context, its request and its response.** Ruled by the owner on
+    2026-11-11 ("ctx, request and response split is cleaner"), as connect-go splits a call
+    into a `context.Context`, a `Request` and a `Response`. `Call` goes; it held all three.
+    - `Context` is the call: its path, protocol, codec and timeout, the counts of the messages
+      it read and wrote, and `values(T)` (decision 35). A handler's parameter is `ctx`.
+    - `Request(T)` holds one message and the request's headers and query. `RequestStream(T)`
+      reads a stream's messages with `next`, and holds the headers and query too. It replaces
+      `Receiver`.
+    - `Response(T)` holds one message to fill, and adds response headers and trailers.
+      `ResponseStream(T)` sends each message with `send`, and adds headers and trailers too. It
+      replaces `Sender`.
+    - A function handler takes `(app, ctx, request, response)`, each of the kind its stream
+      type needs. A type handler's callbacks take `(app, ctx, state, ...)` with the same
+      kinds: `on_message` a `Request` and, for a bidirectional stream, a `ResponseStream`;
+      `on_request` a `Request`; `next` a `Response`; `on_end` an `AnyRequest`, whose headers
+      last to the stream's end, and a `ResponseStream` or a `Response`.
+    - An interceptor takes `on_call(app, ctx, *const AnyRequest, *AnyResponse)` and
+      `on_finish(app, ctx, *AnyResponse, ?RpcError)`: the request and the response without a
+      message, as connect-go's `AnyRequest` and `AnyResponse`.
+    - Each of these is a view of the call the route keeps, valid during the callback that
+      receives it. A program keeps nothing of it past the callback but what it copies.
+
+    Beaten: one object for the call, its request and its response, as connect-es's
+    `HandlerContext`, which the owner found less clean; messages as plain parameters with the
+    headers on two more, which gave a unary handler six parameters; and bare messages in a type
+    handler's callbacks, which read headers another way than a function handler does.
 
 ## Tooling
 

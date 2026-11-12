@@ -13,6 +13,7 @@ const connect = @import("connect");
 const server = @import("server");
 const constants = @import("constants.zig");
 const call_file = @import("call.zig");
+const context_file = @import("context.zig");
 const dispatch = @import("dispatch.zig");
 const pull = @import("pull.zig");
 
@@ -23,10 +24,10 @@ pub const Options = struct {
     token_bytes: usize = constants.token_bytes_default,
     /// The interceptors around the handler, outermost first (`dispatch.zig`).
     interceptors: []const type = &.{},
-    /// The program's own values for each call: a struct whose fields each have a default. Every
-    /// call starts with `.{}`. An interceptor's hook may take it, and a handler reads it with
-    /// `Call.request_context` (decision 35).
-    RequestContext: type = struct {},
+    /// The program's values for each call: a struct whose fields each have a default. Every call
+    /// starts with `.{}`, and an interceptor and a handler read it with `Context.values`
+    /// (decision 35).
+    Values: type = struct {},
 };
 
 /// What a route keeps in its request's entry of the router pool. The request and the reply each
@@ -51,9 +52,9 @@ pub fn CallState(comptime options: Options, comptime handler: anytype) type {
         headers: call_file.RequestHeaders = .{},
         query: call_file.RequestQuery = .{},
         handler_state: dispatch.HandlerState(handler) = .{},
-        /// The call's request context (decision 35). colibri sets the state to its defaults at
-        /// each request, so each call starts with `.{}`.
-        request_context: options.RequestContext = .{},
+        /// The program's values for the call (decision 35). colibri sets the state to its
+        /// defaults at each request, so each call starts with `.{}`.
+        values: options.Values = .{},
         /// How far a route with `next` wrote its response.
         outgoing: if (pulls) pull.Outgoing else struct {} = .{},
 
@@ -87,34 +88,38 @@ fn receive_limit_of(app: anytype, comptime message_bytes: usize) usize {
     return @min(limit, message_bytes);
 }
 
-/// The struct route of `method`, which calls `handler`. A function handler's signature follows
-/// the stream type:
+/// The struct route of `method`, which calls `handler`. A handler takes the call's `Context`, its
+/// request and its response (`context.zig`, decision 36). A function handler's signature follows
+/// the stream type, with `Req` and `Res` the method's message types:
 ///
-/// - unary: `fn (*App, *Call, *const Request, *Response) ?connect.RpcError`
-/// - server stream: `fn (*App, *Call, *const Request, *Sender(Response)) ?connect.RpcError`
-/// - client stream: `fn (*App, *Call, *Receiver(Request), *Response) ?connect.RpcError`
-/// - bidirectional stream: `fn (*App, *Call, *Receiver(Request), *Sender(Response)) ?connect.RpcError`
+/// - unary: `fn (*App, *Context, *const Request(Req), *Response(Res)) ?connect.RpcError`
+/// - server stream: `fn (*App, *Context, *const Request(Req), *ResponseStream(Res)) ?connect.RpcError`
+/// - client stream: `fn (*App, *Context, *RequestStream(Req), *Response(Res)) ?connect.RpcError`
+/// - bidirectional stream: `fn (*App, *Context, *RequestStream(Req), *ResponseStream(Res)) ?connect.RpcError`
 ///
 /// A type handler of a client or bidirectional stream declares an optional `State` and:
 ///
-/// - `on_message(*App, *Call, *State, *const Request, *Sender(Response))` for a bidirectional
-///   stream, or `on_message(*App, *Call, *State, *const Request)` for a client stream;
-/// - `on_end(*App, *Call, *State, *Sender(Response))`, or `on_end(..., *Response)`.
+/// - `on_message(*App, *Context, *State, *const Request(Req), *ResponseStream(Res))` for a
+///   bidirectional stream, or `on_message(*App, *Context, *State, *const Request(Req))` for a
+///   client stream;
+/// - `on_end(*App, *Context, *State, *const AnyRequest, *ResponseStream(Res))`, or
+///   `on_end(..., *Response(Res))`: the request with no message, whose headers last to the end.
 ///
 /// Each returns null to go on, or the error that ends the call.
 ///
 /// A type handler of a server or bidirectional stream may also declare
-/// `next(*App, *Call, *State, *Response) Next`. The route calls it for one message at a time
-/// while the response memory has room, so the stream may be longer than the router's
+/// `next(*App, *Context, *State, *Response(Res)) Next`. The route calls it for one message at a
+/// time while the response memory has room, so the stream may be longer than the router's
 /// `response_bytes` (decision 33). A server stream's type handler declares `next` and
-/// `on_request(*App, *Call, *State, *const Request)`, which takes the stream's one request. The
-/// request's strings point into the request body, which lasts only until `on_request` returns.
+/// `on_request(*App, *Context, *State, *const Request(Req))`, which takes the stream's one
+/// request. The request's strings point into the request body, which lasts only until
+/// `on_request` returns.
 ///
-/// A context may hold a field `message_receive_limit`, a count of octets: a request message
+/// The program's `App` may hold a field `message_receive_limit`, a count of octets: a request message
 /// longer than it, once decompressed, fails the call with `resource_exhausted`.
 pub fn Route(comptime App: type, comptime method: connect.Method, comptime handler: anytype, comptime options: Options) type {
     comptime dispatch.check(method, handler);
-    comptime check_request_context(options.RequestContext);
+    comptime check_values(options.Values);
     const Spec = RouteSpec{ .method = method, .options = options };
     const Whole = struct {
         pub const State = CallState(options, handler);
@@ -145,12 +150,12 @@ pub fn Route(comptime App: type, comptime method: connect.Method, comptime handl
     };
 }
 
-/// Fails the build when `RequestContext` is not a struct whose fields each have a default, so
-/// each call can start with `.{}` (decision 35).
-fn check_request_context(comptime RequestContext: type) void {
-    if (@typeInfo(RequestContext) != .@"struct") @compileError("RouteOptions.RequestContext is a struct, not " ++ @typeName(RequestContext));
-    for (@typeInfo(RequestContext).@"struct".fields) |field| {
-        if (field.defaultValue() == null) @compileError("each field of RouteOptions.RequestContext has a default, and " ++ field.name ++ " has none");
+/// Fails the build when `Values` is not a struct whose fields each have a default, so each call
+/// can start with `.{}` (decision 35).
+fn check_values(comptime Values: type) void {
+    if (@typeInfo(Values) != .@"struct") @compileError("RouteOptions.Values is a struct, not " ++ @typeName(Values));
+    for (@typeInfo(Values).@"struct".fields) |field| {
+        if (field.defaultValue() == null) @compileError("each field of RouteOptions.Values has a default, and " ++ field.name ++ " has none");
     }
 }
 
@@ -195,8 +200,8 @@ fn begin(comptime spec: RouteSpec, comptime handler: anytype, app: anytype, stat
         .headers = &state.headers,
         .path = comptime spec.method.path(),
         .query = query orelse "",
-        .request_context_pointer = &state.request_context,
-        .request_context_name = @typeName(spec.options.RequestContext),
+        .values_pointer = &state.values,
+        .values_name = @typeName(spec.options.Values),
     };
 }
 
@@ -206,15 +211,15 @@ fn serve_whole(comptime spec: RouteSpec, comptime handler: anytype, app: anytype
     // A Connect unary body is the message itself, and an uncompressed one is read in place, so
     // its length is checked here; every other message is read into storage of `limit` octets.
     if (read_in_place(state.call.reply.accepted) and body.len > state.limit) {
-        return stop(dispatch.Interceptors(spec.options.interceptors, spec.options.RequestContext), app, state, too_large);
+        return stop(dispatch.Interceptors(spec.options.interceptors), app, state, too_large);
     }
     var messages = connect.server.Messages.init(&state.call.reply.accepted, body, &scratch_of(spec.options, handler, state, .request), &codings_of(app).decoders);
-    return dispatch.whole(spec.method, handler, dispatch.Interceptors(spec.options.interceptors, spec.options.RequestContext), app, &state.call, &messages);
+    return dispatch.whole(spec.method, handler, dispatch.Interceptors(spec.options.interceptors), app, &state.call, &messages);
 }
 
 /// Takes each whole envelope that arrived, and keeps a partial one for the next call.
 fn serve_streaming(comptime spec: RouteSpec, comptime handler: anytype, app: anytype, state: *CallState(spec.options, handler), body: *std.Io.Reader) !void {
-    const I = dispatch.Interceptors(spec.options.interceptors, spec.options.RequestContext);
+    const I = dispatch.Interceptors(spec.options.interceptors);
     const call = &state.call;
     if (start_once(I, app, state)) |refusal| return stop(I, app, state, refusal);
     const buffered = body.buffered();
@@ -246,22 +251,23 @@ fn serve_request(comptime spec: RouteSpec, comptime handler: anytype, app: anyty
     comptime assert(spec.method.stream_type == .server_stream);
     assert(!state.done);
     state.done = true;
-    const I = dispatch.Interceptors(spec.options.interceptors, spec.options.RequestContext);
+    const I = dispatch.Interceptors(spec.options.interceptors);
     const call = &state.call;
     if (start_once(I, app, state)) |refusal| return stop(I, app, state, refusal);
     var messages = connect.server.Messages.init(&call.reply.accepted, body, &scratch_of(spec.options, handler, state, .request), &codings_of(app).decoders);
-    var request: spec.method.Request = .{};
-    switch (call_file.read_one(spec.method.Request, call, &messages, &request)) {
+    var request: context_file.Request(spec.method.Request) = .{ .message = .{}, .any = .{ .call = call } };
+    switch (call_file.read_one(spec.method.Request, call, &messages, &request.message)) {
         .failure => |failure| return stop(I, app, state, failure),
         .message => {},
     }
-    if (handler.on_request(app, call, &state.handler_state, &request)) |failure| return stop(I, app, state, failure);
+    var ctx: context_file.Context = .{ .call = call };
+    if (handler.on_request(app, &ctx, &state.handler_state, &request)) |failure| return stop(I, app, state, failure);
 }
 
 /// Sends what a stream with `next` has, while the response memory takes it (`pull.zig`).
 fn serve_writable(comptime spec: RouteSpec, comptime handler: anytype, app: anytype, state: *CallState(spec.options, handler), response: *server.ResponseWriter) !void {
     if (state.outgoing.phase == .done) return;
-    const I = dispatch.Interceptors(spec.options.interceptors, spec.options.RequestContext);
+    const I = dispatch.Interceptors(spec.options.interceptors);
     state.call.response = response;
     // A server stream sends nothing before its request arrived whole.
     if (comptime !dispatch.reads_pieces(spec.method, handler)) {

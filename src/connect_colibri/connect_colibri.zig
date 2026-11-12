@@ -10,6 +10,7 @@ const files = struct {
     pub const route = @import("route.zig");
     pub const refusal = @import("refusal.zig");
     pub const call = @import("call.zig");
+    pub const context = @import("context.zig");
     pub const client_call = @import("client_call.zig");
     pub const client_stream = @import("client_stream.zig");
     pub const dispatch = @import("dispatch.zig");
@@ -24,10 +25,15 @@ pub const post = files.route.post;
 pub const get = files.route.get;
 /// The router entries that answer 405 for the HTTP methods Connect does not serve.
 pub const Refusals = files.refusal.Refusals;
-/// What a handler reads about its call, and the streams it reads and writes.
-pub const Call = files.call.Call;
-pub const Sender = files.call.Sender;
-pub const Receiver = files.call.Receiver;
+/// What a handler and an interceptor read and write of a call: the call's context, its request
+/// and its response (decision 36).
+pub const Context = files.context.Context;
+pub const Request = files.context.Request;
+pub const RequestStream = files.context.RequestStream;
+pub const Response = files.context.Response;
+pub const ResponseStream = files.context.ResponseStream;
+pub const AnyRequest = files.context.AnyRequest;
+pub const AnyResponse = files.context.AnyResponse;
 /// What a type handler's `next` answers when its route asks for the stream's next message.
 pub const Next = files.pull.Next;
 /// A client call over colibri's pool.
@@ -51,9 +57,10 @@ comptime {
 
 test "the root exports the names a program calls" {
     try @import("public_names").expect(@This(), &.{
-        "constants",         "Route",      "RouteOptions",    "Codings",     "post",       "get",
-        "Refusals",          "Call",       "Sender",          "Receiver",    "ClientCall", "ClientCallOptions",
-        "ClientCallBuffers", "failure_of", "ClientSendError", "full_duplex", "Next",
+        "constants",       "Route",       "RouteOptions", "Codings",           "post",              "get",
+        "Refusals",        "Context",     "Request",      "RequestStream",     "Response",          "ResponseStream",
+        "AnyRequest",      "AnyResponse", "ClientCall",   "ClientCallOptions", "ClientCallBuffers", "failure_of",
+        "ClientSendError", "full_duplex", "Next",
     });
 }
 
@@ -62,5 +69,6 @@ test {
     _ = @import("connect_colibri_test.zig");
     _ = @import("client_stream_test.zig");
     _ = @import("pull_test.zig");
-    _ = @import("request_context_test.zig");
+    _ = @import("values_test.zig");
+    _ = @import("context_test.zig");
 }

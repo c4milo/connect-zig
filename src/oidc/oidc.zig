@@ -5,19 +5,19 @@
 //! program fetches the issuer's JWK Set and passes the time.
 //!
 //! ```zig
-//! // The context of the routes holds the verifier.
+//! // The program's App holds the verifier.
 //! try app.oidc.init(&.{ .issuer = "https://accounts.example.com", .audience = "my-service" });
 //! try app.oidc.set_keys(jwks_text); // again when `app.oidc.keys_stale()`
 //! app.oidc.set_time(unix_seconds); // when the program's clock moves
 //!
-//! // Each call keeps its own claims, in its request context (decision 35).
-//! const RequestContext = struct { oidc: ?oidc.Claims = null };
-//! const Auth = oidc.Interceptor(.{ .exclude = &.{ "/grpc.health.v1.Health/", "/auth.v1.Auth/Login" } });
-//! const options: rpc.RouteOptions = .{ .interceptors = &.{Auth}, .RequestContext = RequestContext };
+//! // Each call keeps its own claims, in its values (decisions 35 and 36).
+//! const Values = struct { oidc: ?oidc.Claims = null };
+//! const Auth = oidc.Interceptor(Values, .{ .exclude = &.{ "/grpc.health.v1.Health/", "/auth.v1.Auth/Login" } });
+//! const options: rpc.RouteOptions = .{ .interceptors = &.{Auth}, .Values = Values };
 //! pub const routes = Service.Routes(rpc, App, @This(), options).routes;
 //!
 //! // In any callback of a call behind the interceptor:
-//! if (call.request_context(RequestContext).oidc) |*claims| {
+//! if (ctx.values(Values).oidc) |*claims| {
 //!     const email = try claims.string("email");
 //!     const admin = try claims.holds("roles", "admin");
 //! }

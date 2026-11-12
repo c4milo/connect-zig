@@ -9,7 +9,7 @@ const lookup = @import("lookup.zig");
 pub const Error = error{Malformed};
 
 /// What a verified token states, in storage the caller owns: `Verifier.verify` fills it. A route
-/// keeps one in each call's request context, so each call reads its own (decisions 34 and 35).
+/// keeps one in each call's values, so each call reads its own (decisions 34 and 35).
 pub const Claims = struct {
     /// "iss" (RFC 7519 §4.1.1): the verifier's issuer, which the token's equals. It points into
     /// the verifier.

@@ -14,29 +14,29 @@ const App = app_file.App;
 const reply = app_file.text_of;
 
 /// Say answers one sentence.
-pub fn say(app: *App, _: *rpc.Call, request: *const eliza.SayRequest, response: *eliza.SayResponse) ?connect.RpcError {
-    if (request.sentence.len == 0) return .{ .code = .invalid_argument, .message = "say something" };
-    response.sentence = reply(app, "You said \"{s}\". How does that make you feel?", .{request.sentence});
+pub fn say(app: *App, _: *rpc.Context, request: *const rpc.Request(eliza.SayRequest), response: *rpc.Response(eliza.SayResponse)) ?connect.RpcError {
+    if (request.message.sentence.len == 0) return .{ .code = .invalid_argument, .message = "say something" };
+    response.message.sentence = reply(app, "You said \"{s}\". How does that make you feel?", .{request.message.sentence});
     return null;
 }
 
 /// Introduce answers a name with three sentences.
-pub fn introduce(app: *App, _: *rpc.Call, request: *const eliza.IntroduceRequest, sender: *rpc.Sender(eliza.IntroduceResponse)) ?connect.RpcError {
-    const who = if (request.name.len == 0) "friend" else request.name;
+pub fn introduce(app: *App, _: *rpc.Context, request: *const rpc.Request(eliza.IntroduceRequest), response: *rpc.ResponseStream(eliza.IntroduceResponse)) ?connect.RpcError {
+    const who = if (request.message.name.len == 0) "friend" else request.message.name;
     const lines = [_][]const u8{ "Hi {s}, I am Eliza.", "Before we begin, {s}, tell me how you came here.", "How are you feeling today, {s}?" };
     inline for (lines) |line| {
-        sender.send(&.{ .sentence = reply(app, line, .{who}) }) catch return .{ .code = .resource_exhausted };
+        response.send(&.{ .sentence = reply(app, line, .{who}) }) catch return .{ .code = .resource_exhausted };
     }
     return null;
 }
 
 /// Converse answers each sentence it reads, in order.
-pub fn converse(app: *App, call: *rpc.Call, receiver: *rpc.Receiver(eliza.ConverseRequest), sender: *rpc.Sender(eliza.ConverseResponse)) ?connect.RpcError {
+pub fn converse(app: *App, _: *rpc.Context, request: *rpc.RequestStream(eliza.ConverseRequest), response: *rpc.ResponseStream(eliza.ConverseResponse)) ?connect.RpcError {
     for (0..conversation_turns_max) |_| {
-        const request = receiver.next() orelse break;
-        sender.send(&.{ .sentence = reply(app, "Why do you say \"{s}\"?", .{request.sentence}) }) catch return .{ .code = .resource_exhausted };
+        const turn = request.next() orelse break;
+        response.send(&.{ .sentence = reply(app, "Why do you say \"{s}\"?", .{turn.sentence}) }) catch return .{ .code = .resource_exhausted };
     }
-    call.add_trailer("eliza-turns", "done") catch {};
+    response.add_trailer("eliza-turns", "done") catch {};
     return null;
 }
 

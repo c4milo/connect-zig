@@ -61,8 +61,8 @@ pub const Room = struct {
 /// Refuses a token the store does not know, and a call with no token when `required`.
 pub fn Auth(comptime required: bool) type {
     return struct {
-        pub fn on_call(_: *App, call: *rpc.Call) ?connect.RpcError {
-            const header = call.request_header("authorization") orelse {
+        pub fn on_call(_: *App, _: *rpc.Context, request: *const rpc.AnyRequest, _: *rpc.AnyResponse) ?connect.RpcError {
+            const header = request.header("authorization") orelse {
                 if (required) return .{ .code = .unauthenticated, .message = "Requires authentication" };
                 return null;
             };
@@ -74,26 +74,26 @@ pub fn Auth(comptime required: bool) type {
 
 /// Counts each caller's calls, and refuses one past its limit.
 pub const RateLimit = struct {
-    pub fn on_call(app: *App, call: *rpc.Call) ?connect.RpcError {
+    pub fn on_call(app: *App, _: *rpc.Context, request: *const rpc.AnyRequest, response: *rpc.AnyResponse) ?connect.RpcError {
         const room = &app.github;
-        const who: usize = if (caller(call)) |user| user + 1 else store_file.anonymous;
+        const who: usize = if (caller(request)) |user| user + 1 else store_file.anonymous;
         const limit: u32 = if (who == store_file.anonymous) limit_anonymous else limit_user;
         const used = room.store.calls[who];
-        call.add_header("x-ratelimit-limit", decimals[limit]) catch {};
+        response.add_header("x-ratelimit-limit", decimals[limit]) catch {};
         if (used >= limit) {
-            call.add_header("x-ratelimit-remaining", decimals[0]) catch {};
+            response.add_header("x-ratelimit-remaining", decimals[0]) catch {};
             const detail: github.RateLimited = .{ .limit = @intCast(limit), .used = @intCast(used) };
             return detailed(room, .resource_exhausted, "API rate limit exceeded", github.RateLimited, &detail);
         }
         room.store.calls[who] = used + 1;
-        call.add_header("x-ratelimit-remaining", decimals[limit - used - 1]) catch {};
+        response.add_header("x-ratelimit-remaining", decimals[limit - used - 1]) catch {};
         return null;
     }
 };
 
-/// The user the call's token names, or null for an anonymous call.
-pub fn caller(call: *const rpc.Call) ?usize {
-    return store_file.user_of(call.request_header("authorization"));
+/// The user the request's token names, or null for an anonymous call.
+pub fn caller(request: *const rpc.AnyRequest) ?usize {
+    return store_file.user_of(request.header("authorization"));
 }
 
 /// An error with one detail, which the room holds until the reply is encoded.
@@ -128,10 +128,10 @@ pub const Found = union(enum) { index: usize, failure: connect.RpcError };
 
 /// The repository `owner/name` if the caller may see it. A private repository reads as not found
 /// to anyone but its owner, so its name does not leak.
-pub fn visible_repository(room: *Room, call: *const rpc.Call, owner: []const u8, name: []const u8) Found {
+pub fn visible_repository(room: *Room, request: *const rpc.AnyRequest, owner: []const u8, name: []const u8) Found {
     const index = room.store.repository(owner, name) orelse return missing_repository(room, owner, name);
     const entry = &room.store.repositories[index];
-    if (entry.visibility == .visibility_private and caller(call) != entry.owner) return missing_repository(room, owner, name);
+    if (entry.visibility == .visibility_private and caller(request) != entry.owner) return missing_repository(room, owner, name);
     return .{ .index = index };
 }
 
@@ -176,24 +176,25 @@ pub fn repository_message(entry: *const store_file.Repository) github.Repository
     };
 }
 
-fn get_repository(app: *App, call: *rpc.Call, request: *const github.GetRepositoryRequest, response: *github.Repository) ?connect.RpcError {
+fn get_repository(app: *App, _: *rpc.Context, request: *const rpc.Request(github.GetRepositoryRequest), response: *rpc.Response(github.Repository)) ?connect.RpcError {
     const room = &app.github;
-    const index = switch (visible_repository(room, call, request.owner, request.name)) {
+    const index = switch (visible_repository(room, &request.any, request.message.owner, request.message.name)) {
         .index => |index| index,
         .failure => |failure| return failure,
     };
-    response.* = repository_message(&room.store.repositories[index]);
+    response.message = repository_message(&room.store.repositories[index]);
     return null;
 }
 
-fn list_repositories(app: *App, call: *rpc.Call, request: *const github.ListRepositoriesRequest, response: *github.ListRepositoriesResponse) ?connect.RpcError {
+fn list_repositories(app: *App, _: *rpc.Context, request: *const rpc.Request(github.ListRepositoriesRequest), response: *rpc.Response(github.ListRepositoriesResponse)) ?connect.RpcError {
     const room = &app.github;
-    const owner = user_named(request.owner) orelse return not_found(room, "User", "{s}", .{request.owner});
-    const page = switch (page_of(room, request.page_size, request.page_token)) {
+    const asked = &request.message;
+    const owner = user_named(asked.owner) orelse return not_found(room, "User", "{s}", .{asked.owner});
+    const page = switch (page_of(room, asked.page_size, asked.page_token)) {
         .page => |page| page,
         .failure => |failure| return failure,
     };
-    const viewer = caller(call);
+    const viewer = caller(&request.any);
     var total: usize = 0;
     var count: usize = 0;
     for (room.store.repositories[0..room.store.repositories_len]) |*entry| {
@@ -205,21 +206,22 @@ fn list_repositories(app: *App, call: *rpc.Call, request: *const github.ListRepo
         }
         total += 1;
     }
-    response.* = .{ .repositories = .of(room.repositories[0..count]), .next_page_token = page.next_token(room, total) };
+    response.message = .{ .repositories = .of(room.repositories[0..count]), .next_page_token = page.next_token(room, total) };
     return null;
 }
 
-fn create_repository(app: *App, call: *rpc.Call, request: *const github.CreateRepositoryRequest, response: *github.Repository) ?connect.RpcError {
+fn create_repository(app: *App, _: *rpc.Context, request: *const rpc.Request(github.CreateRepositoryRequest), response: *rpc.Response(github.Repository)) ?connect.RpcError {
     const room = &app.github;
+    const asked = &request.message;
     // `Auth(true)` let the call through, so its token names a user.
-    const owner = caller(call).?;
-    if (!valid_name(request.name)) return bad_field(room, "name", "use at most 100 letters, digits, '.', '-' and '_'");
-    if (room.store.repository(users[owner].login, request.name) != null) {
-        const detail: github.AlreadyExists = .{ .resource_type = "Repository", .resource_name = request.name };
+    const owner = caller(&request.any).?;
+    if (!valid_name(asked.name)) return bad_field(room, "name", "use at most 100 letters, digits, '.', '-' and '_'");
+    if (room.store.repository(users[owner].login, asked.name) != null) {
+        const detail: github.AlreadyExists = .{ .resource_type = "Repository", .resource_name = asked.name };
         return detailed(room, .already_exists, "name already exists on this account", github.AlreadyExists, &detail);
     }
-    const entry = room.store.add_repository(owner, request) catch |failure| return store_failure(room, failure, "topics");
-    response.* = repository_message(entry);
+    const entry = room.store.add_repository(owner, asked) catch |failure| return store_failure(room, failure, "topics");
+    response.message = repository_message(entry);
     return null;
 }
 

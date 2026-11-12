@@ -30,27 +30,27 @@ const App = struct {};
 /// The messages a chat answers, at most.
 const chat_turns_max = 4;
 
-fn on_say(_: *App, _: *rpc.Call, request: *const Note, response: *Note) ?connect.RpcError {
-    response.text = request.text;
+fn on_say(_: *App, _: *rpc.Context, request: *const rpc.Request(Note), response: *rpc.Response(Note)) ?connect.RpcError {
+    response.message.text = request.message.text;
     return null;
 }
 
-fn on_count(_: *App, _: *rpc.Call, request: *const Note, sender: *rpc.Sender(Note)) ?connect.RpcError {
-    sender.send(request) catch return .{ .code = .resource_exhausted };
+fn on_count(_: *App, _: *rpc.Context, request: *const rpc.Request(Note), response: *rpc.ResponseStream(Note)) ?connect.RpcError {
+    response.send(&request.message) catch return .{ .code = .resource_exhausted };
     return null;
 }
 
-fn on_gather(_: *App, _: *rpc.Call, receiver: *rpc.Receiver(Note), response: *Note) ?connect.RpcError {
-    response.* = receiver.next() orelse return .{ .code = .invalid_argument };
+fn on_gather(_: *App, _: *rpc.Context, request: *rpc.RequestStream(Note), response: *rpc.Response(Note)) ?connect.RpcError {
+    response.message = request.next() orelse return .{ .code = .invalid_argument };
     return null;
 }
 
-fn on_chat(_: *App, call: *rpc.Call, receiver: *rpc.Receiver(Note), sender: *rpc.Sender(Note)) ?connect.RpcError {
+fn on_chat(_: *App, _: *rpc.Context, request: *rpc.RequestStream(Note), response: *rpc.ResponseStream(Note)) ?connect.RpcError {
     for (0..chat_turns_max) |_| {
-        const note = receiver.next() orelse break;
-        sender.send(&note) catch return .{ .code = .resource_exhausted };
+        const note = request.next() orelse break;
+        response.send(&note) catch return .{ .code = .resource_exhausted };
     }
-    call.add_trailer("x-chat", "done") catch {};
+    response.add_trailer("x-chat", "done") catch {};
     return null;
 }
 

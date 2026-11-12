@@ -73,15 +73,15 @@ pub fn Received(comptime Request: type) type {
 pub const ClientStream = struct {
     pub const State = struct { received: Received(service.ClientStreamRequest) = .{} };
 
-    pub fn on_message(_: *App, _: *rpc.Call, state: *State, request: *const service.ClientStreamRequest) ?connect.RpcError {
-        state.received.add(request) catch return echo_file.internal;
+    pub fn on_message(_: *App, _: *rpc.Context, state: *State, request: *const rpc.Request(service.ClientStreamRequest)) ?connect.RpcError {
+        state.received.add(&request.message) catch return echo_file.internal;
         return null;
     }
 
-    pub fn on_end(app: *App, call: *rpc.Call, state: *State, response: *service.ClientStreamResponse) ?connect.RpcError {
-        const info = app.echo.request_info(call, state.received.requests());
+    pub fn on_end(app: *App, ctx: *rpc.Context, state: *State, request: *const rpc.AnyRequest, response: *rpc.Response(service.ClientStreamResponse)) ?connect.RpcError {
+        const info = app.echo.request_info(ctx, request, state.received.requests());
         const first = state.received.first_request() orelse service.ClientStreamRequest{};
-        return unary.answer(app, call, first.response_definition, &info, &response.payload);
+        return unary.answer(app, ctx, &response.any, first.response_definition, &info, &response.message.payload);
     }
 };
 
@@ -95,38 +95,38 @@ pub const BidiStream = struct {
         slept_ms: u64 = 0,
     };
 
-    const Sender = rpc.Sender(service.BidiStreamResponse);
+    const Stream = rpc.ResponseStream(service.BidiStreamResponse);
 
-    pub fn on_message(app: *App, call: *rpc.Call, state: *State, request: *const service.BidiStreamRequest, sender: *Sender) ?connect.RpcError {
-        state.received.add(request) catch return echo_file.internal;
+    pub fn on_message(app: *App, ctx: *rpc.Context, state: *State, request: *const rpc.Request(service.BidiStreamRequest), response: *Stream) ?connect.RpcError {
+        state.received.add(&request.message) catch return echo_file.internal;
         const first = state.received.first_request() orelse return echo_file.internal;
         const wanted = first.response_definition orelse return null;
         if (state.received.count_total == 1) {
             state.full_duplex = first.full_duplex;
-            if (echo_file.apply_metadata(call, &wanted.response_headers, &wanted.response_trailers)) |failure| return failure;
+            if (echo_file.apply_metadata(&response.any, &wanted.response_headers, &wanted.response_trailers)) |failure| return failure;
         }
         if (!state.full_duplex) return null;
-        const data = nth(&wanted.response_data, state.sent) orelse return finish(app, call, state, &wanted);
-        return respond(app, call, state, &wanted, data, sender);
+        const data = nth(&wanted.response_data, state.sent) orelse return finish(app, ctx, &request.any, state, &wanted);
+        return respond(app, ctx, &request.any, state, &wanted, data, response);
     }
 
-    pub fn on_end(app: *App, call: *rpc.Call, state: *State, sender: *Sender) ?connect.RpcError {
+    pub fn on_end(app: *App, ctx: *rpc.Context, state: *State, request: *const rpc.AnyRequest, response: *Stream) ?connect.RpcError {
         const first = state.received.first_request() orelse return null;
         const wanted = first.response_definition orelse return null;
         for (0..constants.responses_max) |_| {
             const data = nth(&wanted.response_data, state.sent) orelse break;
-            if (respond(app, call, state, &wanted, data, sender)) |failure| return failure;
+            if (respond(app, ctx, request, state, &wanted, data, response)) |failure| return failure;
         }
-        return finish(app, call, state, &wanted);
+        return finish(app, ctx, request, state, &wanted);
     }
 
     /// Sends one response. The first echoes everything the server observed, and each later one
     /// the requests received since the response before it.
-    fn respond(app: *App, call: *rpc.Call, state: *State, wanted: *const service.StreamResponseDefinition, data: []const u8, sender: *Sender) ?connect.RpcError {
-        if (echo_file.pause(app.io, call, wanted.response_delay_ms, &state.slept_ms)) |failure| return failure;
+    fn respond(app: *App, ctx: *const rpc.Context, request: *const rpc.AnyRequest, state: *State, wanted: *const service.StreamResponseDefinition, data: []const u8, response: *Stream) ?connect.RpcError {
+        if (echo_file.pause(app.io, ctx, wanted.response_delay_ms, &state.slept_ms)) |failure| return failure;
         const requests = state.received.requests();
-        const info: RequestInfo = if (state.sent == 0) app.echo.request_info(call, requests) else .{ .requests = .of(requests) };
-        sender.send(&.{ .payload = .{ .data = data, .request_info = info } }) catch return echo_file.internal;
+        const info: RequestInfo = if (state.sent == 0) app.echo.request_info(ctx, request, requests) else .{ .requests = .of(requests) };
+        response.send(&.{ .payload = .{ .data = data, .request_info = info } }) catch return echo_file.internal;
         state.sent += 1;
         state.received.clear();
         return null;
@@ -134,10 +134,10 @@ pub const BidiStream = struct {
 
     /// Ends the stream with the definition's error, if any, which carries the request info when
     /// no response went out.
-    fn finish(app: *App, call: *rpc.Call, state: *State, wanted: *const service.StreamResponseDefinition) ?connect.RpcError {
+    fn finish(app: *App, ctx: *const rpc.Context, request: *const rpc.AnyRequest, state: *State, wanted: *const service.StreamResponseDefinition) ?connect.RpcError {
         const failure = if (wanted.@"error") |*failure| failure else return null;
         if (state.sent != 0) return app.echo.failure(failure, null);
-        const info = app.echo.request_info(call, state.received.requests());
+        const info = app.echo.request_info(ctx, request, state.received.requests());
         return app.echo.failure(failure, &info);
     }
 };

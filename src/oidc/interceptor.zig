@@ -38,37 +38,44 @@ pub fn bearer_token(authorization: []const u8) ?[]const u8 {
 }
 
 /// A server interceptor for `RouteOptions.interceptors`. Its `on_call` verifies the call's
-/// bearer token with the `Verifier` in the program context's field `oidc`, into the request
-/// context's field `oidc`, a `?oidc.Claims` (decision 35). It refuses the call with
-/// `unauthenticated` when the token is missing or not valid. A handler reads
-/// `call.request_context(RequestContext).oidc` at any callback of its call, and finds null on
-/// an excluded path.
+/// bearer token with the `Verifier` in the program's `App`, field `oidc`, into the call's
+/// values, field `oidc`, a `?oidc.Claims` (decisions 35 and 36). `Values` is the type the
+/// routes name in `RouteOptions.Values`. It refuses the call with `unauthenticated` when the
+/// token is missing or not valid. A handler reads `ctx.values(Values).oidc` at any callback of
+/// its call, and finds null on an excluded path.
 ///
-/// `on_call` takes any call type with `path`, `request_header` and `add_header`, as
-/// `connect_colibri.Call` has them, so the module names no transport.
-pub fn Interceptor(comptime options: InterceptorOptions) type {
+/// `on_call` takes any context with `path` and `values`, any request with `header`, and any
+/// response with `add_header`, as `connect_colibri`'s have them, so the module names no
+/// transport.
+pub fn Interceptor(comptime Values: type, comptime options: InterceptorOptions) type {
     comptime check(options);
+    comptime check_values(Values);
     return struct {
-        pub fn on_call(app: anytype, call: anytype, request_context: anytype) ?connect.RpcError {
-            comptime check_types(@TypeOf(app.*), @TypeOf(request_context.*));
-            request_context.oidc = null;
-            if (excluded(options.exclude, call.path)) return null;
-            const authorization = call.request_header("authorization") orelse return refuse(call, .missing);
-            const token = bearer_token(authorization) orelse return refuse(call, .missing);
-            request_context.oidc = .{};
-            app.oidc.verify(token, &request_context.oidc.?) catch |failure| {
-                request_context.oidc = null;
-                return refuse(call, if (failure == error.Expired) .expired else .invalid);
+        pub fn on_call(app: anytype, ctx: anytype, request: anytype, response: anytype) ?connect.RpcError {
+            comptime check_app(@TypeOf(app.*));
+            const values = ctx.values(Values);
+            values.oidc = null;
+            if (excluded(options.exclude, ctx.path())) return null;
+            const authorization = request.header("authorization") orelse return refuse(response, .missing);
+            const token = bearer_token(authorization) orelse return refuse(response, .missing);
+            values.oidc = .{};
+            app.oidc.verify(token, &values.oidc.?) catch |failure| {
+                values.oidc = null;
+                return refuse(response, if (failure == error.Expired) .expired else .invalid);
             };
             return null;
         }
     };
 }
 
-/// The program's context holds the verifier, and the request context a slot for the claims.
-fn check_types(comptime App: type, comptime RequestContext: type) void {
-    if (!@hasField(App, "oidc") or @FieldType(App, "oidc") != Verifier) @compileError("oidc.Interceptor: the context needs a field `oidc: oidc.Verifier`");
-    if (!@hasField(RequestContext, "oidc") or @FieldType(RequestContext, "oidc") != ?Claims) @compileError("oidc.Interceptor: RouteOptions.RequestContext needs a field `oidc: ?oidc.Claims = null`");
+/// The program's `App` holds the verifier.
+fn check_app(comptime App: type) void {
+    if (!@hasField(App, "oidc") or @FieldType(App, "oidc") != Verifier) @compileError("oidc.Interceptor: the App needs a field `oidc: oidc.Verifier`");
+}
+
+/// The call's values hold a slot for the claims.
+fn check_values(comptime Values: type) void {
+    if (!@hasField(Values, "oidc") or @FieldType(Values, "oidc") != ?Claims) @compileError("oidc.Interceptor: RouteOptions.Values needs a field `oidc: ?oidc.Claims = null`");
 }
 
 /// An entry names a service and may name a method. An entry that named neither would exclude
@@ -99,10 +106,10 @@ const Refusal = enum { missing, expired, invalid };
 /// Codes"), with RFC 6750 §3's challenge. §3.1: a request with no credentials gets no error
 /// code, and one whose token is expired, malformed or invalid for another reason gets
 /// "invalid_token".
-fn refuse(call: anytype, refusal: Refusal) connect.RpcError {
+fn refuse(response: anytype, refusal: Refusal) connect.RpcError {
     const challenge = if (refusal == .missing) scheme else scheme ++ " error=\"invalid_token\"";
     // The refusal goes out without the challenge when the call has no room for a header.
-    call.add_header("www-authenticate", challenge) catch {};
+    response.add_header("www-authenticate", challenge) catch {};
     return .{
         .code = .unauthenticated,
         .message = switch (refusal) {

@@ -42,19 +42,19 @@ pub const Echo = struct {
     }
 
     /// Everything the server observed: the headers, the timeout, a GET's query and `requests`.
-    pub fn request_info(echo: *Echo, call: *const rpc.Call, requests: []const Any) RequestInfo {
-        const headers = group(call.request_headers(), &echo.groups, &echo.values);
+    pub fn request_info(echo: *Echo, ctx: *const rpc.Context, request: *const rpc.AnyRequest, requests: []const Any) RequestInfo {
+        const headers = group(request.headers(), &echo.groups, &echo.values);
         return .{
             .request_headers = .of(headers),
-            .timeout_ms = timeout_ms_of(call),
+            .timeout_ms = timeout_ms_of(ctx),
             .requests = .of(requests),
-            .connect_get_info = echo.get_info(call),
+            .connect_get_info = echo.get_info(request),
         };
     }
 
     /// The query parameters of a Connect GET, decoded, or null for a POST.
-    fn get_info(echo: *Echo, call: *const rpc.Call) ?service.ConformancePayload.ConnectGetInfo {
-        const query = call.request_query();
+    fn get_info(echo: *Echo, request: *const rpc.AnyRequest) ?service.ConformancePayload.ConnectGetInfo {
+        const query = request.query();
         if (query.len == 0) return null;
         const pairs = split_query(query, &echo.pairs, &echo.query_octets);
         return .{ .query_params = .of(group(pairs, &echo.query_groups, &echo.query_values)) };
@@ -103,8 +103,8 @@ pub fn code_of(code: config.Code) connect.Code {
     return @enumFromInt(number);
 }
 
-fn timeout_ms_of(call: *const rpc.Call) ?i64 {
-    const timeout_ns = call.timeout_ns() orelse return null;
+fn timeout_ms_of(ctx: *const rpc.Context) ?i64 {
+    const timeout_ns = ctx.timeout_ns() orelse return null;
     return @intCast(timeout_ns / constants.nanos_per_milli);
 }
 
@@ -154,30 +154,30 @@ pub fn split_query(query: []const u8, pairs: []connect.Header, octets: []u8) []c
 }
 
 /// Adds each response header and trailer a definition names, once for each value.
-pub fn apply_metadata(call: *rpc.Call, headers: *const proto.Repeated(Header, .message), trailers: *const proto.Repeated(Header, .message)) ?connect.RpcError {
-    if (add_each(call, headers, .header)) |failure_found| return failure_found;
-    return add_each(call, trailers, .trailer);
+pub fn apply_metadata(response: *rpc.AnyResponse, headers: *const proto.Repeated(Header, .message), trailers: *const proto.Repeated(Header, .message)) ?connect.RpcError {
+    if (add_each(response, headers, .header)) |failure_found| return failure_found;
+    return add_each(response, trailers, .trailer);
 }
 
 const Section = enum { header, trailer };
 
-fn add_each(call: *rpc.Call, list: *const proto.Repeated(Header, .message), section: Section) ?connect.RpcError {
+fn add_each(response: *rpc.AnyResponse, list: *const proto.Repeated(Header, .message), section: Section) ?connect.RpcError {
     var fields = list.iterator();
     for (0..rpc.constants.fields_max + 1) |_| {
         const field = (fields.next() catch return internal) orelse return null;
-        if (add_values(call, &field, section)) |failure| return failure;
+        if (add_values(response, &field, section)) |failure| return failure;
     }
     return internal;
 }
 
 /// Adds one header or trailer of `field`'s name for each of its values.
-fn add_values(call: *rpc.Call, field: *const Header, section: Section) ?connect.RpcError {
+fn add_values(response: *rpc.AnyResponse, field: *const Header, section: Section) ?connect.RpcError {
     var values = field.value.iterator();
     for (0..rpc.constants.fields_max + 1) |_| {
         const value = (values.next() catch return internal) orelse return null;
         switch (section) {
-            .header => call.add_header(field.name, value) catch return internal,
-            .trailer => call.add_trailer(field.name, value) catch return internal,
+            .header => response.add_header(field.name, value) catch return internal,
+            .trailer => response.add_trailer(field.name, value) catch return internal,
         }
     }
     return null;
@@ -186,9 +186,9 @@ fn add_values(call: *rpc.Call, field: *const Header, section: Section) ?connect.
 /// Waits `delay_ms` before a response, as a definition asks. `slept_ms` counts the call's waits
 /// so far. When the call's timeout ends first, the wait stops there and the call fails with
 /// `deadline_exceeded` (PROTOCOL-HTTP2.md, "Timeout"; Connect protocol, "Timeout").
-pub fn pause(io: std.Io, call: *const rpc.Call, delay_ms: u32, slept_ms: *u64) ?connect.RpcError {
+pub fn pause(io: std.Io, ctx: *const rpc.Context, delay_ms: u32, slept_ms: *u64) ?connect.RpcError {
     if (delay_ms == 0) return null;
-    const timeout_ms: u64 = @intCast(timeout_ms_of(call) orelse return wait(io, delay_ms, slept_ms));
+    const timeout_ms: u64 = @intCast(timeout_ms_of(ctx) orelse return wait(io, delay_ms, slept_ms));
     const left_ms = timeout_ms -| slept_ms.*;
     if (delay_ms < left_ms) return wait(io, delay_ms, slept_ms);
     _ = wait(io, left_ms, slept_ms);
