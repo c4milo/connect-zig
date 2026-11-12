@@ -350,6 +350,11 @@ decode of each message among them.
   connect-rust, with every coverage case in Connect proto and JSON with GET, gRPC and gRPC-Web,
   over h2 and HTTP/1.1, with gzip, every stream shape, a typed error, a timeout, headers and
   trailers: 831 calls.
+- `tools/package_check.sh` fetches the tracked files into a new project, as `zig fetch` keeps
+  them, and builds it: the three library modules and the plugin.
+- `oidc`'s tests verify the known answers of RFC 7515 and RFC 8037, RS256 tokens that OpenSSL
+  signs, and ES256 and EdDSA tokens that Zig's standard library signs, so each signature
+  chapulin checks comes from another implementation.
 - `tools/perf_check.sh` counts the instructions of each benchmark operation under callgrind and
   fails when one takes more than 2% above `bench/instructions.txt`. Counts do not move with a
   shared runner's load, so CI catches a regression that wall time would hide.

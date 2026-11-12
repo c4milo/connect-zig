@@ -66,8 +66,9 @@ The first release.
 
 ### Checked
 
-- connectrpc's conformance suite v1.0.4: the server passes 2714 of 2714 cases, and the client
-  8264 of 8264. One timing case of the client is listed as flaky, with its reason.
+- connectrpc's conformance suite v1.0.4: the server passes 2714 of 2714 cases. The client runs
+  8264 cases, and passes each but one timing case of the reference server, which may fail and
+  is listed as flaky with its reason.
 - Clients in other languages call connect-zig's server: connect-go, grpc-go, connect-es on Node,
   grpcio, tonic and connect-rust, across every protobuf type. connect-zig's client calls their
   servers too.
@@ -75,6 +76,10 @@ The first release.
   upb's.
 - A performance gate on instruction counts, and a benchmark beside Go's protobuf runtime and
   connect-rust's Buffa, published by CI.
+- A project that fetches connect-zig as a package builds against it, as `zig fetch` keeps the
+  files: `tools/package_check.sh`, a CI job of its own.
+- `oidc` verifies the RFCs' known answers for RS256, ES256 and EdDSA, and RS256 tokens that
+  OpenSSL signs, and each of its checks was broken on purpose to prove a test catches it.
 
 ### Known limits
 
