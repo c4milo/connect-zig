@@ -26,7 +26,7 @@ jobs:
     outputs:
       checks: ${{ steps.list.outputs.checks }}
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - id: list
         run: echo "checks=$(tools/ci.sh --list)" >>"${GITHUB_OUTPUT}"
   check:
@@ -39,13 +39,13 @@ jobs:
       matrix:
         check: ${{ fromJSON(needs.plan.outputs.checks) }}
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           # The commit linter reads the pushed range, which needs the history.
           fetch-depth: 0
       - name: Restore Zig and buf
         id: zig
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
             ~/zig
@@ -75,7 +75,7 @@ jobs:
       # Zig's caches are addressed by content. Each commit saves its own entry and a run restores
       # the newest one.
       - name: Restore the Zig caches
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
             ~/.cache/zig
@@ -86,7 +86,7 @@ jobs:
       # What each check installs for itself, pinned by its lock files: Go modules, npm packages,
       # the Python virtual environments, Cargo's builds and the conformance runner.
       - name: Restore the checks' caches
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
             ~/.cache/connect-zig
