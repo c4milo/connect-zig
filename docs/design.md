@@ -592,6 +592,24 @@ ran on Linux x86-64 with Zig 0.16.0.
     the two a first run did not catch. One more gave a hook a second view of the same call,
     which behaves the same, so it is no mutation and is not counted.
 
+- **Binary encode counts or writes, chosen at compile time.** Buffa led binary encode on 7 of
+  8 messages. A profile of Small's encode, and then its disassembly, showed why each field cost
+  about 65 instructions: the encoder's `Sink` tested at run time whether it wrote, and kept a
+  count of the octets while it wrote them. `Sink` now takes its mode at compile time (commit
+  `c416354`), so the compiler builds each message's walk once to count and once to write.
+  - The judge, CI's `perf` job on `c416354`: binary encode takes 33.24% fewer instructions on
+    strings, 28.27% on small, 21.13% on deep, 16.96% on large, 16.25% on varints, 15.09% on
+    medium, 3.02% on tree and 0.30% on packed. No other operation moved past 0.03%.
+    `bench/instructions.txt` holds the new counts.
+  - CI's `bench-compare` of that run, on an EPYC 7763: connect-zig's binary encode is faster
+    than Buffa's on small, deep, varints, tree and packed, and slower on medium, large and
+    strings. The README's tables come from another machine, an EPYC 9V74, so they keep run
+    86's numbers until one run refreshes each cell.
+  - A trial that copied a string of up to 32 octets with two loads and no call did not pay on
+    a local counter: 1.6% fewer instructions on strings, 3.7% more on deep. It was dropped.
+  - Mutations, 7, each CAUGHT: each count of the counting walk, the write of a value, and the
+    restore of the writer when a child's length guess fails.
+
 ### What a later step owes
 
 - A stream that waits for an event of the program once its request ended (colibri issue 130).
