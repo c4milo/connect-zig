@@ -93,8 +93,8 @@ confirm a test fails. Report `CAUGHT` or `NOT CAUGHT` per mutation in the commit
   (decision 17).
 - Commit messages: `zig build lint-commits` checks `origin/main..HEAD`.
 - Examples: `zig build examples` runs every program in `examples/` that checks itself:
-  `protobuf_messages`, `sans_io_call`, and `eliza`, `streaming`, `interceptors`, `errors` and
-  `github`, which run a client against the server of `examples/services/` over colibri's h11, h2
+  `protobuf_messages`, `sans_io_call`, and `eliza`, `streaming`, `interceptors`, `errors`,
+  `github` and `oidc`, which run a client against the server of `examples/services/` over colibri's h11, h2
   and h3, in memory; the h3 rounds use the test-only identity of `examples/testdata/tls` (decision 25).
   `zig build example-<name>` runs one; `examples/README.md` lists them. `zig build
   run-eliza-server -- [port]` serves the ELIZA and demo services on `colibri.Server`: h11 and h2
@@ -135,8 +135,10 @@ confirm a test fails. Report `CAUGHT` or `NOT CAUGHT` per mutation in the commit
 - Package: `tools/package_check.sh` builds a small project against connect-zig as `zig fetch`
   keeps it: the files `.paths` of `build.zig.zon` names, and no other. A new folder that
   `build.zig` imports joins that list. It needs the network.
-- OIDC: `zig build test-oidc` runs the `oidc` module's tests, which link chapulin with `JWS=on`
-  and no colibri module (decision 34). `python3 tools/oidc_vectors.py` writes
+- OIDC: `zig build test-oidc` runs the `oidc` module's tests. `build/chapulin.zig` asks for
+  chapulin with colibri's own request, so a program links one chapulin object (decision 34); a
+  colibri release that changes its request changes that file. `zig build example-oidc` runs a
+  service behind the interceptor. `python3 tools/oidc_vectors.py` writes
   `src/oidc/rsa_vectors.zig` again: RS256 tokens that OpenSSL signs with new keys. It needs
   openssl.
 - Guide: `zig build guide` installs pepegrillo's performance method and API guide to

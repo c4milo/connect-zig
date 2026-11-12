@@ -359,11 +359,14 @@ first. Cite an entry by number in code and commits ("decision 6").
       with Ed25519. The module reads the JSON with stdx, and checks the claims itself. It names
       no colibri module, and colibri exports no crypto of chapulin's: the owner refused both a
       path through colibri's `dnssec` module and a signature module in colibri.
-    - connect-zig names chapulin in its own `build.zig.zon`, with colibri's request for its TCP
-      object and `JWS=on` beside it (`build/chapulin.zig`). A program that links colibri and
-      `oidc` links one chapulin object only while the two pins and the two requests are equal
-      (decision 10). chapulin builds `jws` for a host target alone, so another target has no
-      `oidc` module.
+    - connect-zig names chapulin in its own `build.zig.zon`, at the commit colibri pins, and
+      asks for its object with colibri's own request (`build/chapulin.zig`). Zig keys a
+      dependency by its package and its options, so a program that links colibri and `oidc`
+      links one chapulin object; a request that differs in one value fails the link with a
+      duplicate symbol (decision 10). Amended 2026-11-12: since colibri v0.16.2 that request
+      holds `JWS=on` and `SCRAM=on` itself (colibri decision 162), so `oidc` links beside
+      `connect_colibri`. chapulin builds `jws` for a host target alone, so another target has
+      no `oidc` module.
     - The program fetches the issuer's JWK Set, and passes its text to `set_keys` and the time
       to `set_time` (decisions 3 and 4). `keys_stale` says when a token named a key the
       verifier does not hold.

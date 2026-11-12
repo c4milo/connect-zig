@@ -24,6 +24,9 @@ pub fn add(b: *std.Build, graph: Graph) *std.Build.Step {
     b.installArtifact(coverage);
     const rotor_dependency = b.lazyDependency("rotor", .{ .target = graph.target, .release = graph.optimize == .ReleaseSafe }) orelse return step;
     const rotor = rotor_dependency.module("rotor");
+    // The example server's account service checks bearer tokens with `oidc`, which a host target
+    // alone has (decision 34), so another target builds the programs above and no server.
+    const oidc = graph.oidc orelse return step;
     const eliza = generated(b, graph, "examples/gen/connectrpc/eliza/v1/eliza.pb.zig", &.{});
     // The kitchen-sink messages, which reach shared.proto's through its module (decision 17).
     const shared = generated(b, graph, "examples/gen/kitchen/v1/shared.pb.zig", &.{});
@@ -57,6 +60,8 @@ pub fn add(b: *std.Build, graph: Graph) *std.Build.Step {
         .github = generated(b, graph, "examples/gen/github/v1/github.pb.zig", &.{}),
         .coverage = coverage_module,
         .interop = generated(b, graph, "examples/gen/interop/v1/interop.pb.zig", &.{.{ .name = "coverage_v1_coverage", .module = coverage_module }}),
+        .account = generated(b, graph, "examples/gen/account/v1/account.pb.zig", &.{}),
+        .oidc = oidc,
         .rotor = rotor,
         .test_identity = test_identity,
     };
@@ -66,6 +71,7 @@ pub fn add(b: *std.Build, graph: Graph) *std.Build.Step {
         .{ .name = "streaming", .description = "Run bidirectional, client and server streams" },
         .{ .name = "errors", .description = "Run calls that fail with typed error details" },
         .{ .name = "github", .description = "Run a session against a GitHub-style API" },
+        .{ .name = "oidc", .description = "Run calls behind OpenID Connect bearer tokens" },
     }) |linked| {
         const exe = program(b, graph, linked.name, b.fmt("examples/{s}.zig", .{linked.name}), services);
         // The in-memory link runs on Rotor's loops.
@@ -140,6 +146,8 @@ const Services = struct {
     github: *std.Build.Module,
     coverage: *std.Build.Module,
     interop: *std.Build.Module,
+    account: *std.Build.Module,
+    oidc: *std.Build.Module,
     rotor: *std.Build.Module,
     test_identity: *std.Build.Module,
 };
@@ -164,6 +172,8 @@ fn program(b: *std.Build, graph: Graph, name: []const u8, path: []const u8, serv
                 .{ .name = "github", .module = services.github },
                 .{ .name = "coverage", .module = services.coverage },
                 .{ .name = "interop", .module = services.interop },
+                .{ .name = "account", .module = services.account },
+                .{ .name = "oidc", .module = services.oidc },
             },
         }),
     });

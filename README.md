@@ -270,15 +270,14 @@ each call starts with its defaults. An interceptor and a handler read it with
 are on `ctx`, and the headers on the request. Your `App` is still the one value every call
 shares.
 
-> [!IMPORTANT]
-> `oidc` checks signatures with chapulin's `jws` calls, which chapulin v0.6.0 holds. colibri
-> v0.16.1 links chapulin v0.5.0, and one program cannot link both. So a server on
-> `connect_colibri` cannot import `oidc` until a colibri release pins chapulin v0.6.0. Until
-> then the module's own tests prove it: `zig build test-oidc`.
+`oidc` checks signatures with [chapulin](https://github.com/c4milo/chapulin)'s `jws` calls, the
+TLS library colibri already links, so it adds no second crypto library to your program.
+[examples/oidc.zig](examples/oidc.zig) runs all of this over h2 and h3, with a test issuer that
+signs its tokens and changes its key between the rounds.
 
-[examples/](examples) holds ten programs, from generated messages alone to streaming,
-interceptors, error details, a GitHub-style API with tokens, rate limits, pages and field masks,
-and a server on a socket. Each checks itself, and
+[examples/](examples) holds eleven programs, from generated messages alone to streaming,
+interceptors, error details, bearer tokens, a GitHub-style API with tokens, rate limits, pages
+and field masks, and a server on a socket. Each checks itself, and
 [examples/README.md](examples/README.md) says where to start.
 
 The library runs on any event loop (decision 32). The in-memory examples and the socket server
@@ -354,7 +353,9 @@ decode of each message among them.
   them, and builds it: the three library modules and the plugin.
 - `oidc`'s tests verify the known answers of RFC 7515 and RFC 8037, RS256 tokens that OpenSSL
   signs, and ES256 and EdDSA tokens that Zig's standard library signs, so each signature
-  chapulin checks comes from another implementation.
+  chapulin checks comes from another implementation. The `oidc` example runs a client against
+  a service behind the interceptor, and `tools/interop_check.sh` reads its refusals with curl
+  and `buf curl` in all three protocols.
 - `tools/perf_check.sh` counts the instructions of each benchmark operation under callgrind and
   fails when one takes more than 2% above `bench/instructions.txt`. Counts do not move with a
   shared runner's load, so CI catches a regression that wall time would hide.
@@ -392,7 +393,6 @@ Still to come:
 - [x] The client against servers in Go, TypeScript, Python and Rust
 - [x] Long server streams
 - [x] OpenID Connect bearer tokens, checked on the server
-- [ ] `oidc` beside `connect_colibri` in one program, once colibri pins chapulin v0.6.0
 - [x] HTTP/3 in the in-memory examples, with a test-only TLS identity
 - [x] Full-duplex streams on the server, interceptors and error details
 - [x] `Any`, `Struct`, `Value` and `ListValue` in JSON

@@ -1,0 +1,33 @@
+// A service behind OpenID Connect bearer tokens. The `oidc` module's interceptor guards each
+// method but the one it excludes (docs/decisions.md entry 34).
+syntax = "proto3";
+
+package account.v1;
+
+service AccountService {
+  // Status needs no token: the interceptor excludes its path.
+  rpc Status(StatusRequest) returns (StatusResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+  // Whoami answers with what the caller's token states. It needs a valid token.
+  rpc Whoami(WhoamiRequest) returns (WhoamiResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+}
+
+message StatusRequest {}
+
+message StatusResponse {
+  string status = 1;
+}
+
+message WhoamiRequest {}
+
+message WhoamiResponse {
+  // The token's "sub" claim.
+  string subject = 1;
+  // The token's "email" claim, or empty when the token holds none.
+  string email = 2;
+  // Whether the token's "roles" claim holds "admin".
+  bool admin = 3;
+}

@@ -24,6 +24,8 @@ const identity = @import("test_identity");
 const coverage = @import("coverage");
 const App = @import("services/app.zig").App;
 const Router = @import("services/routes.zig").Router;
+const account = @import("services/account.zig");
+const issuer = @import("services/issuer.zig");
 
 comptime {
     // chapulin's hook, which every program over colibri's `tls` defines (colibri decision 94).
@@ -58,6 +60,8 @@ var zstd_decoder: connect.ZstdDecoder align(@alignOf(connect.ZstdDecoder)) = und
 var zstd_encoder: connect.ZstdEncoder align(@alignOf(connect.ZstdEncoder)) = undefined;
 
 /// The seconds since 1970, from the real-time clock: never before it.
+var jwks_text: [issuer.jwks_len_max]u8 = undefined;
+
 fn unix_seconds(io: std.Io) u64 {
     return @intCast(@max(std.Io.Clock.real.now(io).toSeconds(), 0));
 }
@@ -68,13 +72,18 @@ pub fn main(init: std.process.Init) !void {
         .decoders = .{ .gzip = &gzip_decoder, .zstd = &zstd_decoder },
         .encoders = .{ .gzip = &gzip_encoder, .zstd = &zstd_encoder },
     };
+    // The account service's verifier, with the test issuer's key. This server passes the time
+    // once, as it does for its TLS tickets; a server that runs for long calls `set_time` again
+    // as its clock moves, and `set_keys` when `keys_stale` asks for it.
+    const started_seconds = unix_seconds(init.io);
+    try account.start(&app, issuer.jwks(&jwks_text, &.{issuer.first_key()}), @intCast(started_seconds));
     try http_server.init(&.{
         .host = "127.0.0.1",
         .port = port,
         .identity = .{ .chain = identity.chain_pem, .key = identity.key_pem },
         .cpu = cpu,
         // The Unix time when the server starts, which its TLS session tickets carry.
-        .unix_seconds = unix_seconds(init.io),
+        .unix_seconds = started_seconds,
     }, &router, &app);
     defer http_server.deinit();
     // A script that asked for port 0 reads the port from this line.

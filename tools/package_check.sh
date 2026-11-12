@@ -3,7 +3,9 @@
 # it in your project" writes it. `zig fetch` keeps only the files that `.paths` of
 # `build.zig.zon` names. So a file that the build needs and the list omits fails here, and
 # nowhere else: each other check builds the whole tree.
-# The project imports the three library modules and installs the plugin. It needs the network,
+# The project imports the four library modules and installs the plugin. `oidc` beside
+# `connect_colibri` also proves that connect-zig's request for chapulin equals colibri's: two
+# requests that differ link two objects, and the link fails (decision 34). It needs the network,
 # for the packages connect-zig depends on.
 set -eu
 cd "$(dirname "$0")/.."
@@ -39,6 +41,7 @@ pub fn build(b: *std.Build) void {
                 .{ .name = "protobuf", .module = connect_zig.module("protobuf") },
                 .{ .name = "connect", .module = connect_zig.module("connect") },
                 .{ .name = "connect_colibri", .module = connect_zig.module("connect_colibri") },
+                .{ .name = "oidc", .module = connect_zig.module("oidc") },
             },
         }),
     });
@@ -51,6 +54,9 @@ const std = @import("std");
 const protobuf = @import("protobuf");
 const connect = @import("connect");
 const rpc = @import("connect_colibri");
+const oidc = @import("oidc");
+
+var verifier: oidc.Verifier = undefined;
 
 /// chapulin's one hook, which a program that links colibri's `tls` defines.
 export fn ch_assert_fail(condition: [*:0]const u8, file: [*:0]const u8, line: c_int) noreturn {
@@ -63,8 +69,11 @@ pub fn main() !void {
     var buffer: [32]u8 = undefined;
     const stamp: protobuf.wkt.Timestamp = .{ .seconds = 7 };
     const octets = try protobuf.encode(protobuf.wkt.Timestamp, &stamp, &buffer);
-    const sizes = [_]usize{ octets.len, @sizeOf(connect.server.Reply), @sizeOf(rpc.Context) };
+    const sizes = [_]usize{ octets.len, @sizeOf(connect.server.Reply), @sizeOf(rpc.Context), @sizeOf(oidc.Claims) };
     for (sizes) |size| std.debug.assert(size != 0);
+    // A call into chapulin through `oidc`, in a program that links colibri's chapulin too.
+    try verifier.init(&.{ .issuer = "https://issuer.example", .audience = "project" });
+    std.debug.assert(verifier.keys_stale());
     std.debug.print("the package builds: {d} modules\n", .{sizes.len});
 }
 ZIG

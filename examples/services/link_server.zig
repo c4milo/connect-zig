@@ -12,6 +12,8 @@ const tls = @import("tls");
 const identity = @import("test_identity");
 const App = @import("app.zig").App;
 const Router = @import("routes.zig").Router;
+const account = @import("account.zig");
+const issuer = @import("issuer.zig");
 const Link = @import("link.zig").Link;
 const datagram_module = @import("link_datagram.zig");
 const DatagramLink = datagram_module.DatagramLink;
@@ -87,7 +89,12 @@ pub fn init(stream: *Link, datagrams: *DatagramLink) !void {
         .cpu = cpu,
     } };
     try endpoint.init(&config, prng.random(), .{ .unix_seconds = now_seconds, .monotonic_ns = link.now_ns(.server) });
+    // The account service's verifier starts with the test issuer's first key, at the same
+    // instant. A program fetches its provider's JWK Set and reads its clock here.
+    try account.start(&app, issuer.jwks(&jwks_text, &.{issuer.first_key()}), @intCast(now_seconds));
 }
+
+var jwks_text: [issuer.jwks_len_max]u8 = undefined;
 
 /// Wipes the key's scalar, which no session uses any more.
 pub fn deinit() void {

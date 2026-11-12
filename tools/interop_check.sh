@@ -187,6 +187,24 @@ expect "grpc Trailers-Only carries trailers" 'call-received: 1|call-sent: 0|' \
 expect "Connect unary headers" 'demo-logged: yes|trailer-whoami-caller: Ada|' \
     "$(curl -sS -m 5 --cacert "${ca}" -H 'authorization: Bearer Ada' --json '{}' -D - -o /dev/null "${base}/Whoami" |
         tr -d '\r' | grep -i -e '^demo-logged:' -e '^trailer-whoami-caller:' | tr '\n' '|')"
+# The account service sits behind `oidc.Interceptor` (decision 34). Status answers with no
+# token, since the interceptor excludes its path. Whoami is refused, with RFC 6750 section 3's
+# challenge: Connect answers 401, and gRPC and gRPC-Web state the code in their trailers.
+account="https://127.0.0.1:${port}/account.v1.AccountService"
+challenged() {
+    curl -sS -m 5 --cacert "${ca}" "$@" --json '{}' -o /dev/null -D - "${account}/Whoami" | tr -d '\r' |
+        sed -n -e 's/^HTTP[^ ]* \([0-9]*\).*$/\1/p' -e '/^www-authenticate:/Ip' | tr '\n' '|'
+}
+expect "oidc: an excluded method answers with no token" '{"status":"ok"}' \
+    "$(curl -sS -m 5 --cacert "${ca}" --json '{}' "${account}/Status")"
+expect "oidc: Connect refuses a call with no token" '401|www-authenticate: Bearer|' "$(challenged)"
+expect "oidc: Connect refuses a token that is no JWT" '401|www-authenticate: Bearer error="invalid_token"|' \
+    "$(challenged -H 'authorization: Bearer not-a-token')"
+for protocol in grpc grpcweb; do
+    expect "oidc: ${protocol} refuses a call with no token" '{"code":"unauthenticated","message":"missingbearertoken"}' \
+        "$(timeout "${call_seconds}" "${buf}" curl --cacert "${ca}" --schema examples/proto --protocol "${protocol}" \
+            -d '{}' "${account}/Whoami" 2>&1 | unlogged | tr -d ' \n')"
+done
 # Full duplex: Chat's answer to the first message must arrive while the client still holds its
 # stream open, before it sends the second.
 fifo="${log}.fifo"

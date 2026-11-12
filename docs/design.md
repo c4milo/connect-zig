@@ -617,17 +617,42 @@ ran on Linux x86-64 with Zig 0.16.0.
     a local counter: 1.6% fewer instructions on strings, 3.7% more on deep. It was dropped.
   - Mutations, 7, each CAUGHT: each count of the counting walk, the write of a value, and the
     restore of the writer when a child's length guess fails.
+- **`oidc` beside `connect_colibri`, on colibri v0.16.2.** connect-zig pins colibri v0.16.2
+  (`03d56223`); stdx `89a021c3` and Rotor v0.10.0 stay. colibri v0.16.2 pins chapulin v0.6.0
+  (`17fd1f0b`), the commit connect-zig already pinned, and its request for chapulin's
+  TCP object now holds `JWS=on` and `SCRAM=on` (colibri decision 162). `build/chapulin.zig`
+  copies that request key for key, so a program links one chapulin object.
+  - `examples/oidc.zig` runs a client against `services/account.zig`, a generated `Routes`
+    behind `oidc.Interceptor`, over h2 and h3. Status answers with no token, since its path is
+    excluded. Whoami is refused with no token, an expired one and one for another audience, each
+    with RFC 6750's challenge, and answers a valid token with its subject, email and role.
+    `services/issuer.zig` stands where the provider would be. It changes its key between the
+    rounds: the verifier refuses the new key's token, reports its keys stale, takes the new
+    JWK Set, and then takes the same token.
+  - This is the first program that compiles `oidc.Interceptor` against `rpc.Context`,
+    `rpc.AnyRequest` and `rpc.AnyResponse`. Until now two chapulin objects kept `oidc` and
+    `connect_colibri` out of one binary, and the interceptor's tests used views of their own.
+  - `tools/package_check.sh` imports `oidc` beside `connect_colibri` in the fetched project,
+    and calls `Verifier.init`. `tools/interop_check.sh` reads Status and Whoami's refusals
+    from the socket server with curl and `buf curl`: 401 with the challenge in Connect, and
+    `unauthenticated` in gRPC and gRPC-Web.
+  - The example server's `App` holds the verifier, and each server starts it before it takes
+    a call. `build/examples.zig` builds the servers on a host target alone, where `oidc` exists.
+  - Mutations, 6, each CAUGHT. The request without `SCRAM=on`, and with `KEYLOG=on`: the link
+    fails with "duplicate symbol definition". No excluded path, no challenge header, claims
+    dropped after a valid token, and a lookup of a string before another lookup: the example
+    fails.
 
 ### What a later step owes
 
 - A stream that waits for an event of the program once its request ended (colibri issue 130).
-  The owner ruled on 2026-11-10 that colibri v0.16.0 does not wait for it. colibri v0.16.1 does
-  not hold it either: it ships in v0.17.0.
-- For `oidc`, once a colibri release pins chapulin v0.6.0 with `JWS=on`: the same pin and the
-  same request here (`build/chapulin.zig`), an example that serves a route behind the
-  interceptor over colibri, and the module in `tools/package_check.sh`. The README and the
-  changelog then drop the limit they state. colibri's session sends the tag, the chapulin
-  commit and the request.
+  The owner ruled on 2026-11-10 that colibri v0.16.0 does not wait for it. Neither v0.16.1 nor
+  v0.16.2 holds it: it ships in v0.17.0.
+- colibri v0.17.0 gives its router a per-request `RequestContext` with `values(T)`, and each
+  callback the shape `(app, ctx, request, response)` (approved by the owner in colibri on
+  2026-11-11). `connect_colibri` then reads `ctx.values` from colibri's entry, and
+  `RouteOptions.Values` goes for the route table's `.Values`. The owner ruled that v0.1.0
+  waits for it.
 - For `oidc`, a measurement before any change: a client sends one token with each call, and
   the verifier checks its signature each time. If that cost shows in a server's profile, a
   verifier may keep the last tokens it took.

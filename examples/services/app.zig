@@ -3,6 +3,7 @@
 const std = @import("std");
 const connect = @import("connect");
 const rpc = @import("connect_colibri");
+const oidc = @import("oidc");
 const github = @import("github.zig");
 const interop = @import("interop.zig");
 
@@ -31,6 +32,9 @@ pub const App = struct {
     github: github.Room = .{},
     /// The interop service's room for its replies' headers and details.
     interop: interop.Room = .{},
+    /// The verifier of the account service's bearer tokens, which `account.start` starts before
+    /// the server takes a call (decision 34). `oidc.Interceptor` reads it by this name.
+    oidc: oidc.Verifier = undefined,
 };
 
 /// Writes a reply into `app.text`, which stays valid until the next call writes there.

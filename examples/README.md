@@ -13,6 +13,7 @@ Start at the top: each example adds one layer to the one before it.
 | [streaming.zig](streaming.zig) | Bidirectional, client and server streams, a stream that fails, and a client that streams full-duplex over h2 and h3 | `zig build example-streaming` |
 | [interceptors.zig](interceptors.zig) | Server interceptors that log and authenticate, and client interceptors, over h2 and h3 | `zig build example-interceptors` |
 | [errors.zig](errors.zig) | Errors with typed details in Connect, gRPC and gRPC-Web, over h2 and h3 | `zig build example-errors` |
+| [oidc.zig](oidc.zig) | A service behind OpenID Connect bearer tokens: an excluded method, refusals with their challenge, claims in a handler, and an issuer that changes its key, over h2 and h3 | `zig build example-oidc` |
 | [github.zig](github.zig) | A GitHub-style API used as a real client would: tokens, rate limits, pages, field masks, private resources, streams | `zig build example-github` |
 | [socket_server.zig](socket_server.zig) | Both services on a TCP socket, for curl and `buf curl` | `zig build run-eliza-server -- 8080` |
 | [std_io_server.zig](std_io_server.zig) | ELIZA on colibri's engine over `std.Io`, with no Rotor: h11 and h2 in cleartext, no TLS and no h3 | `zig build run-std-io-server -- 8080` |
@@ -37,7 +38,13 @@ Start at the top: each example adds one layer to the one before it.
   reads a bearer token, and `RateLimit`, which counts each caller's calls and sets GitHub's
   `x-ratelimit-*` headers. Failures carry `NotFound`, `AlreadyExists`, `BadField` and
   `RateLimited` details, and a private repository reads as not found to anyone but its owner.
-- [services/routes.zig](services/routes.zig) puts all three under one `server.Router`, which
+- [services/account.zig](services/account.zig) serves `account.v1.AccountService`, from
+  [proto/account/v1/account.proto](proto/account/v1/account.proto), through its generated
+  `Routes` behind `oidc.Interceptor`: `Whoami` needs a valid bearer token and answers with the
+  token's claims, and `Status` needs none, since the interceptor excludes its path.
+  [services/issuer.zig](services/issuer.zig) stands where the OpenID provider would be: it
+  holds test keys, writes their JWK Set and signs the tokens.
+- [services/routes.zig](services/routes.zig) puts them all under one `server.Router`, which
   [services/app.zig](services/app.zig)'s `App` runs.
 - [services/link.zig](services/link.zig) and [services/link_datagram.zig](services/link_datagram.zig)
   are colibri's in-memory links for octet streams and for datagrams, copied unchanged, which stand
