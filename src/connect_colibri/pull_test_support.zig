@@ -63,8 +63,8 @@ pub const App = struct {
     note_len: usize = note_len,
     /// The bidirectional stream gives its notes while its client still sends.
     early: bool = false,
-    /// The bidirectional stream drops an echo its Sender could not send, and counts it, rather
-    /// than end the stream.
+    /// The bidirectional stream drops an echo its response stream could not send, and counts
+    /// it, rather than end the stream.
     drop_unsent: bool = false,
     unsent: usize = 0,
     /// What the interceptor saw: the calls it let in, and each call's outcome.

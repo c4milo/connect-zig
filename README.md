@@ -212,7 +212,7 @@ if (response.failure) |failure| std.debug.print("{s}\n", .{failure.message});
 A gRPC call reads its status from the response's trailers.
 
 A client or bidirectional stream can also stream both ways. `init_stream` builds the call, and its
-`Sender` writes each message as the server's does. The program passes the pool's events for the
+`Sender` sends each message, as the server's `ResponseStream` does. The program passes the pool's events for the
 call on, and reads each answer as it arrives:
 
 ```zig

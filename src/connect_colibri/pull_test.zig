@@ -204,7 +204,7 @@ test "decision 33: a server stream that waits ends with internal, since colibri 
 test "decision 33: a bidirectional stream answers each note at once, then streams from next" {
     var fixture: Fixture = .{ .engine = .{ .window = support.response_bytes } };
     // The first request note arrives and the client still sends: the handler echoes it through
-    // its Sender, and `next` waits.
+    // its response stream, and `next` waits.
     fixture.call("/test.Svc/Chat", "application/grpc+proto", 7, false);
     try testing.expect(!fixture.engine.ended);
     var early = fixture.notes();
@@ -225,7 +225,7 @@ test "decision 33: a bidirectional stream answers each note at once, then stream
     try testing.expectEqual(@as(usize, 0), fixture.engine.cancelled);
 }
 
-test "decision 33: a note from a Sender goes out after the note the call holds" {
+test "decision 33: a note a response stream sends goes out after the note the call holds" {
     // The engine takes the echo and then blocks, so the first notes fill the memory, and the
     // route holds the note that found no room.
     var fixture: Fixture = .{ .engine = .{ .window = window_echo }, .app = .{ .early = true } };
@@ -266,7 +266,7 @@ fn echo_held(fixture: *Fixture, content_type: []const u8) !support.Notes {
     return notes;
 }
 
-test "decision 33: a Sender's notes stay sent, and gRPC's trailers wait, while every run is held" {
+test "decision 33: a response stream's notes stay sent, and gRPC's trailers wait, while every run is held" {
     var fixture: Fixture = .{ .engine = .{ .holds = true } };
     var notes = try echo_held(&fixture, "application/grpc+proto");
     try testing.expect(notes.at_end());
@@ -281,7 +281,7 @@ test "decision 33: the end of a Connect stream waits while every run is held" {
     try testing.expect(notes.at_end());
 }
 
-test "decision 33: a Sender's note whose flush fails still goes out, and is no error" {
+test "decision 33: a response stream's note whose flush fails still goes out, and is no error" {
     // colibri's flush fails when its octets stay in the writer, every slot holds a run, and the
     // writer's region has no room for one more octet. The octets go out later, so the note was
     // sent: each note is delivered or reported unsent, never both.
@@ -365,11 +365,12 @@ test "decision 33: a call the route refused at its head runs no interceptor at o
     try testing.expectEqual(@as(usize, 0), app.calls);
 }
 
-test "decision 33: a route table tells a stream with next from one with a Sender" {
+test "decision 33: a route table tells a stream with next from one with a response stream" {
     var parameters: server.PathParameters = undefined;
     try testing.expect(support.Router.match("POST", "/test.Svc/Count", &parameters) == .found);
     try testing.expect(support.Router.match("POST", "/test.Svc/Chat", &parameters) == .found);
-    // A route with `next` declares `on_writable`, and a route with a Sender alone declares none.
+    // A route with `next` declares `on_writable`, and a route with a response stream alone
+    // declares none.
     try testing.expect(@hasDecl(rpc.Route(App, support.count, support.Counter, support.options), "on_writable"));
     try testing.expect(!@hasDecl(rpc.Route(App, support.count, support.on_count, support.options), "on_writable"));
     try testing.expectEqual(connect.StreamType.server_stream, support.count.stream_type);

@@ -39,7 +39,7 @@ The first release.
   RS256, ES256 or EdDSA, then its issuer, its audience and its times (decision 34). The program
   passes the issuer's JWK Set and the time.
 - `oidc.Interceptor`, a server interceptor that refuses a call with no valid token, and lets
-  the paths a program excludes through. It writes the claims into the call's request context.
+  the paths a program excludes through. It writes the claims into the call's values.
   `Claims.string`, `integer` and `holds` read a program's own claims, such as `email` or
   `roles`.
 

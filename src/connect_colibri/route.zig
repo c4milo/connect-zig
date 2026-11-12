@@ -3,10 +3,10 @@
 //! A function handler's route reads the whole request body (`.whole_body`), decodes its messages,
 //! calls the handler, and writes the reply in the protocol the request spoke. A type handler's
 //! route reads the body as it arrives and passes each message on while the reply goes out, which
-//! is how a bidirectional stream runs full-duplex over h2 (decision 18). Every message a `Sender`
-//! writes goes out at once, and what it writes in one call stays bounded by the router's
-//! `response_bytes` (decision 12). A type handler with `next` has no such bound: its route asks
-//! it for one message at a time, at colibri's `on_writable` (`pull.zig`, decision 33).
+//! is how a bidirectional stream runs full-duplex over h2 (decision 18). Every message a
+//! `ResponseStream` sends goes out at once, and what it writes in one call stays bounded by the
+//! router's `response_bytes` (decision 12). A type handler with `next` has no such bound: its
+//! route asks it for one message at a time, at colibri's `on_writable` (`pull.zig`, decision 33).
 const std = @import("std");
 const assert = std.debug.assert;
 const connect = @import("connect");

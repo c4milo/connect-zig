@@ -79,9 +79,9 @@ pub fn ClientCall(comptime method: connect.Method, comptime call_options: Option
         work: []u8 = &.{},
         reader: connect.client.Response = undefined,
 
-        /// Writes the messages of a streamed call's request, as the server's `Sender` writes a
-        /// stream's replies. Each one goes to the pool at once, or with the next `body_taken`
-        /// event while the pool still holds the piece before it.
+        /// Writes the messages of a streamed call's request, as the server's `ResponseStream`
+        /// sends a stream's replies. Each one goes to the pool at once, or with the next
+        /// `body_taken` event while the pool still holds the piece before it.
         pub const Sender = struct {
             call: *Self,
 
