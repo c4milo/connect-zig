@@ -26,10 +26,13 @@ work="$(mktemp -d)"
 server=""
 trap 'stop_server; rm -rf "${work}"' EXIT
 
+# Stops the server and waits until it ended. `wait` answers the status of the signal that
+# stopped it, which must not end this script (`set -e`).
 stop_server() {
-    [ -n "${server}" ] && kill "${server}" 2>/dev/null && wait "${server}" 2>/dev/null
+    [ -n "${server}" ] || return 0
+    kill "${server}" 2>/dev/null || true
+    wait "${server}" 2>/dev/null || true
     server=""
-    return 0
 }
 
 # The cases in binary, which every runtime reads, and the schema for the servers that compile it.
@@ -65,14 +68,17 @@ left_out_of() {
     esac
 }
 
-# Starts a server and prints its port, or nothing when it printed none in time.
+# Starts a server and sets `port`, which stays empty when the server printed none in time. A
+# caller runs it in this shell, never in a command substitution: a subshell keeps `server` to
+# itself, and stop_server then stops nothing.
 start_server() {
+    port=""
     "interop/$(directory_of "$1")/serve.sh" "$1" 0 "${tls}/chain.pem" "${tls}/key.pem" "${work}/descriptors.binpb" \
         >"${work}/$1.server.log" 2>&1 &
     server=$!
     for _ in $(seq 1 $((server_seconds * 5))); do
         port="$(sed -n 's/^listening on port \([0-9]*\)$/\1/p' "${work}/$1.server.log")"
-        [ -n "${port}" ] && { echo "${port}"; return; }
+        [ -n "${port}" ] && return 0
         kill -0 "${server}" 2>/dev/null || return 0
         sleep 0.2
     done
@@ -108,7 +114,9 @@ annotate() {
 failed=0
 for name in ${servers}; do
     echo "== ${name}"
-    port="$(start_server "${name}")"
+    start_server "${name}"
+    # The script holds the process it started, or it cannot stop it.
+    [ -n "${server}" ] || { echo "the script lost the process of ${name}" >&2; exit 1; }
     status=0
     if [ -z "${port}" ]; then
         cat "${work}/${name}.server.log"
