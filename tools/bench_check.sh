@@ -16,6 +16,25 @@ fi
 scratch="$(mktemp -d)"
 trap 'rm -rf "${scratch}"' EXIT
 
+# The CPU's features: the first CPU's `flags` line on x86-64, and its `Features` line on aarch64.
+# Runners that report the same model have different features, so a hash of them names a machine
+# better than the model does.
+cpu_features="$(sed -n -e 's/^flags[[:space:]]*: //p' -e 's/^Features[[:space:]]*: //p' /proc/cpuinfo 2>/dev/null |
+    head -n 1 | sha256sum | cut -c1-12)"
+
+# The CPU's model, which the report names, so two runs' times compare only on the same kind of
+# machine (docs/performance.md). lscpu names an arm64 core that /proc/cpuinfo leaves unnamed, and
+# macOS has neither.
+cpu_model() {
+    if command -v lscpu >/dev/null 2>&1; then
+        lscpu | sed -n 's/^Model name:[[:space:]]*//p' | head -n 1
+    elif [ "$(uname -s)" = "Darwin" ]; then
+        sysctl -n machdep.cpu.brand_string
+    else
+        echo "unknown"
+    fi
+}
+
 zig build bench -- ${quick} --write "${scratch}/zig" >"${scratch}/zig.md"
 (cd bench/go && "${go}" run . ${quick} --write "${scratch}/go") >"${scratch}/go.md"
 baselines="go"
@@ -25,11 +44,7 @@ if command -v "${cargo}" >/dev/null 2>&1; then
     # from bench/rust, whose .cargo/config.toml builds for this machine's CPU, as Zig does.
     # The build targets this machine's CPU, and CI caches the directory across runners, so the
     # directory is named for the CPU's features: a build from a CPU with other features stops on
-    # an instruction this one lacks (SIGILL), as a build script did on CI run 62. The model name
-    # is not enough: runners that report the same model have different features. The features
-    # are the first CPU's `flags` line on x86-64, and its `Features` line on aarch64.
-    cpu_features="$(sed -n -e 's/^flags[[:space:]]*: //p' -e 's/^Features[[:space:]]*: //p' /proc/cpuinfo 2>/dev/null |
-        head -n 1 | sha256sum | cut -c1-12)"
+    # an instruction this one lacks (SIGILL), as a build script did on CI run 62.
     target="${XDG_CACHE_HOME:-${HOME}/.cache}/connect-zig/bench-rust-target-${cpu_features}"
     (cd bench/rust && BENCH_DESCRIPTORS="${scratch}/bench.binpb" CARGO_TARGET_DIR="${target}" \
         "${cargo}" build --quiet --locked --release)
@@ -55,6 +70,8 @@ for baseline in ${baselines}; do
         done
     done
 done
+echo
+echo "Machine: $(uname -m), $(cpu_model), $(getconf _NPROCESSORS_ONLN 2>/dev/null || echo "?") CPUs, features ${cpu_features}"
 echo
 
 # Each table row is "| message | operation | bytes | ns/op | MB/s |". The Zig row and the Go and
