@@ -42,7 +42,15 @@ fn Sink(comptime mode: Mode) type {
             sink.len += wire.varint_len(number);
         }
 
-        inline fn tag(sink: *@This(), number: u32, wire_type: wire.WireType) Error!void {
+        /// A field's tag. The compiler knows the field's number and its wire type, so the tag is
+        /// one constant varint.
+        inline fn tag(sink: *@This(), comptime number: u32, comptime wire_type: wire.WireType) Error!void {
+            try sink.varint(comptime (wire.Tag{ .number = number, .wire_type = wire_type }).encode());
+        }
+
+        /// A tag whose number is known at run time alone: a child's, since one copy of
+        /// `encode_child` serves each field of the child's type.
+        inline fn tag_of(sink: *@This(), number: u32, comptime wire_type: wire.WireType) Error!void {
             try sink.varint((wire.Tag{ .number = number, .wire_type = wire_type }).encode());
         }
 
@@ -185,20 +193,20 @@ fn encode_lazy(comptime L: type, comptime field: Field, item: L, sink: anytype) 
 fn encode_child(comptime M: type, comptime kind: Kind, number: u32, child: *const M, sink: anytype) Error!void {
     if (comptime kind == .group) {
         // "Groups": the fields sit between a start and an end tag, with no length before them.
-        try sink.tag(number, .start_group);
+        try sink.tag_of(number, .start_group);
         try encode_message(M, child, sink);
-        return sink.tag(number, .end_group);
+        return sink.tag_of(number, .end_group);
     }
     if (comptime !@TypeOf(sink.*).writes) {
         // A counting sink needs the child's length alone, which one walk gives.
         const child_len = try encoded_len(M, child);
-        try sink.tag(number, .len);
+        try sink.tag_of(number, .len);
         try sink.varint(child_len);
         sink.len += child_len;
         return;
     }
     const writer = sink.writer;
-    try sink.tag(number, .len);
+    try sink.tag_of(number, .len);
     if (sink.measured) return write_child_measured(M, child, sink);
     const tag_end = writer.len;
     write_child_once(M, child, sink, writer) catch |failure| switch (failure) {
