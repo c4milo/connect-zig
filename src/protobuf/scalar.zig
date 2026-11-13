@@ -117,6 +117,14 @@ pub inline fn write(comptime kind: Kind, comptime V: type, value: V, writer: *wi
     }
 }
 
+/// Writes one value as `write` does, a number's varint with `Writer.varint_wide`: binary
+/// encode's form. A string's length keeps `varint`, since it nearly always takes one octet.
+pub inline fn write_wide(comptime kind: Kind, comptime V: type, value: V, writer: *wire.Writer) wire.Writer.WriteError!void {
+    comptime assert(!kind.holds_message());
+    if (comptime kind.wire_type() == .varint) return writer.varint_wide(varint_of(kind, V, value));
+    return write(kind, V, value, writer);
+}
+
 /// The bytes `write` takes for `value`.
 pub fn len(comptime kind: Kind, comptime V: type, value: V) usize {
     return switch (comptime kind.wire_type()) {

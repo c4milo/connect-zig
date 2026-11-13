@@ -136,11 +136,18 @@ fn check_read_value(value: u64) anyerror!void {
     }
 }
 
-fn check_write_room(want: []const u8, value: u64, offset: usize, room: usize) !void {
+/// Which varint call a write sweep checks: `varint`, or binary encode's `varint_wide`.
+const Write = enum { plain, wide };
+
+fn check_write_room(comptime write: Write, want: []const u8, value: u64, offset: usize, room: usize) !void {
     var buffer: [write_buffer_len]u8 = @splat(sentinel);
     var writer: wire.Writer = .{ .buffer = buffer[0 .. offset + room], .len = offset };
     var end = offset;
-    if (writer.varint(value)) |_| {
+    const written = switch (write) {
+        .plain => writer.varint(value),
+        .wide => writer.varint_wide(value),
+    };
+    if (written) |_| {
         try testing.expect(room >= want.len);
         try testing.expectEqualSlices(u8, want, buffer[offset..writer.len]);
         end = writer.len;
@@ -159,7 +166,10 @@ fn check_write_value(value: u64) anyerror!void {
     const len = reference_write(value, &want);
     try testing.expectEqual(len, wire.varint_len(value));
     for (0..write_offsets_count) |offset| {
-        for (0..varint_len_max + room_past_len) |room| try check_write_room(want[0..len], value, offset, room);
+        for (0..varint_len_max + room_past_len) |room| {
+            try check_write_room(.plain, want[0..len], value, offset, room);
+            try check_write_room(.wide, want[0..len], value, offset, room);
+        }
     }
 }
 
