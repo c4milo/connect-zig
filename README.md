@@ -327,17 +327,20 @@ all: it drives colibri's `server.Engine` over Zig 0.16's `std.Io` sockets, tasks
 
 `zig build bench` times eight messages. `tools/bench_check.sh` runs two baselines beside it on
 the same inputs: Go's `google.golang.org/protobuf` v1.36.12, and Buffa, the Rust runtime of
-connect-rust. It checks that each writes the same bytes as connect-zig. Each cell is a
-baseline's time over connect-zig's: above 1 means connect-zig is faster. The numbers come from
+connect-rust. It checks that each writes the same bytes as connect-zig. The numbers come from
 CI's `bench-compare` job of commit `52fc27a`
 ([run 97](https://github.com/c4milo/connect-zig/actions/runs/43300188302)), on GitHub's
 `ubuntu-24.04` runner, an AMD EPYC 7763 core. The three programs ran in the same job. GitHub's
 runners differ from run to run, and the ratios move with the CPU. So each run names its machine
 and publishes the full table in its summary: every time, and the four one-kind messages.
 
-![connect-zig is 2.2 to 13.5 times faster than Go's protobuf runtime; Rust's Buffa is faster in 6 of 16 cells](docs/images/speed-vs-go.svg)
+The chart draws the speed of connect-zig and of Buffa in multiples of Go's speed. A longer bar is
+faster, and Go is the line at 1.
 
-Go's time over connect-zig's:
+![Bars of connect-zig's and Buffa's speed in multiples of Go's: connect-zig is 2.2 to 13.5 times faster than Go's protobuf runtime, and Buffa is faster than connect-zig in 6 of 16 cells](docs/images/speed-vs-go.svg)
+
+Each cell of the two tables is a baseline's time over connect-zig's: above 1 means connect-zig
+is faster. Go's time over connect-zig's:
 
 | Message | Binary encode | Binary decode, every field read | JSON encode | JSON decode |
 | --- | ---: | ---: | ---: | ---: |
