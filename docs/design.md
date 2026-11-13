@@ -659,6 +659,32 @@ ran on Linux x86-64 with Zig 0.16.0.
     dropped after a valid token, and a lookup of a string before another lookup: the example
     fails.
 
+- **Medium binary against Buffa** (steps 14 and 15, decision 37). The owner wrote on
+  2026-11-13 "we need to beat buffa on binary encoding and decoding for medium size docs".
+  - Encode, commit `69595b7`: a flat child, with no message and no repeated field, is
+    measured before it is written, and no longer moves. The judge on `69595b7`: medium binary
+    encode takes 6.21% fewer instructions, and no other operation moved past 0.1%.
+  - Decode, commit `e491ebc`: `decode_into`, which the benchmark takes before its binary
+    walk. The judge on `e491ebc`: binary decode+walk takes fewer instructions on medium
+    (41.32%), deep (38.75%), large (33.53%), packed (21.17%) and tree (18.26%). Two counts
+    rose past 2%. Medium binary decode took 4.72% more, because the benchmark now calls
+    `decode` from fewer places; with the old calls the library counted the same, on an M1.
+    Tree's JSON decode+walk took 2.51% more, from the iterator's inline items check.
+  - CI's `bench-compare` on `e491ebc` ([run 43441672466](https://github.com/c4milo/connect-zig/actions/runs/43441672466)),
+    an EPYC 9V45. Buffa's time over connect-zig's, medium: decode+walk 1.06, from 0.78 in run
+    97; decode 1.22; encode 0.74. Decode+walk elsewhere: large 1.18, deep 1.21, tree 0.73,
+    packed 0.64. Buffa still leads binary encode on medium, deep, tree and packed.
+  - Each fast path, switched off, counted under callgrind in an x86-64 container on the
+    owner's Mac, built for x86-64-v2: the flat child, medium binary encode +7.35%; the inline
+    items check, binary decode+walk +86.22% on packed, +26.59% on large, +22.66% on medium
+    and +8.35% on tree, with tree's JSON decode+walk 3.18% lower.
+  - Tries that lost, each dropped: varints of three to eight octets read and written as one
+    word, which took 11% to 15% more cycles to decode on an M1; a copy of short strings with
+    no call, which took small 22% more cycles; a packed record's varints written in room
+    checked once, 6% more instructions on large and packed; a long varint written with no
+    length first, on x86-64 2.78% more on medium and 22.44% more on varints.
+  - `bench/instructions.txt` holds the judge's counts of `e491ebc`, which `1fac7e6` repeats.
+
 ### What a later step owes
 
 - A stream that waits for an event of the program once its request ended (colibri issue 130).

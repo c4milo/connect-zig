@@ -110,6 +110,8 @@ failed (the owner's ruling of 2026-11-09). A new fast path joins this list the s
 | A JSON integer of up to 19 decimal digits | `json_scalar.zig`, `parse_decimal` | packed JSON decode +8.66%, varints JSON decode +8.67%, medium JSON decode +7.10% |
 | A JSON float equal to a short decimal | `json_float.zig`, `exact_text` | packed JSON encode +44.66%, small JSON encode +15.15%, large JSON encode +7.68% |
 | A JSON float text read as one exact quotient | `json_float.zig`, `parse_exact` | packed JSON decode +4.63%, small JSON decode +2.47% |
+| A flat child measured before it is written | `encode.zig`, `is_flat` | medium binary encode +7.35%, local x86-64-v2 |
+| A field's stored items read in place | `repeated.zig`, `RepeatedIterator.next` | packed binary decode+walk +86.22%, large +26.59%, medium +22.66%, local x86-64-v2 |
 
 ## The pitfalls
 
@@ -124,6 +126,7 @@ failed (the owner's ruling of 2026-11-09). A new fast path joins this list the s
 | tree binary decode+walk took 4.4% more instructions when the iterator's items check moved inline. | The out-of-line rest takes the iterator's address, so each inline check reloads its fields. | One inline check per call; measure each caller's shape before adding a second. The items check is inline since decision 37: on an M1, stored walks took 8% to 46% fewer instructions, and tree's JSON decode+walk 3.5% more. |
 | `decode` took 39% more instructions on tree once `decode_run`'s fallbacks also called `decode.read_repeated`. | LLVM called it out of line from `read_field` too. | A path other code shares is inlined with `@call(.always_inline, ...)` where the hot caller calls it. |
 | A mutation that turned a fast path off passed every test. | The reference path gives the same output, and the old baseline already holds the slow count. | Write the new baseline first; then `tools/perf_check.sh` fails such a mutation. |
+| callgrind in an x86-64 container on an Apple Mac stops at an AVX instruction. | Rosetta's x86-64 reports no AVX, and valgrind refuses it. | A local count builds for x86-64-v2; its counts track the judge's within 1% where no code is vectorized. |
 
 A pitfall that belongs to Zig and not to connect-zig moves to pepegrillo's
 `performance_zig.md`.
