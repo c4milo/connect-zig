@@ -64,18 +64,18 @@ const float_exponent_above = 1e21;
 pub fn write(comptime kind: Kind, comptime V: type, value: V, text: *json.TextWriter) EncodeError!void {
     comptime assert(!kind.holds_message());
     switch (kind) {
-        .int32, .sint32, .sfixed32 => try text.signed(value),
-        .uint32, .fixed32 => try text.unsigned(value),
+        .int32, .sint32, .sfixed32 => try @call(.always_inline, json.TextWriter.signed, .{ text, value }),
+        .uint32, .fixed32 => try @call(.always_inline, json.TextWriter.unsigned, .{ text, value }),
         .int64, .sint64, .sfixed64, .uint64, .fixed64 => try write_integer_string(value, text),
-        .bool => try text.boolean(value),
+        .bool => try @call(.always_inline, json.TextWriter.boolean, .{ text, value }),
         .float, .double => try write_float(V, value, text),
         // stdx's writer refuses a string that is not UTF-8, which a parser left unchecked where
         // utf8_validation is NONE: JSON text is UTF-8 (RFC 8259 §8.1), and Go's protojson refuses
         // it too.
-        .string, .unvalidated_string => try text.string(value),
+        .string, .unvalidated_string => try @call(.always_inline, json.TextWriter.string, .{ text, value }),
         // "JSON Mapping", bytes: standard base64 with padding, which stdx's encoder writes
         // straight into the text.
-        .bytes => try text.base64(value),
+        .bytes => try @call(.always_inline, json.TextWriter.base64, .{ text, value }),
         .@"enum" => try write_enum(V, value, text),
         .message, .group => unreachable,
     }
@@ -84,21 +84,21 @@ pub fn write(comptime kind: Kind, comptime V: type, value: V, text: *json.TextWr
 fn write_integer_string(value: anytype, text: *json.TextWriter) EncodeError!void {
     var buffer: [integer_text_len_max]u8 = undefined;
     const digits = std.fmt.bufPrint(&buffer, "{d}", .{value}) catch unreachable;
-    try text.string(digits);
+    try @call(.always_inline, json.TextWriter.string, .{ text, digits });
 }
 
 fn write_enum(comptime V: type, value: V, text: *json.TextWriter) EncodeError!void {
     // The JSON mapping writes NullValue's one value as the literal null.
-    if (comptime std.mem.eql(u8, V.protobuf.full_name, "google.protobuf.NullValue")) return text.null_literal();
-    const name = V.protobuf.name_of(@intFromEnum(value)) orelse return text.signed(@intFromEnum(value));
-    try text.string(name);
+    if (comptime std.mem.eql(u8, V.protobuf.full_name, "google.protobuf.NullValue")) return @call(.always_inline, json.TextWriter.null_literal, .{text});
+    const name = V.protobuf.name_of(@intFromEnum(value)) orelse return @call(.always_inline, json.TextWriter.signed, .{ text, @intFromEnum(value) });
+    try @call(.always_inline, json.TextWriter.string, .{ text, name });
 }
 
 pub fn write_float(comptime V: type, value: V, text: *json.TextWriter) EncodeError!void {
-    if (std.math.isNan(value)) return text.string("NaN");
-    if (std.math.isInf(value)) return text.string(if (value > 0) "Infinity" else "-Infinity");
+    if (std.math.isNan(value)) return @call(.always_inline, json.TextWriter.string, .{ text, "NaN" });
+    if (std.math.isInf(value)) return @call(.always_inline, json.TextWriter.string, .{ text, if (value > 0) "Infinity" else "-Infinity" });
     var buffer: [float_text_len_max]u8 = undefined;
-    try text.number(float_text(V, value, &buffer));
+    try @call(.always_inline, json.TextWriter.number, .{ text, float_text(V, value, &buffer) });
 }
 
 /// The shortest text of a finite float: plain between the exponent bounds, where a value equal
@@ -119,7 +119,7 @@ pub fn write_key(comptime kind: Kind, comptime V: type, key: V, text: *json.Text
         .bool => if (key) "true" else "false",
         else => std.fmt.bufPrint(&buffer, "{d}", .{key}) catch unreachable,
     };
-    try text.name(name);
+    try @call(.always_inline, json.TextWriter.name, .{ text, name });
 }
 
 /// Reads an integer from a number or a string token. A number with an exponent or a fraction is
