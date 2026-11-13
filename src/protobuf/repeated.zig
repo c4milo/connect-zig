@@ -74,10 +74,8 @@ pub fn RepeatedIterator(comptime T: type, comptime element_kind: Kind) type {
 
         pub inline fn next(it: *Self) wire.Error!?T {
             // Items are read in place, which a decode with storage leaves as a program does.
-            if (it.index < it.items.len) {
-                it.index += 1;
-                return it.items[it.index - 1];
-            }
+            // Items, the end among them, take no call.
+            if (it.items.len != 0) return @call(.always_inline, next_item, .{ T, it });
             // Inside a packed record whose every number is an element, the next element is the
             // record's next scalar ("Packed Repeated Fields").
             if (comptime keeps_every_number(T, element_kind)) {
@@ -86,10 +84,10 @@ pub fn RepeatedIterator(comptime T: type, comptime element_kind: Kind) type {
             return it.next_slow();
         }
 
-        /// Items, a new record, the end of the field and the numbers of a closed enum: out of
+        /// A new record, the end of the field and the numbers of a closed enum: out of
         /// line, so each inlined call keeps the packed path alone.
         noinline fn next_slow(it: *Self) wire.Error!?T {
-            if (it.items.len != 0) return next_item(T, it);
+            assert(it.items.len == 0);
             // A number a closed enum does not name stays with the unknown fields, so the
             // iterator passes over it (editions, "enum_type"). Each one takes an octet at least.
             for (0..it.reader.bytes.len + it.packed_reader.bytes.len + 1) |_| {
