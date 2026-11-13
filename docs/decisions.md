@@ -479,6 +479,9 @@ first. Cite an entry by number in code and commits ("decision 6").
       each element follows the one before. Any other run is counted first, so its elements stay
       together while their own runs take storage after them.
     - The decoder's mode, `stored`, is known at compile time, so `decode` compiles as before.
+    - connect's codec takes `decode_stored` for a binary message when its `Scratch` holds
+      storage. Each route holds `message_bytes` of it by default, which the owner chose over
+      none (design §8 step 15).
     - Why: a program that reads every field parsed each repeated field twice, once when
       `decode` checked it and once when the program read it. So Buffa's decode with every field
       read beat connect-zig's on medium, large, tree and packed.

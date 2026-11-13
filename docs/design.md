@@ -161,6 +161,14 @@ Each step names the check that proves it. A step is done when its check passes i
     test-protobuf` holds a proof harness that decodes each input with both calls and requires
     the same message or the same refusal; `tools/bench_check.sh` decodes with `decode_stored`
     before its binary walk, and still matches Go's and Buffa's octets and sums.
+15. **Services decode with storage.** `connect.Scratch` gains `storage`, and the codec takes
+    `decode_stored` for a binary message when it is not empty. Each route of `connect_colibri`
+    holds `storage_bytes` of it for its requests: `message_bytes` unless a program names another
+    size, and 0 keeps `decode` (decision 37). A client passes storage in its own `Scratch`. New
+    public names: none at a module's root; the field `storage` of `connect.Scratch`, and the
+    field `storage_bytes` of `connect_colibri.RouteOptions`. Check: `zig build test-connect`
+    decodes into a scratch's storage and without one; `zig build test-connect-colibri` holds
+    each size of a request's storage.
 
 ### Step records
 

@@ -52,6 +52,9 @@ The first release.
 - `decode_stored` reads each repeated field's elements, and each recursive field's message, into
   storage the caller owns, once. A program that reads every field takes it, and parses nothing
   twice. `decode` stores nothing (decision 37).
+- A server reads each binary request's repeated fields into storage once, so a handler that
+  reads them parses them once: each route holds `storage_bytes`, `message_bytes` by default, and
+  0 keeps `decode`. A client passes storage in its `connect.Scratch`.
 - Every scalar type, `optional`, packed and unpacked repeated fields, maps with every key type,
   oneofs, enums, recursive messages, and unknown fields kept and written back.
 - proto2, proto3, and editions 2023 and 2024, with groups, closed enums and `utf8_validation`.

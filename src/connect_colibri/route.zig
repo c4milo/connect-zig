@@ -10,6 +10,7 @@
 const std = @import("std");
 const assert = std.debug.assert;
 const connect = @import("connect");
+const proto = @import("protobuf");
 const server = @import("server");
 const constants = @import("constants.zig");
 const call_file = @import("call.zig");
@@ -22,6 +23,9 @@ pub const Options = struct {
     message_bytes: usize = constants.message_bytes_default,
     /// The longest JSON token of a request: a string's octets.
     token_bytes: usize = constants.token_bytes_default,
+    /// The storage a binary request's repeated fields are read into, so a handler that reads them
+    /// parses them once (decision 37). Null takes `message_bytes`; 0 keeps them in the message.
+    storage_bytes: ?usize = null,
     /// The interceptors around the handler, outermost first (`dispatch.zig`).
     interceptors: []const type = &.{},
     /// The program's values for each call: a struct whose fields each have a default. Every call
@@ -44,6 +48,7 @@ pub fn CallState(comptime options: Options, comptime handler: anytype) type {
         request_message: [options.message_bytes]u8 = undefined,
         request_work: [options.message_bytes]u8 = undefined,
         tokens: [options.token_bytes]u8 = undefined,
+        storage: [options.storage_bytes orelse options.message_bytes]u8 align(@alignOf(u64)) = undefined,
         /// A reply message of `message_bytes`, after the octets of its envelope's prefix
         /// (`connect.server.Reply.prepare`).
         reply_message: [reply_bytes]u8 = undefined,
@@ -311,7 +316,7 @@ const Side = enum { request, reply };
 fn scratch_of(comptime options: Options, comptime handler: anytype, state: *CallState(options, handler), side: Side) connect.Scratch {
     assert(state.limit <= options.message_bytes);
     return switch (side) {
-        .request => .{ .message = state.request_message[0..state.limit], .work = &state.request_work, .tokens = &state.tokens },
+        .request => .{ .message = state.request_message[0..state.limit], .work = &state.request_work, .tokens = &state.tokens, .storage = &state.storage },
         .reply => .{ .message = &state.reply_message, .work = &state.reply_work, .tokens = &state.tokens },
     };
 }
@@ -343,6 +348,33 @@ test "the receive limit is the context's when it is set and smaller, else messag
     const Plain = struct {};
     var plain: Plain = .{};
     try testing.expectEqual(@as(usize, message_bytes), receive_limit_of(&plain, message_bytes));
+}
+
+test "a request's scratch holds storage of message_bytes, or of storage_bytes when set" {
+    const Note = struct {
+        text: []const u8 = "",
+        pub const FieldNumber = enum(u29) { text = 1 };
+        pub const protobuf: proto.Descriptor = .{ .full_name = "test.Note", .fields = &.{proto.field_of(FieldNumber.text, .string, .{})} };
+    };
+    const handler = struct {
+        fn on_say(_: *struct {}, _: *context_file.Context, _: *const context_file.Request(Note), _: *context_file.Response(Note)) ?connect.RpcError {
+            return null;
+        }
+    }.on_say;
+    const message_bytes = 64;
+    const storage_bytes = 32;
+    // A token's size differs from each other, so no size stands in for another.
+    const token_bytes = 16;
+    const sized: Options = .{ .message_bytes = message_bytes, .token_bytes = token_bytes };
+    var state: CallState(sized, handler) = .{};
+    try testing.expectEqual(@as(usize, message_bytes), scratch_of(sized, handler, &state, .request).storage.len);
+    try testing.expectEqual(@as(usize, 0), scratch_of(sized, handler, &state, .reply).storage.len);
+    const set: Options = .{ .message_bytes = message_bytes, .token_bytes = token_bytes, .storage_bytes = storage_bytes };
+    var set_state: CallState(set, handler) = .{};
+    try testing.expectEqual(@as(usize, storage_bytes), scratch_of(set, handler, &set_state, .request).storage.len);
+    const none: Options = .{ .message_bytes = message_bytes, .token_bytes = token_bytes, .storage_bytes = 0 };
+    var none_state: CallState(none, handler) = .{};
+    try testing.expectEqual(@as(usize, 0), scratch_of(none, handler, &none_state, .request).storage.len);
 }
 
 test "only an uncompressed Connect unary POST is read in place" {

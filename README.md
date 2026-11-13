@@ -224,6 +224,10 @@ request body, and `response_bytes` holds a reply with its headers. Set both abov
 `message_bytes`. colibri's defaults are 0 and 256 octets: with them a POST gets 413, and a reply
 past 256 octets gets 500.
 
+Each call of a route also holds storage of `message_bytes`. A binary request's repeated fields
+are read into it once, so a handler that reads them parses them once (decision 37). A route's
+`storage_bytes` names another size, and 0 keeps them in the message.
+
 `rpc.Refusals` makes a method Connect does not serve, such as DELETE, get 405 with an Allow
 header on every path, as connect-go answers. A table names it once, for any one method.
 

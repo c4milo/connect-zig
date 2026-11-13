@@ -14,6 +14,9 @@ pub const Scratch = struct {
     work: []u8,
     /// One JSON token's octets.
     tokens: []u8,
+    /// Where `decode_stored` reads a binary message's repeated fields, for a program that reads
+    /// every field (decision 37). Empty, `decode` keeps them in the message's octets.
+    storage: []u8 = &.{},
 };
 
 pub const EncodeError = proto.EncodeError || proto.JsonEncodeError;
@@ -27,10 +30,10 @@ pub fn encode(comptime T: type, codec: Codec, message: *const T, buffer: []u8) E
 }
 
 /// Decodes `octets`. A JSON message's strings point into `scratch.work`, a binary one's into
-/// `octets`.
+/// `octets`, and its repeated fields into `scratch.storage` while it has room.
 pub fn decode(comptime T: type, codec: Codec, octets: []const u8, scratch: Scratch) DecodeError!T {
     return switch (codec) {
-        .proto => proto.decode(T, octets),
+        .proto => if (scratch.storage.len == 0) proto.decode(T, octets) else proto.decode_stored(T, octets, scratch.storage),
         .json => proto.decode_json(T, octets, scratch.work, scratch.tokens),
     };
 }
@@ -124,4 +127,28 @@ test "a request is compressed from its floor on, even when the coding cannot shr
     try testing.expectEqualStrings("hi", below.octets);
     try testing.expect(!(try compress_request(.identity, encoders, "hi", &buffer, 0)).compressed);
     try testing.expectError(error.NoSpaceLeft, compress_request(.gzip, encoders, "hi", buffer[0..1], 0));
+}
+
+/// A message with a repeated field, which `decode_stored` reads into storage.
+const Bag = struct {
+    numbers: proto.Repeated(u32, .uint32) = .{},
+    pub const FieldNumber = enum(u29) { numbers = 1 };
+    pub const protobuf: proto.Descriptor = .{ .full_name = "test.Bag", .fields = &.{
+        proto.field_of(FieldNumber.numbers, .uint32, .{}),
+    } };
+};
+
+test "a binary message's repeated fields go into the scratch's storage, and stay in its octets with none" {
+    const numbers = [_]u32{ 1, 2, 3 };
+    var octets: [compress_len_min]u8 = undefined;
+    const encoded = try proto.encode(Bag, &.{ .numbers = .of(&numbers) }, &octets);
+    var storage: [compress_len_min]u8 align(@alignOf(u64)) = undefined;
+    const scratch: Scratch = .{ .message = &.{}, .work = &.{}, .tokens = &.{}, .storage = &storage };
+    const stored = try decode(Bag, .proto, encoded, scratch);
+    try testing.expectEqualSlices(u32, &numbers, stored.numbers.items);
+    var none = scratch;
+    none.storage = &.{};
+    const kept = try decode(Bag, .proto, encoded, none);
+    try testing.expectEqual(@as(usize, 0), kept.numbers.items.len);
+    try testing.expectEqual(numbers.len, try kept.numbers.count());
 }
