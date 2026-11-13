@@ -38,7 +38,7 @@ fn Sink(comptime mode: Mode) type {
         measured: bool = false,
 
         inline fn varint(sink: *@This(), number: u64) Error!void {
-            if (writes) return sink.writer.varint(number);
+            if (writes) return sink.writer.varint_wide(number);
             sink.len += wire.varint_len(number);
         }
 
@@ -60,7 +60,7 @@ fn Sink(comptime mode: Mode) type {
         }
 
         inline fn value(sink: *@This(), comptime kind: Kind, comptime V: type, item: V) Error!void {
-            if (writes) return scalar.write(kind, V, item, sink.writer);
+            if (writes) return scalar.write_wide(kind, V, item, sink.writer);
             sink.len += scalar.len(kind, V, item);
         }
     };
@@ -397,7 +397,7 @@ fn encode_packed_items(comptime field: Field, comptime F: type, items: []const F
     }
     const writer = sink.writer;
     const start = writer.len;
-    for (items) |element| try scalar.write(F.kind, F.Element, element, writer);
+    for (items) |element| try scalar.write_wide(F.kind, F.Element, element, writer);
     assert(writer.len - start == payload_len);
 }
 

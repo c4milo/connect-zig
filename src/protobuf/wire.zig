@@ -267,6 +267,30 @@ pub const Writer = struct {
         writer.len = try varint_near_end(writer.buffer, writer.len, value);
     }
 
+    /// Writes `value` as `varint` does, and three or four octets inline too: binary encode's
+    /// samples, counts and ids take that many. The JSON transcoder keeps `varint`, whose callers
+    /// the larger code kept from being inlined: tree's JSON decode took 3.58% more instructions.
+    pub inline fn varint_wide(writer: *Writer, value: u64) WriteError!void {
+        // One and two octets first, as `varint` writes them: tags and most lengths.
+        if (value < 1 << (two_octets * group_bits)) return writer.varint(value);
+        if (value < 1 << (four_octets * group_bits) and four_octets <= writer.buffer.len - writer.len) {
+            const octets = writer.buffer[writer.len..][0..four_octets];
+            octets[0] = @as(u8, @truncate(value)) | continuation;
+            octets[1] = @as(u8, @truncate(value >> group_bits)) | continuation;
+            const third: u8 = @truncate(value >> two_octets * group_bits);
+            if (value < 1 << (three_octets * group_bits)) {
+                octets[two_octets] = third;
+                writer.len += three_octets;
+                return;
+            }
+            octets[two_octets] = third | continuation;
+            octets[three_octets] = @intCast(value >> three_octets * group_bits);
+            writer.len += four_octets;
+            return;
+        }
+        return writer.varint(value);
+    }
+
     /// A varint of three octets or more, out of line: inlined at every call, it made the callers
     /// too large to inline in turn, and Small's encode took 21% more instructions. It takes the
     /// buffer and the position by value and returns the position past the varint: the writer's
@@ -318,6 +342,9 @@ pub const Writer = struct {
 
 /// The octets of the longest varint `Writer.varint` writes inline and `Reader.varint` reads inline.
 const two_octets = 2;
+/// The octets `Writer.varint_wide` writes inline beside them.
+const three_octets = 3;
+const four_octets = 4;
 
 /// A padded varint of 0: every byte but the last carries the continuation bit alone.
 const padded_zero: [constants.limits.padded_length_len]u8 = .{continuation} ** (constants.limits.padded_length_len - 1) ++ .{0};
