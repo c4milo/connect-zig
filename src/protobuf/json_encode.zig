@@ -123,7 +123,7 @@ fn write_any(message: *const wkt.Any, text: *json.TextWriter, comptime registry:
 }
 
 fn write_any_as(comptime A: type, message: *const wkt.Any, text: *json.TextWriter, comptime registry: []const type) Error!void {
-    const inner = try decode.decode_depth(A, message.value, constants.limits.depth_max);
+    const inner = try decode.decode_depth(A, message.value, constants.limits.depth_max, .checked, {});
     try text.begin_object();
     try text.name("@type");
     try text.string(message.type_url);

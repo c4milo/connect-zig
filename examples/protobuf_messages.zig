@@ -3,8 +3,9 @@
 //! The program builds a `kitchen.v1.Tree`, a message with a nested message, a map, a oneof, a
 //! recursive field and well-known types, from the code `buf generate` wrote into examples/gen. It
 //! encodes it to binary and decodes it back, then writes it as JSON and reads that back. Decoding
-//! copies nothing: every string of a decoded message points into the bytes it was decoded from,
-//! which the program keeps.
+//! copies no string: every string of a decoded message points into the bytes it was decoded
+//! from, which the program keeps. `decode_stored` reads each repeated field's elements into
+//! storage the program passes, so reading them parses nothing again (decision 37).
 //!
 //! Every buffer is the program's. The library allocates nothing, so a buffer too small is an
 //! error the program sees, not an allocation it cannot see.
@@ -19,14 +20,17 @@ const kitchen = @import("kitchen");
 pub const Error = error{ExampleWrong};
 
 /// Room for the encoded message, its JSON text, and what reading JSON needs: the binary form it
-/// writes, and one token at a time.
+/// writes, and one token at a time. `decode_stored` reads the elements of repeated fields into
+/// `storage`.
 const message_len = 1024;
 const token_len = 256;
+const storage_len = 4096;
 
 var binary: [message_len]u8 = undefined;
 var text: [message_len]u8 = undefined;
 var from_json: [message_len]u8 = undefined;
 var tokens: [token_len]u8 = undefined;
+var storage: [storage_len]u8 align(16) = undefined;
 
 pub fn main() !void {
     // A recursive field is a `proto.Lazy`, which holds a pointer to encode and bytes once decoded.
@@ -45,7 +49,9 @@ pub fn main() !void {
 
     // Binary: `encode` writes into the program's buffer and returns the bytes it wrote.
     const bytes = try proto.encode(kitchen.Tree, &tree, &binary);
-    const decoded = try proto.decode(kitchen.Tree, bytes);
+    // `decode_stored` reads each repeated field's elements into `storage` once, for a program
+    // that reads every field. `decode` leaves them in `bytes`, and each read parses them again.
+    const decoded = try proto.decode_stored(kitchen.Tree, bytes, &storage);
     std.debug.print("binary: {d} bytes, name \"{s}\"\n", .{ bytes.len, decoded.name });
     try check_tree(&decoded);
 
@@ -64,7 +70,7 @@ fn check_tree(tree: *const kitchen.Tree) !void {
     // `map_get` reads a map's entries and returns the value of the last entry with the key.
     const label = try proto.map_get(@TypeOf(tree.labels), &tree.labels, @as(i32, 7)) orelse return error.ExampleWrong;
     if (!std.mem.eql(u8, label, "seven")) return error.ExampleWrong;
-    // A repeated field decoded from bytes is read through its iterator.
+    // A repeated field is read through its iterator, from storage or from the bytes.
     var children = tree.children.iterator();
     const child = try children.next() orelse return error.ExampleWrong;
     if (!std.mem.eql(u8, child.name, "child")) return error.ExampleWrong;

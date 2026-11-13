@@ -9,6 +9,9 @@ const proto = @import("protobuf");
 const buffer_len = 1 << 20;
 /// Room for the longest JSON token: the large message's description, about 6 KB.
 const token_len = 16 * 1024;
+/// Room for the elements of every repeated field of the largest message: about 130 KB for the
+/// large one's records and their values.
+const storage_len = 1 << 20;
 
 pub const Operation = enum {
     binary_encode,
@@ -47,6 +50,9 @@ var encode_scratch: [buffer_len]u8 align(16) = undefined;
 var json_scratch: [buffer_len]u8 align(16) = undefined;
 var transcoded: [buffer_len]u8 align(16) = undefined;
 var tokens: [token_len]u8 align(16) = undefined;
+/// The storage `decode_stored` reads repeated fields into before a binary walk, as a program that
+/// reads every field takes it (decision 37). A decode alone takes `decode`, with none.
+var storage: [storage_len]u8 align(16) = undefined;
 
 pub fn Case(comptime T: type, comptime walk: fn (*const T) proto.Error!u64) type {
     return struct {
@@ -90,6 +96,11 @@ fn check(comptime C: type, case: *const C) !void {
     const T = C.Message;
     const decoded = try proto.decode(T, case.binary);
     if (try C.walk_message(&decoded) != case.sum) return error.WalkMismatch;
+    // With storage, the decode gives the same message back.
+    const stored = try proto.decode_stored(T, case.binary, &storage);
+    if (try C.walk_message(&stored) != case.sum) return error.WalkMismatch;
+    const stored_again = try proto.encode(T, &stored, &encode_scratch);
+    if (!std.mem.eql(u8, stored_again, case.binary)) return error.EncodingMismatch;
     const again = try proto.encode(T, &decoded, &encode_scratch);
     if (!std.mem.eql(u8, again, case.binary)) return error.EncodingMismatch;
     const from_json = try proto.decode_json(T, case.json, &transcoded, &tokens);
@@ -117,7 +128,7 @@ fn step(comptime C: type, case: *const C, comptime operation: Operation) !void {
     switch (operation) {
         .binary_encode => keep((try proto.encode(T, case.input, &encode_scratch)).len),
         .binary_decode => keep(&try proto.decode(T, case.binary)),
-        .binary_decode_walk => keep(try walk(&try proto.decode(T, case.binary))),
+        .binary_decode_walk => keep(try walk(&try proto.decode_stored(T, case.binary, &storage))),
         .json_encode => keep((try proto.encode_json(T, case.input, &json_scratch)).len),
         .json_decode => keep(&try proto.decode_json(T, case.json, &transcoded, &tokens)),
         .json_decode_walk => keep(try walk(&try proto.decode_json(T, case.json, &transcoded, &tokens))),

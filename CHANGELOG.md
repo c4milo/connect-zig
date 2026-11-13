@@ -49,6 +49,9 @@ The first release.
 
 - A runtime with no allocator: decoding leaves strings, bytes and repeated fields pointing into
   the input, and a message is encoded straight into the body it goes out in.
+- `decode_stored` reads each repeated field's elements, and each recursive field's message, into
+  storage the caller owns, once. A program that reads every field takes it, and parses nothing
+  twice. `decode` stores nothing (decision 37).
 - Every scalar type, `optional`, packed and unpacked repeated fields, maps with every key type,
   oneofs, enums, recursive messages, and unknown fields kept and written back.
 - proto2, proto3, and editions 2023 and 2024, with groups, closed enums and `utf8_validation`.

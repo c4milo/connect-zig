@@ -155,6 +155,12 @@ Each step names the check that proves it. A step is done when its check passes i
     in `connect_colibri`: `Context`, `Request`, `RequestStream`, `Response`, `ResponseStream`,
     `AnyRequest` and `AnyResponse`. Check: every module's tests, the examples and the
     conformance server build and pass on the new signatures.
+14. **Decode into the caller's storage.** `decode_stored` reads each repeated field's elements,
+    and each `Lazy` field's message, into storage the caller passes, once (decision 37).
+    `decode` does not change. New public name in `protobuf`: `decode_stored`. Check: `zig build
+    test-protobuf` holds a proof harness that decodes each input with both calls and requires
+    the same message or the same refusal; `tools/bench_check.sh` decodes with `decode_stored`
+    before its binary walk, and still matches Go's and Buffa's octets and sums.
 
 ### Step records
 

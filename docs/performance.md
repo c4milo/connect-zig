@@ -39,8 +39,11 @@ hold one kind of field each, so their counts give the cost of that kind per fiel
 - Packed (975 B): 64 elements in each of four packed fields.
 
 It runs six operations on each: binary encode, binary decode, binary decode with every field
-read, and the same three in JSON. `bench/instructions.txt` holds the count of each pair. The
-benchmark builds stdx's modules in ReleaseFast too, so no count includes a safety check.
+read, and the same three in JSON. A binary decode alone takes `decode`, and a binary decode
+with every field read takes `decode_stored`, as a program that reads every field does (decision
+37).
+`bench/instructions.txt` holds the count of each pair. The benchmark builds stdx's modules in
+ReleaseFast too, so no count includes a safety check.
 
 ## The admission rule
 
@@ -118,7 +121,8 @@ failed (the owner's ruling of 2026-11-09). A new fast path joins this list the s
 | A long JSON string failed to decode in the benchmark. | The JSON token buffer was shorter than the string. | The benchmark's token buffer holds 16 KB; size it from the longest token a caller expects. |
 | Large binary decode took 5.4% more instructions when the benchmark gained four messages. | More instances of the generic decoder made LLVM call `decode.read_repeated` instead of inlining it. | A new benchmark message writes a new baseline in its own commit, before any change it measures. |
 | Small binary encode took 21% more instructions once `Writer.varint` was inlined whole. | The inlined loop made its callers too large for LLVM to inline in turn. | A fast path inlines its common case alone; the rest is a `noinline` function. |
-| tree binary decode+walk took 4.4% more instructions when the iterator's items check moved inline. | The out-of-line rest takes the iterator's address, so each inline check reloads its fields. | One inline check per call; measure each caller's shape before adding a second. |
+| tree binary decode+walk took 4.4% more instructions when the iterator's items check moved inline. | The out-of-line rest takes the iterator's address, so each inline check reloads its fields. | One inline check per call; measure each caller's shape before adding a second. The items check is inline since decision 37: on an M1, stored walks took 8% to 46% fewer instructions, and tree's JSON decode+walk 3.5% more. |
+| `decode` took 39% more instructions on tree once `decode_run`'s fallbacks also called `decode.read_repeated`. | LLVM called it out of line from `read_field` too. | A path other code shares is inlined with `@call(.always_inline, ...)` where the hot caller calls it. |
 | A mutation that turned a fast path off passed every test. | The reference path gives the same output, and the old baseline already holds the slow count. | Write the new baseline first; then `tools/perf_check.sh` fails such a mutation. |
 
 A pitfall that belongs to Zig and not to connect-zig moves to pepegrillo's

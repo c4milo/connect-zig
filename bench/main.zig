@@ -12,9 +12,11 @@
 //!   collects around `instruction_iterations` runs of each operation and dumps the count under
 //!   the operation's name, which tools/perf_check.sh reads. Outside valgrind it does nothing.
 //!
-//! Decoding copies nothing: a decoded string or bytes field points into the input, and a repeated
-//! or recursive field is decoded when a program reads it. "binary decode" times that first step
-//! alone. "decode+walk" also reads every field, which is the work Go's `proto.Unmarshal` does.
+//! A decoded string or bytes field points into the input. "binary decode" takes `decode`: a
+//! repeated or recursive field stays in the input, and is parsed when a program reads it. "binary
+//! decode+walk" takes `decode_stored`, as a program that reads every field: the decode reads each
+//! such field into storage once, and the walk reads every field, which is the work Go's
+//! `proto.Unmarshal` does (decision 37). "JSON decode+walk" takes `decode_json`.
 //!
 //! This is a program, not the library: it reads the clock and writes files through `init.io`.
 const std = @import("std");

@@ -45,6 +45,9 @@ first. Cite an entry by number in code and commits ("decision 6").
    occurrence's elements. A serializer never writes a message field twice, so this needs an
    input built by hand or by concatenation.
 
+   Amended on 2026-11-13 by decision 37: `decode_stored` reads each repeated field's elements
+   into storage the caller passes, once, and `decode` keeps the views above.
+
 7. **Field types.** Implicit-presence scalars are plain values with defaults (`x: i32 = 0`).
    Explicit presence (`optional`, proto2) is `?T`. A singular message is `?Sub`, or `Lazy(Sub)`
    when it is recursive. A oneof is `?union(enum)`. A map is a `Repeated` of its entry messages.
@@ -460,6 +463,34 @@ first. Cite an entry by number in code and commits ("decision 6").
     `HandlerContext`, which the owner found less clean; messages as plain parameters with the
     headers on two more, which gave a unary handler six parameters; and bare messages in a type
     handler's callbacks, which read headers another way than a function handler does.
+
+37. **A second decode takes storage the caller owns, for the elements of repeated fields.**
+    Ruled by the owner on 2026-11-13, after the owner wrote "we need to beat buffa on binary
+    encoding and decoding for medium size docs". It amends decision 6.
+    - `decode_stored(T, bytes, storage)` decodes as `decode` does. It also reads each run of a
+      repeated field's records once, into elements in `storage`, and each `Lazy` field's
+      message. An iterator then reads them as a slice, and parses nothing again.
+    - A field whose records come in two runs, and a run that finds no room, keep decision 6's
+      view. A closed enum's field keeps it too. `decode_stored` refuses the inputs `decode`
+      refuses, with the same error.
+    - Strings and bytes still point into the input. A message from `decode_stored` points into
+      the input and into `storage`, and both must outlive it.
+    - A run whose elements hold no repeated field and no message of their own takes one pass:
+      each element follows the one before. Any other run is counted first, so its elements stay
+      together while their own runs take storage after them.
+    - The decoder's mode, `stored`, is known at compile time, so `decode` compiles as before.
+    - Why: a program that reads every field parsed each repeated field twice, once when
+      `decode` checked it and once when the program read it. So Buffa's decode with every field
+      read beat connect-zig's on medium, large, tree and packed.
+
+    Beaten: one `decode` that takes storage, `&.{}` for none. The owner chose it first, then
+    chose two calls once it was measured: 76 call sites passed no storage, and the empty path
+    took 4% to 39% more instructions. Also beaten: an array for each repeated field, as decision
+    6 beat it, where one slice serves every field; and `decode` alone, which parses each repeated
+    field twice.
+
+    Cost: a second decode call, and a second copy of the decoder in a program that calls both. A
+    run that is counted first reads its records' tags twice.
 
 ## Tooling
 

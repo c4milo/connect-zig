@@ -25,7 +25,8 @@ pub fn Repeated(comptime T: type, comptime element_kind: Kind) type {
         pub const kind = element_kind;
         pub const Iterator = RepeatedIterator(T, element_kind);
 
-        /// The elements a program sets to encode. Ignored when empty and `view` is set.
+        /// The elements a program sets to encode, or that a decode with storage read into it
+        /// (decision 37). Ignored when empty and `view` is set.
         items: []const T = &.{},
         /// Where `decode` found the elements.
         view: descriptor.View = .{},
@@ -72,6 +73,11 @@ pub fn RepeatedIterator(comptime T: type, comptime element_kind: Kind) type {
         packed_reader: wire.Reader = .{ .bytes = &.{} },
 
         pub inline fn next(it: *Self) wire.Error!?T {
+            // Items are read in place, which a decode with storage leaves as a program does.
+            if (it.index < it.items.len) {
+                it.index += 1;
+                return it.items[it.index - 1];
+            }
             // Inside a packed record whose every number is an element, the next element is the
             // record's next scalar ("Packed Repeated Fields").
             if (comptime keeps_every_number(T, element_kind)) {
@@ -197,7 +203,8 @@ pub fn Lazy(comptime T: type) type {
 
         /// The encoded message, which `decode` sets after it checked them.
         bytes: ?[]const u8 = null,
-        /// The message a program sets to encode.
+        /// The message a program sets to encode, or that a decode with storage decoded into it
+        /// (decision 37).
         value: ?*const T = null,
 
         pub fn of(value: *const T) Self {

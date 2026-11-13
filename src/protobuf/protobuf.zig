@@ -4,7 +4,8 @@
 //! A generated message is a struct whose `pub const protobuf: Descriptor` names its fields. The
 //! generic `encode`, `decode` and `encoded_len` read that table at comptime. `decode` copies
 //! nothing: strings, bytes and repeated fields point into the input, which must outlive the
-//! message. The caller owns every buffer.
+//! message. `decode_stored` reads each repeated field into storage the caller passes, for a
+//! program that reads every field (decision 37). The caller owns every buffer.
 const std = @import("std");
 const json = @import("json");
 const codec = @import("codec");
@@ -17,6 +18,7 @@ const files = struct {
     pub const scalar = @import("scalar.zig");
     pub const repeated = @import("repeated.zig");
     pub const decode = @import("decode.zig");
+    pub const decode_run = @import("decode_run.zig");
     pub const encode = @import("encode.zig");
     pub const json_scalar = @import("json_scalar.zig");
     pub const json_float = @import("json_float.zig");
@@ -54,14 +56,25 @@ pub const EncodeError = files.encode.Error;
 pub fn decode(comptime T: type, bytes: []const u8) Error!T {
     // "Size Limitations": a message holds less than 2 GiB.
     if (bytes.len > constants.limits.message_len_max) return error.LengthTooLarge;
-    return files.decode.decode_depth(T, bytes, constants.limits.depth_max);
+    return files.decode.decode_depth(T, bytes, constants.limits.depth_max, .checked, {});
+}
+
+/// Decodes `bytes` as `decode` does, and reads each repeated field's elements, and each `Lazy`
+/// field's message, into `storage` while it has room. A later read of them parses nothing again,
+/// so a program that reads every field takes this call. A field that finds no room points into
+/// `bytes`, as `decode` leaves it. The message points into both, which must outlive it (decision
+/// 37).
+pub fn decode_stored(comptime T: type, bytes: []const u8, storage: []u8) Error!T {
+    if (bytes.len > constants.limits.message_len_max) return error.LengthTooLarge;
+    var store: files.decode.Store = .{ .buffer = storage };
+    return files.decode.decode_depth(T, bytes, constants.limits.depth_max, .stored, &store);
 }
 
 /// Merges `bytes` into `message`, as a later occurrence of the same message merges ("Last One
 /// Wins", encoding guide).
 pub fn merge(comptime T: type, message: *T, bytes: []const u8) Error!void {
     if (bytes.len > constants.limits.message_len_max) return error.LengthTooLarge;
-    return files.decode.merge_depth(T, message, bytes, constants.limits.depth_max, .checked);
+    return files.decode.merge_depth(T, message, bytes, constants.limits.depth_max, .checked, {});
 }
 
 /// The bytes `encode` writes for `message`.
@@ -137,11 +150,11 @@ pub const map_get = files.repeated.map_get;
 
 test "the root exports the names a program calls" {
     try @import("public_names").expect(@This(), &.{
-        "constants",       "Kind",        "Field",            "Descriptor",  "EnumValue",        "EnumDescriptor",
-        "View",            "Unknown",     "Repeated",         "Lazy",        "Error",            "EncodeError",
-        "decode",          "merge",       "encoded_len",      "encode",      "map_get",          "JsonEncodeError",
-        "JsonDecodeError", "encode_json", "encode_json_with", "decode_json", "decode_json_with", "wkt",
-        "FieldOptions",    "field_of",    "WireType",
+        "constants",       "Kind",            "Field",       "Descriptor",       "EnumValue",   "EnumDescriptor",
+        "View",            "Unknown",         "Repeated",    "Lazy",             "Error",       "EncodeError",
+        "decode",          "decode_stored",   "merge",       "encoded_len",      "encode",      "map_get",
+        "JsonEncodeError", "JsonDecodeError", "encode_json", "encode_json_with", "decode_json", "decode_json_with",
+        "wkt",             "FieldOptions",    "field_of",    "WireType",
     });
 }
 
@@ -156,5 +169,6 @@ test {
     _ = @import("protobuf_fast_path_test.zig");
     _ = @import("protobuf_fast_path_message_test.zig");
     _ = @import("protobuf_fast_path_flat_test.zig");
+    _ = @import("protobuf_storage_test.zig");
     _ = @import("protobuf_fast_path_number_test.zig");
 }
