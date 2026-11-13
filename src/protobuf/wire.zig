@@ -222,13 +222,13 @@ pub const Writer = struct {
         return writer.buffer[0..writer.len];
     }
 
-    pub fn bytes(writer: *Writer, octets: []const u8) WriteError!void {
+    pub inline fn bytes(writer: *Writer, octets: []const u8) WriteError!void {
         if (octets.len > writer.buffer.len - writer.len) return error.NoSpaceLeft;
         @memcpy(writer.buffer[writer.len..][0..octets.len], octets);
         writer.len += octets.len;
     }
 
-    pub fn byte(writer: *Writer, value: u8) WriteError!void {
+    pub inline fn byte(writer: *Writer, value: u8) WriteError!void {
         if (writer.len == writer.buffer.len) return error.NoSpaceLeft;
         writer.buffer[writer.len] = value;
         writer.len += 1;
@@ -252,16 +252,30 @@ pub const Writer = struct {
             writer.len += two_octets;
             return;
         }
-        return writer.varint_long(value);
+        // With room for the longest varint, the call returns the position past it in a register.
+        if (constants.protocol.varint_len_max <= writer.buffer.len - writer.len) {
+            writer.len = varint_long(writer.buffer.ptr, writer.len, value);
+            return;
+        }
+        writer.len = try varint_near_end(writer.buffer, writer.len, value);
     }
 
     /// A varint of three octets or more, out of line: inlined at every call, it made the callers
-    /// too large to inline in turn, and Small's encode took 21% more instructions.
-    noinline fn varint_long(writer: *Writer, value: u64) WriteError!void {
+    /// too large to inline in turn, and Small's encode took 21% more instructions. It takes the
+    /// buffer and the position by value and returns the position past the varint: the writer's
+    /// address, or an error union, would make each caller keep its length in memory.
+    noinline fn varint_long(buffer: [*]u8, at: usize, value: u64) usize {
         const len = varint_len(value);
-        if (len > writer.buffer.len - writer.len) return error.NoSpaceLeft;
-        write_groups(writer.buffer[writer.len..][0..len], value);
-        writer.len += len;
+        write_groups(buffer[at..][0..len], value);
+        return at + len;
+    }
+
+    /// A varint of three octets or more with less room than the longest varint takes.
+    noinline fn varint_near_end(buffer: []u8, at: usize, value: u64) WriteError!usize {
+        const len = varint_len(value);
+        if (len > buffer.len - at) return error.NoSpaceLeft;
+        write_groups(buffer[at..][0..len], value);
+        return at + len;
     }
 
     /// A placeholder of `constants.limits.padded_length_len` octets for a length written once it
@@ -272,18 +286,18 @@ pub const Writer = struct {
         return at;
     }
 
-    pub fn fixed32(writer: *Writer, value: u32) WriteError!void {
+    pub inline fn fixed32(writer: *Writer, value: u32) WriteError!void {
         const room = try writer.take(constants.protocol.fixed32_len);
         std.mem.writeInt(u32, room, value, .little);
     }
 
-    pub fn fixed64(writer: *Writer, value: u64) WriteError!void {
+    pub inline fn fixed64(writer: *Writer, value: u64) WriteError!void {
         const room = try writer.take(constants.protocol.fixed64_len);
         std.mem.writeInt(u64, room, value, .little);
     }
 
     /// The next `len` bytes of the buffer, which the caller fills, or an error when they do not fit.
-    fn take(writer: *Writer, comptime len: usize) WriteError!*[len]u8 {
+    inline fn take(writer: *Writer, comptime len: usize) WriteError!*[len]u8 {
         if (len > writer.buffer.len - writer.len) return error.NoSpaceLeft;
         const room = writer.buffer[writer.len..][0..len];
         writer.len += len;

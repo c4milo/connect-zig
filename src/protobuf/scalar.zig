@@ -95,7 +95,7 @@ fn varint_of(comptime kind: Kind, comptime V: type, value: V) u64 {
 }
 
 /// Writes one value of `kind`, without its tag.
-pub fn write(comptime kind: Kind, comptime V: type, value: V, writer: *wire.Writer) wire.Writer.WriteError!void {
+pub inline fn write(comptime kind: Kind, comptime V: type, value: V, writer: *wire.Writer) wire.Writer.WriteError!void {
     comptime assert(!kind.holds_message());
     switch (comptime kind.wire_type()) {
         .varint => try writer.varint(varint_of(kind, V, value)),
