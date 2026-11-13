@@ -684,6 +684,24 @@ ran on Linux x86-64 with Zig 0.16.0.
     checked once, 6% more instructions on large and packed; a long varint written with no
     length first, on x86-64 2.78% more on medium and 22.44% more on varints.
   - `bench/instructions.txt` holds the judge's counts of `e491ebc`, which `1fac7e6` repeats.
+  - Encode on x86, commits `34558ab` and `d648336`. On x86-64 under callgrind, Buffa ran
+    14,432 instructions for medium binary encode and connect-zig 12,173, yet connect-zig took
+    16% to 26% longer on CI's x86 runners. Its writer lived in memory: `varint_long` took the
+    writer's address, so each write stored the length and the next loaded it. An M1 hides that
+    wait, and its cycles had put connect-zig ahead. `varint_long` now takes the buffer and the
+    position by value, and the writer's small calls are inline. `varint_len` also divides by 7
+    with a multiply and a shift.
+  - Both, measured on a branch before they landed, with the owner's word. [Run
+    43472841911](https://github.com/c4milo/connect-zig/actions/runs/43472841911) ran on a Xeon
+    8573C, the CPU of `69595b7`'s run: medium binary encode went from 771 to 683 ns, against
+    Buffa's 646 ns, so Buffa's time over connect-zig's went from 0.84 to 0.94. It read 1.03 on
+    a Xeon 6975P-C in the run before. The judge: binary encode takes fewer instructions on
+    varints (22.52%), packed (15.95%), small (12.69%), strings (9.70%) and medium (7.27%), and
+    more on large (2.00%) and deep (1.38%). Large's count is the price of the inline writer:
+    its packed loop calls no function now, and its walk takes more instructions to set up.
+  - Tries that lost on x86-64-v2: the reader's `varint_long` by value, 20% to 44% more
+    instructions to decode, since its two-part result came back through memory; and a flat
+    child written once behind a one-octet length, 2.8% more on medium.
 
 ### What a later step owes
 

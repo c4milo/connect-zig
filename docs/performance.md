@@ -112,6 +112,7 @@ failed (the owner's ruling of 2026-11-09). A new fast path joins this list the s
 | A JSON float text read as one exact quotient | `json_float.zig`, `parse_exact` | packed JSON decode +4.63%, small JSON decode +2.47% |
 | A flat child measured before it is written | `encode.zig`, `is_flat` | medium binary encode +7.35%, local x86-64-v2 |
 | A field's stored items read in place | `repeated.zig`, `RepeatedIterator.next` | packed binary decode+walk +86.22%, large +26.59%, medium +22.66%, local x86-64-v2 |
+| The binary writer's length in a register | `wire.zig`, `Writer.varint` and `varint_long` | varints binary encode +29.06%, packed +18.97%, small +14.54%, strings +10.74%, medium +7.84% |
 
 ## The pitfalls
 
