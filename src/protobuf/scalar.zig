@@ -16,17 +16,7 @@ const Kind = descriptor.Kind;
 pub fn read(comptime kind: Kind, comptime V: type, reader: *wire.Reader) wire.Error!V {
     comptime assert(!kind.holds_message());
     return switch (kind) {
-        // "Base 128 Varints": int32 is sign-extended to 64 bits on the wire, so its value is the
-        // low 32 bits. uint32 keeps the low 32 bits as well.
-        .int32 => @bitCast(@as(u32, @truncate(try reader.varint()))),
-        .uint32 => @truncate(try reader.varint()),
-        .int64 => @bitCast(try reader.varint()),
-        .uint64 => try reader.varint(),
-        // Encoding guide, "Signed Integers": a sint32 decodes from the low 32 bits.
-        .sint32 => @intCast(wire.zigzag_decode(@as(u32, @truncate(try reader.varint())))),
-        .sint64 => wire.zigzag_decode(try reader.varint()),
-        .bool => (try reader.varint()) != 0,
-        .@"enum" => @enumFromInt(@as(i32, @bitCast(@as(u32, @truncate(try reader.varint()))))),
+        .int32, .uint32, .int64, .uint64, .sint32, .sint64, .bool, .@"enum" => from_varint(kind, V, try reader.varint()),
         .fixed32 => try reader.fixed32(),
         .sfixed32 => @bitCast(try reader.fixed32()),
         .float => @bitCast(try reader.fixed32()),
@@ -81,6 +71,24 @@ fn is_ascii_short(octets: []const u8) bool {
 }
 
 /// The integer a varint kind writes for `value`.
+/// The value a varint of `kind` holds: the inverse of `varint_of`.
+pub inline fn from_varint(comptime kind: Kind, comptime V: type, varint: u64) V {
+    return switch (kind) {
+        // "Base 128 Varints": int32 is sign-extended to 64 bits on the wire, so its value is the
+        // low 32 bits. uint32 keeps the low 32 bits as well.
+        .int32 => @bitCast(@as(u32, @truncate(varint))),
+        .uint32 => @truncate(varint),
+        .int64 => @bitCast(varint),
+        .uint64 => varint,
+        // Encoding guide, "Signed Integers": a sint32 decodes from the low 32 bits.
+        .sint32 => @intCast(wire.zigzag_decode(@as(u32, @truncate(varint)))),
+        .sint64 => wire.zigzag_decode(varint),
+        .bool => varint != 0,
+        .@"enum" => @enumFromInt(@as(i32, @bitCast(@as(u32, @truncate(varint))))),
+        else => unreachable,
+    };
+}
+
 fn varint_of(comptime kind: Kind, comptime V: type, value: V) u64 {
     return switch (kind) {
         .int32 => @bitCast(@as(i64, value)),

@@ -83,6 +83,9 @@ const fixed_wide = 0xdead_beef;
 
 const numbers = [_]i64{ 0, 1, -1, two_octets, std.math.maxInt(i64), std.math.minInt(i64) };
 const few_numbers = [_]i64{ 1, -1 };
+/// Two one-octet numbers: a change of one bit can leave the record's last octet alone with its
+/// continuation bit.
+const short_numbers = [_]i64{ 1, 0 };
 const fixed = [_]u32{ fixed_small, fixed_wide };
 const names = [_][]const u8{ "", "a", "données", "日本語" };
 const few_names = [_][]const u8{ "a", "données" };
@@ -158,6 +161,7 @@ test "decode_into gives the message or the refusal decode gives" {
     try check_each_change(try encoded(&full, &buffer));
     try check_each_change(try encoded(&middle, &buffer));
     try check_each_change(try encoded(&.{ .children = .of(&children) }, &buffer));
+    try check_each_change(try encoded(&.{ .numbers = .of(&short_numbers) }, &buffer));
 }
 
 test "a field in two runs keeps its view, and gives the same message" {
