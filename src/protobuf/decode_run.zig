@@ -139,6 +139,7 @@ fn read_record(comptime F: type, items: []F.Element, index: usize, tag: wire.Tag
 }
 
 fn read_packed(comptime F: type, items: []F.Element, start_index: usize, payload: []const u8) (Error || error{NoRoom})!usize {
+    if (comptime F.kind.wire_type() == .varint) return read_packed_varints(F, items, start_index, payload);
     var packed_reader: wire.Reader = .{ .bytes = payload };
     var index = start_index;
     // Each element takes at least one byte.
@@ -149,6 +150,53 @@ fn read_packed(comptime F: type, items: []F.Element, start_index: usize, payload
         index += 1;
     }
     unreachable;
+}
+
+/// Reads a packed record of varints with its position in a local, each varint with no call: a
+/// reader's address would put the position in memory at each element, and each element would
+/// wait for the one before it to store it.
+fn read_packed_varints(comptime F: type, items: []F.Element, start_index: usize, payload: []const u8) (Error || error{NoRoom})!usize {
+    var index = start_index;
+    var position: usize = 0;
+    // Each element takes at least one byte.
+    for (0..payload.len + 1) |_| {
+        if (position == payload.len) return index;
+        if (index == items.len) return error.NoRoom;
+        items[index] = scalar.from_varint(F.kind, F.Element, try packed_varint(payload, &position));
+        index += 1;
+    }
+    unreachable;
+}
+
+/// The varint at `position.*`, which it moves past the varint. It is inline, so the caller's
+/// position stays in a register.
+inline fn packed_varint(payload: []const u8, position: *usize) Error!u64 {
+    const group_bits = constants.protocol.varint_group_bits;
+    const continuation = constants.protocol.varint_continuation;
+    const payload_mask = constants.protocol.varint_payload_mask;
+    const two_octets = 2;
+    // A varint of one or two octets, as most small numbers are, takes no loop.
+    const first = payload[position.*];
+    if (first < continuation) {
+        position.* += 1;
+        return first;
+    }
+    if (position.* + 1 < payload.len and payload[position.* + 1] < continuation) {
+        const second = payload[position.* + 1];
+        position.* += two_octets;
+        return @as(u64, first & payload_mask) | @as(u64, second) << group_bits;
+    }
+    var varint: u64 = 0;
+    // "Base 128 Varints": at most 10 octets, the last one with no continuation bit. The tenth
+    // carries bit 63 alone; higher bits fall off the 64-bit value.
+    for (0..constants.protocol.varint_len_max) |group| {
+        if (position.* == payload.len) return error.Truncated;
+        const octet = payload[position.*];
+        position.* += 1;
+        varint |= @as(u64, octet & payload_mask) << @intCast(group * group_bits);
+        if (octet < continuation) return varint;
+    }
+    return error.VarintTooLong;
 }
 
 /// The records of the field's run that starts at `field_start`: one message element each. A
