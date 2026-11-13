@@ -101,9 +101,28 @@ module.addImport("connect", connect_zig.module("connect"));
 module.addImport("connect_colibri", connect_zig.module("connect_colibri"));
 ```
 
+A program that imports `connect_colibri` or `oidc` links
+[chapulin](https://github.com/c4milo/chapulin), the TLS library under colibri. chapulin reports
+a failed assertion through one hook, which your program defines once:
+
+```zig
+export fn ch_assert_fail(condition: [*:0]const u8, file: [*:0]const u8, line: c_int) noreturn {
+    std.debug.panic("chapulin assertion failed: {s} ({s}:{d})", .{ condition, file, line });
+}
+```
+
+Without the hook, the link fails with `undefined symbol: ch_assert_fail`. A program that imports
+`protobuf` alone needs no hook.
+
 ### 2. Generate code
 
-Build the plugin with `zig build`, then point `buf.gen.yaml` at it:
+Install the plugin from your `build.zig`, so `zig build` writes it to `zig-out/bin`:
+
+```zig
+b.installArtifact(connect_zig.artifact("protoc-gen-connect-zig"));
+```
+
+Then point `buf.gen.yaml` at it:
 
 ```yaml
 version: v2
@@ -117,6 +136,15 @@ plugins:
 - a message becomes a struct, with a `FieldNumber` enum that names each field's number;
 - an enum becomes a non-exhaustive `enum(i32)`;
 - each RPC becomes a `connect.Method` you hand to a route or a client.
+
+Give your program each generated file as a module, with the modules its header names:
+
+```zig
+const eliza = b.createModule(.{ .root_source_file = b.path("gen/connectrpc/eliza/v1/eliza.pb.zig") });
+eliza.addImport("protobuf", connect_zig.module("protobuf"));
+eliza.addImport("connect", connect_zig.module("connect"));
+module.addImport("eliza", eliza);
+```
 
 > [!TIP]
 > A generated file imports other generated files by module name, and its header lists the
@@ -240,7 +268,8 @@ var response = chat.read(storage);
 
 The `oidc` module checks the token an OpenID Connect provider issued: a JWT signed with RS256,
 ES256 or EdDSA. It does no I/O and reads no clock. Your program fetches the provider's JWK Set,
-and passes its text and the time:
+and passes its text and the time. Import the module as the others, with
+`module.addImport("oidc", connect_zig.module("oidc"))`:
 
 ```zig
 const oidc = @import("oidc");
@@ -258,12 +287,13 @@ const Auth = oidc.Interceptor(Values, .{ .exclude = &.{ "/grpc.health.v1.Health/
 const options: rpc.RouteOptions = .{ .interceptors = &.{Auth}, .Values = Values };
 pub const routes = Service.Routes(rpc, App, @This(), options).routes;
 
-// In any callback of a call behind the interceptor, a stream's tenth message included:
+// In any callback of a call behind the interceptor, a stream's tenth message included. A
+// lookup fails on a claim of another type, or on one longer than the claims' room.
 if (ctx.values(Values).oidc) |*claims| {
     std.debug.print("{s}\n", .{claims.subject()});
-    const email = try claims.string("email"); // ?[]const u8
-    const admin = try claims.holds("roles", "admin"); // in an array, or equal
-    const since = try claims.integer("auth_time"); // ?i64
+    const email = claims.string("email") catch null; // ?[]const u8
+    const admin = claims.holds("roles", "admin") catch false; // in an array, or equal
+    const since = claims.integer("auth_time") catch null; // ?i64
 }
 ```
 
