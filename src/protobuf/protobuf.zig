@@ -4,7 +4,7 @@
 //! A generated message is a struct whose `pub const protobuf: Descriptor` names its fields. The
 //! generic `encode`, `decode` and `encoded_len` read that table at comptime. `decode` copies
 //! nothing: strings, bytes and repeated fields point into the input, which must outlive the
-//! message. `decode_stored` reads each repeated field into storage the caller passes, for a
+//! message. `decode_into` reads each repeated field into storage the caller passes, for a
 //! program that reads every field (decision 37). The caller owns every buffer.
 const std = @import("std");
 const json = @import("json");
@@ -64,7 +64,7 @@ pub fn decode(comptime T: type, bytes: []const u8) Error!T {
 /// so a program that reads every field takes this call. A field that finds no room points into
 /// `bytes`, as `decode` leaves it. The message points into both, which must outlive it (decision
 /// 37).
-pub fn decode_stored(comptime T: type, bytes: []const u8, storage: []u8) Error!T {
+pub fn decode_into(comptime T: type, bytes: []const u8, storage: []u8) Error!T {
     if (bytes.len > constants.limits.message_len_max) return error.LengthTooLarge;
     var store: files.decode.Store = .{ .buffer = storage };
     return files.decode.decode_depth(T, bytes, constants.limits.depth_max, .stored, &store);
@@ -152,7 +152,7 @@ test "the root exports the names a program calls" {
     try @import("public_names").expect(@This(), &.{
         "constants",       "Kind",            "Field",       "Descriptor",       "EnumValue",   "EnumDescriptor",
         "View",            "Unknown",         "Repeated",    "Lazy",             "Error",       "EncodeError",
-        "decode",          "decode_stored",   "merge",       "encoded_len",      "encode",      "map_get",
+        "decode",          "decode_into",     "merge",       "encoded_len",      "encode",      "map_get",
         "JsonEncodeError", "JsonDecodeError", "encode_json", "encode_json_with", "decode_json", "decode_json_with",
         "wkt",             "FieldOptions",    "field_of",    "WireType",
     });

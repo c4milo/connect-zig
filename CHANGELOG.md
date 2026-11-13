@@ -49,7 +49,7 @@ The first release.
 
 - A runtime with no allocator: decoding leaves strings, bytes and repeated fields pointing into
   the input, and a message is encoded straight into the body it goes out in.
-- `decode_stored` reads each repeated field's elements, and each recursive field's message, into
+- `decode_into` reads each repeated field's elements, and each recursive field's message, into
   storage the caller owns, once. A program that reads every field takes it, and parses nothing
   twice. `decode` stores nothing (decision 37).
 - A server reads each binary request's repeated fields into storage once, so a handler that

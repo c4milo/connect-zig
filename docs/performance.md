@@ -40,7 +40,7 @@ hold one kind of field each, so their counts give the cost of that kind per fiel
 
 It runs six operations on each: binary encode, binary decode, binary decode with every field
 read, and the same three in JSON. A binary decode alone takes `decode`, and a binary decode
-with every field read takes `decode_stored`, as a program that reads every field does (decision
+with every field read takes `decode_into`, as a program that reads every field does (decision
 37).
 `bench/instructions.txt` holds the count of each pair. The benchmark builds stdx's modules in
 ReleaseFast too, so no count includes a safety check.

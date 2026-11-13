@@ -4,7 +4,7 @@
 //! recursive field and well-known types, from the code `buf generate` wrote into examples/gen. It
 //! encodes it to binary and decodes it back, then writes it as JSON and reads that back. Decoding
 //! copies no string: every string of a decoded message points into the bytes it was decoded
-//! from, which the program keeps. `decode_stored` reads each repeated field's elements into
+//! from, which the program keeps. `decode_into` reads each repeated field's elements into
 //! storage the program passes, so reading them parses nothing again (decision 37).
 //!
 //! Every buffer is the program's. The library allocates nothing, so a buffer too small is an
@@ -20,7 +20,7 @@ const kitchen = @import("kitchen");
 pub const Error = error{ExampleWrong};
 
 /// Room for the encoded message, its JSON text, and what reading JSON needs: the binary form it
-/// writes, and one token at a time. `decode_stored` reads the elements of repeated fields into
+/// writes, and one token at a time. `decode_into` reads the elements of repeated fields into
 /// `storage`.
 const message_len = 1024;
 const token_len = 256;
@@ -49,9 +49,9 @@ pub fn main() !void {
 
     // Binary: `encode` writes into the program's buffer and returns the bytes it wrote.
     const bytes = try proto.encode(kitchen.Tree, &tree, &binary);
-    // `decode_stored` reads each repeated field's elements into `storage` once, for a program
+    // `decode_into` reads each repeated field's elements into `storage` once, for a program
     // that reads every field. `decode` leaves them in `bytes`, and each read parses them again.
-    const decoded = try proto.decode_stored(kitchen.Tree, bytes, &storage);
+    const decoded = try proto.decode_into(kitchen.Tree, bytes, &storage);
     std.debug.print("binary: {d} bytes, name \"{s}\"\n", .{ bytes.len, decoded.name });
     try check_tree(&decoded);
 

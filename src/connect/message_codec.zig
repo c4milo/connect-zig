@@ -14,7 +14,7 @@ pub const Scratch = struct {
     work: []u8,
     /// One JSON token's octets.
     tokens: []u8,
-    /// Where `decode_stored` reads a binary message's repeated fields, for a program that reads
+    /// Where `decode_into` reads a binary message's repeated fields, for a program that reads
     /// every field (decision 37). Empty, `decode` keeps them in the message's octets.
     storage: []u8 = &.{},
 };
@@ -33,7 +33,7 @@ pub fn encode(comptime T: type, codec: Codec, message: *const T, buffer: []u8) E
 /// `octets`, and its repeated fields into `scratch.storage` while it has room.
 pub fn decode(comptime T: type, codec: Codec, octets: []const u8, scratch: Scratch) DecodeError!T {
     return switch (codec) {
-        .proto => if (scratch.storage.len == 0) proto.decode(T, octets) else proto.decode_stored(T, octets, scratch.storage),
+        .proto => if (scratch.storage.len == 0) proto.decode(T, octets) else proto.decode_into(T, octets, scratch.storage),
         .json => proto.decode_json(T, octets, scratch.work, scratch.tokens),
     };
 }
@@ -129,7 +129,7 @@ test "a request is compressed from its floor on, even when the coding cannot shr
     try testing.expectError(error.NoSpaceLeft, compress_request(.gzip, encoders, "hi", buffer[0..1], 0));
 }
 
-/// A message with a repeated field, which `decode_stored` reads into storage.
+/// A message with a repeated field, which `decode_into` reads into storage.
 const Bag = struct {
     numbers: proto.Repeated(u32, .uint32) = .{},
     pub const FieldNumber = enum(u29) { numbers = 1 };

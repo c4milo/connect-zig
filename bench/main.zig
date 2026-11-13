@@ -14,7 +14,7 @@
 //!
 //! A decoded string or bytes field points into the input. "binary decode" takes `decode`: a
 //! repeated or recursive field stays in the input, and is parsed when a program reads it. "binary
-//! decode+walk" takes `decode_stored`, as a program that reads every field: the decode reads each
+//! decode+walk" takes `decode_into`, as a program that reads every field: the decode reads each
 //! such field into storage once, and the walk reads every field, which is the work Go's
 //! `proto.Unmarshal` does (decision 37). "JSON decode+walk" takes `decode_json`.
 //!

@@ -45,7 +45,7 @@ first. Cite an entry by number in code and commits ("decision 6").
    occurrence's elements. A serializer never writes a message field twice, so this needs an
    input built by hand or by concatenation.
 
-   Amended on 2026-11-13 by decision 37: `decode_stored` reads each repeated field's elements
+   Amended on 2026-11-13 by decision 37: `decode_into` reads each repeated field's elements
    into storage the caller passes, once, and `decode` keeps the views above.
 
 7. **Field types.** Implicit-presence scalars are plain values with defaults (`x: i32 = 0`).
@@ -467,19 +467,21 @@ first. Cite an entry by number in code and commits ("decision 6").
 37. **A second decode takes storage the caller owns, for the elements of repeated fields.**
     Ruled by the owner on 2026-11-13, after the owner wrote "we need to beat buffa on binary
     encoding and decoding for medium size docs". It amends decision 6.
-    - `decode_stored(T, bytes, storage)` decodes as `decode` does. It also reads each run of a
+    - `decode_into(T, bytes, storage)` decodes as `decode` does. It also reads each run of a
       repeated field's records once, into elements in `storage`, and each `Lazy` field's
       message. An iterator then reads them as a slice, and parses nothing again.
     - A field whose records come in two runs, and a run that finds no room, keep decision 6's
-      view. A closed enum's field keeps it too. `decode_stored` refuses the inputs `decode`
+      view. A closed enum's field keeps it too. `decode_into` refuses the inputs `decode`
       refuses, with the same error.
-    - Strings and bytes still point into the input. A message from `decode_stored` points into
+    - Strings and bytes still point into the input. A message from `decode_into` points into
       the input and into `storage`, and both must outlive it.
     - A run whose elements hold no repeated field and no message of their own takes one pass:
       each element follows the one before. Any other run is counted first, so its elements stay
       together while their own runs take storage after them.
     - The decoder's mode, `stored`, is known at compile time, so `decode` compiles as before.
-    - connect's codec takes `decode_stored` for a binary message when its `Scratch` holds
+    - The owner named the call `decode_into` on 2026-11-13: it says where the elements go. It
+      beat `decode_stored`, the name the call first shipped with, and `decode_eager`.
+    - connect's codec takes `decode_into` for a binary message when its `Scratch` holds
       storage. Each route holds `message_bytes` of it by default, which the owner chose over
       none (design §8 step 15).
     - Why: a program that reads every field parsed each repeated field twice, once when

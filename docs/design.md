@@ -155,14 +155,14 @@ Each step names the check that proves it. A step is done when its check passes i
     in `connect_colibri`: `Context`, `Request`, `RequestStream`, `Response`, `ResponseStream`,
     `AnyRequest` and `AnyResponse`. Check: every module's tests, the examples and the
     conformance server build and pass on the new signatures.
-14. **Decode into the caller's storage.** `decode_stored` reads each repeated field's elements,
+14. **Decode into the caller's storage.** `decode_into` reads each repeated field's elements,
     and each `Lazy` field's message, into storage the caller passes, once (decision 37).
-    `decode` does not change. New public name in `protobuf`: `decode_stored`. Check: `zig build
+    `decode` does not change. New public name in `protobuf`: `decode_into`. Check: `zig build
     test-protobuf` holds a proof harness that decodes each input with both calls and requires
-    the same message or the same refusal; `tools/bench_check.sh` decodes with `decode_stored`
+    the same message or the same refusal; `tools/bench_check.sh` decodes with `decode_into`
     before its binary walk, and still matches Go's and Buffa's octets and sums.
 15. **Services decode with storage.** `connect.Scratch` gains `storage`, and the codec takes
-    `decode_stored` for a binary message when it is not empty. Each route of `connect_colibri`
+    `decode_into` for a binary message when it is not empty. Each route of `connect_colibri`
     holds `storage_bytes` of it for its requests: `message_bytes` unless a program names another
     size, and 0 keeps `decode` (decision 37). A client passes storage in its own `Scratch`. New
     public names: none at a module's root; the field `storage` of `connect.Scratch`, and the

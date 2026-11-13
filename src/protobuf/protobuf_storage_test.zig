@@ -1,5 +1,5 @@
 //! The proof harness of a decode with storage (decision 37; pepegrillo's performance method,
-//! step 5): `decode_stored` gives the message that `decode` gives, or the same refusal, on every
+//! step 5): `decode_into` gives the message that `decode` gives, or the same refusal, on every
 //! input. The inputs:
 //!
 //! - The encoding of a message with each kind of repeated field: packed varints, packed fixed
@@ -112,12 +112,12 @@ const Outcome = union(enum) {
 };
 
 fn outcome(bytes: []const u8, storage: ?[]u8, out: []u8) Outcome {
-    const decoded = if (storage) |room| proto.decode_stored(Node, bytes, room) else proto.decode(Node, bytes);
+    const decoded = if (storage) |room| proto.decode_into(Node, bytes, room) else proto.decode(Node, bytes);
     const node = decoded catch |failure| return .{ .refusal = failure };
     return .{ .message = proto.encode(Node, &node, out) catch |failure| return .{ .refusal = failure } };
 }
 
-/// Decodes `bytes` with `decode`, and with `decode_stored` in each size of storage, and requires
+/// Decodes `bytes` with `decode`, and with `decode_into` in each size of storage, and requires
 /// one outcome.
 fn check(bytes: []const u8) !void {
     var want_out: [out_len_max]u8 = @splat(0);
@@ -153,7 +153,7 @@ fn encoded(message: *const Node, buffer: []u8) ![]const u8 {
     return proto.encode(Node, message, buffer);
 }
 
-test "decode_stored gives the message or the refusal decode gives" {
+test "decode_into gives the message or the refusal decode gives" {
     var buffer: [encoded_len_max]u8 = @splat(0);
     try check_each_change(try encoded(&full, &buffer));
     try check_each_change(try encoded(&middle, &buffer));
@@ -177,7 +177,7 @@ test "with room, each repeated field and each Lazy child is read into the storag
     var buffer: [encoded_len_max]u8 = @splat(0);
     const bytes = try encoded(&full, &buffer);
     var storage: [storage_len_max]u8 align(storage_align) = @splat(0);
-    const node = try proto.decode_stored(Node, bytes, &storage);
+    const node = try proto.decode_into(Node, bytes, &storage);
     try testing.expectEqual(numbers.len, node.numbers.items.len);
     try testing.expectEqual(fixed.len, node.fixed.items.len);
     try testing.expectEqual(names.len, node.names.items.len);
@@ -194,7 +194,7 @@ test "with room, each repeated field and each Lazy child is read into the storag
     try testing.expect(lazy.next.value == null);
 }
 
-/// A closed enum: a field of it passes over a number it does not name, so `decode_stored` keeps
+/// A closed enum: a field of it passes over a number it does not name, so `decode_into` keeps
 /// the field's view (editions, "enum_type").
 const Size = enum(i32) {
     unspecified = 0,
@@ -232,7 +232,7 @@ test "a closed enum's field keeps its view, and its unknown numbers go back out"
     // the closed enum does not name.
     const bytes = "\x0a\x03\x01\x05\x00\x12\x05\x0a\x01a\x10\x01\x12\x05\x0a\x01b\x10\x05";
     var storage: [storage_len_max]u8 align(storage_align) = @splat(0);
-    const stored = try proto.decode_stored(Shirt, bytes, &storage);
+    const stored = try proto.decode_into(Shirt, bytes, &storage);
     try testing.expectEqual(@as(usize, 0), stored.sizes.items.len);
     try testing.expectEqual(@as(usize, 0), stored.by_name.items.len);
     const lazy = try proto.decode(Shirt, bytes);
@@ -247,7 +247,7 @@ fn fuzz_one(_: void, smith: *testing.Smith) anyerror!void {
     try check(input[0..len]);
 }
 
-test "fuzz: decode_stored gives what decode gives, on any input" {
+test "fuzz: decode_into gives what decode gives, on any input" {
     try testing.fuzz({}, fuzz_one, .{ .corpus = &.{
         "\x12\x03\x01\xac\x02",
         "\x2a\x07\x0a\x03one\x10\x01\x2a\x00",
