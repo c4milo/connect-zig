@@ -13,7 +13,7 @@ and serve the same handlers to Connect, gRPC and gRPC-Web clients, in binary pro
   each RPC message is encoded straight into the HTTP body it goes out in.
 - **No hidden I/O.** The protocol core reads bytes you give it and writes bytes you send. It
   reads no clock, so every test is deterministic.
-- **Fast.** Binary and JSON encoding and decoding run 1.7 to 18 times faster than Go's protobuf
+- **Fast.** Binary and JSON encoding and decoding run 1.9 to 16 times faster than Go's protobuf
   runtime (see [Performance](#performance)).
 - **HTTP underneath from [colibri](https://github.com/c4milo/colibri).** Servers and clients run
   over h11, h2 and h3. The in-memory examples and the socket server run over all three;
@@ -332,39 +332,40 @@ all: it drives colibri's `server.Engine` over Zig 0.16's `std.Io` sockets, tasks
 `zig build bench` times eight messages. `tools/bench_check.sh` runs two baselines beside it on
 the same inputs: Go's `google.golang.org/protobuf` v1.36.12, and Buffa, the Rust runtime of
 connect-rust. It checks that each writes the same bytes as connect-zig. The numbers come from
-CI's `bench-compare` job of commit `52fc27a`
-([run 97](https://github.com/c4milo/connect-zig/actions/runs/43300188302)), on GitHub's
-`ubuntu-24.04` runner, an AMD EPYC 7763 core. The three programs ran in the same job. GitHub's
+CI's `bench-compare` job of commit `1fac7e6`
+([run 105](https://github.com/c4milo/connect-zig/actions/runs/43449362779)), on GitHub's
+`ubuntu-24.04` runner, an AMD EPYC 9V74 core. The three programs ran in the same job. GitHub's
 runners differ from run to run, and the ratios move with the CPU. So each run names its machine
 and publishes the full table in its summary: every time, and the four one-kind messages.
 
 The chart draws the speed of connect-zig and of Buffa in multiples of Go's speed. A longer bar is
-faster, and Go is the line at 1.
+faster, and Go is the line at 1. A binary decode with every field read takes `decode_into`,
+which reads each repeated field once (decision 37).
 
-![Bars of connect-zig's and Buffa's speed in multiples of Go's: connect-zig is 2.2 to 13.5 times faster than Go's protobuf runtime, and Buffa is faster than connect-zig in 6 of 16 cells](docs/images/speed-vs-go.svg)
+![Bars of connect-zig's and Buffa's speed in multiples of Go's: connect-zig is 2.4 to 13.1 times faster than Go's protobuf runtime, and Buffa is faster than connect-zig in 4 of 16 cells](docs/images/speed-vs-go.svg)
 
 Each cell of the two tables is a baseline's time over connect-zig's: above 1 means connect-zig
 is faster. Go's time over connect-zig's:
 
 | Message | Binary encode | Binary decode, every field read | JSON encode | JSON decode |
 | --- | ---: | ---: | ---: | ---: |
-| Small, 40 B | 7.2 | 6.5 | 7.9 | 10.4 |
-| Medium, 1 KB | 6.0 | 4.5 | 9.9 | 13.5 |
-| Large, 180 KB | 2.3 | 2.2 | 7.2 | 10.8 |
-| Deep, 50 levels | 3.4 | 2.7 | 11.9 | 10.7 |
+| Small, 40 B | 6.7 | 5.5 | 7.0 | 10.2 |
+| Medium, 1 KB | 7.2 | 5.9 | 8.3 | 13.1 |
+| Large, 180 KB | 2.4 | 2.6 | 7.2 | 10.7 |
+| Deep, 50 levels | 3.9 | 3.2 | 10.6 | 9.9 |
 
 Buffa's time over connect-zig's:
 
 | Message | Binary encode | Binary decode, every field read | JSON encode | JSON decode |
 | --- | ---: | ---: | ---: | ---: |
-| Small, 40 B | 1.40 | 1.90 | 0.83 | 1.09 |
-| Medium, 1 KB | 0.86 | 0.78 | 1.23 | 1.55 |
-| Large, 180 KB | 0.94 | 0.93 | 1.46 | 1.27 |
-| Deep, 50 levels | 1.05 | 1.03 | 0.76 | 1.63 |
+| Small, 40 B | 1.17 | 2.13 | 0.86 | 1.22 |
+| Medium, 1 KB | 0.95 | 1.17 | 1.20 | 1.54 |
+| Large, 180 KB | 0.84 | 1.32 | 1.63 | 1.23 |
+| Deep, 50 levels | 1.04 | 1.32 | 0.83 | 1.53 |
 
-Buffa is faster in 6 of the 16 cells: binary encode of the medium and large messages, their
-binary decode with every field read, and JSON encode of the small and deep ones. connect-zig is
-faster in the other 10, JSON decode of each message among them.
+Buffa is faster in 4 of the 16 cells: binary encode of the medium and large messages, and JSON
+encode of the small and deep ones. connect-zig is faster in the other 12, binary decode with
+every field read and JSON decode of each message among them.
 
 ## How it is checked
 
