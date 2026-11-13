@@ -43,7 +43,8 @@ pub const limits = struct {
     pub const elements_max: usize = message_len_max;
     /// The octets `encode` sets aside for a nested message's length before it writes the
     /// message: 2 hold any length below 2^14, which most children have. A child whose length
-    /// takes another count of octets moves once, when its length is known.
+    /// takes another count of octets moves once, when its length is known. A flat child, with
+    /// no message and no repeated field, is measured first instead, and never moves.
     pub const child_length_guess_len = 2;
     /// The octets a short child moves as one chunk when the buffer holds that many past it: one
     /// AVX2 register, two SSE ones. A store past the child's end lands in room no one has written

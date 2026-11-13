@@ -207,7 +207,8 @@ fn encode_child(comptime M: type, comptime kind: Kind, number: u32, child: *cons
     }
     const writer = sink.writer;
     try sink.tag_of(number, .len);
-    if (sink.measured) return write_child_measured(M, child, sink);
+    // A flat child's length costs one pass over its own fields, and then the child never moves.
+    if (sink.measured or comptime is_flat(M)) return write_child_measured(M, child, sink);
     const tag_end = writer.len;
     write_child_once(M, child, sink, writer) catch |failure| switch (failure) {
         // The guess took an octet more than the length will, or a longer length found no room
@@ -219,6 +220,17 @@ fn encode_child(comptime M: type, comptime kind: Kind, number: u32, child: *cons
         },
         else => |other| return other,
     };
+}
+
+/// Whether a message holds no message and no repeated field. Its length is then the sum of its
+/// own fields' lengths: measuring it walks no subtree, and costs less than the move of a short
+/// child that the guess makes.
+fn is_flat(comptime M: type) bool {
+    for (M.protobuf.fields) |field| {
+        if (field.kind.holds_message()) return false;
+        if (field.oneof == null and repeated.is_repeated(@FieldType(M, field.name))) return false;
+    }
+    return true;
 }
 
 fn write_child_measured(comptime M: type, child: *const M, sink: anytype) Error!void {
@@ -387,4 +399,41 @@ fn encode_packed_items(comptime field: Field, comptime F: type, items: []const F
     const start = writer.len;
     for (items) |element| try scalar.write(F.kind, F.Element, element, writer);
     assert(writer.len - start == payload_len);
+}
+
+const testing = std.testing;
+
+test "a message of scalars and strings is flat, and one with a message or a repeated field is not" {
+    const Number = enum(u29) { name = 1, id = 2, kind = 3, child = 4, ids = 5 };
+    const Flat = struct {
+        name: []const u8 = "",
+        id: u32 = 0,
+        pub const protobuf: descriptor.Descriptor = .{ .full_name = "test.Flat", .fields = &.{
+            descriptor.field_of(Number.name, .string, .{}),
+            descriptor.field_of(Number.id, .uint32, .{}),
+        } };
+    };
+    const Parent = struct {
+        child: ?Flat = null,
+        pub const protobuf: descriptor.Descriptor = .{ .full_name = "test.Parent", .fields = &.{
+            descriptor.field_of(Number.child, .message, .{}),
+        } };
+    };
+    const Listed = struct {
+        ids: repeated.Repeated(u32, .uint32) = .{},
+        pub const protobuf: descriptor.Descriptor = .{ .full_name = "test.Listed", .fields = &.{
+            descriptor.field_of(Number.ids, .uint32, .{}),
+        } };
+    };
+    const Choice = struct {
+        kind: ?union(enum) { name: []const u8, child: Flat } = null,
+        pub const protobuf: descriptor.Descriptor = .{ .full_name = "test.Choice", .fields = &.{
+            descriptor.field_of(Number.name, .string, .{ .oneof = "kind" }),
+            descriptor.field_of(Number.child, .message, .{ .oneof = "kind" }),
+        } };
+    };
+    try testing.expect(comptime is_flat(Flat));
+    try testing.expect(!comptime is_flat(Parent));
+    try testing.expect(!comptime is_flat(Listed));
+    try testing.expect(!comptime is_flat(Choice));
 }
