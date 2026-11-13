@@ -68,10 +68,17 @@ pub fn zigzag_decode(value: u64) i64 {
     return shifted ^ sign;
 }
 
+/// The terms of `varint_len`'s division by 7: (bits * 9 + 64) / 64 equals ceil(bits / 7) for
+/// each count of bits from 1 to 64, which a test checks.
+const len_scale = 9;
+const len_bias = 64;
+const len_shift = 6;
+
 /// The bytes a varint of `value` takes.
 pub fn varint_len(value: u64) usize {
     const bits: usize = @bitSizeOf(u64) - @clz(value | 1);
-    const len = std.math.divCeil(usize, bits, group_bits) catch unreachable;
+    // ceil(bits / 7) for 1 to 64 bits, with a multiply-add and a shift in place of a division.
+    const len = (bits * len_scale + len_bias) >> len_shift;
     assert(len >= 1 and len <= constants.protocol.varint_len_max);
     return len;
 }
@@ -344,6 +351,14 @@ test "varints round-trip at each length boundary" {
         var reader: Reader = .{ .bytes = writer.written() };
         try testing.expectEqual(value, try reader.varint());
         try testing.expect(reader.at_end());
+    }
+}
+
+test "a varint's length is its significant bits over 7, rounded up, for each count of bits" {
+    for (1..@bitSizeOf(u64) + 1) |bits| {
+        const value = @as(u64, 1) << @intCast(bits - 1);
+        try testing.expectEqual(try std.math.divCeil(usize, bits, group_bits), varint_len(value));
+        try testing.expectEqual(try std.math.divCeil(usize, bits, group_bits), varint_len(value | (value - 1)));
     }
 }
 
