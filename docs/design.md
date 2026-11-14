@@ -749,6 +749,17 @@ ran on Linux x86-64 with Zig 0.16.0.
     walk that read the stored nodes in place took 1.74 µs: the iterator's `next` returns each
     56-octet node by value, and the walk copies it three times. Large binary encode showed no
     loss there: the wide varint path was 4.5% faster than the path before it on that CPU.
+  - The judge and the times of both fixes, on `c3ad49d`, [run
+    43609978018](https://github.com/c4milo/connect-zig/actions/runs/43609978018). No count
+    moved past 2%: deep binary encode takes 1.88% more instructions and packed binary
+    decode+walk 1.71% more, and tree's binary decode+walk takes 1.76% fewer.
+    `bench/instructions.txt` holds these counts. `bench-compare` runs on an arm64 runner too
+    since `d44aa02` (decision 16), a Neoverse-N2. There, from the run before to this run,
+    binary encode went from 680 to 575 ns on medium and from 51.2 to 43.3 µs on large, and
+    medium's decode+walk from 877 to 808 ns. On a Xeon 8573C, Buffa's time over connect-zig's
+    is above 1 in each of the README's 16 cells: binary encode reads 1.44 on medium and 1.33
+    on large, where the same CPU read 1.32 and 1.10 before the fixes. So the loss on large
+    binary encode was the length read again from memory.
 
 ### What a later step owes
 
