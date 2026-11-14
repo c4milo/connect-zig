@@ -504,4 +504,7 @@ first. Cite an entry by number in code and commits ("decision 6").
 
 16. **CI downloads Zig 0.16.0 and buf 1.74.0 pinned by SHA-256**, and every check a person runs
     is one `zig build` step or one script of `tools/`, as in colibri's workflow (colibri decision
-    47).
+    47). `bench-compare` runs a second time on GitHub's arm64 runner, with Zig and buf pinned
+    for that machine too. The owner asked on 2026-11-14 for an arm64 chart in the README, and
+    a chart's numbers come from one CI job (decision 30). The runner is the workflow's to name,
+    so this one job joins the workflow file and no other check does.

@@ -2,7 +2,8 @@
 # entry 16). `plan` asks tools/ci.sh for its checks, and `check` runs each in a job of its own, so
 # each shows apart in GitHub's checks with its own summary: a new check joins tools/ci.sh alone.
 # Each job's work is `tools/ci.sh --only <check>`, which a person runs by hand for the same
-# answer. Each download is pinned by checksum.
+# answer. Each download is pinned by checksum. `bench-compare` runs a second time on an arm64
+# runner: the README's arm64 chart comes from that job.
 name: main
 on:
   push:
@@ -14,10 +15,12 @@ permissions:
 env:
   ZIG_VERSION: 0.16.0
   ZIG_SHA256: 70e49664a74374b48b51e6f3fdfbf437f6395d42509050588bd49abe52ba3d00
+  ZIG_SHA256_ARM64: ea4b09bfb22ec6f6c6ceac57ab63efb6b46e17ab08d21f69f3a48b38e1534f17
   # buf runs the plugin over examples/proto, and tools/generate_check.sh compares its output with
   # examples/gen (design §8 step 6).
   BUF_VERSION: 1.74.0
   BUF_SHA256: 92326d957d613712669fb55f9e4340946a8142a92120e09008459118778273d2
+  BUF_SHA256_ARM64: d42b471501a85dbadb40062960492dd81ce5ca4e413f4133d514d3ae3c0af4df
   # go.mod files name their Go; the runner's Go fetches it.
   GOTOOLCHAIN: auto
 jobs:
@@ -31,13 +34,19 @@ jobs:
         run: echo "checks=$(tools/ci.sh --list)" >>"${GITHUB_OUTPUT}"
   check:
     needs: plan
-    name: ${{ matrix.check }}
-    runs-on: ubuntu-24.04
+    name: ${{ matrix.check }}${{ matrix.runner == 'ubuntu-24.04-arm' && ' (arm64)' || '' }}
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
         check: ${{ fromJSON(needs.plan.outputs.checks) }}
+        runner: [ubuntu-24.04]
+        # The comparison with Go and Buffa runs on arm64 too. Its times belong to that machine
+        # alone, as each run's do (docs/performance.md).
+        include:
+          - check: bench-compare
+            runner: ubuntu-24.04-arm
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -50,19 +59,27 @@ jobs:
           path: |
             ~/zig
             ~/bin
-          key: tools-${{ runner.os }}-${{ env.ZIG_SHA256 }}-${{ env.BUF_SHA256 }}
+          key: tools-${{ runner.os }}-${{ runner.arch }}-${{ env.ZIG_SHA256 }}-${{ env.ZIG_SHA256_ARM64 }}-${{ env.BUF_SHA256 }}-${{ env.BUF_SHA256_ARM64 }}
       - name: Install Zig
         if: steps.zig.outputs.cache-hit != 'true'
         run: |
-          curl -sSfL -o zig.tar.xz "https://ziglang.org/download/${ZIG_VERSION}/zig-x86_64-linux-${ZIG_VERSION}.tar.xz"
-          echo "${ZIG_SHA256}  zig.tar.xz" | sha256sum -c -
+          case "$(uname -m)" in
+            aarch64) arch=aarch64 sha="${ZIG_SHA256_ARM64}" ;;
+            *) arch=x86_64 sha="${ZIG_SHA256}" ;;
+          esac
+          curl -sSfL -o zig.tar.xz "https://ziglang.org/download/${ZIG_VERSION}/zig-${arch}-linux-${ZIG_VERSION}.tar.xz"
+          echo "${sha}  zig.tar.xz" | sha256sum -c -
           mkdir -p "${HOME}/zig" && tar -xJf zig.tar.xz -C "${HOME}/zig" --strip-components=1
           rm zig.tar.xz
       - name: Install buf
         if: steps.zig.outputs.cache-hit != 'true'
         run: |
-          curl -sSfL -o buf "https://github.com/bufbuild/buf/releases/download/v${BUF_VERSION}/buf-Linux-x86_64"
-          echo "${BUF_SHA256}  buf" | sha256sum -c -
+          case "$(uname -m)" in
+            aarch64) arch=aarch64 sha="${BUF_SHA256_ARM64}" ;;
+            *) arch=x86_64 sha="${BUF_SHA256}" ;;
+          esac
+          curl -sSfL -o buf "https://github.com/bufbuild/buf/releases/download/v${BUF_VERSION}/buf-Linux-${arch}"
+          echo "${sha}  buf" | sha256sum -c -
           mkdir -p "${HOME}/bin" && install -m 0755 buf "${HOME}/bin/buf"
           rm buf
       - name: Install valgrind
@@ -80,9 +97,9 @@ jobs:
           path: |
             ~/.cache/zig
             .zig-cache
-          key: zig-cache-${{ matrix.check }}-${{ runner.os }}-${{ hashFiles('build.zig.zon') }}-${{ github.sha }}
+          key: zig-cache-${{ matrix.check }}-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('build.zig.zon') }}-${{ github.sha }}
           restore-keys: |
-            zig-cache-${{ matrix.check }}-${{ runner.os }}-${{ hashFiles('build.zig.zon') }}-
+            zig-cache-${{ matrix.check }}-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('build.zig.zon') }}-
       # What each check installs for itself, pinned by its lock files: Go modules, npm packages,
       # the Python virtual environments, Cargo's builds and the conformance runner.
       - name: Restore the checks' caches
@@ -93,9 +110,9 @@ jobs:
             ~/go/pkg/mod
             ~/.cargo/registry
             interop/typescript/node_modules
-          key: deps-${{ matrix.check }}-${{ hashFiles('interop/*/go.sum', 'interop/*/package-lock.json', 'interop/*/Cargo.lock', 'interop/*/requirements.txt', 'tools/*.txt', 'bench/go/go.sum', 'bench/rust/Cargo.lock') }}
+          key: deps-${{ matrix.check }}-${{ runner.arch }}-${{ hashFiles('interop/*/go.sum', 'interop/*/package-lock.json', 'interop/*/Cargo.lock', 'interop/*/requirements.txt', 'tools/*.txt', 'bench/go/go.sum', 'bench/rust/Cargo.lock') }}
           restore-keys: |
-            deps-${{ matrix.check }}-
+            deps-${{ matrix.check }}-${{ runner.arch }}-
       - name: Run the check
         env:
           COMMIT_RANGE: ${{ github.event_name == 'pull_request' && format('{0}..{1}', github.event.pull_request.base.sha, github.event.pull_request.head.sha) || (github.event.before && github.event.before != '0000000000000000000000000000000000000000' && format('{0}..{1}', github.event.before, github.sha)) || format('{0}~1..{0}', github.sha) }}
