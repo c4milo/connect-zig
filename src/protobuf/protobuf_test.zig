@@ -235,6 +235,29 @@ test "a oneof message member that repeats merges into the one already set" {
     try testing.expectEqual(@as(i32, 3), all.choice.?.sub.a);
 }
 
+/// A oneof whose message member is `Lazy`, as a member of a recursive type is.
+const Pick = struct {
+    pick: ?union(enum) { node: Lazy(Node), name: []const u8 } = null,
+    pub const FieldNumber = enum(u29) { node = 1, name = 2 };
+    pub const protobuf: proto.Descriptor = .{ .full_name = "test.Pick", .fields = &.{
+        proto.field_of(FieldNumber.node, .message, .{ .oneof = "pick" }),
+        proto.field_of(FieldNumber.name, .string, .{ .oneof = "pick" }),
+    } };
+};
+
+test "a oneof's Lazy member that repeats is refused, as a Lazy field's second record is" {
+    // node { value: 3 }, then node {}. The two payloads lie apart in the input, so no one view
+    // holds them, and the first must not vanish (decision 6).
+    const twice = [_]u8{ 0x0a, 0x02, 0x08, 0x03, 0x0a, 0x00 };
+    try testing.expectError(error.MergeUnsupported, proto.decode(Pick, &twice));
+    var storage: [256]u8 align(16) = undefined;
+    try testing.expectError(error.MergeUnsupported, proto.decode_into(Pick, &twice, &storage));
+    // Another member between them: the oneof's last member wins, and the second node is it.
+    const apart = [_]u8{ 0x0a, 0x02, 0x08, 0x03, 0x12, 0x01, 'x', 0x0a, 0x02, 0x08, 0x05 };
+    const pick = try proto.decode(Pick, &apart);
+    try testing.expectEqual(@as(i64, 5), (try pick.pick.?.node.get()).?.value);
+}
+
 test "a nested message encodes alike into a roomy buffer and into one of its exact length" {
     const leaf: Node = .{ .value = 3 };
     const middle: Node = .{ .value = 2, .next = .of(&leaf) };

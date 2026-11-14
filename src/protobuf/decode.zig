@@ -235,14 +235,16 @@ fn read_oneof(comptime T: type, comptime field: Field, comptime oneof: []const u
         slot.* = @unionInit(U, field.name, value);
         return .field;
     }
+    // "Oneof": a member that repeats merges when it is still the one set.
+    const same = if (slot.*) |active| active == @field(std.meta.Tag(U), field.name) else false;
     if (comptime repeated.is_lazy(V)) {
-        var lazy: V = .{};
+        // A `Lazy` member keeps its first payload, which a second one apart in the input cannot
+        // join: `read_lazy` refuses it, as it refuses a `Lazy` field's second record (decision 6).
+        var lazy: V = if (same) @field(slot.*.?, field.name) else .{};
         try read_lazy(V, field.kind, &lazy, tag, reader, depth_left, mode, store);
         slot.* = @unionInit(U, field.name, lazy);
         return .field;
     }
-    // "Oneof": a member that repeats merges when it is still the one set.
-    const same = if (slot.*) |active| active == @field(std.meta.Tag(U), field.name) else false;
     if (!same) slot.* = @unionInit(U, field.name, .{});
     try read_message(V, field.kind, &@field(slot.*.?, field.name), tag, reader, depth_left, mode, store);
     return .field;
