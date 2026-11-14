@@ -202,8 +202,10 @@ fn separators_hold(text: []const u8) bool {
     if (text.len < timestamp_len_min) return false;
     const dashes = text[month_dash_at] == '-' and text[day_dash_at] == '-';
     const colons = text[minute_colon_at] == ':' and text[second_colon_at] == ':';
-    // RFC 3339 §5.6: "T" separates the date and the time, in either case.
-    const mark = text[time_mark_at] == 'T' or text[time_mark_at] == 't';
+    // "JSON Mapping", Timestamp: RFC 3339 with an uppercase "T". RFC 3339 §5.6 allows a
+    // lowercase one, and protobuf's parsers refuse it (the conformance suite's
+    // "TimestampJsonInputLowercaseT").
+    const mark = text[time_mark_at] == 'T';
     return dashes and colons and mark;
 }
 
@@ -226,9 +228,10 @@ pub fn parse_timestamp(text: []const u8) Error!Instant {
     return .{ .seconds = seconds, .nanos = @intCast(fraction.nanos) };
 }
 
-/// The offset's seconds east of UTC: "Z", or "+HH:MM" and "-HH:MM" (RFC 3339 §5.6).
+/// The offset's seconds east of UTC: "Z", or "+HH:MM" and "-HH:MM" (RFC 3339 §5.6). Protobuf
+/// takes an uppercase "Z" alone ("TimestampJsonInputLowercaseZ").
 fn parse_offset(text: []const u8) Error!i64 {
-    if (text.len == 1 and (text[0] == 'Z' or text[0] == 'z')) return 0;
+    if (text.len == 1 and text[0] == 'Z') return 0;
     if (text.len != offset_len or text[offset_colon_at] != ':' or (text[0] != '+' and text[0] != '-')) return error.InvalidTimestamp;
     const hours = try field_value(text, offset_hour_at, two_digits);
     const minutes = try field_value(text, offset_minute_at, two_digits);
@@ -273,6 +276,9 @@ test "an offset moves the instant, and malformed or out-of-range text is refused
     try testing.expectError(error.InvalidTimestamp, parse_timestamp("1970-02-30T00:00:00Z"));
     try testing.expectError(error.InvalidTimestamp, parse_timestamp("1970-01-01 00:00:00Z"));
     try testing.expectError(error.InvalidTimestamp, parse_timestamp("1970-01-01T00:00:00"));
+    // RFC 3339 allows a lowercase "t" and "z"; protobuf's JSON mapping does not.
+    try testing.expectError(error.InvalidTimestamp, parse_timestamp("1970-01-01t00:00:00Z"));
+    try testing.expectError(error.InvalidTimestamp, parse_timestamp("1970-01-01T00:00:00z"));
     var buffer: [text_len_max]u8 = undefined;
     try testing.expectError(error.InvalidTimestamp, format_timestamp(.{ .seconds = timestamp_seconds_max + 1, .nanos = 0 }, &buffer));
 }

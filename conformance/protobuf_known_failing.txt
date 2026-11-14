@@ -115,13 +115,6 @@ Recommended.Proto2.JsonInput.BytesFieldBase64Url.ProtobufOutput
 Recommended.Proto3.JsonInput.BytesFieldBase64Url.JsonOutput
 Recommended.Proto3.JsonInput.BytesFieldBase64Url.ProtobufOutput
 
-# A JSON timestamp with a lowercase t or z. The JSON decoder reads it, and RFC 3339 as protobuf
-# takes it wants the capitals.
-Required.Editions_Proto3.JsonInput.TimestampJsonInputLowercaseT
-Required.Editions_Proto3.JsonInput.TimestampJsonInputLowercaseZ
-Required.Proto3.JsonInput.TimestampJsonInputLowercaseT
-Required.Proto3.JsonInput.TimestampJsonInputLowercaseZ
-
 # A field mask whose path does not come back from its JSON form, such as a digit after an
 # underscore. The JSON encoder writes it, and must refuse it.
 Recommended.Editions_Proto3.ProtobufInput.FieldMaskNumbersDontRoundTrip.JsonOutput
