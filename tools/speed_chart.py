@@ -3,12 +3,14 @@
 
     tools/speed_chart.py <table.md> <run> <commit> [out.svg]
 
-<table.md> holds the job's table. The chart draws a bar for connect-zig and a bar for Buffa: a
-runtime's speed in multiples of Go's, which is Go's time over the runtime's time. Go is the unit,
-a line at 1. The column "Go time / Zig time" gives connect-zig's bar, and "Go ns/op" over
-"Rust ns/op" gives Buffa's. A cell that reads "absent" draws no bar. <run> and <commit> name the
-run in the chart's subtitle, as docs/performance.md asks of a published number. The title states
-what the numbers show, so a row where Buffa beats connect-zig changes it.
+<table.md> holds the job's table, or the job's whole output: its "Machine:" line then names the
+machine in the chart's subtitle, so an x86-64 chart and an arm64 chart read apart. The chart
+draws a bar for connect-zig and a bar for Buffa: a runtime's speed in multiples of Go's, which
+is Go's time over the runtime's time. Go is the unit, a line at 1. The column "Go time / Zig
+time" gives connect-zig's bar, and "Go ns/op" over "Rust ns/op" gives Buffa's. A cell that reads
+"absent" draws no bar. <run> and <commit> name the run in the subtitle, as docs/performance.md
+asks of a published number. The title states what the numbers show, so a row where Buffa beats
+connect-zig changes it.
 A PNG for places that show no SVG comes from any browser's screenshot of the file.
 """
 import math
@@ -50,7 +52,11 @@ def number(cells, name):
 # For each message and operation: connect-zig's and Buffa's speed in multiples of Go's, and
 # Buffa's time over connect-zig's, which says who is faster in the cell.
 zig_speed, buffa_speed, buffa_over_zig = {}, {}, {}
+# The architecture and the CPU's model, from tools/bench_check.sh's "Machine:" line.
+machine = None
 for line in open(table_path):
+    if line.startswith("Machine: "):
+        machine = ", ".join(part.strip() for part in line[len("Machine: "):].split(",")[:2])
     if not line.startswith("|"):
         continue
     cells = [c.strip() for c in line.strip().strip("|").split("|")]
@@ -160,7 +166,8 @@ a(f'<rect width="{W}" height="{H}" rx="8" fill="var(--surface)"/>')
 a(f'<text class="title" x="{pad_l}" y="34">{title}</text>')
 a(f'<text class="sub" x="{pad_l}" y="56">Each bar is a runtime\'s speed in multiples of Go\'s: Go\'s time over the runtime\'s time. '
   f'A longer bar is faster.</text>')
-a(f'<text class="sub" x="{pad_l}" y="74">The three programs ran in one CI job and wrote the same octets: run {run}, commit {commit}.</text>')
+where = f", {machine}" if machine else ""
+a(f'<text class="sub" x="{pad_l}" y="74">One CI job ran all three, and each wrote the same octets: run {run}, commit {commit}{where}.</text>')
 legend_x = pad_l
 for _, name, fill in series:
     a(f'<rect x="{legend_x}" y="{legend_y - 10}" width="12" height="12" rx="2" fill="var({fill})"/>')
