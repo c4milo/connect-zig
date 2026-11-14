@@ -21,6 +21,7 @@ const files = struct {
     pub const decode_run = @import("decode_run.zig");
     pub const encode = @import("encode.zig");
     pub const json_scalar = @import("json_scalar.zig");
+    pub const json_base64 = @import("json_base64.zig");
     pub const json_float = @import("json_float.zig");
     pub const json_encode = @import("json_encode.zig");
     pub const json_decode = @import("json_decode.zig");

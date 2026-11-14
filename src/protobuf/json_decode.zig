@@ -13,6 +13,7 @@ const descriptor = @import("descriptor.zig");
 const scalar = @import("scalar.zig");
 const repeated = @import("repeated.zig");
 const json_scalar = @import("json_scalar.zig");
+const json_base64 = @import("json_base64.zig");
 const wkt = @import("wkt.zig");
 const time_text = @import("time_text.zig");
 const constants = @import("constants.zig");
@@ -235,7 +236,7 @@ fn write_single(comptime field: Field, comptime V: type, transcoder: *Transcoder
     try writer.tag(field.number, field.kind.wire_type());
     switch (comptime field.kind) {
         .string, .unvalidated_string => try scalar.write(field.kind, []const u8, try string_of(value), writer),
-        .bytes => try json_scalar.write_base64_field(try string_of(value), writer),
+        .bytes => try json_base64.write_base64_field(try string_of(value), writer),
         .bool => try scalar.write(.bool, bool, try bool_of(value), writer),
         .float, .double => try scalar.write(field.kind, V, try float_of(V, value), writer),
         .@"enum" => try scalar.write(.@"enum", V, try enum_of(V, value), writer),

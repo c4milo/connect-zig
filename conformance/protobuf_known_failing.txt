@@ -104,17 +104,6 @@ Required.Proto2.ProtobufInput.RepeatedScalarMessageMerge.ProtobufOutput
 Required.Proto3.ProtobufInput.RepeatedScalarMessageMerge.JsonOutput
 Required.Proto3.ProtobufInput.RepeatedScalarMessageMerge.ProtobufOutput
 
-# JSON bytes in the URL-safe base64 alphabet, with - and _. The JSON decoder reads the standard
-# alphabet alone.
-Recommended.Editions_Proto2.JsonInput.BytesFieldBase64Url.JsonOutput
-Recommended.Editions_Proto2.JsonInput.BytesFieldBase64Url.ProtobufOutput
-Recommended.Editions_Proto3.JsonInput.BytesFieldBase64Url.JsonOutput
-Recommended.Editions_Proto3.JsonInput.BytesFieldBase64Url.ProtobufOutput
-Recommended.Proto2.JsonInput.BytesFieldBase64Url.JsonOutput
-Recommended.Proto2.JsonInput.BytesFieldBase64Url.ProtobufOutput
-Recommended.Proto3.JsonInput.BytesFieldBase64Url.JsonOutput
-Recommended.Proto3.JsonInput.BytesFieldBase64Url.ProtobufOutput
-
 # A proto2 extension named in JSON. connect-zig has no extensions: an extension's field is an
 # unknown field, kept and written back (decision 38).
 Recommended.Editions_Proto2.JsonInput.FieldNameExtension.JsonOutput

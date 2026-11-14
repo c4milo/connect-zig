@@ -10,7 +10,6 @@ const std = @import("std");
 const assert = std.debug.assert;
 const json = @import("json");
 const codec = @import("codec");
-const base64 = @import("base64");
 const wire = @import("wire.zig");
 const descriptor = @import("descriptor.zig");
 const constants = @import("constants.zig");
@@ -292,23 +291,6 @@ pub fn parse_float(comptime V: type, octets: []const u8, from_string: bool) Deco
     return value;
 }
 
-/// The octets base64 text decodes to, written into `writer` after their length, in standard or
-/// URL-safe base64, with or without padding ("JSON Mapping", bytes).
-pub fn write_base64_field(octets: []const u8, writer: *wire.Writer) DecodeError!void {
-    // The length and the pad characters give the octets' count, so the length goes first.
-    const len = base64.Decoder.decoded_len(octets) catch return error.InvalidBase64;
-    try writer.varint(len);
-    if (len > writer.buffer.len - writer.len) return error.NoSpaceLeft;
-    // "JSON Mapping", bytes: a parser accepts either alphabet, but one alone in a text (RFC 4648
-    // §5), with or without padding. The decoder takes the free room after the length, whose slack
-    // its vector step uses, and writes `len` octets.
-    var decoder: base64.Decoder = undefined;
-    decoder.init(.{ .accept = .either, .padding = .optional }, codec.Features.target());
-    const decoded_len = decoder.decode_all(octets, writer.buffer[writer.len..]) catch return error.InvalidBase64;
-    assert(decoded_len == len);
-    writer.len += len;
-}
-
 const testing = std.testing;
 
 fn written(comptime kind: Kind, comptime V: type, value: V, buffer: []u8) ![]const u8 {
@@ -378,35 +360,4 @@ test "an integer text that is no JSON number is refused, as Go's protojson refus
     try testing.expectError(error.InvalidNumber, parse_integer(i32, "1e-99999999999"));
     try testing.expectError(error.NumberOutOfRange, parse_integer(i32, "1e99999999999999999999999"));
     try testing.expectError(error.InvalidNumber, parse_integer(i32, "1e-99999999999999999999999"));
-}
-
-test "base64 decodes in either alphabet, padded or not" {
-    var buffer: [16]u8 = undefined;
-    for ([_][]const u8{ "AP8=", "AP8", "_w==", "_w" }, [_][]const u8{ &.{ 0, 255 }, &.{ 0, 255 }, &.{255}, &.{255} }) |input, want| {
-        var writer: wire.Writer = .{ .buffer = &buffer };
-        try write_base64_field(input, &writer);
-        try testing.expectEqualSlices(u8, want, writer.written()[1..]);
-    }
-    var writer: wire.Writer = .{ .buffer = &buffer };
-    try testing.expectError(error.InvalidBase64, write_base64_field("A!", &writer));
-    // A text that mixes the alphabets is neither.
-    var mixed: wire.Writer = .{ .buffer = &buffer };
-    try testing.expectError(error.InvalidBase64, write_base64_field("+_8=", &mixed));
-}
-
-test "bytes of each length write the base64 that std.base64 writes, and read back" {
-    var octets: [200]u8 = undefined;
-    for (&octets, 0..) |*octet, index| octet.* = @truncate(index * 7);
-    // Short and long lengths, with each remainder of 3 among them.
-    for ([_]usize{ 0, 1, 44, 45, 46, 90, 91, 200 }) |len| {
-        var buffer: [300]u8 = undefined;
-        const text = try written(.bytes, []const u8, octets[0..len], &buffer);
-        var reference: [300]u8 = undefined;
-        const want = std.base64.standard.Encoder.encode(&reference, octets[0..len]);
-        try testing.expectEqualStrings(want, text[1 .. text.len - 1]);
-        var room: [300]u8 = undefined;
-        var writer: wire.Writer = .{ .buffer = &room };
-        try write_base64_field(want, &writer);
-        try testing.expectEqualSlices(u8, octets[0..len], writer.written()[writer.written().len - len ..]);
-    }
 }

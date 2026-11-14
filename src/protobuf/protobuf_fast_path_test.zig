@@ -14,6 +14,7 @@ const testing = std.testing;
 const wire = @import("wire.zig");
 const scalar = @import("scalar.zig");
 const json_scalar = @import("json_scalar.zig");
+const json_base64 = @import("json_base64.zig");
 const constants = @import("constants.zig");
 
 const varint_len_max = constants.protocol.varint_len_max;
@@ -41,6 +42,12 @@ const base64_text_len_max = 4;
 const base64_room_len = 64;
 /// Base64 writes 4 characters for each 3 octets, so a padded text is a multiple of 4 (RFC 4648 §4).
 const base64_chars = 4;
+/// The letters of a base64 alphabet (RFC 4648 §4).
+const base64_alphabet_len = 64;
+/// A last quantum of 2 letters holds one octet and 4 pad bits; one of 3 holds two octets and 2.
+const base64_one_octet_letters = 2;
+const base64_one_octet_pad_mask = 0x0f;
+const base64_two_octet_pad_mask = 0x03;
 /// The most octets one fuzz input holds.
 const fuzz_input_len_max = 64;
 
@@ -227,9 +234,17 @@ test "a string is UTF-8 as the standard library judges it, with each letter at e
 
 /// The bytes of a base64 text, decoded as `write_base64_field` decoded them through
 /// `std.base64`, before stdx's decoder: it chose the alphabet by a search for "-" and "_". It
-/// stays the reference, a decoder written apart from stdx's.
-fn reference_base64(octets: []const u8, writer: *wire.Writer) json_scalar.DecodeError!void {
-    const url_safe = std.mem.indexOfAny(u8, octets, "-_") != null;
+/// stays the reference, a decoder written apart from stdx's. protobuf's parsers drop pad bits
+/// that are set, where std's decoder refuses them (RFC 4648 §3.5 allows either), so the
+/// reference clears them in a copy first.
+fn reference_base64(text: []const u8, writer: *wire.Writer) json_scalar.DecodeError!void {
+    var copy: [fuzz_input_len_max]u8 = undefined;
+    if (text.len > copy.len) return error.NoSpaceLeft;
+    @memcpy(copy[0..text.len], text);
+    const octets = copy[0..text.len];
+    // The alphabet comes from the text as written: the cleared letter is in both.
+    const url_safe = std.mem.indexOfAny(u8, text, "-_") != null;
+    clear_pad_bits(octets, if (url_safe) std.base64.url_safe_alphabet_chars else std.base64.standard_alphabet_chars);
     const padded = octets.len % base64_chars == 0 and octets.len != 0 and octets[octets.len - 1] == '=';
     const decoder = if (url_safe)
         (if (padded) std.base64.url_safe.Decoder else std.base64.url_safe_no_pad.Decoder)
@@ -242,13 +257,27 @@ fn reference_base64(octets: []const u8, writer: *wire.Writer) json_scalar.Decode
     writer.len += len;
 }
 
+/// Clears the pad bits of a text's last letter, when its last quantum holds two or three letters
+/// and the letter is in `alphabet`: it then stands for a multiple of 16 or of 4, below 62,
+/// which both alphabets write alike. A letter of the other alphabet stays, for std to refuse.
+fn clear_pad_bits(text: []u8, alphabet: [base64_alphabet_len]u8) void {
+    const letters = std.mem.trimEnd(u8, text, "=").len;
+    const last_len = letters % base64_chars;
+    if (last_len < base64_one_octet_letters) return;
+    const letter = &text[letters - 1];
+    const value = std.mem.indexOfScalar(u8, &alphabet, letter.*) orelse return;
+    // Two letters carry 4 pad bits, three carry 2.
+    const pad_mask: usize = if (last_len == base64_one_octet_letters) base64_one_octet_pad_mask else base64_two_octet_pad_mask;
+    letter.* = alphabet[value & ~pad_mask];
+}
+
 fn check_base64(octets: []const u8) !void {
     var want_room: [base64_room_len]u8 = @splat(0);
     var want: wire.Writer = .{ .buffer = &want_room };
     const want_result = reference_base64(octets, &want);
     var got_room: [base64_room_len]u8 = @splat(0);
     var got: wire.Writer = .{ .buffer = &got_room };
-    const got_result = json_scalar.write_base64_field(octets, &got);
+    const got_result = json_base64.write_base64_field(octets, &got);
     if (want_result) |_| try got_result else |refusal| try testing.expectError(refusal, got_result);
     // A refusal fails the whole decode, which drops the writer, so what it holds then is no result.
     if (want_result) |_| try testing.expectEqualSlices(u8, want.written(), got.written()) else |_| {}
