@@ -29,6 +29,15 @@ const Holder = struct {
     } };
 };
 
+/// A repeated enum: JSON's null names its value 0 in a field, but no element of an array.
+const Palette = struct {
+    colors: proto.Repeated(binary_test.Color, .@"enum") = .{},
+    pub const FieldNumber = enum(u29) { colors = 1 };
+    pub const protobuf: proto.Descriptor = .{ .full_name = "test.Palette", .fields = &.{
+        proto.field_of(FieldNumber.colors, .@"enum", .{}),
+    } };
+};
+
 const text_len = 1024;
 const tokens_len = 256;
 /// The JSON texts the invariant below reads: each kind of field, nested messages, a map, a
@@ -172,6 +181,24 @@ fn fuzz_transcoded(_: void, smith: *testing.Smith) anyerror!void {
 
 test "fuzz: the transcoder writes binary that decode accepts whole, on any text" {
     try testing.fuzz({}, fuzz_transcoded, .{ .corpus = &nested_texts });
+}
+
+test "an array of a packed field transcodes to one packed record, as the encoder writes it" {
+    var buffers: Buffers = .{};
+    var encoded: [text_len]u8 = undefined;
+    // `numbers` is packed and `unpacked` is not; an empty array writes nothing.
+    for ([_][]const u8{ "{\"numbers\":[1,2,300],\"unpacked\":[4,5]}", "{\"numbers\":[],\"unpacked\":[]}", "{\"numbers\":[7]}" }) |text| {
+        const bytes = try json_decode.transcode(All, text, &buffers.binary, &buffers.tokens, any.types);
+        const message = try decode(All, text, &buffers);
+        try testing.expectEqualSlices(u8, try proto.encode(All, &message, &encoded), bytes);
+    }
+    // "JSON Mapping": null is not an element of a repeated field, packed or not.
+    try testing.expectError(error.UnexpectedToken, decode(All, "{\"numbers\":[1,null]}", &buffers));
+    try testing.expectError(error.UnexpectedToken, decode(All, "{\"unpacked\":[null]}", &buffers));
+    try testing.expectError(error.UnexpectedToken, decode(Palette, "{\"colors\":[null]}", &buffers));
+    const palette = try decode(Palette, "{\"colors\":[\"COLOR_GREEN\",1]}", &buffers);
+    var colors = palette.colors.iterator();
+    try testing.expectEqual(binary_test.Color.green, (try colors.next()).?);
 }
 
 test "a field mask path that lowerCamelCase cannot carry back is refused" {

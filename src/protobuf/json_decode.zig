@@ -155,6 +155,7 @@ fn takes_null(comptime V: type) bool {
 
 fn read_array(comptime field: Field, comptime E: type, transcoder: *Transcoder, value: json.TextReader.Item, depth_left: u32, comptime registry: []const type) Error!void {
     if (value != .begin_array) return error.UnexpectedToken;
+    if (comptime field.kind.packable() and field.@"packed") return read_packed_array(field, E, transcoder);
     for (0..transcoder.reader.input.len + 1) |_| {
         const element = try transcoder.next();
         if (element == .end_array) return;
@@ -219,6 +220,29 @@ fn parse_bool_key(key: []const u8) Error!bool {
 }
 
 /// Writes one value of `field`, with its tag, from the token `value`.
+/// Writes an array of a field the descriptor packs as one packed record, as an encoder writes it
+/// ("Packed Repeated Fields"): the binary is canonical, as an Any keeps it, and the decode reads
+/// one record, not one for each element. An empty array writes nothing, as an encoder does.
+fn read_packed_array(comptime field: Field, comptime E: type, transcoder: *Transcoder) Error!void {
+    const writer = &transcoder.writer;
+    var at: ?usize = null;
+    for (0..transcoder.reader.input.len + 1) |_| {
+        const element = try transcoder.next();
+        if (element == .end_array) {
+            if (at) |start| patch(writer, start);
+            return;
+        }
+        // "JSON Mapping": null is not an element of a repeated field.
+        if (element == .null and !comptime takes_null(E)) return error.UnexpectedToken;
+        if (at == null) {
+            try writer.tag(field.number, .len);
+            at = try writer.padded_varint();
+        }
+        try write_scalar(field, E, element, writer);
+    }
+    unreachable;
+}
+
 fn write_single(comptime field: Field, comptime V: type, transcoder: *Transcoder, value: json.TextReader.Item, depth_left: u32, comptime registry: []const type) Error!void {
     const writer = &transcoder.writer;
     if (comptime field.kind == .group) {
@@ -237,6 +261,13 @@ fn write_single(comptime field: Field, comptime V: type, transcoder: *Transcoder
     switch (comptime field.kind) {
         .string, .unvalidated_string => try scalar.write(field.kind, []const u8, try string_of(value), writer),
         .bytes => try json_base64.write_base64_field(try string_of(value), writer),
+        else => try write_scalar(field, V, value, writer),
+    }
+}
+
+/// A number, a bool or an enum's value, with no tag: alone after its tag, or in a packed record.
+inline fn write_scalar(comptime field: Field, comptime V: type, value: json.TextReader.Item, writer: *wire.Writer) Error!void {
+    switch (comptime field.kind) {
         .bool => try scalar.write(.bool, bool, try bool_of(value), writer),
         .float, .double => try scalar.write(field.kind, V, try float_of(V, value), writer),
         .@"enum" => try scalar.write(.@"enum", V, try enum_of(V, value), writer),

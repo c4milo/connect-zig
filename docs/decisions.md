@@ -75,6 +75,9 @@ first. Cite an entry by number in code and commits ("decision 6").
    field's type. A test, and a fuzz test, hold that what the transcoder writes passes `decode`
    whole. The second check read each subtree again, and cost tree's JSON decode 30% more
    instructions, as the owner asked on 2026-11-14 to cut JSON decode on arm64.
+   Amended on 2026-11-14 again: an array of a field the descriptor packs is written as one
+   packed record, as an encoder writes it, where each element was a record of its own. The
+   binary is canonical then, as an Any keeps it, and the decode reads one record for the array.
 
 ## Connect
 

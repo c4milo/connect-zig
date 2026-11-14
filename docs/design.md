@@ -814,6 +814,13 @@ ran on Linux x86-64 with Zig 0.16.0.
     (8.20%), and on arm64 alike; the largest rise is 0.36%, packed. Tree's JSON decode on arm64
     now runs 0.91 of Buffa's instructions, from 1.15. Packed, small and varints hold no nested
     message and did not move: their cost is in reading numbers, a later step.
+  - JSON arrays of numbers transcode packed (decision 9, amended again). The transcoder wrote
+    each element of an array as a record of its own, so the decode read a tag, matched the field
+    and widened the view once for each element. A field the descriptor packs is now one packed
+    record. On x86-64-v2: packed JSON decode takes 17.57% fewer instructions, and 27.57% fewer
+    with every field read; medium 7.00% and 10.83%; large 10.02% with every field read. Large's
+    JSON decode alone takes 0.53% more: each of its records' 8 values closes a record of its
+    own. arm64 moves alike. Mutations, 5, each CAUGHT, after a test of a repeated enum's null.
   - The judge on `808a25e`, [run
     43642289829](https://github.com/c4milo/connect-zig/actions/runs/43642289829): JSON decode
     takes fewer instructions on tree (23.07%), deep (17.25%), large (14.92%) and medium
