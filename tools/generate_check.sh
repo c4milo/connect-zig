@@ -6,7 +6,8 @@
 set -eu
 cd "$(dirname "$0")/.."
 buf="${BUF:-buf}"
-zig build
+# The plugin alone: the rest of the build compiles the generated code this script rewrites.
+zig build plugin
 # Each output directory, and the template that writes it.
 targets="examples/gen:buf.gen.yaml bench/gen:bench/buf.gen.yaml conformance/gen:conformance/buf.gen.yaml"
 scratch="$(mktemp -d)"

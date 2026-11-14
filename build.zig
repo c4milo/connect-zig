@@ -43,6 +43,9 @@ pub fn build(b: *std.Build) void {
         }),
     });
     b.installArtifact(plugin);
+    // The plugin alone: `tools/generate_check.sh` builds it so, since a generated file that no
+    // longer compiles must not keep the plugin that rewrites it from being built.
+    b.step("plugin", "Build the protoc plugin alone into zig-out/bin").dependOn(&b.addInstallArtifact(plugin, .{}).step);
 
     // Everything below is connect-zig's own build. A project that depends on it stops here,
     // before the tooling requests pepegrillo (docs/decisions.md entry 15).
