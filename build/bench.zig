@@ -38,7 +38,9 @@ pub fn add(b: *std.Build, public_names: *std.Build.Module, target: std.Build.Res
             .optimize = optimize,
             // `--instructions` talks to callgrind through client requests, which ReleaseFast drops
             // unless the module asks for them. Natively each is a few instructions outside the loops.
-            .valgrind = true,
+            // The judge runs on Linux; Zig refuses the request on a target valgrind does not
+            // run on, such as arm64 macOS, where the benchmark must still build.
+            .valgrind = if (target.result.os.tag == .linux) true else null,
             .imports = &.{
                 .{ .name = "protobuf", .module = protobuf },
                 .{ .name = "bench_v1", .module = messages },
