@@ -760,6 +760,14 @@ ran on Linux x86-64 with Zig 0.16.0.
     is above 1 in each of the README's 16 cells: binary encode reads 1.44 on medium and 1.33
     on large, where the same CPU read 1.32 and 1.10 before the fixes. So the loss on large
     binary encode was the length read again from memory.
+  - A run of messages counted with no call. Before `decode_into` reads a run of messages
+    that hold runs of their own, it counts the run's records, and the count called
+    `Reader.skip` for each one. A message's record is length-delimited, so the count reads
+    that length itself, and calls `skip` for a group alone. The lab's second round, [run
+    43613206326](https://github.com/c4milo/connect-zig/actions/runs/43613206326), ran on an
+    EPYC 9V74 and on a Neoverse-N2: tree's binary decode+walk took 21.5% and 9.1% less time,
+    and large's 5.1% and 2.7% less. On x86-64-v2, tree takes 10.22% fewer instructions.
+    Mutations, 3, each CAUGHT, after a new test of a counted run of groups.
 
 ### What a later step owes
 

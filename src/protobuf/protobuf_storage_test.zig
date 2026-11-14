@@ -61,6 +61,23 @@ const Node = struct {
     } };
 };
 
+/// A group that holds a run of its own, so a run of such groups is counted before it is read.
+const Bundle = struct {
+    numbers: Repeated(i64, .int64) = .{},
+    pub const FieldNumber = enum(u29) { numbers = 1 };
+    pub const protobuf: proto.Descriptor = .{ .full_name = "test.Crate.Bundle", .fields = &.{
+        proto.field_of(FieldNumber.numbers, .int64, .{}),
+    } };
+};
+
+const Crate = struct {
+    bundles: Repeated(Bundle, .group) = .{},
+    pub const FieldNumber = enum(u29) { bundles = 1 };
+    pub const protobuf: proto.Descriptor = .{ .full_name = "test.Crate", .fields = &.{
+        proto.field_of(FieldNumber.bundles, .group, .{}),
+    } };
+};
+
 /// The most octets an input of the harness takes, and the most its message's encoding takes again
 /// once decoded: an input changed by one bit may decode to a longer message.
 const encoded_len_max = 1024;
@@ -96,6 +113,8 @@ const children = [_]Node{ .{ .label = "c", .children = .of(&grandchildren), .lea
 const tail: Node = .{ .label = "tail", .numbers = .of(&numbers) };
 const middle: Node = .{ .label = "middle", .next = .of(&tail), .leaves = .of(&leaves) };
 
+const bundles = [_]Bundle{ .{ .numbers = .of(&few_numbers) }, .{}, .{ .numbers = .of(&numbers) } };
+
 /// A node with every kind of repeated field, and a chain of two `Lazy` children.
 const full: Node = .{
     .label = "root",
@@ -114,22 +133,22 @@ const Outcome = union(enum) {
     refusal: anyerror,
 };
 
-fn outcome(bytes: []const u8, storage: ?[]u8, out: []u8) Outcome {
-    const decoded = if (storage) |room| proto.decode_into(Node, bytes, room) else proto.decode(Node, bytes);
-    const node = decoded catch |failure| return .{ .refusal = failure };
-    return .{ .message = proto.encode(Node, &node, out) catch |failure| return .{ .refusal = failure } };
+fn outcome(comptime T: type, bytes: []const u8, storage: ?[]u8, out: []u8) Outcome {
+    const decoded = if (storage) |room| proto.decode_into(T, bytes, room) else proto.decode(T, bytes);
+    const message = decoded catch |failure| return .{ .refusal = failure };
+    return .{ .message = proto.encode(T, &message, out) catch |failure| return .{ .refusal = failure } };
 }
 
-/// Decodes `bytes` with `decode`, and with `decode_into` in each size of storage, and requires
-/// one outcome.
-fn check(bytes: []const u8) !void {
+/// Decodes `bytes` as a `T` with `decode`, and with `decode_into` in each size of storage, and
+/// requires one outcome.
+fn check(comptime T: type, bytes: []const u8) !void {
     var want_out: [out_len_max]u8 = @splat(0);
-    const want = outcome(bytes, null, &want_out);
+    const want = outcome(T, bytes, null, &want_out);
     var storage: [storage_len_max + 1]u8 align(storage_align) = @splat(0);
     for (storage_lens) |len| {
         for ([_]usize{ 0, 1 }) |offset| {
             var got_out: [out_len_max]u8 = @splat(0);
-            const got = outcome(bytes, storage[offset..][0..len], &got_out);
+            const got = outcome(T, bytes, storage[offset..][0..len], &got_out);
             switch (want) {
                 .refusal => |refusal| try testing.expectEqual(Outcome{ .refusal = refusal }, got),
                 .message => |message| try testing.expectEqualSlices(u8, message, got.message),
@@ -139,15 +158,15 @@ fn check(bytes: []const u8) !void {
 }
 
 /// Each input cut short at every length, and with each bit of each octet flipped.
-fn check_each_change(bytes: []const u8) !void {
-    try check(bytes);
+fn check_each_change(comptime T: type, bytes: []const u8) !void {
+    try check(T, bytes);
     var changed: [encoded_len_max]u8 = @splat(0);
-    for (0..bytes.len) |len| try check(bytes[0..len]);
+    for (0..bytes.len) |len| try check(T, bytes[0..len]);
     for (0..bytes.len) |index| {
         for (0..bits_per_octet) |bit| {
             @memcpy(changed[0..bytes.len], bytes);
             changed[index] ^= @as(u8, 1) << @intCast(bit);
-            try check(changed[0..bytes.len]);
+            try check(T, changed[0..bytes.len]);
         }
     }
 }
@@ -158,10 +177,10 @@ fn encoded(message: *const Node, buffer: []u8) ![]const u8 {
 
 test "decode_into gives the message or the refusal decode gives" {
     var buffer: [encoded_len_max]u8 = @splat(0);
-    try check_each_change(try encoded(&full, &buffer));
-    try check_each_change(try encoded(&middle, &buffer));
-    try check_each_change(try encoded(&.{ .children = .of(&children) }, &buffer));
-    try check_each_change(try encoded(&.{ .numbers = .of(&short_numbers) }, &buffer));
+    try check_each_change(Node, try encoded(&full, &buffer));
+    try check_each_change(Node, try encoded(&middle, &buffer));
+    try check_each_change(Node, try encoded(&.{ .children = .of(&children) }, &buffer));
+    try check_each_change(Node, try encoded(&.{ .numbers = .of(&short_numbers) }, &buffer));
 }
 
 test "a field in two runs keeps its view, and gives the same message" {
@@ -174,7 +193,18 @@ test "a field in two runs keeps its view, and gives the same message" {
     const two = try encoded(&.{ .numbers = .of(numbers[0..1]), .names = .of(names[0..1]), .leaves = .of(leaves[0..1]) }, &second);
     @memcpy(joined[0..one.len], one);
     @memcpy(joined[one.len..][0..two.len], two);
-    try check_each_change(joined[0 .. one.len + two.len]);
+    try check_each_change(Node, joined[0 .. one.len + two.len]);
+}
+
+test "a run of groups is counted, and read into the storage" {
+    var buffer: [encoded_len_max]u8 = @splat(0);
+    const bytes = try proto.encode(Crate, &.{ .bundles = .of(&bundles) }, &buffer);
+    var storage: [storage_len_max]u8 align(storage_align) = @splat(0);
+    // "Groups": a group's record has no length, so its count passes over it to its end tag.
+    const crate = try proto.decode_into(Crate, bytes, &storage);
+    try testing.expectEqual(bundles.len, crate.bundles.items.len);
+    try testing.expectEqual(numbers.len, crate.bundles.items[bundles.len - 1].numbers.items.len);
+    try check_each_change(Crate, bytes);
 }
 
 test "with room, each repeated field and each Lazy child is read into the storage" {
@@ -248,7 +278,7 @@ test "a closed enum's field keeps its view, and its unknown numbers go back out"
 fn fuzz_one(_: void, smith: *testing.Smith) anyerror!void {
     var input: [encoded_len_max]u8 = @splat(0);
     const len = smith.slice(&input);
-    try check(input[0..len]);
+    try check(Node, input[0..len]);
 }
 
 test "fuzz: decode_into gives what decode gives, on any input" {

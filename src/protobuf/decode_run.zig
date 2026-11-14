@@ -215,7 +215,12 @@ fn run_count(comptime F: type, bytes: []const u8, field_start: usize, number: u3
         const tag = try reader.tag();
         if (tag.number != number) return count;
         count += 1;
-        try reader.skip(tag, constants.limits.depth_max);
+        // A message's record is length-delimited: its length read here takes no call.
+        if (tag.wire_type == .len) {
+            _ = try reader.length_delimited();
+        } else {
+            try reader.skip(tag, constants.limits.depth_max);
+        }
     }
     unreachable;
 }

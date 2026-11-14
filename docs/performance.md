@@ -117,6 +117,7 @@ failed (the owner's ruling of 2026-11-09). A new fast path joins this list the s
 | A varint of three or four octets written inline | `wire.zig`, `Writer.varint_wide` | medium binary encode +27.48%, varints +11.41%, large +5.03% |
 | The end of a field's stored items with no call | `repeated.zig`, `RepeatedIterator.next` | packed binary decode+walk +25.50%, large +7.17%, medium +5.66% |
 | Each `TextWriter` call inline in the JSON encoder | `json_encode.zig` and `json_scalar.zig` | deep JSON encode +30.03%, small +25.20%, varints +21.74%, tree +19.71%, strings +18.24% |
+| A run of messages counted with no call | `decode_run.zig`, `run_count` | tree binary decode+walk +11.38%, large +3.32%, local x86-64-v2 |
 
 ## The pitfalls
 
