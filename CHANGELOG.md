@@ -52,6 +52,8 @@ The first release.
 - `decode_into` reads each repeated field's elements, and each recursive field's message, into
   storage the caller owns, once. A program that reads every field takes it, and parses nothing
   twice. `decode` stores nothing (decision 37).
+- JSON decode checks the binary it transcodes once, as it writes it, and decodes it one level:
+  tree's JSON decode takes 23% fewer instructions, deep 17% and large 14%.
 - A repeated field's iterator gives a message in place: for a field of messages, `next`
   returns a pointer, and copies no message that `decode_into` stored or that a program set.
   The pointer holds until the next call. A number, a string or an enum still comes back by

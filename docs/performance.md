@@ -119,6 +119,7 @@ failed (the owner's ruling of 2026-11-09). A new fast path joins this list the s
 | Each `TextWriter` call inline in the JSON encoder | `json_encode.zig` and `json_scalar.zig` | deep JSON encode +30.03%, small +25.20%, varints +21.74%, tree +19.71%, strings +18.24% |
 | A run of messages counted with no call | `decode_run.zig`, `run_count` | tree binary decode+walk +11.38%, large +3.32%, local x86-64-v2 |
 | A message given in place by its iterator | `repeated.zig`, `next_message` | tree binary decode+walk +27.11%, large +4.09%, local x86-64-v2 |
+| The transcoder's binary decoded one level | `protobuf.zig`, `decode_transcoded` | tree JSON decode +30.31%, deep +20.58%, large +16.20%, medium +8.94%, local x86-64-v2 |
 
 ## The pitfalls
 

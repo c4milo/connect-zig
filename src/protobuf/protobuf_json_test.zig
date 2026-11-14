@@ -3,6 +3,8 @@
 const std = @import("std");
 const testing = std.testing;
 const proto = @import("protobuf.zig");
+const json_decode = @import("json_decode.zig");
+const any = @import("any.zig");
 const binary_test = @import("protobuf_test.zig");
 const All = binary_test.All;
 const Inner = binary_test.Inner;
@@ -29,6 +31,14 @@ const Holder = struct {
 
 const text_len = 1024;
 const tokens_len = 256;
+/// The JSON texts the invariant below reads: each kind of field, nested messages, a map, a
+/// recursive chain, and the well-known types.
+const nested_texts = [_][]const u8{
+    "{\"int32Field\":-3,\"stringField\":\"x\",\"inner\":{\"a\":7,\"tags\":[\"x\",\"y\"]}," ++
+        "\"inners\":[{\"a\":1},{\"tags\":[\"z\"]}],\"counts\":{\"k\":9,\"j\":8},\"sub\":{\"a\":2}}",
+    "{\"node\":{\"value\":\"1\",\"next\":{\"value\":\"2\",\"next\":{}}}}",
+    "{\"numbers\":[1,2,3],\"unpacked\":[4],\"color\":\"COLOR_GREEN\",\"name\":\"n\"}",
+};
 
 const Buffers = struct {
     text: [text_len]u8 = undefined,
@@ -137,6 +147,31 @@ test "the well-known types take their own forms both ways" {
     var paths = back.mask.?.paths.iterator();
     try testing.expectEqualStrings("user.display_name", (try paths.next()).?);
     try testing.expectEqualStrings("hi", back.label.?.value);
+}
+
+/// Requires what the transcoder writes for `text` to pass `decode` whole, nested payloads
+/// checked: `decode_json` decodes it one level (decision 9). A text it refuses writes nothing.
+fn check_transcoded(comptime T: type, text: []const u8) !void {
+    var buffers: Buffers = .{};
+    const bytes = json_decode.transcode(T, text, &buffers.binary, &buffers.tokens, any.types) catch return;
+    _ = try proto.decode(T, bytes);
+}
+
+test "the transcoder writes binary that decode accepts whole, so decode_json checks it once" {
+    for (nested_texts) |text| try check_transcoded(All, text);
+    try check_transcoded(Node, "{\"next\":" ** 20 ++ "{\"value\":\"9\"}" ++ "}" ** 20);
+    try check_transcoded(Holder, "{\"stamp\":\"1972-01-01T10:00:20.021Z\",\"span\":\"-1.500s\",\"mask\":\"a.bC\",\"empty\":{}}");
+}
+
+fn fuzz_transcoded(_: void, smith: *testing.Smith) anyerror!void {
+    var input: [text_len]u8 = @splat(0);
+    const len = smith.slice(&input);
+    try check_transcoded(All, input[0..len]);
+    try check_transcoded(Node, input[0..len]);
+}
+
+test "fuzz: the transcoder writes binary that decode accepts whole, on any text" {
+    try testing.fuzz({}, fuzz_transcoded, .{ .corpus = &nested_texts });
 }
 
 test "a field mask path that lowerCamelCase cannot carry back is refused" {

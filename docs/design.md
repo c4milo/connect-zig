@@ -802,6 +802,18 @@ ran on Linux x86-64 with Zig 0.16.0.
     these counts. Buffa's time over connect-zig's for tree's binary decode+walk reads 1.79 on
     a Xeon 6975P-C and 2.01 on the Neoverse-N2, where run 116 read 0.85 and 1.10; large's
     reads 1.50 and 1.63.
+  - JSON on arm64. The owner asked on 2026-11-14 whether connect-zig beat Buffa on arm64 as on
+    x86-64: binary yes, JSON less, with Buffa faster on 14 of 48 rows on the Neoverse-N2 of run
+    119 against 9 of 48 on x86-64. A local counter, callgrind in a linux/arm64 container on the
+    owner's Mac, counted both runtimes. JSON encode runs fewer instructions than Buffa on every
+    message but tree, so its loss there is in cycles, which callgrind does not show; stdx's
+    session measured TextWriter at 4.3 instructions a cycle on an N2. JSON decode ran 13% to
+    32% more instructions than Buffa on small, varints, tree and packed.
+  - JSON decode reads the transcoder's binary one level (decision 9, amended). On x86-64-v2 it
+    takes fewer instructions on tree (23.26%), deep (17.07%), large (13.94%) and medium
+    (8.20%), and on arm64 alike; the largest rise is 0.36%, packed. Tree's JSON decode on arm64
+    now runs 0.91 of Buffa's instructions, from 1.15. Packed, small and varints hold no nested
+    message and did not move: their cost is in reading numbers, a later step.
 
 ### What a later step owes
 

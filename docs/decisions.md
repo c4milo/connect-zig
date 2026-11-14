@@ -68,6 +68,13 @@ first. Cite an entry by number in code and commits ("decision 6").
    moves up to meet the octets the length needs, so the binary is canonical: an Any keeps its
    message's bytes as they are, and Go writes them canonical. Beaten: a second decoder that writes
    struct fields from JSON, which doubles the merge and presence rules.
+   Amended on 2026-11-14: `decode_json` decodes the transcoder's binary one level, as
+   `Lazy.get` decodes bytes `decode` checked, and does not check each nested payload again.
+   The transcoder read the JSON to its full depth and checked each value as it wrote it: stdx
+   refuses a lone surrogate and any text that is not UTF-8, and each scalar is parsed into its
+   field's type. A test, and a fuzz test, hold that what the transcoder writes passes `decode`
+   whole. The second check read each subtree again, and cost tree's JSON decode 30% more
+   instructions, as the owner asked on 2026-11-14 to cut JSON decode on arm64.
 
 ## Connect
 

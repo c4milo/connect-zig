@@ -116,12 +116,20 @@ fn encode_json_registry(comptime T: type, message: *const T, buffer: []u8, compt
 /// `binary`, and the message's strings and bytes point into it. `tokens` holds one token's octets
 /// at a time, so a string as long as the longest one in the text fits.
 pub fn decode_json(comptime T: type, text: []const u8, binary: []u8, tokens: []u8) JsonDecodeError!T {
-    return decode(T, try files.json_decode.transcode(T, text, binary, tokens, files.any.types));
+    return decode_transcoded(T, try files.json_decode.transcode(T, text, binary, tokens, files.any.types));
 }
 
 /// `decode_json`, with an Any naming its type from the well-known types and `any_types`.
 pub fn decode_json_with(comptime T: type, text: []const u8, binary: []u8, tokens: []u8, comptime any_types: []const type) JsonDecodeError!T {
-    return decode(T, try files.json_decode.transcode(T, text, binary, tokens, files.any.with(any_types)));
+    return decode_transcoded(T, try files.json_decode.transcode(T, text, binary, tokens, files.any.with(any_types)));
+}
+
+/// Decodes the binary the transcoder wrote (decision 9). The transcoder read the JSON to its full
+/// depth and checked each value as it wrote it, so `decode`'s check of each nested payload would
+/// read the subtree again: the binary decodes one level, as `Lazy.get` decodes bytes that
+/// `decode` checked. A test holds that what the transcoder writes passes `decode` whole.
+fn decode_transcoded(comptime T: type, bytes: []const u8) JsonDecodeError!T {
+    return files.decode.decode_shallow(T, bytes);
 }
 
 /// The well-known types with their own JSON form (design §5).
