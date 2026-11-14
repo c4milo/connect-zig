@@ -13,6 +13,9 @@ pub const protocol = struct {
     pub const reserved_number_last: u32 = 19_999;
     /// The low three bits of a tag hold the wire type ("Message Structure").
     pub const wire_type_bits = 3;
+    /// A tag is a uint32 varint, so it takes at most 5 bytes: protobuf's parsers refuse a longer
+    /// one even when its value is small (the conformance suite's "BadTag_OverlongVarint").
+    pub const tag_len_max = 5;
     /// A fixed32 field is 4 bytes and a fixed64 field 8 bytes, little-endian ("Non-varint Numbers").
     pub const fixed32_len = 4;
     pub const fixed64_len = 8;

@@ -24,7 +24,7 @@ pub const WireType = enum(u3) {
 pub const Error = error{
     /// The input ended inside a field.
     Truncated,
-    /// A varint ran past 10 bytes ("Base 128 Varints").
+    /// A varint ran past 10 bytes, or a tag past 5 ("Base 128 Varints", "Message Structure").
     VarintTooLong,
     /// The tag named wire type 6 or 7 ("Message Structure").
     InvalidWireType,
@@ -95,6 +95,12 @@ pub const Reader = struct {
     }
 
     pub inline fn varint(reader: *Reader) Error!u64 {
+        return reader.varint_of(constants.protocol.varint_len_max);
+    }
+
+    /// A varint of at most `len_max` bytes. A varint of one or two bytes takes no call, so a
+    /// shorter bound costs the common case nothing.
+    inline fn varint_of(reader: *Reader, comptime len_max: usize) Error!u64 {
         // "Base 128 Varints": an octet with no continuation bit is the last of its varint. A first
         // octet without it is the whole varint, as most tags and short lengths are.
         if (reader.position < reader.bytes.len) {
@@ -112,14 +118,15 @@ pub const Reader = struct {
                 }
             }
         }
-        return reader.varint_long();
+        return reader.varint_long(len_max);
     }
 
     /// A varint of two octets or more, or the refusal of one, out of line, so each inlined call
     /// keeps the one-octet path alone.
-    noinline fn varint_long(reader: *Reader) Error!u64 {
+    noinline fn varint_long(reader: *Reader, comptime len_max: usize) Error!u64 {
+        comptime assert(len_max >= two_octets and len_max <= constants.protocol.varint_len_max);
         var value: u64 = 0;
-        for (0..constants.protocol.varint_len_max) |index| {
+        for (0..len_max) |index| {
             if (reader.position == reader.bytes.len) return error.Truncated;
             const byte = reader.bytes[reader.position];
             reader.position += 1;
@@ -129,7 +136,7 @@ pub const Reader = struct {
             value |= @as(u64, byte & payload_mask) << shift;
             if (byte & continuation == 0) return value;
         }
-        // "Base 128 Varints": a varint holds at most 10 bytes.
+        // "Base 128 Varints": a varint holds at most 10 bytes, and a tag at most 5.
         return error.VarintTooLong;
     }
 
@@ -152,7 +159,8 @@ pub const Reader = struct {
     }
 
     pub fn tag(reader: *Reader) Error!Tag {
-        const value = try reader.varint();
+        // "Message Structure": a tag is a uint32 varint, so it takes 5 bytes at most.
+        const value = try reader.varint_of(constants.protocol.tag_len_max);
         const wire_type: WireType = @enumFromInt(@as(u3, @truncate(value)));
         // "Message Structure": wire types 6 and 7 are not defined.
         if (@intFromEnum(wire_type) > @intFromEnum(WireType.i32)) return error.InvalidWireType;
@@ -423,6 +431,17 @@ test "tags refuse field number 0 and wire types 6 and 7" {
     try testing.expectError(error.InvalidWireType, six.tag());
     var good: Reader = .{ .bytes = &.{0x08} };
     try testing.expectEqual(Tag{ .number = 1, .wire_type = .varint }, try good.tag());
+}
+
+test "a tag of 5 bytes is read, and one of 6 is refused though its value is small" {
+    // Field 1's varint tag, 8, padded with continuation bytes to 5 and to 6 bytes.
+    var five: Reader = .{ .bytes = &.{ 0x88, 0x80, 0x80, 0x80, 0x00 } };
+    try testing.expectEqual(Tag{ .number = 1, .wire_type = .varint }, try five.tag());
+    var six: Reader = .{ .bytes = &.{ 0x88, 0x80, 0x80, 0x80, 0x80, 0x00 } };
+    try testing.expectError(error.VarintTooLong, six.tag());
+    // The largest field number's tag takes 5 bytes.
+    var largest: Reader = .{ .bytes = &.{ 0xf8, 0xff, 0xff, 0xff, 0x0f } };
+    try testing.expectEqual(constants.protocol.field_number_max, (try largest.tag()).number);
 }
 
 test "a group is skipped to its end tag, and a mismatched or too deep group is refused" {

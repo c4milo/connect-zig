@@ -115,12 +115,6 @@ Recommended.Proto2.JsonInput.BytesFieldBase64Url.ProtobufOutput
 Recommended.Proto3.JsonInput.BytesFieldBase64Url.JsonOutput
 Recommended.Proto3.JsonInput.BytesFieldBase64Url.ProtobufOutput
 
-# A field's tag written as a varint longer than a 32-bit number takes. The decoder reads it.
-Required.Editions_Proto2.ProtobufInput.BadTag_OverlongVarint
-Required.Editions_Proto3.ProtobufInput.BadTag_OverlongVarint
-Required.Proto2.ProtobufInput.BadTag_OverlongVarint
-Required.Proto3.ProtobufInput.BadTag_OverlongVarint
-
 # A JSON timestamp with a lowercase t or z. The JSON decoder reads it, and RFC 3339 as protobuf
 # takes it wants the capitals.
 Required.Editions_Proto3.JsonInput.TimestampJsonInputLowercaseT
