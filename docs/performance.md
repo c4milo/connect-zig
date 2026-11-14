@@ -113,6 +113,10 @@ failed (the owner's ruling of 2026-11-09). A new fast path joins this list the s
 | A flat child measured before it is written | `encode.zig`, `is_flat` | medium binary encode +7.35%, local x86-64-v2 |
 | A field's stored items read in place | `repeated.zig`, `RepeatedIterator.next` | packed binary decode+walk +86.22%, large +26.59%, medium +22.66%, local x86-64-v2 |
 | The binary writer's length in a register | `wire.zig`, `Writer.varint` and `varint_long` | varints binary encode +29.06%, packed +18.97%, small +14.54%, strings +10.74%, medium +7.84% |
+| A packed record's varints read with a local position | `decode_run.zig`, `read_packed_varints` | packed binary decode+walk +18.69%, medium +9.92% |
+| A varint of three or four octets written inline | `wire.zig`, `Writer.varint_wide` | medium binary encode +27.48%, varints +11.41%, large +5.03% |
+| The end of a field's stored items with no call | `repeated.zig`, `RepeatedIterator.next` | packed binary decode+walk +25.50%, large +7.17%, medium +5.66% |
+| Each `TextWriter` call inline in the JSON encoder | `json_encode.zig` and `json_scalar.zig` | deep JSON encode +30.03%, small +25.20%, varints +21.74%, tree +19.71%, strings +18.24% |
 
 ## The pitfalls
 
@@ -128,6 +132,7 @@ failed (the owner's ruling of 2026-11-09). A new fast path joins this list the s
 | `decode` took 39% more instructions on tree once `decode_run`'s fallbacks also called `decode.read_repeated`. | LLVM called it out of line from `read_field` too. | A path other code shares is inlined with `@call(.always_inline, ...)` where the hot caller calls it. |
 | A mutation that turned a fast path off passed every test. | The reference path gives the same output, and the old baseline already holds the slow count. | Write the new baseline first; then `tools/perf_check.sh` fails such a mutation. |
 | callgrind in an x86-64 container on an Apple Mac stops at an AVX instruction. | Rosetta's x86-64 reports no AVX, and valgrind refuses it. | A local count builds for x86-64-v2; its counts track the judge's within 1% where no code is vectorized. |
+| Large binary encode took 11% more time on an EPYC 7763 with 4.79% fewer instructions. | The judge counts instructions. It does not count a missed branch or a load that waits for a store, and an M1 hides both. | Before a number is published, compare the times of two `bench-compare` runs on the same CPU. |
 
 A pitfall that belongs to Zig and not to connect-zig moves to pepegrillo's
 `performance_zig.md`.

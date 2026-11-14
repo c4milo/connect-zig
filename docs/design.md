@@ -702,6 +702,30 @@ ran on Linux x86-64 with Zig 0.16.0.
   - Tries that lost on x86-64-v2: the reader's `varint_long` by value, 20% to 44% more
     instructions to decode, since its two-part result came back through memory; and a flat
     child written once behind a one-octet length, 2.8% more on medium.
+  - Varints and the iterator, commits `9e5ce7a`, `b63de14` and `214d579`. A packed record's
+    varints are read with the position in a local, so no element waits for a stored position.
+    Binary encode writes a varint of three or four octets inline, as samples, counts and ids
+    are. A field's stored items answer their end with no call.
+  - JSON encode, commit `b636a88`. The owner wrote on 2026-11-13 "we also need to win on json
+    encode speed over Buffa". The encoder calls each method of stdx's `TextWriter` inline, and
+    stdx did not change.
+  - The judge on `b63de14`, [run 43604260449](https://github.com/c4milo/connect-zig/actions/runs/43604260449),
+    against the baseline before the four commits. Binary encode takes fewer instructions on
+    medium (21.54%), varints (10.24%), large (4.79%), small (3.96%) and packed (2.43%). Binary
+    decode+walk takes fewer on packed (32.86%), medium (13.89%), large (8.14%) and tree
+    (1.35%). JSON encode takes fewer on deep (23.10%), small (20.13%), varints (17.86%), tree
+    (16.47%), strings (15.43%), large (9.68%) and medium (6.00%). The largest rise is 0.95%,
+    on deep binary encode. `bench/instructions.txt` holds these counts.
+  - The same run's `bench-compare`, on an EPYC 7763, the CPU of run 97. Buffa's time over
+    connect-zig's, from run 97 to this run: medium binary encode 0.86 to 1.16, medium
+    decode+walk 0.78 to 1.46, and packed decode+walk 0.62 to 1.19. JSON encode: small 0.83 to
+    0.87, deep 0.76 to 0.84, and strings 0.88 to 0.92. Buffa still leads JSON encode on those
+    three, on tree (0.47) and on packed (0.96).
+  - Two times rose on x86 while their instructions fell, and an M1 shows neither. Large
+    binary encode took 73.2 µs on `b636a88` and 81.5 µs on `b63de14`, on the same CPU, with
+    4.79% fewer instructions. Tree's binary decode+walk took 9.6 µs in run 97, before
+    `decode_into`, and 13.8 µs in this run, with 19.36% fewer instructions. Both causes are
+    open.
 
 ### What a later step owes
 
