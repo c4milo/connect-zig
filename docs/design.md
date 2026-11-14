@@ -739,6 +739,16 @@ ran on Linux x86-64 with Zig 0.16.0.
     stores its octets, and stores the length. In the lab, medium binary encode went from 416
     to 347 ns; no other encode moved past 4%. Mutations, 13, each CAUGHT, after a new test of
     the room a fixed-width value needs.
+  - A run's next tag read with no copy of the reader. To learn whether a run of records went
+    on, `decode_into` copied the reader, read a tag from the copy, and copied it back: two
+    copies through memory at each record. It reads the tag in place now, and moves the
+    position back when the tag is another field's. In the lab, binary decode+walk took 10.8%
+    less time on medium and 9.0% less on large, with 0.53% fewer instructions on medium.
+    Mutations, 5, each CAUGHT.
+  - The lab also placed tree's cost: `decode_into` alone took 3.66 µs and the walk 4.69 µs. A
+    walk that read the stored nodes in place took 1.74 µs: the iterator's `next` returns each
+    56-octet node by value, and the walk copies it three times. Large binary encode showed no
+    loss there: the wide varint path was 4.5% faster than the path before it on that CPU.
 
 ### What a later step owes
 

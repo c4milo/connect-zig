@@ -110,10 +110,14 @@ fn read_records(comptime F: type, slot: *F, items: []F.Element, field_start: usi
         // The view starts at the run's first record, and each record widens it to its end.
         decode.extend_view(&slot.view, bytes, field_start, reader.position, number);
         if (reader.at_end()) return count;
-        var peek = reader.*;
-        const next_tag = try peek.tag();
-        if (next_tag.number != number) return count;
-        reader.* = peek;
+        // Another field's tag is read back: a copy of the reader to read it from would cost
+        // each record two copies through memory.
+        const mark = reader.position;
+        const next_tag = try reader.tag();
+        if (next_tag.number != number) {
+            reader.position = mark;
+            return count;
+        }
         record_tag = next_tag;
     }
     unreachable;
