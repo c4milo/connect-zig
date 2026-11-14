@@ -99,6 +99,9 @@ def claim(numbers, name):
     if min(numbers) > 1:
         return f"connect-zig is {span(numbers)} faster than {name}"
     beaten = sum(1 for v in numbers if v < 1)
+    # A cell at 1 is a tie: neither runtime beats the other there.
+    if beaten == 0:
+        return f"{name} beats connect-zig in no cell"
     return f"{name} beats connect-zig in {beaten} of {len(numbers)} cells"
 
 
