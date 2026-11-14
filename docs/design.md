@@ -182,7 +182,8 @@ Each step names the check that proves it. A step is done when its check passes i
     `tools/ci.sh` holds it as the check `protobuf-conformance` (decision 38). New public
     names: none. `zig build plugin` builds the plugin alone. Check: the runner passes with the
     cases of `conformance/protobuf_known_failing.txt` as its expected failures. At its first
-    run 5629 cases pass, 48 are skipped and 113 are listed.
+    run 5629 cases pass, 48 are skipped and 113 are listed. The fixes it led to leave 5635
+    passing and 107 listed.
 
 ### Step records
 

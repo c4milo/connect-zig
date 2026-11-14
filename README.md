@@ -406,9 +406,11 @@ small one. Go's time on arm64 is 2.9 to 15.1 times connect-zig's.
   reason.
 - `tools/protobuf_conformance_check.sh` runs [Google's protobuf conformance
   suite](https://github.com/protocolbuffers/protobuf/tree/main/conformance) against the
-  runtime, in binary and in JSON, for proto3, proto2 and edition 2023. 5629 cases pass. 113
-  fail, each listed under its reason in `conformance/protobuf_known_failing.txt`, and 48 are
-  skipped: the text format, and JSON that ignores unknown members.
+  runtime, in binary and in JSON, for proto3, proto2 and edition 2023. 5635 cases pass and 48
+  are skipped: the text format, and JSON that ignores unknown members. 107 fail, each listed
+  under its reason in `conformance/protobuf_known_failing.txt`: a map written to JSON with a
+  key twice, a message that arrives twice with a repeated field in both (decision 6), and
+  proto2 extensions, which connect-zig does not read.
 - `tools/interop_languages_check.sh` calls the server from [clients in other
   languages](interop): connect-go and grpc-go, connect-es on Node, Python's grpcio, and Rust's
   tonic and connect-rust. Each echoes every coverage case, in every protocol, codec and

@@ -83,7 +83,10 @@ The first release.
   8264 cases, and passes each but one timing case of the reference server, which may fail and
   is listed as flaky with its reason.
 - Google's protobuf conformance suite, of protobuf v37.0's first release candidate, in binary
-  and in JSON: 5629 cases pass, and 113 fail, each listed with its reason.
+  and in JSON: 5635 cases pass, and 107 fail, each listed with its reason. The suite found and
+  fixed a tag longer than 5 bytes read, lowercase "t" and "z" read in a JSON timestamp, a
+  field mask written that JSON could not carry back, URL-safe JSON bytes with pad bits refused,
+  and a oneof's repeated `Lazy` member that silently replaced the first.
 - Clients in other languages call connect-zig's server: connect-go, grpc-go, connect-es on Node,
   grpcio, tonic and connect-rust, across every protobuf type. connect-zig's client calls their
   servers too.
