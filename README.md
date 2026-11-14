@@ -13,7 +13,7 @@ and serve the same handlers to Connect, gRPC and gRPC-Web clients, in binary pro
   each RPC message is encoded straight into the HTTP body it goes out in.
 - **No hidden I/O.** The protocol core reads bytes you give it and writes bytes you send. It
   reads no clock, so every test is deterministic.
-- **Fast.** Binary and JSON encoding and decoding run 2.0 to 21 times faster than Go's protobuf
+- **Fast.** Binary and JSON encoding and decoding run 2.5 to 20 times faster than Go's protobuf
   runtime on x86-64, and 2.4 to 26 times on arm64 (see [Performance](#performance)).
 - **HTTP underneath from [colibri](https://github.com/c4milo/colibri).** Servers and clients run
   over h11, h2 and h3. The in-memory examples and the socket server run over all three;
@@ -332,9 +332,9 @@ all: it drives colibri's `server.Engine` over Zig 0.16's `std.Io` sockets, tasks
 `zig build bench` times eight messages. `tools/bench_check.sh` runs two baselines beside it on
 the same inputs: Go's `google.golang.org/protobuf` v1.36.12, and Buffa, the Rust runtime of
 connect-rust. It checks that each writes the same bytes as connect-zig. The numbers come from
-CI's two `bench-compare` jobs of commit `989d740`
-([run 119](https://github.com/c4milo/connect-zig/actions/runs/43622491626)). One ran on GitHub's
-`ubuntu-24.04` runner, an Intel Xeon 6975P-C core (x86-64). The other ran on
+CI's two `bench-compare` jobs of commit `808a25e`
+([run 121](https://github.com/c4milo/connect-zig/actions/runs/43642289829)). One ran on GitHub's
+`ubuntu-24.04` runner, an AMD EPYC 7763 core (x86-64). The other ran on
 `ubuntu-24.04-arm`, an Arm Neoverse-N2 core (arm64). On each machine the three programs ran in
 the same job. GitHub's runners differ from run to run, and the ratios move with the CPU. So each
 run names its machines and publishes the full tables in its summary: every time, and the four
@@ -347,43 +347,43 @@ which reads each repeated field once, and its iterators give each message in pla
 
 On x86-64:
 
-![Bars of connect-zig's and Buffa's speed in multiples of Go's, on x86-64: connect-zig is 3.6 to 14.2 times faster than Go's protobuf runtime, and Buffa is faster than connect-zig in 1 of 16 cells](docs/images/speed-vs-go.svg)
+![Bars of connect-zig's and Buffa's speed in multiples of Go's, on x86-64: connect-zig is 3.5 to 14.9 times faster than Go's protobuf runtime, and Buffa is faster than connect-zig in 2 of 16 cells](docs/images/speed-vs-go.svg)
 
 On arm64:
 
-![Bars of connect-zig's and Buffa's speed in multiples of Go's, on arm64: connect-zig is 2.9 to 15.1 times faster than Go's protobuf runtime, and Buffa is faster than connect-zig in 3 of 16 cells](docs/images/speed-vs-go-arm64.svg)
+![Bars of connect-zig's and Buffa's speed in multiples of Go's, on arm64: connect-zig is 3.0 to 16.2 times faster than Go's protobuf runtime, and Buffa is faster than connect-zig in 3 of 16 cells](docs/images/speed-vs-go-arm64.svg)
 
 Each cell of the tables is a baseline's time over connect-zig's: above 1 means connect-zig is
 faster. Go's time over connect-zig's, on x86-64:
 
 | Message | Binary encode | Binary decode, every field read | JSON encode | JSON decode |
 | --- | ---: | ---: | ---: | ---: |
-| Small, 40 B | 7.2 | 6.4 | 9.5 | 9.0 |
-| Medium, 1 KB | 12.6 | 9.0 | 8.8 | 12.3 |
-| Large, 180 KB | 4.1 | 4.8 | 8.1 | 9.3 |
-| Deep, 50 levels | 3.8 | 3.6 | 14.2 | 9.1 |
+| Small, 40 B | 8.5 | 6.5 | 8.7 | 10.7 |
+| Medium, 1 KB | 10.7 | 9.0 | 8.4 | 14.9 |
+| Large, 180 KB | 3.5 | 4.2 | 7.3 | 12.8 |
+| Deep, 50 levels | 3.5 | 4.5 | 13.5 | 12.5 |
 
 Buffa's time over connect-zig's, on x86-64:
 
 | Message | Binary encode | Binary decode, every field read | JSON encode | JSON decode |
 | --- | ---: | ---: | ---: | ---: |
-| Small, 40 B | 1.09 | 2.18 | 1.02 | 1.13 |
-| Medium, 1 KB | 1.32 | 1.35 | 1.19 | 1.51 |
-| Large, 180 KB | 1.29 | 1.50 | 1.55 | 1.12 |
-| Deep, 50 levels | 1.33 | 1.39 | 0.99 | 1.54 |
+| Small, 40 B | 1.67 | 2.00 | 0.89 | 1.10 |
+| Medium, 1 KB | 1.52 | 1.55 | 1.09 | 1.68 |
+| Large, 180 KB | 1.41 | 1.71 | 1.49 | 1.51 |
+| Deep, 50 levels | 1.11 | 1.73 | 0.84 | 1.89 |
 
 Buffa's time over connect-zig's, on arm64:
 
 | Message | Binary encode | Binary decode, every field read | JSON encode | JSON decode |
 | --- | ---: | ---: | ---: | ---: |
-| Small, 40 B | 1.61 | 1.59 | 0.94 | 0.90 |
-| Medium, 1 KB | 1.25 | 1.69 | 1.42 | 1.51 |
-| Large, 180 KB | 1.39 | 1.63 | 1.41 | 1.05 |
-| Deep, 50 levels | 1.24 | 1.56 | 0.85 | 1.32 |
+| Small, 40 B | 1.58 | 1.52 | 0.94 | 0.94 |
+| Medium, 1 KB | 1.25 | 1.66 | 1.40 | 1.61 |
+| Large, 180 KB | 1.39 | 1.64 | 1.40 | 1.20 |
+| Deep, 50 levels | 1.30 | 1.84 | 0.91 | 1.55 |
 
-On x86-64, Buffa is faster in 1 of the 16 cells: JSON encode of the deep message, at 0.99. On
-arm64, Buffa is faster in 3: JSON encode of the small and deep messages, and JSON decode of the
-small one. Go's time on arm64 is 2.9 to 15.1 times connect-zig's.
+On x86-64, Buffa is faster in 2 of the 16 cells: JSON encode of the small and deep messages.
+On arm64, Buffa is faster in 3: those two, and JSON decode of the small message. Go's time on
+arm64 is 3.0 to 16.2 times connect-zig's.
 
 ## How it is checked
 
