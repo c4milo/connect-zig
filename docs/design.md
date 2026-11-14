@@ -814,6 +814,12 @@ ran on Linux x86-64 with Zig 0.16.0.
     (8.20%), and on arm64 alike; the largest rise is 0.36%, packed. Tree's JSON decode on arm64
     now runs 0.91 of Buffa's instructions, from 1.15. Packed, small and varints hold no nested
     message and did not move: their cost is in reading numbers, a later step.
+  - The judge on `808a25e`, [run
+    43642289829](https://github.com/c4milo/connect-zig/actions/runs/43642289829): JSON decode
+    takes fewer instructions on tree (23.07%), deep (17.25%), large (14.92%) and medium
+    (8.12%), and no count rose past 0.5%. `bench/instructions.txt` holds these counts. Buffa's
+    time over connect-zig's for JSON decode, on the Neoverse-N2, from run 119 to this run:
+    tree 1.22 to 1.53, deep 1.32 to 1.55, large 1.05 to 1.20, medium 1.51 to 1.61.
 
 ### What a later step owes
 
