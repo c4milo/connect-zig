@@ -92,6 +92,9 @@ pub fn members(comptime T: type, transcoder: *Transcoder, depth_left: u32, compt
 /// The index of the field a member names by its JSON name or its .proto name ("JSON Mapping":
 /// a parser accepts both).
 fn field_index(comptime T: type, name: []const u8) ?usize {
+    // Each field's two names are compared at compile time, so a message of many fields takes
+    // more branches than Zig allows by default.
+    @setEvalBranchQuota(T.protobuf.fields.len * constants.limits.eval_branches_per_field + constants.limits.eval_branches_base);
     inline for (T.protobuf.fields, 0..) |field, index| {
         if (name_is(name, field.json_name)) return index;
         if (comptime !std.mem.eql(u8, field.json_name, field.proto_name)) {

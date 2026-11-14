@@ -41,6 +41,13 @@ pub const limits = struct {
     /// The most elements an iterator over a `Repeated` field yields. An element takes at least
     /// one byte, so a message of `message_len_max` bytes holds no more.
     pub const elements_max: usize = message_len_max;
+    /// The backward branches the compiler may take for each field of a message where it
+    /// compares the field's names at compile time: more than the octets of a field's two names.
+    /// Zig's default is 1000 for a whole evaluation, which a message of about 40 fields
+    /// passes; protobuf's own test messages hold about 150.
+    pub const eval_branches_per_field = 512;
+    /// The backward branches such an evaluation may take beside its fields: Zig's default.
+    pub const eval_branches_base = 1000;
     /// The octets `encode` sets aside for a nested message's length before it writes the
     /// message: 2 hold any length below 2^14, which most children have. A child whose length
     /// takes another count of octets moves once, when its length is known. A flat child, with
