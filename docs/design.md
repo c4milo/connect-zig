@@ -821,6 +821,16 @@ ran on Linux x86-64 with Zig 0.16.0.
     with every field read; medium 7.00% and 10.83%; large 10.02% with every field read. Large's
     JSON decode alone takes 0.53% more: each of its records' 8 values closes a record of its
     own. arm64 moves alike. Mutations, 5, each CAUGHT, after a test of a repeated enum's null.
+  - The judge on `80b8e69`, [run
+    43646988363](https://github.com/c4milo/connect-zig/actions/runs/43646988363): packed JSON
+    decode takes 17.67% fewer instructions, 27.64% with every field read, medium 7.03% and
+    10.86%, large 11.05% with every field read; large's JSON decode alone moved 0.08%.
+    `bench/instructions.txt` holds these counts. On a Xeon 6975P-C, connect-zig is faster than
+    Buffa in each of the README's 16 cells.
+  - JSON encode on the N2, with the owner's word, in the lab: stdx main `22f5139`, past stdx's
+    decision 77, makes JSON encode beat Buffa there on small (1.18), deep (1.08) and packed
+    (1.13), where connect-zig's pin `89a021c` lost them; strings (0.89) and tree (0.48) still
+    trail. It reaches connect-zig when colibri pins it. The numbers went to stdx's session.
   - The judge on `808a25e`, [run
     43642289829](https://github.com/c4milo/connect-zig/actions/runs/43642289829): JSON decode
     takes fewer instructions on tree (23.07%), deep (17.25%), large (14.92%) and medium
