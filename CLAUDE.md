@@ -85,8 +85,8 @@ confirm a test fails. Report `CAUGHT` or `NOT CAUGHT` per mutation in the commit
   heap, io, determinism, layering, unbounded-loop, file-length, markdown, relative-import,
   magic-numbers, global-state, static-alignment, defer-order, undefined-fill, unreleased-acquire and
   denied-words, all from pepegrillo. The rules read `conformance/` as they read `examples/`, and
-  `conformance/gen` as `examples/gen`; `conformance/proto` is connectrpc's copy, which
-  denied-words skips. `zig build test` also requires `.githooks/pre-push` to equal pepegrillo's
+  `conformance/gen` as `examples/gen`; `conformance/proto` holds connectrpc's copy and
+  protobuf's test protos, which denied-words skips. `zig build test` also requires `.githooks/pre-push` to equal pepegrillo's
   hook (`zig build hook-check`).
 - Hooks: `zig build hooks` once after cloning points `core.hooksPath` at `.githooks`, whose
   pre-push hook runs the commit linter that `zig build install-commit-lint` installs. They read `examples/gen` as they read hand-written code
@@ -105,7 +105,8 @@ confirm a test fails. Report `CAUGHT` or `NOT CAUGHT` per mutation in the commit
   which `zig build examples` runs, starts it and calls it over TCP with a pool driven over `std.Io`.
 - Generated code: `zig build test-generated` compiles `examples/gen` and runs its round trips.
   `tools/generate_check.sh` regenerates it with `buf generate` and fails on a difference;
-  `--write` rewrites it. It needs buf, or `BUF` naming it.
+  `--write` rewrites it. It needs buf, or `BUF` naming it. It builds the plugin alone, with
+  `zig build plugin`, so generated code that no longer compiles does not stop it.
 - Interop: `tools/interop_check.sh` calls the socket server with `buf curl` in Connect, gRPC and
   gRPC-Web, over h2 and h3, and with curl over h11 and h2, all over TLS with the test CA, and
   checks that Chat answers full-duplex. It needs buf, curl and python3.
@@ -124,6 +125,12 @@ confirm a test fails. Report `CAUGHT` or `NOT CAUGHT` per mutation in the commit
   It downloads the runner pinned by SHA-256, unless `CONNECTCONFORMANCE` names one. A case that
   fails on purpose goes in `conformance/known_failing.txt` or `client_known_failing.txt`, with
   its reason; one that may fail goes in `client_known_flaky.txt`.
+- Protobuf conformance: `tools/protobuf_conformance_check.sh` runs Google's protobuf conformance
+  runner 37.0.0-rc1 against `zig build protobuf-testee`, in binary and JSON, for proto3, proto2
+  and edition 2023 (decision 38). It downloads the runner's npm package pinned by SHA-512,
+  unless `PROTOBUF_CONFORMANCE` names a runner; the package holds one for x86-64 Linux and for
+  macOS. A case that fails on purpose, or that does not pass yet, goes in
+  `conformance/protobuf_known_failing.txt` under its reason.
 - Interop across languages: `tools/interop_languages_check.sh [client...]` runs the clients of
   `interop/` (Go, TypeScript, Python, and Rust's tonic and connect-rust) against the socket
   server; `interop/README.md` holds their contract. It needs buf, go, node with npm, python3 with venv, and cargo.

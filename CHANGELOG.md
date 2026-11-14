@@ -67,7 +67,8 @@ The first release.
 - base64 from stdx for bytes in JSON, error details, "-bin" values and unary GET messages. A
   value whose pad characters do not complete a quantum of four is refused (RFC 4648 §4).
 - `protoc-gen-connect-zig`, a protoc and buf plugin that writes one `.pb.zig` file for each
-  `.proto` file.
+  `.proto` file. A field or an enum value named `protobuf` gains an underscore, since each
+  generated type declares its descriptor under that name.
 
 ### Runs on any event loop
 
@@ -81,6 +82,8 @@ The first release.
 - connectrpc's conformance suite v1.0.4: the server passes 2714 of 2714 cases. The client runs
   8264 cases, and passes each but one timing case of the reference server, which may fail and
   is listed as flaky with its reason.
+- Google's protobuf conformance suite, of protobuf v37.0's first release candidate, in binary
+  and in JSON: 5629 cases pass, and 113 fail, each listed with its reason.
 - Clients in other languages call connect-zig's server: connect-go, grpc-go, connect-es on Node,
   grpcio, tonic and connect-rust, across every protobuf type. connect-zig's client calls their
   servers too.

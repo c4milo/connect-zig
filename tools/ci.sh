@@ -12,7 +12,7 @@
 # job of its own, so each shows apart in GitHub.
 set -eu
 cd "$(dirname "$0")/.."
-checks="format commits test release package bench costs bench-compare perf generated interop interop-languages interop-servers coverage conformance"
+checks="format commits test release package bench costs bench-compare perf generated interop interop-languages interop-servers coverage conformance protobuf-conformance"
 only=""
 case "${1:-}" in
     --list)
@@ -77,6 +77,8 @@ check() {
         interop-servers) tools/interop_servers_check.sh ;;
         coverage) tools/coverage_check.sh ;;
         conformance) tools/conformance_check.sh ;;
+        # Google's protobuf conformance suite, in binary and JSON (decision 38).
+        protobuf-conformance) tools/protobuf_conformance_check.sh ;;
         *)
             echo "no check named $1" >&2
             return 2

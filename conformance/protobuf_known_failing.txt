@@ -1,0 +1,143 @@
+# The cases of Google's protobuf conformance suite that connect-zig fails on purpose or does not
+# pass yet, each group under its reason (decision 38). tools/protobuf_conformance_check.sh hands
+# this file to the runner, which fails when a case here passes: a fix removes its lines.
+
+# A map read from binary holds one key twice, and its JSON writes the key twice. A JSON object
+# must hold each key once: the last entry of a key is the map's ("Maps", language guide). The
+# JSON encoder does not yet pass over the earlier entries.
+Required.Editions_Proto2.ProtobufInput.ValidDataMap.BOOL.BOOL.DuplicateKey.JsonOutput
+Required.Editions_Proto2.ProtobufInput.ValidDataMap.FIXED32.FIXED32.DuplicateKey.JsonOutput
+Required.Editions_Proto2.ProtobufInput.ValidDataMap.FIXED64.FIXED64.DuplicateKey.JsonOutput
+Required.Editions_Proto2.ProtobufInput.ValidDataMap.INT32.DOUBLE.DuplicateKey.JsonOutput
+Required.Editions_Proto2.ProtobufInput.ValidDataMap.INT32.FLOAT.DuplicateKey.JsonOutput
+Required.Editions_Proto2.ProtobufInput.ValidDataMap.INT32.INT32.DuplicateKey.JsonOutput
+Required.Editions_Proto2.ProtobufInput.ValidDataMap.INT64.INT64.DuplicateKey.JsonOutput
+Required.Editions_Proto2.ProtobufInput.ValidDataMap.SFIXED32.SFIXED32.DuplicateKey.JsonOutput
+Required.Editions_Proto2.ProtobufInput.ValidDataMap.SFIXED64.SFIXED64.DuplicateKey.JsonOutput
+Required.Editions_Proto2.ProtobufInput.ValidDataMap.SINT32.SINT32.DuplicateKey.JsonOutput
+Required.Editions_Proto2.ProtobufInput.ValidDataMap.SINT64.SINT64.DuplicateKey.JsonOutput
+Required.Editions_Proto2.ProtobufInput.ValidDataMap.STRING.BYTES.DuplicateKey.JsonOutput
+Required.Editions_Proto2.ProtobufInput.ValidDataMap.STRING.ENUM.DuplicateKey.JsonOutput
+Required.Editions_Proto2.ProtobufInput.ValidDataMap.STRING.MESSAGE.DuplicateKey.JsonOutput
+Required.Editions_Proto2.ProtobufInput.ValidDataMap.STRING.MESSAGE.MergeValue.JsonOutput
+Required.Editions_Proto2.ProtobufInput.ValidDataMap.STRING.STRING.DuplicateKey.JsonOutput
+Required.Editions_Proto2.ProtobufInput.ValidDataMap.UINT32.UINT32.DuplicateKey.JsonOutput
+Required.Editions_Proto2.ProtobufInput.ValidDataMap.UINT64.UINT64.DuplicateKey.JsonOutput
+Required.Editions_Proto3.ProtobufInput.ValidDataMap.BOOL.BOOL.DuplicateKey.JsonOutput
+Required.Editions_Proto3.ProtobufInput.ValidDataMap.FIXED32.FIXED32.DuplicateKey.JsonOutput
+Required.Editions_Proto3.ProtobufInput.ValidDataMap.FIXED64.FIXED64.DuplicateKey.JsonOutput
+Required.Editions_Proto3.ProtobufInput.ValidDataMap.INT32.DOUBLE.DuplicateKey.JsonOutput
+Required.Editions_Proto3.ProtobufInput.ValidDataMap.INT32.FLOAT.DuplicateKey.JsonOutput
+Required.Editions_Proto3.ProtobufInput.ValidDataMap.INT32.INT32.DuplicateKey.JsonOutput
+Required.Editions_Proto3.ProtobufInput.ValidDataMap.INT64.INT64.DuplicateKey.JsonOutput
+Required.Editions_Proto3.ProtobufInput.ValidDataMap.SFIXED32.SFIXED32.DuplicateKey.JsonOutput
+Required.Editions_Proto3.ProtobufInput.ValidDataMap.SFIXED64.SFIXED64.DuplicateKey.JsonOutput
+Required.Editions_Proto3.ProtobufInput.ValidDataMap.SINT32.SINT32.DuplicateKey.JsonOutput
+Required.Editions_Proto3.ProtobufInput.ValidDataMap.SINT64.SINT64.DuplicateKey.JsonOutput
+Required.Editions_Proto3.ProtobufInput.ValidDataMap.STRING.BYTES.DuplicateKey.JsonOutput
+Required.Editions_Proto3.ProtobufInput.ValidDataMap.STRING.ENUM.DuplicateKey.JsonOutput
+Required.Editions_Proto3.ProtobufInput.ValidDataMap.STRING.MESSAGE.DuplicateKey.JsonOutput
+Required.Editions_Proto3.ProtobufInput.ValidDataMap.STRING.MESSAGE.MergeValue.JsonOutput
+Required.Editions_Proto3.ProtobufInput.ValidDataMap.STRING.STRING.DuplicateKey.JsonOutput
+Required.Editions_Proto3.ProtobufInput.ValidDataMap.UINT32.UINT32.DuplicateKey.JsonOutput
+Required.Editions_Proto3.ProtobufInput.ValidDataMap.UINT64.UINT64.DuplicateKey.JsonOutput
+Required.Proto2.ProtobufInput.ValidDataMap.BOOL.BOOL.DuplicateKey.JsonOutput
+Required.Proto2.ProtobufInput.ValidDataMap.FIXED32.FIXED32.DuplicateKey.JsonOutput
+Required.Proto2.ProtobufInput.ValidDataMap.FIXED64.FIXED64.DuplicateKey.JsonOutput
+Required.Proto2.ProtobufInput.ValidDataMap.INT32.DOUBLE.DuplicateKey.JsonOutput
+Required.Proto2.ProtobufInput.ValidDataMap.INT32.FLOAT.DuplicateKey.JsonOutput
+Required.Proto2.ProtobufInput.ValidDataMap.INT32.INT32.DuplicateKey.JsonOutput
+Required.Proto2.ProtobufInput.ValidDataMap.INT64.INT64.DuplicateKey.JsonOutput
+Required.Proto2.ProtobufInput.ValidDataMap.SFIXED32.SFIXED32.DuplicateKey.JsonOutput
+Required.Proto2.ProtobufInput.ValidDataMap.SFIXED64.SFIXED64.DuplicateKey.JsonOutput
+Required.Proto2.ProtobufInput.ValidDataMap.SINT32.SINT32.DuplicateKey.JsonOutput
+Required.Proto2.ProtobufInput.ValidDataMap.SINT64.SINT64.DuplicateKey.JsonOutput
+Required.Proto2.ProtobufInput.ValidDataMap.STRING.BYTES.DuplicateKey.JsonOutput
+Required.Proto2.ProtobufInput.ValidDataMap.STRING.ENUM.DuplicateKey.JsonOutput
+Required.Proto2.ProtobufInput.ValidDataMap.STRING.MESSAGE.DuplicateKey.JsonOutput
+Required.Proto2.ProtobufInput.ValidDataMap.STRING.MESSAGE.MergeValue.JsonOutput
+Required.Proto2.ProtobufInput.ValidDataMap.STRING.STRING.DuplicateKey.JsonOutput
+Required.Proto2.ProtobufInput.ValidDataMap.UINT32.UINT32.DuplicateKey.JsonOutput
+Required.Proto2.ProtobufInput.ValidDataMap.UINT64.UINT64.DuplicateKey.JsonOutput
+Required.Proto3.ProtobufInput.ValidDataMap.BOOL.BOOL.DuplicateKey.JsonOutput
+Required.Proto3.ProtobufInput.ValidDataMap.FIXED32.FIXED32.DuplicateKey.JsonOutput
+Required.Proto3.ProtobufInput.ValidDataMap.FIXED64.FIXED64.DuplicateKey.JsonOutput
+Required.Proto3.ProtobufInput.ValidDataMap.INT32.DOUBLE.DuplicateKey.JsonOutput
+Required.Proto3.ProtobufInput.ValidDataMap.INT32.FLOAT.DuplicateKey.JsonOutput
+Required.Proto3.ProtobufInput.ValidDataMap.INT32.INT32.DuplicateKey.JsonOutput
+Required.Proto3.ProtobufInput.ValidDataMap.INT64.INT64.DuplicateKey.JsonOutput
+Required.Proto3.ProtobufInput.ValidDataMap.SFIXED32.SFIXED32.DuplicateKey.JsonOutput
+Required.Proto3.ProtobufInput.ValidDataMap.SFIXED64.SFIXED64.DuplicateKey.JsonOutput
+Required.Proto3.ProtobufInput.ValidDataMap.SINT32.SINT32.DuplicateKey.JsonOutput
+Required.Proto3.ProtobufInput.ValidDataMap.SINT64.SINT64.DuplicateKey.JsonOutput
+Required.Proto3.ProtobufInput.ValidDataMap.STRING.BYTES.DuplicateKey.JsonOutput
+Required.Proto3.ProtobufInput.ValidDataMap.STRING.ENUM.DuplicateKey.JsonOutput
+Required.Proto3.ProtobufInput.ValidDataMap.STRING.MESSAGE.DuplicateKey.JsonOutput
+Required.Proto3.ProtobufInput.ValidDataMap.STRING.MESSAGE.MergeValue.JsonOutput
+Required.Proto3.ProtobufInput.ValidDataMap.STRING.STRING.DuplicateKey.JsonOutput
+Required.Proto3.ProtobufInput.ValidDataMap.UINT32.UINT32.DuplicateKey.JsonOutput
+Required.Proto3.ProtobufInput.ValidDataMap.UINT64.UINT64.DuplicateKey.JsonOutput
+
+# A message in a oneof arrives twice, and the two must merge ("Last One Wins": a message field
+# merges). The decoder keeps the second alone.
+Recommended.Editions_Proto2.ProtobufInput.ValidDataOneofBinary.MESSAGE.Merge.ProtobufOutput
+Recommended.Editions_Proto3.ProtobufInput.ValidDataOneofBinary.MESSAGE.Merge.ProtobufOutput
+Recommended.Proto2.ProtobufInput.ValidDataOneofBinary.MESSAGE.Merge.ProtobufOutput
+Recommended.Proto3.ProtobufInput.ValidDataOneofBinary.MESSAGE.Merge.ProtobufOutput
+Required.Editions_Proto2.ProtobufInput.ValidDataOneof.MESSAGE.Merge.JsonOutput
+Required.Editions_Proto2.ProtobufInput.ValidDataOneof.MESSAGE.Merge.ProtobufOutput
+Required.Editions_Proto3.ProtobufInput.ValidDataOneof.MESSAGE.Merge.JsonOutput
+Required.Editions_Proto3.ProtobufInput.ValidDataOneof.MESSAGE.Merge.ProtobufOutput
+Required.Proto2.ProtobufInput.ValidDataOneof.MESSAGE.Merge.JsonOutput
+Required.Proto2.ProtobufInput.ValidDataOneof.MESSAGE.Merge.ProtobufOutput
+Required.Proto3.ProtobufInput.ValidDataOneof.MESSAGE.Merge.JsonOutput
+Required.Proto3.ProtobufInput.ValidDataOneof.MESSAGE.Merge.ProtobufOutput
+
+# A nested message arrives twice, each time with elements of a repeated field. Its two views
+# cannot be one view, so the decoder refuses the input (decision 6).
+Required.Editions_Proto2.ProtobufInput.RepeatedScalarMessageMerge.JsonOutput
+Required.Editions_Proto2.ProtobufInput.RepeatedScalarMessageMerge.ProtobufOutput
+Required.Editions_Proto3.ProtobufInput.RepeatedScalarMessageMerge.JsonOutput
+Required.Editions_Proto3.ProtobufInput.RepeatedScalarMessageMerge.ProtobufOutput
+Required.Proto2.ProtobufInput.RepeatedScalarMessageMerge.JsonOutput
+Required.Proto2.ProtobufInput.RepeatedScalarMessageMerge.ProtobufOutput
+Required.Proto3.ProtobufInput.RepeatedScalarMessageMerge.JsonOutput
+Required.Proto3.ProtobufInput.RepeatedScalarMessageMerge.ProtobufOutput
+
+# JSON bytes in the URL-safe base64 alphabet, with - and _. The JSON decoder reads the standard
+# alphabet alone.
+Recommended.Editions_Proto2.JsonInput.BytesFieldBase64Url.JsonOutput
+Recommended.Editions_Proto2.JsonInput.BytesFieldBase64Url.ProtobufOutput
+Recommended.Editions_Proto3.JsonInput.BytesFieldBase64Url.JsonOutput
+Recommended.Editions_Proto3.JsonInput.BytesFieldBase64Url.ProtobufOutput
+Recommended.Proto2.JsonInput.BytesFieldBase64Url.JsonOutput
+Recommended.Proto2.JsonInput.BytesFieldBase64Url.ProtobufOutput
+Recommended.Proto3.JsonInput.BytesFieldBase64Url.JsonOutput
+Recommended.Proto3.JsonInput.BytesFieldBase64Url.ProtobufOutput
+
+# A field's tag written as a varint longer than a 32-bit number takes. The decoder reads it.
+Required.Editions_Proto2.ProtobufInput.BadTag_OverlongVarint
+Required.Editions_Proto3.ProtobufInput.BadTag_OverlongVarint
+Required.Proto2.ProtobufInput.BadTag_OverlongVarint
+Required.Proto3.ProtobufInput.BadTag_OverlongVarint
+
+# A JSON timestamp with a lowercase t or z. The JSON decoder reads it, and RFC 3339 as protobuf
+# takes it wants the capitals.
+Required.Editions_Proto3.JsonInput.TimestampJsonInputLowercaseT
+Required.Editions_Proto3.JsonInput.TimestampJsonInputLowercaseZ
+Required.Proto3.JsonInput.TimestampJsonInputLowercaseT
+Required.Proto3.JsonInput.TimestampJsonInputLowercaseZ
+
+# A field mask whose path does not come back from its JSON form, such as a digit after an
+# underscore. The JSON encoder writes it, and must refuse it.
+Recommended.Editions_Proto3.ProtobufInput.FieldMaskNumbersDontRoundTrip.JsonOutput
+Recommended.Proto3.ProtobufInput.FieldMaskNumbersDontRoundTrip.JsonOutput
+
+# A proto2 extension named in JSON. connect-zig has no extensions: an extension's field is an
+# unknown field, kept and written back (decision 38).
+Recommended.Editions_Proto2.JsonInput.FieldNameExtension.JsonOutput
+Recommended.Proto2.JsonInput.FieldNameExtension.JsonOutput
+
+# An extension string that is not valid UTF-8. With no extensions, the string is an unknown
+# field, which the decoder keeps unread (decision 38).
+Recommended.Editions.ProtobufInput.RejectInvalidUtf8.String.Extension

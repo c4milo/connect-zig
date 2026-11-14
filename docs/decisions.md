@@ -520,3 +520,31 @@ first. Cite an entry by number in code and commits ("decision 6").
     for that machine too. The owner asked on 2026-11-14 for an arm64 chart in the README, and
     a chart's numbers come from one CI job (decision 30). The runner is the workflow's to name,
     so this one job joins the workflow file and no other check does.
+
+38. **Google's protobuf conformance suite checks the runtime, in binary and in JSON.** Ruled by
+    the owner on 2026-11-13 and 2026-11-14.
+    - `tools/protobuf_conformance_check.sh` runs the suite's runner against
+      `conformance/protobuf_testee.zig`, for the proto3, proto2 and edition 2023 test messages,
+      with the recommended cases enforced. The program answers `skipped` for the text format,
+      for JSPB, and for a JSON case that asks to ignore unknown members: connect-zig has none
+      of the three.
+    - The suite is that of protobuf v37.0's first release candidate, which the owner chose over
+      v36.2, the latest stable release.
+    - The runner comes prebuilt in the npm package `protobuf-conformance` 37.0.0-rc1, pinned by
+      the SHA-512 of its tarball. One maintainer publishes it from `timostamm/protobuf-npm` as
+      an unofficial package, and Buf's `protobuf-conformance` repository names it as the
+      runner's home since v32.0. The owner kept it on 2026-11-14 with that known. It beat a
+      build of the runner from protobuf's source in CI, which adds minutes to the job or a
+      cache. The package holds a runner for x86-64 Linux and for macOS, so the check runs on
+      the x86-64 runner.
+    - The test protos are the package's own, copied to `conformance/proto`, and the check
+      compares them with the package's at each run.
+    - A case that fails on purpose, or that does not pass yet, is in
+      `conformance/protobuf_known_failing.txt` under its reason. The runner fails when a listed
+      case passes, so a fix removes its lines.
+    - connect-zig reads no proto2 extension: an extension's field is an unknown field, which it
+      keeps and writes back.
+    - Why: connectrpc's suite tests the RPC protocols, and the coverage check compares with
+      Go's runtime on this repository's own cases. Neither holds the encoding's corner cases.
+      This suite's first run found a generated name that did not compile, a JSON decoder that
+      did not compile for a message of 150 fields, and 113 failing cases.

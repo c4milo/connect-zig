@@ -177,6 +177,12 @@ Each step names the check that proves it. A step is done when its check passes i
     test-protobuf` reads each node its harness decodes through its iterators, from a view and
     from storage, and requires the same elements in the same order; `tools/bench_check.sh`
     walks each field of messages in place, and still matches Go's and Buffa's sums.
+17. **Google's protobuf conformance suite.** `tools/protobuf_conformance_check.sh` runs the
+    suite's runner against `conformance/protobuf_testee.zig`, in binary and in JSON, and
+    `tools/ci.sh` holds it as the check `protobuf-conformance` (decision 38). New public
+    names: none. `zig build plugin` builds the plugin alone. Check: the runner passes with the
+    cases of `conformance/protobuf_known_failing.txt` as its expected failures. At its first
+    run 5629 cases pass, 48 are skipped and 113 are listed.
 
 ### Step records
 

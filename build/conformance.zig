@@ -1,13 +1,47 @@
 //! `zig build conformance-server` and `zig build conformance-client` build the conformance server
 //! and client of conformance/ and install them to zig-out/bin, where `tools/conformance_check.sh`
 //! runs each under the connectrpc conformance runner (design §8 step 7). `zig build
-//! test-conformance` runs their unit tests.
+//! test-conformance` runs their unit tests. `zig build protobuf-testee` builds the program that
+//! Google's protobuf conformance runner tests, which `tools/protobuf_conformance_check.sh` runs
+//! (decision 38).
 const std = @import("std");
 
 const Graph = @import("graph.zig").Graph;
 
 /// The generated code of conformance/gen, which names its files by the module of each .proto.
 const generated_directory = "conformance/gen/connectrpc/conformance/v1/";
+
+/// The generated code of the protobuf conformance suite's own protos: the runner's protocol,
+/// and the test messages up to edition 2023. Each is a module under the name the program
+/// imports.
+const protobuf_suite = [_]struct { name: []const u8, path: []const u8 }{
+    .{ .name = "conformance_pb", .path = "conformance/gen/conformance/conformance.pb.zig" },
+    .{ .name = "test_messages_proto3", .path = "conformance/gen/google/protobuf/test_messages_proto3.pb.zig" },
+    .{ .name = "test_messages_proto2", .path = "conformance/gen/google/protobuf/test_messages_proto2.pb.zig" },
+    .{ .name = "test_messages_edition2023", .path = "conformance/gen/google/protobuf/test_messages_edition2023.pb.zig" },
+    .{ .name = "test_messages_proto3_editions", .path = "conformance/gen/google/protobuf/test_messages_proto3_editions.pb.zig" },
+    .{ .name = "test_messages_proto2_editions", .path = "conformance/gen/google/protobuf/test_messages_proto2_editions.pb.zig" },
+};
+
+/// Adds the step that builds the protobuf conformance suite's program, and returns it.
+fn add_protobuf_testee(b: *std.Build, graph: Graph) *std.Build.Step {
+    const root = b.createModule(.{
+        .root_source_file = b.path("conformance/protobuf_testee.zig"),
+        .target = graph.target,
+        .optimize = graph.optimize,
+    });
+    root.addImport("protobuf", graph.protobuf);
+    for (protobuf_suite) |file| {
+        const module = b.createModule(.{ .root_source_file = b.path(file.path), .target = graph.target, .optimize = graph.optimize });
+        module.addImport("protobuf", graph.protobuf);
+        root.addImport(file.name, module);
+    }
+    const exe = b.addExecutable(.{ .name = "protobuf-testee", .root_module = root });
+    const install = b.addInstallArtifact(exe, .{});
+    b.getInstallStep().dependOn(&install.step);
+    b.step("protobuf-testee", "Build the protobuf conformance suite's program into zig-out/bin").dependOn(&install.step);
+    return &install.step;
+}
 
 /// Adds the server's steps and returns the step that runs its unit tests.
 pub fn add(b: *std.Build, graph: Graph) *std.Build.Step {
@@ -65,6 +99,7 @@ pub fn add(b: *std.Build, graph: Graph) *std.Build.Step {
     // The test step also builds the server, so a change that breaks it fails `zig build test`.
     step.dependOn(&install.step);
     step.dependOn(&client_install.step);
+    step.dependOn(add_protobuf_testee(b, graph));
     return step;
 }
 
