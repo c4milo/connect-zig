@@ -788,6 +788,13 @@ ran on Linux x86-64 with Zig 0.16.0.
     change alone takes 21.33% fewer instructions on tree and 3.93% fewer on large. The
     encoders, the plugin and the conformance server read messages through the pointer; the
     plugin copies a descriptor where it keeps one. Mutations, 7, each CAUGHT.
+  - The judge and the times of both, on `989d740`, [run
+    43622491626](https://github.com/c4milo/connect-zig/actions/runs/43622491626). Binary
+    decode+walk takes 26.88% fewer instructions on tree and 5.80% fewer on large, and tree's
+    JSON decode+walk 4.12% fewer; no count rose past 0.5%. `bench/instructions.txt` holds
+    these counts. Buffa's time over connect-zig's for tree's binary decode+walk reads 1.79 on
+    a Xeon 6975P-C and 2.01 on the Neoverse-N2, where run 116 read 0.85 and 1.10; large's
+    reads 1.50 and 1.63.
 
 ### What a later step owes
 
