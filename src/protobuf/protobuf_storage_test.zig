@@ -9,6 +9,10 @@
 //! - Each one cut short at every length, and with each bit of each octet flipped.
 //! - Storage of each size from none to more than the message needs, aligned and not.
 //!
+//! Each node that decodes is also read through its iterators, from the views `decode` leaves and
+//! from the storage `decode_into` fills, and both readings must give the same elements in the
+//! same order. An iterator gives a message in place, and any other element by value.
+//!
 //! A fuzz property runs the same check on any input.
 const std = @import("std");
 const testing = std.testing;
@@ -139,16 +143,75 @@ fn outcome(comptime T: type, bytes: []const u8, storage: ?[]u8, out: []u8) Outco
     return .{ .message = proto.encode(T, &message, out) catch |failure| return .{ .refusal = failure } };
 }
 
+/// An element changes a fold by its place and by its value, so two folds agree only when both
+/// read the same elements in the same order.
+const fold_factor = 31;
+/// The levels of nodes a fold follows: more than any message of the harness nests.
+const fold_depth_max = 16;
+
+/// One number from every element of every repeated field of a node, each read through its
+/// field's iterator.
+fn fold_node(node: *const Node, depth_left: usize) anyerror!u64 {
+    if (depth_left == 0) return error.FoldTooDeep;
+    var sum: u64 = node.label.len;
+    inline for (.{ "numbers", "fixed", "names", "leaves", "children", "counts" }) |name| {
+        const field = &@field(node, name);
+        sum = sum *% fold_factor +% try fold_field(@TypeOf(field.*), field, depth_left);
+    }
+    const next = try node.next.get() orelse return sum;
+    return sum *% fold_factor +% try fold_node(&next, depth_left - 1);
+}
+
+fn fold_field(comptime F: type, field: *const F, depth_left: usize) anyerror!u64 {
+    var elements = field.iterator();
+    var sum: u64 = 0;
+    // Each element takes at least one octet of an input.
+    for (0..encoded_len_max + 1) |_| {
+        const element = try elements.next() orelse return sum;
+        // A message comes from the iterator in place, as a pointer.
+        const at = if (comptime F.kind.holds_message()) element else &element;
+        sum = sum *% fold_factor +% try fold_element(F.Element, at, depth_left);
+    }
+    return error.FoldTooLong;
+}
+
+fn fold_element(comptime E: type, element: *const E, depth_left: usize) anyerror!u64 {
+    return switch (E) {
+        i64 => @bitCast(element.*),
+        u32 => element.*,
+        []const u8 => fold_text(element.*),
+        Leaf => fold_text(element.name) *% fold_factor +% element.id,
+        CountsEntry => fold_text(element.key) *% fold_factor +% @as(u64, @bitCast(element.value)),
+        Node => fold_node(element, depth_left - 1),
+        else => @compileError("no fold for " ++ @typeName(E)),
+    };
+}
+
+fn fold_text(text: []const u8) u64 {
+    return text.len *% fold_factor +% (if (text.len == 0) 0 else text[0]);
+}
+
+/// What the iterators of a decoded node read, or null when `T` is no node or the decode refuses
+/// `bytes`: the outcome holds the refusal.
+fn reading(comptime T: type, bytes: []const u8, storage: ?[]u8) ?anyerror!u64 {
+    if (T != Node) return null;
+    const decoded = if (storage) |room| proto.decode_into(Node, bytes, room) else proto.decode(Node, bytes);
+    const node = decoded catch return null;
+    return fold_node(&node, fold_depth_max);
+}
+
 /// Decodes `bytes` as a `T` with `decode`, and with `decode_into` in each size of storage, and
 /// requires one outcome.
 fn check(comptime T: type, bytes: []const u8) !void {
     var want_out: [out_len_max]u8 = @splat(0);
     const want = outcome(T, bytes, null, &want_out);
+    const want_reading = reading(T, bytes, null);
     var storage: [storage_len_max + 1]u8 align(storage_align) = @splat(0);
     for (storage_lens) |len| {
         for ([_]usize{ 0, 1 }) |offset| {
             var got_out: [out_len_max]u8 = @splat(0);
             const got = outcome(T, bytes, storage[offset..][0..len], &got_out);
+            try testing.expectEqual(want_reading, reading(T, bytes, storage[offset..][0..len]));
             switch (want) {
                 .refusal => |refusal| try testing.expectEqual(Outcome{ .refusal = refusal }, got),
                 .message => |message| try testing.expectEqualSlices(u8, message, got.message),
@@ -205,6 +268,37 @@ test "a run of groups is counted, and read into the storage" {
     try testing.expectEqual(bundles.len, crate.bundles.items.len);
     try testing.expectEqual(numbers.len, crate.bundles.items[bundles.len - 1].numbers.items.len);
     try check_each_change(Crate, bytes);
+}
+
+test "an iterator gives a message of the storage where it lies, and a view's message from its slot" {
+    var buffer: [encoded_len_max]u8 = @splat(0);
+    const bytes = try encoded(&full, &buffer);
+    var storage: [storage_len_max]u8 align(storage_align) = @splat(0);
+    const stored = try proto.decode_into(Node, bytes, &storage);
+    var in_storage = stored.leaves.iterator();
+    for (stored.leaves.items) |*leaf| try testing.expectEqual(leaf, (try in_storage.next()).?);
+    // The end holds: each later call gives null again.
+    try testing.expectEqual(@as(?*const Leaf, null), try in_storage.next());
+    try testing.expectEqual(@as(?*const Leaf, null), try in_storage.next());
+    // A view holds no message to point at, so each one is decoded into the iterator's slot.
+    const lazy = try proto.decode(Node, bytes);
+    var in_view = lazy.leaves.iterator();
+    for (leaves) |want| {
+        const got = (try in_view.next()).?;
+        try testing.expectEqual(&in_view.current, got);
+        try testing.expectEqualStrings(want.name, got.name);
+        try testing.expectEqual(want.id, got.id);
+    }
+    try testing.expectEqual(@as(?*const Leaf, null), try in_view.next());
+    // The messages a program set are read in place too, and an empty field has none.
+    var in_program = full.leaves.iterator();
+    try testing.expectEqual(&leaves[0], (try in_program.next()).?);
+    try testing.expectEqual(try fold_node(&full, fold_depth_max), try fold_node(&stored, fold_depth_max));
+    var in_empty = (Node{}).children.iterator();
+    try testing.expectEqual(@as(?*const Node, null), try in_empty.next());
+    // A number comes back by value, and a field of numbers holds no slot.
+    try testing.expectEqual(i64, @TypeOf(stored.numbers).Iterator.Item);
+    try testing.expectEqual(void, @FieldType(@TypeOf(stored.numbers).Iterator, "current"));
 }
 
 test "with room, each repeated field and each Lazy child is read into the storage" {

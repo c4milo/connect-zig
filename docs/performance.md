@@ -118,6 +118,7 @@ failed (the owner's ruling of 2026-11-09). A new fast path joins this list the s
 | The end of a field's stored items with no call | `repeated.zig`, `RepeatedIterator.next` | packed binary decode+walk +25.50%, large +7.17%, medium +5.66% |
 | Each `TextWriter` call inline in the JSON encoder | `json_encode.zig` and `json_scalar.zig` | deep JSON encode +30.03%, small +25.20%, varints +21.74%, tree +19.71%, strings +18.24% |
 | A run of messages counted with no call | `decode_run.zig`, `run_count` | tree binary decode+walk +11.38%, large +3.32%, local x86-64-v2 |
+| A message given in place by its iterator | `repeated.zig`, `next_message` | tree binary decode+walk +27.11%, large +4.09%, local x86-64-v2 |
 
 ## The pitfalls
 
@@ -134,6 +135,7 @@ failed (the owner's ruling of 2026-11-09). A new fast path joins this list the s
 | A mutation that turned a fast path off passed every test. | The reference path gives the same output, and the old baseline already holds the slow count. | Write the new baseline first; then `tools/perf_check.sh` fails such a mutation. |
 | callgrind in an x86-64 container on an Apple Mac stops at an AVX instruction. | Rosetta's x86-64 reports no AVX, and valgrind refuses it. | A local count builds for x86-64-v2; its counts track the judge's within 1% where no code is vectorized. |
 | Large binary encode took 11% more time on an EPYC 7763 with 4.79% fewer instructions. | The judge counts instructions. It does not count a missed branch or a load that waits for a store, and an M1 hides both. | Before a number is published, compare the times of two `bench-compare` runs on the same CPU. |
+| Tree's decode with every field read took 10.0 µs, and 4.5 µs once its walk read each node in place. | `next` returned each message by value, and its caller copied a 56-octet node three times through memory. | An iterator gives a message as a pointer; pass a message by its address from there on. |
 | Medium binary encode took 20% more time with `writer.len += n` after each inline write. | A store through the buffer, a `[]u8`, may be the length, so the compiler reads the length again from memory, and each write waits for the one before it. | A write reads the length once, stores its octets, then stores the length. Time such a change on x86: an M1 hides the wait. |
 
 A pitfall that belongs to Zig and not to connect-zig moves to pepegrillo's

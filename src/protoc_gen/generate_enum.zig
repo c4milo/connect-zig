@@ -52,7 +52,7 @@ pub fn write_service(out: *Out, package: []const u8, service: pb.ServiceDescript
     try out.print("\npub const {s} = struct {{\n", .{try names.identifier(out.arena, name)});
     try out.print("    pub const service_name = {s};\n", .{try names.string_literal(out.arena, try generate_out.full_name(out.arena, package, name))});
     var methods = service.method.iterator();
-    while (try methods.next()) |method| try write_method(out, method);
+    while (try methods.next()) |method| try write_method(out, method.*);
     try write_routes(out, service);
     try out.print("}};\n", .{});
 }
@@ -67,7 +67,7 @@ fn write_routes(out: *Out, service: pb.ServiceDescriptorProto) Error!void {
     while (try methods.next()) |method| {
         const field = try names.identifier(out.arena, try names.snake_case(out.arena, method.name orelse ""));
         try entries.print(out.arena, "                transport.post(App, {s}, Handlers.{s}, options),\n", .{ field, field });
-        if (no_side_effects(method)) try entries.print(out.arena, "                transport.get(App, {s}, Handlers.{s}, options),\n", .{ field, field });
+        if (no_side_effects(method.*)) try entries.print(out.arena, "                transport.get(App, {s}, Handlers.{s}, options),\n", .{ field, field });
     }
     try out.print(
         \\

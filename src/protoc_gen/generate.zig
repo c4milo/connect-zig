@@ -23,11 +23,11 @@ pub fn file(arena: Allocator, index: *const Index, descriptor: pb.FileDescriptor
     var out: Out = .{ .arena = arena, .index = index, .file = descriptor.name orelse "", .features = .of_file(descriptor) };
     const package = descriptor.package orelse "";
     var messages = descriptor.message_type.iterator();
-    while (try messages.next()) |message| try generate_message.write(&out, package, message, 0);
+    while (try messages.next()) |message| try generate_message.write(&out, package, message.*, 0);
     var enums = descriptor.enum_type.iterator();
-    while (try enums.next()) |enumeration| try generate_enum.write(&out, package, enumeration, 0);
+    while (try enums.next()) |enumeration| try generate_enum.write(&out, package, enumeration.*, 0);
     var services = descriptor.service.iterator();
-    while (try services.next()) |service| try generate_enum.write_service(&out, package, service);
+    while (try services.next()) |service| try generate_enum.write_service(&out, package, service.*);
     const outputs = try arena.alloc(Output, 1);
     outputs[0] = .{ .name = try names.output_path(arena, descriptor.name orelse ""), .content = try out.assemble() };
     return outputs;

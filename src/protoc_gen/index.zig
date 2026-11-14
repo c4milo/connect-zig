@@ -33,9 +33,9 @@ pub const Index = struct {
         for (files) |file| {
             const prefix = try package_prefix(arena, file.package);
             var messages = file.message_type.iterator();
-            while (try messages.next()) |message| try index.add_message(arena, file.name orelse "", prefix, "", message);
+            while (try messages.next()) |message| try index.add_message(arena, file.name orelse "", prefix, "", message.*);
             var enums = file.enum_type.iterator();
-            while (try enums.next()) |enumeration| try index.add_enum(arena, file.name orelse "", prefix, "", enumeration);
+            while (try enums.next()) |enumeration| try index.add_enum(arena, file.name orelse "", prefix, "", enumeration.*);
         }
         return index;
     }
@@ -48,9 +48,9 @@ pub const Index = struct {
         try index.entries.put(arena, full, .{ .file = file, .zig_path = zig_path, .message = message });
         const nested_prefix = try std.fmt.allocPrint(arena, "{s}.", .{full});
         var nested = message.nested_type.iterator();
-        while (try nested.next()) |child| try index.add_message(arena, file, nested_prefix, zig_path, child);
+        while (try nested.next()) |child| try index.add_message(arena, file, nested_prefix, zig_path, child.*);
         var enums = message.enum_type.iterator();
-        while (try enums.next()) |enumeration| try index.add_enum(arena, file, nested_prefix, zig_path, enumeration);
+        while (try enums.next()) |enumeration| try index.add_enum(arena, file, nested_prefix, zig_path, enumeration.*);
     }
 
     fn add_enum(index: *Index, arena: Allocator, file: []const u8, prefix: []const u8, parent: []const u8, enumeration: pb.EnumDescriptorProto) Error!void {

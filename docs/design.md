@@ -169,6 +169,14 @@ Each step names the check that proves it. A step is done when its check passes i
     field `storage_bytes` of `connect_colibri.RouteOptions`. Check: `zig build test-connect`
     decodes into a scratch's storage and without one; `zig build test-connect-colibri` holds
     each size of a request's storage.
+16. **Read a repeated field's messages in place.** A repeated field's iterator gives a
+    message as a pointer, and copies none that lies in `items`; it gives any other element by
+    value, as before (decision 37). This changes `next` for a field of messages: its result is
+    `?*const T`, where it was `?T`. New public names: none at a module's root; the type `Item`
+    of a `Repeated` field's `Iterator`, and its field `current`. Check: `zig build
+    test-protobuf` reads each node its harness decodes through its iterators, from a view and
+    from storage, and requires the same elements in the same order; `tools/bench_check.sh`
+    walks each field of messages in place, and still matches Go's and Buffa's sums.
 
 ### Step records
 
@@ -768,6 +776,18 @@ ran on Linux x86-64 with Zig 0.16.0.
     EPYC 9V74 and on a Neoverse-N2: tree's binary decode+walk took 21.5% and 9.1% less time,
     and large's 5.1% and 2.7% less. On x86-64-v2, tree takes 10.22% fewer instructions.
     Mutations, 3, each CAUGHT, after a new test of a counted run of groups.
+  - Messages in place (step 16), ruled by the owner on 2026-11-14. The first round of the lab
+    placed tree's cost in the walk: `next` returned a 56-octet node by value, and the walk
+    copied it three times. `next` now gives a message as a pointer into `items`, or into the
+    iterator's slot for a message of a view, and answers the end of a view with no call. The
+    benchmark's walk reads each field of messages so, as Go's reads a slice of pointers and
+    Buffa's a vector by reference. The lab's second round timed this as a second method,
+    `next_ptr`, which the owner then folded into `next`. With the run counted with no call,
+    binary decode+walk took less time on tree, 55.5% on the EPYC 9V74 and 45.6% on the
+    Neoverse-N2, and on large, 27.5% and 15.1%; medium moved less than 5%. On x86-64-v2, the
+    change alone takes 21.33% fewer instructions on tree and 3.93% fewer on large. The
+    encoders, the plugin and the conformance server read messages through the pointer; the
+    plugin copies a descriptor where it keeps one. Mutations, 7, each CAUGHT.
 
 ### What a later step owes
 

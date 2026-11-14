@@ -339,7 +339,8 @@ fn encode_each(comptime field: Field, comptime F: type, item: *const F, sink: an
     for (0..constants.limits.elements_max) |_| {
         const element = try elements.next() orelse return;
         if (comptime F.kind.holds_message()) {
-            try encode_child(F.Element, F.kind, field.number, &element, sink);
+            // A message comes from the iterator in place, as a pointer.
+            try encode_child(F.Element, F.kind, field.number, element, sink);
         } else {
             try sink.tag(field.number, F.kind.wire_type());
             try sink.value(F.kind, F.Element, element);

@@ -484,6 +484,18 @@ first. Cite an entry by number in code and commits ("decision 6").
     - connect's codec takes `decode_into` for a binary message when its `Scratch` holds
       storage. Each route holds `message_bytes` of it by default, which the owner chose over
       none (design §8 step 15).
+    - An iterator gives a message in place (design §8 step 16). `next` returns `?Item`: for a
+      message, a pointer that holds until the next call, into `items` or into the iterator's
+      own slot for a message of a view; for a number, a string or an enum, the value. The
+      owner ruled it on 2026-11-14. It follows TigerStyle's `*const` for a value of more than
+      16 octets, and std has iterators whose `next` returns a pointer. No std iterator chooses
+      by a compile-time parameter, so the iterator names the choice `Item`. Before, `next`
+      returned each message by value, and a walk copied a 56-octet node three times: with
+      messages in place and a run counted with no call, tree's decode with every field read
+      took 4.5 µs where it took 10.0 µs, on an EPYC 9V74. It beat a second method `next_ptr`
+      beside `next`, which the owner ruled first and then replaced, since one method reads a
+      field; a pointer for every element, where a number needs `.*` at each read and passes
+      through the slot; and a slot the caller passes, which adds a line at each call.
     - Why: a program that reads every field parsed each repeated field twice, once when
       `decode` checked it and once when the program read it. So Buffa's decode with every field
       read beat connect-zig's on medium, large, tree and packed.

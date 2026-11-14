@@ -1,7 +1,8 @@
 //! Reads every field of a message and folds what it read into one number, as bench/go/walk.go
 //! does. A decoded message here is lazy: strings and bytes point into the input, and a repeated
 //! field or a recursive one is decoded when it is read. Walking it does the work that Go's
-//! `proto.Unmarshal` does up front, so "decode+walk" compares like with like.
+//! `proto.Unmarshal` does up front, so "decode+walk" compares like with like. An iterator gives
+//! each message of a field in place, and each number or string by value.
 //!
 //! The fold adds, with wrapping: each integer and enum as a sign-extended 64-bit value, each bool
 //! as 0 or 1, each float's bits, and each string's and bytes field's length. A message folds its
@@ -32,7 +33,7 @@ pub fn medium(message: *const bench.Medium) Error!u64 {
     sum +%= try each(@TypeOf(message.tags), &message.tags, text);
     sum +%= try each(@TypeOf(message.counters), &message.counters, counter);
     if (message.contact) |contact| sum +%= try contact_sum(contact);
-    sum +%= try each(@TypeOf(message.previous), &message.previous, address);
+    sum +%= try each(@TypeOf(message.previous), &message.previous, address_at);
     sum +%= message.checksum;
     sum +%= @as(u32, @bitCast(message.ratio));
     sum +%= int(message.delta);
@@ -47,10 +48,14 @@ fn contact_sum(contact: @typeInfo(@FieldType(bench.Medium, "contact")).optional.
 }
 
 fn address(message: bench.Address) Error!u64 {
+    return address_at(&message);
+}
+
+fn address_at(message: *const bench.Address) Error!u64 {
     return message.street.len +% message.city.len +% message.country.len +% message.postal_code;
 }
 
-fn counter(entry: bench.Medium.CountersEntry) Error!u64 {
+fn counter(entry: *const bench.Medium.CountersEntry) Error!u64 {
     return entry.key.len +% int(entry.value);
 }
 
@@ -66,7 +71,7 @@ fn signed(value: i32) Error!u64 {
     return int(value);
 }
 
-fn record(message: bench.Record) Error!u64 {
+fn record(message: *const bench.Record) Error!u64 {
     var sum: u64 = message.id;
     sum +%= message.key.len;
     sum +%= message.payload.len;
@@ -129,10 +134,10 @@ pub fn strings(message: *const bench.Strings) Error!u64 {
 
 /// A tree holds no scalar, so its walk counts the nodes it reads, itself included.
 pub fn tree(message: *const bench.Tree) Error!u64 {
-    return tree_node(message.*);
+    return tree_node(message);
 }
 
-fn tree_node(message: bench.Tree) Error!u64 {
+fn tree_node(message: *const bench.Tree) Error!u64 {
     return 1 +% try each(@TypeOf(message.children), &message.children, tree_node);
 }
 
@@ -152,7 +157,10 @@ pub fn packed_scalars(message: *const bench.Packed) Error!u64 {
     return sum;
 }
 
-fn each(comptime Field: type, field: *const Field, comptime fold: fn (Field.Element) Error!u64) Error!u64 {
+/// Folds each element of a field. The iterator gives a message in place, as a pointer, as Go's
+/// walk reads a slice of pointers and Rust's a vector by reference; it gives a number or a
+/// string by value.
+fn each(comptime Field: type, field: *const Field, comptime fold: fn (Field.Iterator.Item) Error!u64) Error!u64 {
     var elements = field.iterator();
     var sum: u64 = 0;
     for (0..proto.constants.limits.elements_max) |_| {

@@ -41,9 +41,9 @@ pub fn write(out: *Out, scope: []const u8, message: pb.DescriptorProto, depth: u
 
 fn write_nested(out: *Out, full: []const u8, message: pb.DescriptorProto, depth: usize) Error!void {
     var nested = message.nested_type.iterator();
-    while (try nested.next()) |child| try write(out, full, child, depth);
+    while (try nested.next()) |child| try write(out, full, child.*, depth);
     var enums = message.enum_type.iterator();
-    while (try enums.next()) |enumeration| try generate_enum.write(out, full, enumeration, depth);
+    while (try enums.next()) |enumeration| try generate_enum.write(out, full, enumeration.*, depth);
 }
 
 /// A nested declaration named `FieldNumber` would collide with the enum the generator adds.
@@ -69,7 +69,7 @@ fn collect_fields(out: *Out, message: pb.DescriptorProto) Error![]Member {
     while (try fields.next()) |field| {
         const synthetic = field.proto3_optional orelse false;
         const oneof: ?[]const u8 = if (field.oneof_index) |at| (if (synthetic) null else oneofs.items[@intCast(at)]) else null;
-        try members.append(out.arena, .{ .field = field, .oneof = oneof });
+        try members.append(out.arena, .{ .field = field.*, .oneof = oneof });
     }
     return members.items;
 }

@@ -48,7 +48,7 @@ fn generate_all(arena: Allocator, request_bytes: []const u8) (generate.Error || 
     const request = try proto.decode(pb.CodeGeneratorRequest, request_bytes);
     var descriptors: std.ArrayList(pb.FileDescriptorProto) = .empty;
     var proto_files = request.proto_file.iterator();
-    while (try proto_files.next()) |descriptor| try descriptors.append(arena, descriptor);
+    while (try proto_files.next()) |descriptor| try descriptors.append(arena, descriptor.*);
     const index = try index_file.Index.build(arena, descriptors.items);
     var outputs: std.ArrayList(pb.GeneratedFile) = .empty;
     var wanted = request.file_to_generate.iterator();

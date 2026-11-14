@@ -107,7 +107,7 @@ fn write_list(list: *const wkt.ListValue, text: *json.TextWriter, depth_left: u3
     var values = list.values.iterator();
     for (0..constants.limits.elements_max) |_| {
         const value = try values.next() orelse break;
-        try write_json_value(&value, text, depth_left - 1);
+        try write_json_value(value, text, depth_left - 1);
     }
     try @call(.always_inline, json.TextWriter.end_array, .{text});
 }
@@ -251,7 +251,9 @@ noinline fn write_array_encoded(comptime field: Field, comptime F: type, item: *
     var elements = item.iterator();
     for (0..constants.limits.elements_max) |_| {
         const element = try elements.next() orelse return;
-        try write_value(field, F.Element, element, text, registry);
+        // A message comes from the iterator in place, as a pointer.
+        const at = if (comptime F.kind.holds_message()) element else &element;
+        try write_element(field, F.Element, at, text, registry);
     }
 }
 
@@ -276,7 +278,7 @@ noinline fn write_map_encoded(comptime F: type, item: *const F, text: *json.Text
     var entries = item.iterator();
     for (0..constants.limits.elements_max) |_| {
         const entry = try entries.next() orelse return;
-        try write_entry(Entry, Entry.protobuf.fields[0], Entry.protobuf.fields[1], &entry, text, registry);
+        try write_entry(Entry, Entry.protobuf.fields[0], Entry.protobuf.fields[1], entry, text, registry);
     }
 }
 

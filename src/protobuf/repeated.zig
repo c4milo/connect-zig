@@ -3,7 +3,9 @@
 //! A `Repeated` field is either a slice of `items`, which a program sets to encode, or a `View`
 //! of the enclosing message's bytes, which `decode` sets. An `Iterator` yields each element from
 //! either, reading packed and unpacked elements alike ("Packed Repeated Fields": a parser must
-//! accept both). A map field is a `Repeated` of its entry messages ("Maps", language guide).
+//! accept both). `next` gives a message in place, as a pointer, which copies nothing when the
+//! message lies in `items`; it gives any other element by value (decision 37). A map field is
+//! a `Repeated` of its entry messages ("Maps", language guide).
 //!
 //! A `Lazy` field holds a singular message that may contain its own type. It holds either the
 //! encoded bytes, which `decode` sets, or a pointer to a value, which a program sets to encode.
@@ -65,23 +67,24 @@ fn count_view(comptime Iterator: type, start: Iterator) wire.Error!usize {
 pub fn RepeatedIterator(comptime T: type, comptime element_kind: Kind) type {
     return struct {
         const Self = @This();
+        /// What `next` gives: a message in place, as a pointer, and any other element by
+        /// value. A message is passed by its address, as any value of more than 16 octets is.
+        pub const Item = ItemOf(T, element_kind);
         items: []const T,
         index: usize = 0,
         reader: wire.Reader,
         number: u32,
         /// The rest of a packed record being read, or empty.
         packed_reader: wire.Reader = .{ .bytes = &.{} },
+        /// Where `next` decodes a message of a view, which lies nowhere else.
+        current: Slot(T, element_kind) = undefined,
 
-        pub inline fn next(it: *Self) wire.Error!?T {
-            // Items are read in place, which a decode with storage leaves as a program does.
-            // Items, the end among them, take no call.
-            if (it.items.len != 0) return @call(.always_inline, next_item, .{ T, it });
-            // Inside a packed record whose every number is an element, the next element is the
-            // record's next scalar ("Packed Repeated Fields").
-            if (comptime keeps_every_number(T, element_kind)) {
-                if (!it.packed_reader.at_end()) return try read_scalar(T, element_kind, &it.packed_reader);
-            }
-            return it.next_slow();
+        /// The next element, or null at the field's end. A message comes back in place: a
+        /// pointer into `items`, or into this iterator's own slot for a message of a view. The
+        /// pointer holds until the next call. Any other element comes back by value.
+        pub inline fn next(it: *Self) wire.Error!?Item {
+            if (comptime element_kind.holds_message()) return @call(.always_inline, next_message, .{ T, it });
+            return @call(.always_inline, next_value, .{ T, element_kind, it });
         }
 
         /// A new record, the end of the field and the numbers of a closed enum: out of
@@ -110,6 +113,43 @@ fn keeps_every_number(comptime T: type, comptime element_kind: Kind) bool {
 fn next_read(comptime T: type, comptime element_kind: Kind, it: anytype) wire.Error!?T {
     if (!it.packed_reader.at_end()) return try read_scalar(T, element_kind, &it.packed_reader);
     return next_in_view(T, element_kind, it);
+}
+
+fn ItemOf(comptime T: type, comptime element_kind: Kind) type {
+    return if (element_kind.holds_message()) *const T else T;
+}
+
+/// Room for one message of a view. A field of numbers or strings takes none.
+fn Slot(comptime T: type, comptime element_kind: Kind) type {
+    return if (element_kind.holds_message()) T else void;
+}
+
+/// The next number, string or enum by value, inline at each call.
+fn next_value(comptime T: type, comptime element_kind: Kind, it: anytype) wire.Error!?T {
+    // Items are read in place, which a decode with storage leaves as a program does.
+    // Items, the end among them, take no call.
+    if (it.items.len != 0) return @call(.always_inline, next_item, .{ T, it });
+    // Inside a packed record whose every number is an element, the next element is the
+    // record's next scalar ("Packed Repeated Fields").
+    if (comptime keeps_every_number(T, element_kind)) {
+        if (!it.packed_reader.at_end()) return try read_scalar(T, element_kind, &it.packed_reader);
+    }
+    return it.next_slow();
+}
+
+/// The next message in place, apart from the iterator's type and inline at each call. A
+/// message by value cost its caller three copies of it through memory (docs/performance.md).
+fn next_message(comptime T: type, it: anytype) wire.Error!?*const T {
+    if (it.items.len != 0) {
+        if (it.index == it.items.len) return null;
+        it.index += 1;
+        return &it.items[it.index - 1];
+    }
+    // The end of a view, an empty field's among them, takes no call. A message is never
+    // packed, so the view's reader alone says where the field ends.
+    if (it.reader.at_end()) return null;
+    it.current = try it.next_slow() orelse return null;
+    return &it.current;
 }
 
 fn next_item(comptime T: type, it: anytype) ?T {

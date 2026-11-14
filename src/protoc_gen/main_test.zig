@@ -32,7 +32,7 @@ fn generated_files(arena: std.mem.Allocator, request: *const pb.CodeGeneratorReq
     try testing.expectEqual(@as(?i32, pb.edition_2024), response.maximum_edition);
     var files = response.file.iterator();
     var list: std.ArrayList(pb.GeneratedFile) = .empty;
-    while (try files.next()) |output| try list.append(arena, output);
+    while (try files.next()) |output| try list.append(arena, output.*);
     return list.items;
 }
 

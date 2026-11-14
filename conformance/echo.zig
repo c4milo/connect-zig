@@ -165,7 +165,7 @@ fn add_each(response: *rpc.AnyResponse, list: *const proto.Repeated(Header, .mes
     var fields = list.iterator();
     for (0..rpc.constants.fields_max + 1) |_| {
         const field = (fields.next() catch return internal) orelse return null;
-        if (add_values(response, &field, section)) |failure| return failure;
+        if (add_values(response, field, section)) |failure| return failure;
     }
     return internal;
 }

@@ -52,6 +52,10 @@ The first release.
 - `decode_into` reads each repeated field's elements, and each recursive field's message, into
   storage the caller owns, once. A program that reads every field takes it, and parses nothing
   twice. `decode` stores nothing (decision 37).
+- A repeated field's iterator gives a message in place: for a field of messages, `next`
+  returns a pointer, and copies no message that `decode_into` stored or that a program set.
+  The pointer holds until the next call. A number, a string or an enum still comes back by
+  value.
 - A server reads each binary request's repeated fields into storage once, so a handler that
   reads them parses them once: each route holds `storage_bytes`, `message_bytes` by default, and
   0 keeps `decode`. A client passes storage in its `connect.Scratch`.

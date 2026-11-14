@@ -70,7 +70,8 @@ fn check_tree(tree: *const kitchen.Tree) !void {
     // `map_get` reads a map's entries and returns the value of the last entry with the key.
     const label = try proto.map_get(@TypeOf(tree.labels), &tree.labels, @as(i32, 7)) orelse return error.ExampleWrong;
     if (!std.mem.eql(u8, label, "seven")) return error.ExampleWrong;
-    // A repeated field is read through its iterator, from storage or from the bytes.
+    // A repeated field is read through its iterator, from storage or from the bytes. It gives a
+    // message in place, as a pointer, and a number or a string by value.
     var children = tree.children.iterator();
     const child = try children.next() orelse return error.ExampleWrong;
     if (!std.mem.eql(u8, child.name, "child")) return error.ExampleWrong;

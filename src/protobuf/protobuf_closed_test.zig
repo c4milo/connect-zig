@@ -79,7 +79,7 @@ test "a repeated closed enum and a map skip what the enum does not name" {
     try testing.expectEqual(@as(usize, 2), try shirt.sizes.count());
     var entries = shirt.by_name.iterator();
     try testing.expectEqualStrings("a", (try entries.next()).?.key);
-    try testing.expectEqual(@as(?Entry, null), try entries.next());
+    try testing.expectEqual(@as(?*const Entry, null), try entries.next());
 }
 
 test "what a closed enum did not take is written back" {

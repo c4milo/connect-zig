@@ -34,7 +34,7 @@ test "a group reads back, its repeated form too, and a field after it" {
     var items = message.items.iterator();
     try testing.expectEqual(@as(i32, 1), (try items.next()).?.a);
     try testing.expectEqual(@as(i32, 2), (try items.next()).?.a);
-    try testing.expectEqual(@as(?Inner, null), try items.next());
+    try testing.expectEqual(@as(?*const Inner, null), try items.next());
     try testing.expectEqual(@as(i32, 7), message.after);
 }
 
