@@ -118,6 +118,33 @@ test "messages, enums, oneofs, maps, recursion and services are generated" {
     try expect_contains(text, "                transport.post(App, get_node, Handlers.get_node, options),\n            };\n");
 }
 
+test "a field and an enum value named as the type's descriptor gain an underscore" {
+    var arena_state = std.heap.ArenaAllocator.init(testing.allocator);
+    defer arena_state.deinit();
+    const arena = arena_state.allocator();
+    // Each generated type declares `protobuf`, so a member of that name would be declared twice:
+    // the conformance suite's own `WireFormat` holds the value PROTOBUF.
+    const carrier: pb.DescriptorProto = .{ .name = "Carrier", .field = .of(&.{ field("protobuf", 1, .bytes, .optional), field("json", 2, .string, .optional) }) };
+    const format: pb.EnumDescriptorProto = .{ .name = "Format", .value = .of(&.{
+        .{ .name = "UNSPECIFIED", .number = 0 }, .{ .name = "PROTOBUF", .number = 1 }, .{ .name = "PROTOBUF_JSON", .number = 2 },
+    }) };
+    const file: pb.FileDescriptorProto = .{
+        .name = "demo/v1/demo.proto",
+        .package = "demo.v1",
+        .message_type = .of(&.{carrier}),
+        .enum_type = .of(&.{format}),
+        .syntax = "proto3",
+    };
+    const request: pb.CodeGeneratorRequest = .{ .file_to_generate = .of(&.{"demo/v1/demo.proto"}), .proto_file = .of(&.{file}) };
+    const text = try generated(arena, &request);
+    try expect_contains(text, "pub const Carrier = struct {\n    protobuf_: []const u8 = \"\",\n    json: []const u8 = \"\",\n");
+    try expect_contains(text, "        protobuf_ = 1,\n        json = 2,\n");
+    // The descriptor reads the field by its Zig name, and keeps the name the .proto file gives.
+    try expect_contains(text, ".{ .name = \"protobuf_\", .number = @intFromEnum(@This().FieldNumber.protobuf_), .kind = .bytes, .json_name = \"protobuf\", .proto_name = \"protobuf\" },");
+    try expect_contains(text, "    unspecified = 0,\n    protobuf_ = 1,\n    protobuf_json = 2,\n    _,\n");
+    try expect_contains(text, ".{ .name = \"PROTOBUF\", .number = @intFromEnum(@This().protobuf_) },");
+}
+
 test "a request that names a missing file gets an error response" {
     var arena_state = std.heap.ArenaAllocator.init(testing.allocator);
     defer arena_state.deinit();

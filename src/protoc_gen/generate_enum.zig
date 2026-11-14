@@ -22,7 +22,7 @@ pub fn write(out: *Out, scope: []const u8, enumeration: pb.EnumDescriptorProto, 
         const number = value.number orelse 0;
         const entry = try tags.getOrPut(out.arena, number);
         if (entry.found_existing) continue;
-        entry.value_ptr.* = try names.field_identifier(out.arena, try names.snake_case(out.arena, value.name orelse ""));
+        entry.value_ptr.* = try names.member_identifier(out.arena, try names.snake_case(out.arena, value.name orelse ""));
         try out.indent(depth + 1);
         try out.print("{s} = {d},\n", .{ entry.value_ptr.*, number });
     }

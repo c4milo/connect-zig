@@ -36,6 +36,22 @@ pub fn field_identifier(arena: Allocator, name: []const u8) Allocator.Error![]co
     return std.fmt.allocPrint(arena, "{f}", .{std.zig.fmtIdFlags(name, .{ .allow_primitive = true, .allow_underscore = true })});
 }
 
+/// The name each generated message and each generated enum declares for its descriptor.
+const descriptor_name = "protobuf";
+
+/// A field's or an enum value's name inside a generated type, as the descriptor's `name` holds
+/// it. A name the type declares itself gains an underscore, since Zig refuses a member and a
+/// declaration of one name. So the enum value `PROTOBUF` is the tag `protobuf_`.
+pub fn member_name(arena: Allocator, name: []const u8) Allocator.Error![]const u8 {
+    if (std.mem.eql(u8, name, descriptor_name)) return std.fmt.allocPrint(arena, "{s}_", .{name});
+    return name;
+}
+
+/// `member_name` as zig fmt writes a struct field or an enum tag: a keyword is quoted.
+pub fn member_identifier(arena: Allocator, name: []const u8) Allocator.Error![]const u8 {
+    return field_identifier(arena, try member_name(arena, name));
+}
+
 /// A string literal's contents, escaped.
 pub fn string_literal(arena: Allocator, text: []const u8) Allocator.Error![]const u8 {
     return std.fmt.allocPrint(arena, "\"{f}\"", .{std.zig.fmtString(text)});
@@ -65,6 +81,11 @@ test "names follow Zig's conventions" {
     try testing.expectEqualStrings("@\"bool\"", try identifier(arena, "bool"));
     try testing.expectEqualStrings("type", try field_identifier(arena, "type"));
     try testing.expectEqualStrings("@\"error\"", try field_identifier(arena, "error"));
+    try testing.expectEqualStrings("protobuf_", try member_identifier(arena, "protobuf"));
+    try testing.expectEqualStrings("protobuf_", try member_name(arena, "protobuf"));
+    try testing.expectEqualStrings("error", try member_name(arena, "error"));
+    try testing.expectEqualStrings("@\"error\"", try member_identifier(arena, "error"));
+    try testing.expectEqualStrings("protobuf_json", try member_identifier(arena, "protobuf_json"));
     try testing.expectEqualStrings("name", try identifier(arena, "name"));
     try testing.expectEqualStrings("a/b.pb.zig", try output_path(arena, "a/b.proto"));
     try testing.expectEqualStrings("google_type_date", try import_name(arena, "google/type/date.proto"));

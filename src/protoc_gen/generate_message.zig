@@ -63,7 +63,7 @@ fn check_names(message: pb.DescriptorProto) Error!void {
 fn collect_fields(out: *Out, message: pb.DescriptorProto) Error![]Member {
     var oneofs: std.ArrayList([]const u8) = .empty;
     var decls = message.oneof_decl.iterator();
-    while (try decls.next()) |decl| try oneofs.append(out.arena, try names.field_identifier(out.arena, decl.name orelse ""));
+    while (try decls.next()) |decl| try oneofs.append(out.arena, try names.member_identifier(out.arena, decl.name orelse ""));
     var members: std.ArrayList(Member) = .empty;
     var fields = message.field.iterator();
     while (try fields.next()) |field| {
@@ -83,7 +83,7 @@ fn write_struct_fields(out: *Out, full: []const u8, fields: []const Member, dept
         const field = member.field;
         try out.indent(depth);
         const typed = try zig_type(out, full, field);
-        try out.print("{s}: {s} = {s},\n", .{ try names.field_identifier(out.arena, field.name orelse ""), typed.text, typed.default });
+        try out.print("{s}: {s} = {s},\n", .{ try names.member_identifier(out.arena, field.name orelse ""), typed.text, typed.default });
     }
 }
 
@@ -116,7 +116,7 @@ fn write_oneof(out: *Out, full: []const u8, fields: []const Member, oneof: []con
         const name = member.oneof orelse continue;
         if (!std.mem.eql(u8, name, oneof)) continue;
         try out.indent(depth + 1);
-        try out.print("{s}: {s},\n", .{ try names.field_identifier(out.arena, member.field.name orelse ""), try value_type(out, full, member.field) });
+        try out.print("{s}: {s},\n", .{ try names.member_identifier(out.arena, member.field.name orelse ""), try value_type(out, full, member.field) });
     }
     try out.indent(depth);
     try out.print("}} = null,\n", .{});
@@ -231,7 +231,7 @@ fn write_field_numbers(out: *Out, fields: []const Member, depth: usize) Error!vo
     try out.print("pub const {s} = enum(u29) {{\n", .{field_number_enum});
     for (fields) |member| {
         try out.indent(depth + 1);
-        try out.print("{s} = {d},\n", .{ try names.field_identifier(out.arena, member.field.name orelse ""), member.field.number orelse 0 });
+        try out.print("{s} = {d},\n", .{ try names.member_identifier(out.arena, member.field.name orelse ""), member.field.number orelse 0 });
     }
     try out.indent(depth);
     try out.print("}};\n", .{});
@@ -273,9 +273,10 @@ fn write_field_entry(out: *Out, member: Member, depth: usize) Error!void {
     const name = field.name orelse "";
     try out.indent(depth);
     try out.print(".{{ .name = {s}, .number = @intFromEnum(@This().{s}.{s}), .kind = .{s}, .json_name = {s}, .proto_name = {s}", .{
-        try names.string_literal(out.arena, name),
+        // The descriptor reads the message's field by its Zig name.
+        try names.string_literal(out.arena, try names.member_name(out.arena, name)),
         field_number_enum,
-        try names.field_identifier(out.arena, name),
+        try names.member_identifier(out.arena, name),
         try field_kind(out, field),
         try names.string_literal(out.arena, field.json_name orelse name),
         try names.string_literal(out.arena, name),
