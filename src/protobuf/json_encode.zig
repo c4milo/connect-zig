@@ -172,11 +172,19 @@ fn write_camel_path(path: []const u8, text: *json.TextWriter) Error!void {
             upper_next = true;
             continue;
         }
-        const out = if (upper_next) std.ascii.toUpper(octet) else octet;
+        try text.write(.{ .string = .more }, &.{try camel_octet(octet, upper_next)});
         upper_next = false;
-        try text.write(.{ .string = .more }, &.{out});
     }
     if (upper_next) return error.InvalidFieldMask;
+}
+
+/// A path's octet in lowerCamelCase: uppercase after an underscore. An underscore before
+/// anything but a lowercase letter leaves no trace: "foo_3" would read back as "foo3" (the
+/// conformance suite's "FieldMaskNumbersDontRoundTrip").
+fn camel_octet(octet: u8, after_underscore: bool) Error!u8 {
+    if (!after_underscore) return octet;
+    if (!std.ascii.isLower(octet)) return error.InvalidFieldMask;
+    return std.ascii.toUpper(octet);
 }
 
 /// A repeated field: an array, or an object for a map, and nothing when it holds no element.

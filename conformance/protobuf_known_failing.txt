@@ -115,11 +115,6 @@ Recommended.Proto2.JsonInput.BytesFieldBase64Url.ProtobufOutput
 Recommended.Proto3.JsonInput.BytesFieldBase64Url.JsonOutput
 Recommended.Proto3.JsonInput.BytesFieldBase64Url.ProtobufOutput
 
-# A field mask whose path does not come back from its JSON form, such as a digit after an
-# underscore. The JSON encoder writes it, and must refuse it.
-Recommended.Editions_Proto3.ProtobufInput.FieldMaskNumbersDontRoundTrip.JsonOutput
-Recommended.Proto3.ProtobufInput.FieldMaskNumbersDontRoundTrip.JsonOutput
-
 # A proto2 extension named in JSON. connect-zig has no extensions: an extension's field is an
 # unknown field, kept and written back (decision 38).
 Recommended.Editions_Proto2.JsonInput.FieldNameExtension.JsonOutput

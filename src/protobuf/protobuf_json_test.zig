@@ -138,3 +138,15 @@ test "the well-known types take their own forms both ways" {
     try testing.expectEqualStrings("user.display_name", (try paths.next()).?);
     try testing.expectEqualStrings("hi", back.label.?.value);
 }
+
+test "a field mask path that lowerCamelCase cannot carry back is refused" {
+    var buffers: Buffers = .{};
+    // An uppercase letter, a double underscore, an underscore at the end, and an underscore
+    // before a digit or a dot each leave no exact trace in lowerCamelCase.
+    for ([_][]const u8{ "fooBar", "foo__bar", "foo_", "foo_3_bar", "foo_.bar" }) |path| {
+        const holder: Holder = .{ .mask = .{ .paths = .of(&.{path}) } };
+        try testing.expectError(error.InvalidFieldMask, proto.encode_json(Holder, &holder, &buffers.text));
+    }
+    const holder: Holder = .{ .mask = .{ .paths = .of(&.{"foo3_bar"}) } };
+    try testing.expectEqualStrings("{\"mask\":\"foo3Bar\"}", try proto.encode_json(Holder, &holder, &buffers.text));
+}
