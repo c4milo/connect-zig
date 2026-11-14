@@ -133,6 +133,7 @@ failed (the owner's ruling of 2026-11-09). A new fast path joins this list the s
 | A mutation that turned a fast path off passed every test. | The reference path gives the same output, and the old baseline already holds the slow count. | Write the new baseline first; then `tools/perf_check.sh` fails such a mutation. |
 | callgrind in an x86-64 container on an Apple Mac stops at an AVX instruction. | Rosetta's x86-64 reports no AVX, and valgrind refuses it. | A local count builds for x86-64-v2; its counts track the judge's within 1% where no code is vectorized. |
 | Large binary encode took 11% more time on an EPYC 7763 with 4.79% fewer instructions. | The judge counts instructions. It does not count a missed branch or a load that waits for a store, and an M1 hides both. | Before a number is published, compare the times of two `bench-compare` runs on the same CPU. |
+| Medium binary encode took 20% more time with `writer.len += n` after each inline write. | A store through the buffer, a `[]u8`, may be the length, so the compiler reads the length again from memory, and each write waits for the one before it. | A write reads the length once, stores its octets, then stores the length. Time such a change on x86: an M1 hides the wait. |
 
 A pitfall that belongs to Zig and not to connect-zig moves to pepegrillo's
 `performance_zig.md`.

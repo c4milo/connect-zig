@@ -230,41 +230,46 @@ pub const Writer = struct {
     }
 
     pub inline fn bytes(writer: *Writer, octets: []const u8) WriteError!void {
-        if (octets.len > writer.buffer.len - writer.len) return error.NoSpaceLeft;
-        @memcpy(writer.buffer[writer.len..][0..octets.len], octets);
-        writer.len += octets.len;
+        const at = writer.len;
+        if (octets.len > writer.buffer.len - at) return error.NoSpaceLeft;
+        @memcpy(writer.buffer[at..][0..octets.len], octets);
+        writer.len = at + octets.len;
     }
 
     pub inline fn byte(writer: *Writer, value: u8) WriteError!void {
-        if (writer.len == writer.buffer.len) return error.NoSpaceLeft;
-        writer.buffer[writer.len] = value;
-        writer.len += 1;
+        const at = writer.len;
+        if (at == writer.buffer.len) return error.NoSpaceLeft;
+        writer.buffer[at] = value;
+        writer.len = at + 1;
     }
 
     /// Writes `value` as a varint, in exactly the octets it takes: a length written before octets
     /// already in place must not store past itself.
     pub inline fn varint(writer: *Writer, value: u64) WriteError!void {
+        // The length is read once, before any octet is stored, and stored once after: an octet
+        // stored through the buffer could be the length, so a read after it would wait for it.
+        const at = writer.len;
         // "Base 128 Varints": a value below 2^7 is one octet with no continuation bit, as most
         // tags and short lengths are.
         if (value < continuation) {
-            if (writer.len == writer.buffer.len) return error.NoSpaceLeft;
-            writer.buffer[writer.len] = @intCast(value);
-            writer.len += 1;
+            if (at == writer.buffer.len) return error.NoSpaceLeft;
+            writer.buffer[at] = @intCast(value);
+            writer.len = at + 1;
             return;
         }
         // Two octets hold a value below 2^14: most lengths, and the tags of fields 16 to 2047.
         if (value < 1 << (two_octets * group_bits)) {
-            if (two_octets > writer.buffer.len - writer.len) return error.NoSpaceLeft;
-            writer.buffer[writer.len..][0..two_octets].* = .{ @as(u8, @truncate(value)) | continuation, @intCast(value >> group_bits) };
-            writer.len += two_octets;
+            if (two_octets > writer.buffer.len - at) return error.NoSpaceLeft;
+            writer.buffer[at..][0..two_octets].* = .{ @as(u8, @truncate(value)) | continuation, @intCast(value >> group_bits) };
+            writer.len = at + two_octets;
             return;
         }
         // With room for the longest varint, the call returns the position past it in a register.
-        if (constants.protocol.varint_len_max <= writer.buffer.len - writer.len) {
-            writer.len = varint_long(writer.buffer.ptr, writer.len, value);
+        if (constants.protocol.varint_len_max <= writer.buffer.len - at) {
+            writer.len = varint_long(writer.buffer.ptr, at, value);
             return;
         }
-        writer.len = try varint_near_end(writer.buffer, writer.len, value);
+        writer.len = try varint_near_end(writer.buffer, at, value);
     }
 
     /// Writes `value` as `varint` does, and three or four octets inline too: binary encode's
@@ -273,19 +278,20 @@ pub const Writer = struct {
     pub inline fn varint_wide(writer: *Writer, value: u64) WriteError!void {
         // One and two octets first, as `varint` writes them: tags and most lengths.
         if (value < 1 << (two_octets * group_bits)) return writer.varint(value);
-        if (value < 1 << (four_octets * group_bits) and four_octets <= writer.buffer.len - writer.len) {
-            const octets = writer.buffer[writer.len..][0..four_octets];
+        const at = writer.len;
+        if (value < 1 << (four_octets * group_bits) and four_octets <= writer.buffer.len - at) {
+            const octets = writer.buffer[at..][0..four_octets];
             octets[0] = @as(u8, @truncate(value)) | continuation;
             octets[1] = @as(u8, @truncate(value >> group_bits)) | continuation;
             const third: u8 = @truncate(value >> two_octets * group_bits);
             if (value < 1 << (three_octets * group_bits)) {
                 octets[two_octets] = third;
-                writer.len += three_octets;
+                writer.len = at + three_octets;
                 return;
             }
             octets[two_octets] = third | continuation;
             octets[three_octets] = @intCast(value >> three_octets * group_bits);
-            writer.len += four_octets;
+            writer.len = at + four_octets;
             return;
         }
         return writer.varint(value);
@@ -318,21 +324,19 @@ pub const Writer = struct {
     }
 
     pub inline fn fixed32(writer: *Writer, value: u32) WriteError!void {
-        const room = try writer.take(constants.protocol.fixed32_len);
-        std.mem.writeInt(u32, room, value, .little);
+        const len = constants.protocol.fixed32_len;
+        const at = writer.len;
+        if (len > writer.buffer.len - at) return error.NoSpaceLeft;
+        std.mem.writeInt(u32, writer.buffer[at..][0..len], value, .little);
+        writer.len = at + len;
     }
 
     pub inline fn fixed64(writer: *Writer, value: u64) WriteError!void {
-        const room = try writer.take(constants.protocol.fixed64_len);
-        std.mem.writeInt(u64, room, value, .little);
-    }
-
-    /// The next `len` bytes of the buffer, which the caller fills, or an error when they do not fit.
-    inline fn take(writer: *Writer, comptime len: usize) WriteError!*[len]u8 {
-        if (len > writer.buffer.len - writer.len) return error.NoSpaceLeft;
-        const room = writer.buffer[writer.len..][0..len];
-        writer.len += len;
-        return room;
+        const len = constants.protocol.fixed64_len;
+        const at = writer.len;
+        if (len > writer.buffer.len - at) return error.NoSpaceLeft;
+        std.mem.writeInt(u64, writer.buffer[at..][0..len], value, .little);
+        writer.len = at + len;
     }
 
     pub fn tag(writer: *Writer, number: u32, wire_type: WireType) WriteError!void {
@@ -438,4 +442,25 @@ test "a length prefix past the input is refused, and writes past the buffer fail
     var buffer: [1]u8 = undefined;
     var writer: Writer = .{ .buffer = &buffer };
     try testing.expectError(error.NoSpaceLeft, writer.fixed32(1));
+}
+
+test "a fixed-width value fits the room left exactly, and fails with one octet less" {
+    const used = 1;
+    inline for (.{ constants.protocol.fixed32_len, constants.protocol.fixed64_len }) |len| {
+        // One octet is taken first, so the room left is the buffer less that octet.
+        var exact: [used + len]u8 = undefined;
+        var short: [used + len - 1]u8 = undefined;
+        for ([_][]u8{ &exact, &short }, [_]bool{ true, false }) |buffer, fits| {
+            var writer: Writer = .{ .buffer = buffer };
+            try writer.byte(0);
+            const result = if (len == constants.protocol.fixed32_len) writer.fixed32(1) else writer.fixed64(1);
+            if (fits) {
+                try result;
+                try testing.expectEqual(buffer.len, writer.len);
+            } else {
+                try testing.expectError(error.NoSpaceLeft, result);
+                try testing.expectEqual(used, writer.len);
+            }
+        }
+    }
 }

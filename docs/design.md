@@ -726,6 +726,19 @@ ran on Linux x86-64 with Zig 0.16.0.
     4.79% fewer instructions. Tree's binary decode+walk took 9.6 µs in run 97, before
     `decode_into`, and 13.8 µs in this run, with 19.36% fewer instructions. Both causes are
     open.
+  - The x86 lab, with the owner's word: a branch whose one CI job builds the benchmark of the
+    tree and of the tree with each of a set of patches, runs each three times on that one
+    runner, and prints each operation's lowest time. [Run
+    43607446083](https://github.com/c4milo/connect-zig/actions/runs/43607446083) ran on an EPYC
+    9V45. It never lands.
+  - The writer's length stored once. Each inline write did `writer.len += n` after it stored
+    octets through the buffer. A store through `[]u8` may be the length itself, so the
+    compiler read the length again from memory, and each write waited for the one before it.
+    The out-of-line `varint_long` returned the length in a register, so the inline paths of
+    three and four octets were the slower ones on x86. Each write now reads the length once,
+    stores its octets, and stores the length. In the lab, medium binary encode went from 416
+    to 347 ns; no other encode moved past 4%. Mutations, 13, each CAUGHT, after a new test of
+    the room a fixed-width value needs.
 
 ### What a later step owes
 
