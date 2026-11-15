@@ -23,6 +23,7 @@ import (
 	"os"
 	"time"
 
+	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
@@ -47,6 +48,10 @@ const (
 )
 
 var failed = false
+
+// exportErrors holds what the SDK reported while it exported: a synchronous exporter logs its
+// errors through the global handler, and returns none to the code that ends a span.
+var exportErrors []error
 
 func report(check string, problem string) {
 	if problem == "" {
@@ -119,6 +124,7 @@ func exportSpans(ctx context.Context, host string, creds credentials.TransportCr
 	if err != nil {
 		return nil, err
 	}
+	otel.SetErrorHandler(otel.ErrorHandlerFunc(func(err error) { exportErrors = append(exportErrors, err) }))
 	recorder := tracetest.NewSpanRecorder()
 	provider := sdktrace.NewTracerProvider(
 		sdktrace.WithSyncer(exporter),
@@ -132,6 +138,9 @@ func exportSpans(ctx context.Context, host string, creds credentials.TransportCr
 	}
 	if err := provider.Shutdown(ctx); err != nil {
 		return nil, err
+	}
+	if len(exportErrors) > 0 {
+		return nil, fmt.Errorf("the exporter reported %d errors, the first: %w", len(exportErrors), exportErrors[0])
 	}
 	return recorder.Ended(), nil
 }

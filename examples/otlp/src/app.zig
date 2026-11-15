@@ -6,8 +6,10 @@ const otlp = @import("otlp");
 const service = @import("otlp_service");
 const constants = @import("constants.zig");
 
-/// What the routes read: the receiver's room.
+/// What the routes read: the receiver's room, and the codings it reads messages in. An
+/// OpenTelemetry exporter sends gzip, so a server for one sets them (`serve.zig`).
 pub const App = struct {
+    codings: rpc.Codings = .{},
     otlp: service.Room = .{},
 };
 
