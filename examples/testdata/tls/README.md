@@ -1,7 +1,8 @@
 # The test identity
 
 The TLS identity of the examples' h3 rounds (decision 25). It is for tests alone: anyone can
-read the private key here, so no program outside the examples may present it.
+read the private key here, so no program outside the examples and `tools/package_check.sh` may
+present it.
 
 | File | Holds |
 | --- | --- |

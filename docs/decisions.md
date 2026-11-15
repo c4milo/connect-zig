@@ -39,8 +39,9 @@ first. Cite an entry by number in code and commits ("decision 6").
       `.private` kinds of `colibri.Server` and `colibri.Client`, which run on Rotor. Without it,
       a dependent fetches no Rotor, and the library still needs none (decision 32).
     - `tools/package_check.sh` proves it. A project that depends on connect-zig alone generates
-      code with the plugin, serves a method over TCP, and calls it with `connect_colibri`'s
-      client and with curl.
+      code with the plugin, and serves a method over TLS on TCP and over h3 on UDP, under the
+      test identity (decision 25). It calls the method with `connect_colibri`'s client over h2
+      and h3, and with curl over h11.
     - Why: before this, a project that followed the README could not reach `server.Router` or
       `client.ConnectionPool`. A project that added colibri itself got a second instance, unless
       it passed connect-zig's three arguments exactly. It could not build on Rotor at all.
@@ -273,7 +274,10 @@ first. Cite an entry by number in code and commits ("decision 6").
     programs judge them at the fixed instant 1_800_000_000. The key is public and for tests
     alone: no module of `src/` reads it. The rounds over h2 and h11 stay in cleartext (decision
     13). Beaten: colibri's test identity, which colibri does not package; and minting an identity
-    at each run, which needs openssl in every build.
+    at each run, which needs openssl in every build. Amended 2026-11-14 (decision 39):
+    `tools/package_check.sh` copies the identity into the project it builds. That project's
+    server presents it over TLS for h11, h2 and h3, and its client and curl trust the CA. The
+    check is a test too, and the fetched package does not hold the identity.
 
 26. **The conformance suite runs against a server of its own.** `conformance/` holds a program
     that serves connectrpc's ConformanceService on a socket the kernel picks, as the runner's

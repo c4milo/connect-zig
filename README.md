@@ -87,7 +87,7 @@ passes newer fields on.
 ## Use it in your project
 
 `tools/package_check.sh` runs these steps in a new project, from a fetched copy of connect-zig, on
-each push. It generates the code, serves a method over TCP and calls it.
+each push. It generates the code, serves a method over TLS on h11, h2 and h3, and calls it.
 
 ### 1. Add the package
 
@@ -254,20 +254,27 @@ To give methods different options, such as their own interceptors, list routes b
 `colibri.Server` serves the router on Rotor:
 
 ```zig
-const Server = colibri.Server(.{ .tcp_connections = 64, .quic_connections = 0 }, .private);
-var http_server: Server = undefined;
-var router: Router = .{};
-var state: App = .{};
+const Server = colibri.Server(.{ .tcp_connections = 64, .quic_connections = 8 }, .private);
+var http_server: Server align(@alignOf(Server)) = undefined;
+var router: Router align(@alignOf(Router)) = .{};
+var state: App align(@alignOf(App)) = .{};
 
-try http_server.init(&.{ .port = 8080, .cpu = cpu, .unix_seconds = unix_seconds }, &router, &state);
+try http_server.init(&.{
+    .port = 8443,
+    .identity = .{ .chain = chain_pem, .key = key_pem },
+    .cpu = cpu,
+    .unix_seconds = unix_seconds,
+}, &router, &state);
 defer http_server.deinit();
 try http_server.run();
 ```
 
-With no `identity`, it serves h11 and h2 in cleartext. An `identity` adds TLS, and
-`quic_connections` adds h3 on the UDP socket of the same port. `cpu` is what your program
-probed of its CPU, for TLS. [examples/socket_server.zig](examples/socket_server.zig) serves all
-three.
+It serves h11 and h2 over TLS on a TCP socket, and h3 on the UDP socket of the same port. Each
+global states its alignment: Zig 0.16's x86_64 backend, which builds Debug on x86-64, can place
+a global off its type's alignment otherwise, and Rotor then stops on an assertion.
+`chain_pem` and `key_pem` are your certificate chain and its key, as PEM text. `cpu` is what
+your program probed of its CPU, for TLS. With no `identity`, the server serves h11 and h2 in
+cleartext, and no h3, which needs TLS.
 
 ### 5. Call it
 
@@ -287,7 +294,14 @@ if (response.failure) |failure| std.debug.print("{s}\n", .{failure.message});
 A gRPC call reads its status from the response's trailers.
 
 On Rotor, `colibri.Client(.{}, .private)` holds the pool. Its `request` takes the call as the
-pool's does, and `run` runs the pool until a handler's `on_finished` calls `shutdown`.
+pool's does, and `run` runs the pool until a handler's `on_finished` calls `shutdown`. Over TLS,
+the pool's configuration names what it trusts:
+
+```zig
+const anchors = try tls.pem.anchors(ca_pem, &anchor_der, &anchor_room);
+const trust: tls.Trust = .{ .web_pki = .{ .anchors = anchors, .server_name = "api.example.com" } };
+const config: client.Config = .{ .tls = .{ .trust = trust, .cpu = cpu }, .authority = "api.example.com" };
+```
 
 A client or bidirectional stream can also stream both ways. `init_stream` builds the call, and its
 `Sender` sends each message, as the server's `ResponseStream` does. The program passes the pool's events for the

@@ -882,6 +882,21 @@ ran on Linux x86-64 with Zig 0.16.0.
   - The README's step 1 imports the colibri modules from connect-zig, and step 2 installs the
     plugin in a step of its own. Step 4 serves the router on `colibri.Server`, and step 5 names
     `colibri.Client`.
+  - TLS and h3, the same day: the owner asked why the server ran in cleartext, and chose TLS
+    and h3. The check copies `examples/testdata/tls` into its project (decision 25 as amended).
+    The server presents that identity. The client trusts its CA and runs a round over h2 and a
+    round over h3, each on a `colibri.Client` of its own, and checks the protocol of each round.
+    curl calls over h11 with `--cacert`. The README's step 4 shows the TLS form first.
+  - CI's package job failed on `c7bf280`, [run
+    43660036629](https://github.com/c4milo/connect-zig/actions/runs/43660036629). Zig 0.16's
+    x86_64 backend, which builds Debug on x86-64, placed the client's global off its type's
+    alignment, and Rotor's loop stopped on an assertion in `layout.take`. Each global of the
+    check, and of the README's server, now states its alignment (pepegrillo's
+    `static-alignment` rule), which the lint does not read inside a script.
+  - In a linux/amd64 container, `c7bf280`'s client stops on the same assertion, and the new one
+    starts its loop. Rosetta has no `epoll_pwait2`, so the run goes no further there. In an
+    arm64 container, on Ubuntu 24.04 and 26.04, the client reads every answer over h2 and h3.
+  - Mutations, 2, each CAUGHT: a server with no identity, and a server with no h3.
 
 ### What a later step owes
 

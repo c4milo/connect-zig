@@ -104,8 +104,9 @@ The first release.
 - A performance gate on instruction counts, and a benchmark beside Go's protobuf runtime and
   connect-rust's Buffa, published by CI.
 - A project that fetches connect-zig as a package follows the README: it generates its code
-  with the plugin, serves a method over TCP, and calls it with connect-zig's client and with
-  curl. `tools/package_check.sh` runs it as a CI job of its own.
+  with the plugin, and serves a method over TLS on h11, h2 and h3. It calls the method with
+  connect-zig's client over h2 and h3, and with curl over h11. `tools/package_check.sh` runs it
+  as a CI job of its own.
 - `oidc` verifies the RFCs' known answers for RS256, ES256 and EdDSA, and RS256 tokens that
   OpenSSL signs, and each of its checks was broken on purpose to prove a test catches it.
 
