@@ -41,6 +41,18 @@ pub const storage_len = 1 << 20;
 /// The alignment of each buffer that an operation reads or writes, and of the program's output.
 pub const buffer_align = 16;
 
+/// The routed calls of bench/call.zig. The router holds one request at a time.
+pub const call_requests = 1;
+/// The router's memory for each request: a response's headers and octets, and a request's body.
+/// The example projects name the same 16 KiB.
+pub const call_response_bytes = 16 * 1024;
+pub const call_body_bytes = 16 * 1024;
+/// Room for a routed call's request body, and for the reply `prepare` checks: the small message
+/// in an envelope.
+pub const call_body_len = 256;
+/// The HTTP version the routed calls name: h2 (RFC 9113).
+pub const h2_major = 2;
+
 /// The limits of the costs table, bench/costs.zig.
 pub const costs = struct {
     /// The runs of each cost; their median is the cost, as the method asks.

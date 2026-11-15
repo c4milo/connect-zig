@@ -1,5 +1,6 @@
-//! `zig build bench`: the protobuf runtime's benchmark in bench/, built ReleaseFast.
-//! Arguments after `--` reach the program: `zig build bench -- --quick` runs it as a smoke test.
+//! `zig build bench`: the protobuf runtime's benchmark in bench/, and the routed calls of
+//! bench/call.zig, built ReleaseFast. Arguments after `--` reach the program: `zig build bench --
+//! --quick` runs it as a smoke test.
 //!
 //! The library's own build offers Debug and ReleaseSafe alone. The benchmark builds its own copy
 //! of the protobuf module, and the generated code of bench/gen, in ReleaseFast. stdx's build
@@ -30,6 +31,7 @@ pub fn add(b: *std.Build, public_names: *std.Build.Module, target: std.Build.Res
         .optimize = optimize,
         .imports = &.{.{ .name = "protobuf", .module = protobuf }},
     });
+    const routed = routed_modules(b, &copies, stdx, protobuf, public_names, target);
     const exe = b.addExecutable(.{
         .name = "bench",
         .root_module = b.createModule(.{
@@ -44,6 +46,10 @@ pub fn add(b: *std.Build, public_names: *std.Build.Module, target: std.Build.Res
             .imports = &.{
                 .{ .name = "protobuf", .module = protobuf },
                 .{ .name = "bench_v1", .module = messages },
+                .{ .name = "connect", .module = routed.connect },
+                .{ .name = "connect_colibri", .module = routed.connect_colibri },
+                .{ .name = "server", .module = routed.server },
+                .{ .name = "http", .module = routed.http },
             },
         }),
     });
@@ -62,6 +68,52 @@ pub fn add(b: *std.Build, public_names: *std.Build.Module, target: std.Build.Res
     const costs_run = b.addRunArtifact(costs);
     costs_run.has_side_effects = true;
     b.step("costs", "Time a cache hit, a memory read, a mispredict, a copy and a system call, ReleaseFast").dependOn(&costs_run.step);
+}
+
+/// The modules a routed call runs (bench/call.zig), in ReleaseFast.
+const Routed = struct {
+    connect: *std.Build.Module,
+    connect_colibri: *std.Build.Module,
+    server: *std.Build.Module,
+    http: *std.Build.Module,
+};
+
+/// `connect` and `connect_colibri` as the root build makes them, over copies of colibri's modules
+/// in ReleaseFast. colibri in ReleaseSafe asks stdx with `.release = true`, as `add` does, so both
+/// share one copy of each stdx module. The benchmark needs no Rotor.
+fn routed_modules(b: *std.Build, copies: *Copies, stdx: *std.Build.Dependency, protobuf: *std.Build.Module, public_names: *std.Build.Module, target: std.Build.ResolvedTarget) Routed {
+    const colibri = b.dependency("colibri", .{ .target = target, .release = true, .rotor = false });
+    const server = release_fast(b, copies, colibri.module("server"));
+    const http = release_fast(b, copies, colibri.module("http"));
+    const connect = b.createModule(.{
+        .root_source_file = b.path("src/connect/connect.zig"),
+        .target = target,
+        .optimize = optimize,
+        .imports = &.{
+            .{ .name = "protobuf", .module = protobuf },
+            .{ .name = "json", .module = release_fast(b, copies, stdx.module("json")) },
+            .{ .name = "codec", .module = release_fast(b, copies, stdx.module("codec")) },
+            .{ .name = "gzip", .module = release_fast(b, copies, stdx.module("gzip")) },
+            .{ .name = "zstd", .module = release_fast(b, copies, stdx.module("zstd")) },
+            .{ .name = "brotli", .module = release_fast(b, copies, stdx.module("brotli")) },
+            .{ .name = "base64", .module = release_fast(b, copies, stdx.module("base64")) },
+            .{ .name = "public_names", .module = public_names },
+        },
+    });
+    const connect_colibri = b.createModule(.{
+        .root_source_file = b.path("src/connect_colibri/connect_colibri.zig"),
+        .target = target,
+        .optimize = optimize,
+        .imports = &.{
+            .{ .name = "connect", .module = connect },
+            .{ .name = "protobuf", .module = protobuf },
+            .{ .name = "server", .module = server },
+            .{ .name = "client", .module = release_fast(b, copies, colibri.module("client")) },
+            .{ .name = "http", .module = http },
+            .{ .name = "public_names", .module = public_names },
+        },
+    });
+    return .{ .connect = connect, .connect_colibri = connect_colibri, .server = server, .http = http };
 }
 
 /// Each module copied so far, by its original: a module two others import is copied once, as a

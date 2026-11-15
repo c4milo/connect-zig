@@ -45,6 +45,15 @@ with every field read takes `decode_into`, as a program that reads every field d
 `bench/instructions.txt` holds the count of each pair. The benchmark builds stdx's modules in
 ReleaseFast too, so no count includes a safety check.
 
+Two more operations are routed calls (`bench/call.zig`): one unary call of the small message, in
+Connect and in gRPC, through `connect_colibri`'s route on colibri's `server.Router`. The route
+takes the default options, as a program that names none does. The program hands the router an
+engine's events: the request's head, its body with its end, and the request's end. A stand-in
+engine takes each octet at once. So a count holds the router, the route, the protocol and the
+codec, and no framing, TLS or socket. The rows read "small Connect unary call" and "small gRPC
+unary call"; Go and Rust have none. The benchmark builds `connect`, `connect_colibri` and
+colibri's modules in ReleaseFast for them.
+
 ## The admission rule
 
 - **A regression fails past 2%** of the baseline count for any operation. The margin covers what

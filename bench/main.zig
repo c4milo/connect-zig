@@ -1,7 +1,9 @@
 //! The protobuf runtime's benchmark: binary and JSON, encode and decode, on eight messages from
-//! bench/proto: four shaped as services send them, and four that each hold one kind of field. It
-//! prints one Markdown table: the bytes each operation reads or writes, the median nanoseconds of
-//! one operation, and MB/s (10^6 bytes a second).
+//! bench/proto: four shaped as services send them, and four that each hold one kind of field.
+//! Then the routed calls of bench/call.zig: a unary call of the small message in Connect and in
+//! gRPC, through `connect_colibri`'s route on colibri's router. It prints one Markdown table: the
+//! bytes each operation reads or writes, the median nanoseconds of one operation, and MB/s (10^6
+//! bytes a second). A call's bytes are its request body's.
 //!
 //! Run it with `zig build bench`, which builds it ReleaseFast. Flags:
 //!
@@ -25,6 +27,7 @@ const bench = @import("bench_v1");
 const inputs = @import("inputs.zig");
 const walk = @import("walk.zig");
 const cases = @import("cases.zig");
+const call = @import("call.zig");
 const measure = @import("measure.zig");
 const constants = @import("constants.zig");
 
@@ -48,6 +51,7 @@ const Options = struct {
 const State = struct {
     messages: inputs.Messages,
     buffers: cases.Buffers,
+    calls: call.Calls,
     output: [constants.output_len]u8 align(constants.buffer_align),
 };
 
@@ -68,6 +72,10 @@ pub fn main(init: std.process.Init) !void {
     try run_message(context, bench.Strings, walk.strings, "strings", &inputs.strings);
     try run_message(context, bench.Tree, walk.tree, "tree", &messages.tree);
     try run_message(context, bench.Packed, walk.packed_scalars, "packed", &messages.packed_scalars);
+    try state.calls.prepare(&inputs.small);
+    for (std.enums.values(call.Protocol)) |protocol| {
+        try run(context, "small", protocol.label(), state.calls.bytes(protocol), state.calls.runner(protocol));
+    }
     try writer.flush();
 }
 
@@ -108,29 +116,31 @@ fn run_message(
     const case = try cases.Case(T, walk_message).prepare(input, context.buffers);
     if (context.options.write_directory) |directory| try write_outputs(context.io, directory, name, case.binary, case.sum);
     for (std.enums.values(Operation)) |operation| {
-        if (context.options.instructions) {
-            try count_instructions(name, operation, case.runner(operation));
-            continue;
-        }
-        const ns = try measure.median_ns(context.io, context.options.settings, case.runner(operation));
-        const bytes = case.bytes(operation);
-        const megabytes_per_second = @as(f64, @floatFromInt(bytes)) / ns * std.time.ns_per_s / bytes_per_megabyte;
-        try context.writer.print("| {s} | {s} | {d} | {d:.1} | {d:.1} |\n", .{ name, operation.label(), bytes, ns, megabytes_per_second });
-        try context.writer.flush();
+        try run(context, name, operation.label(), case.bytes(operation), case.runner(operation));
     }
+}
+
+/// Counts the instructions of one operation under `--instructions`, or else times it and prints
+/// its row.
+fn run(context: Context, name: []const u8, label: []const u8, bytes: usize, runner: anytype) !void {
+    if (context.options.instructions) return count_instructions(name, label, runner);
+    const ns = try measure.median_ns(context.io, context.options.settings, runner);
+    const megabytes_per_second = @as(f64, @floatFromInt(bytes)) / ns * std.time.ns_per_s / bytes_per_megabyte;
+    try context.writer.print("| {s} | {s} | {d} | {d:.1} | {d:.1} |\n", .{ name, label, bytes, ns, megabytes_per_second });
+    try context.writer.flush();
 }
 
 /// Collects the instructions of `instruction_iterations` runs of one operation, after one run that
 /// warms it, and dumps them under "<message> <operation>".
-fn count_instructions(name: []const u8, operation: Operation, runner: anytype) !void {
+fn count_instructions(name: []const u8, label: []const u8, runner: anytype) !void {
     try runner.run(1);
     const callgrind = std.valgrind.callgrind;
     callgrind.toggleCollect();
     try runner.run(instruction_iterations);
     callgrind.toggleCollect();
-    var label: [constants.label_len]u8 = @splat(0);
-    _ = try std.fmt.bufPrint(label[0 .. constants.label_len - 1], "{s} {s}", .{ name, operation.label() });
-    callgrind.dumpStatsAt(@ptrCast(&label));
+    var dump_label: [constants.label_len]u8 = @splat(0);
+    _ = try std.fmt.bufPrint(dump_label[0 .. constants.label_len - 1], "{s} {s}", .{ name, label });
+    callgrind.dumpStatsAt(@ptrCast(&dump_label));
 }
 
 fn write_outputs(io: std.Io, directory: []const u8, name: []const u8, binary: []const u8, sum: u64) !void {

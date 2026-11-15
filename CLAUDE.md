@@ -123,7 +123,8 @@ confirm a test fails. Report `CAUGHT` or `NOT CAUGHT` per mutation in the commit
   gRPC-Web, over h2 and h3, with curl over h11 and h2, and with OpenTelemetry's Go SDK, which
   exports spans to the OTLP receiver and reads them back (decision 40), all over TLS with the
   test CA, and checks that Chat answers full-duplex. It needs buf, curl, python3 and go.
-- Benchmark: `zig build bench` times binary and JSON encode and decode, ReleaseFast;
+- Benchmark: `zig build bench` times binary and JSON encode and decode, and a routed unary
+  call in Connect and in gRPC (`bench/call.zig`), ReleaseFast;
   `tools/bench_check.sh` runs the Go benchmark in `bench/go` and, when cargo is on the path, the
   Rust one on Buffa in `bench/rust` beside it, and checks each writes the same bytes as Zig. The
   Rust build needs buf, or `BUF` naming it. `tools/ci.sh` runs `zig build bench -- --quick`, and
