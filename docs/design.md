@@ -856,6 +856,15 @@ ran on Linux x86-64 with Zig 0.16.0.
     fewer instructions on x86-64-v2, and no other count moves. A scalar member through
     `member_*` took small's and varints' JSON encode 5% to 10% more instructions, and an optional
     message field 0.09% more, so both keep `name` and `write`.
+  - The judge on `493b3e0`, [run
+    43657281850](https://github.com/c4milo/connect-zig/actions/runs/43657281850), with this pin
+    and the member call: JSON decode takes 10% to 34% fewer instructions (tree 34.02%, deep
+    30.19%, packed 26.08%), and JSON encode 2% to 13% fewer (deep 13.34%, packed 11.85%, small
+    11.19%). No binary count moved past 0.1%. `bench/instructions.txt` holds these counts.
+  - Run 129 timed the same commit on an AMD EPYC 9V45 and on a Neoverse-N2. On the N2,
+    connect-zig is faster than Buffa in each of the README's 16 cells, and in JSON encode of six
+    of the eight messages. On the AMD, Buffa leads deep's binary encode (0.87), as on each run on
+    that CPU.
 
 ### What a later step owes
 
