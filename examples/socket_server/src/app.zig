@@ -26,13 +26,16 @@ pub const App = struct {
     otlp: otlp_service.Room = .{},
 };
 
-fn on_error(_: *App, _: *const server.Request, _: anyerror, response: *server.ResponseWriter) void {
+fn on_error(_: *App, _: *server.RequestContext, _: *const server.Request, _: anyerror, response: *server.Response) void {
     response.status = .internal_server_error;
 }
 
 /// Every service's routes. A method Connect does not serve gets 405, on every path of the table.
 pub const Router = server.Router(App, .{
     .error_handler = on_error,
+    // What each call keeps for itself: the claims the account service's interceptor reads
+    // (decision 35). colibri gives a table one type of values, for every route.
+    .Values = account_service.Values,
     .routes = eliza_service.Service(App).routes ++
         streaming_service.Service(App).routes ++
         interceptors_service.Service(App).routes ++
@@ -41,4 +44,4 @@ pub const Router = server.Router(App, .{
         account_service.Service(App).routes ++
         otlp_service.Service(App).routes ++
         rpc.Refusals(App, eliza.ElizaService.say).routes,
-}, .{ .requests = constants.requests, .response_bytes = constants.response_bytes, .body_bytes = constants.body_bytes });
+}, .{ .requests = constants.requests, .response_bytes = constants.response_bytes, .body_bytes = constants.body_bytes, .header_bytes = 0 });

@@ -1,5 +1,5 @@
 //! A stream that its route asks for one message at a time (decision 33). colibri's router calls
-//! a struct route's `on_writable` while the response memory has room, and the route then calls
+//! a struct route's `next` while the response memory has room, and the route then calls
 //! the handler's `next`. A message that found no room stays in the call until the next call, so
 //! the handler never writes one twice. The router's `response_bytes` then bound the octets in
 //! flight, not the stream (colibri decisions 103 and 127 as amended on 2026-11-09).
@@ -26,7 +26,7 @@ pub const Next = union(enum) {
     failure: connect.RpcError,
 };
 
-/// What a route with `next` keeps between two calls of `on_writable`.
+/// What a route with `next` keeps between two calls of `next`.
 pub const Outgoing = struct {
     phase: Phase = .messages,
     /// The end of the response, built once into the call's `Room`, so that a later call writes
@@ -36,7 +36,7 @@ pub const Outgoing = struct {
     pub const Phase = enum { messages, end_body, end_trailers, done };
 };
 
-/// Whether a pass of `serve` goes on to the next, or waits for the next `on_writable`.
+/// Whether a pass of `serve` goes on to the next, or waits for colibri's next call of `next`.
 const Pass = enum { go_on, wait };
 
 /// Sends what the stream has while the response memory takes it. `input_open` says whether the
@@ -150,7 +150,7 @@ fn write_end(call: *Call, outgoing: *Outgoing) !Pass {
 /// frame, each one slice.
 fn write_end_body(call: *Call, outgoing: *Outgoing) Pass {
     if (outgoing.end.octets.len != 0) {
-        // colibri's `ResponseWriter.body`: a slice that does not fit is not written at all.
+        // colibri's `Response.body`: a slice that does not fit is not written at all.
         call.response.body().writeAll(outgoing.end.octets) catch return .wait;
         outgoing.end.octets = "";
     }
@@ -163,7 +163,7 @@ fn write_end_trailers(call: *Call, outgoing: *Outgoing) !Pass {
     const trailers = outgoing.end.trailers;
     const ended = if (trailers.len == 0) call.response.end() else call.response.trailers(call_file.trailer_fields(call, trailers));
     ended catch |failure| switch (failure) {
-        // colibri's `ResponseWriter.Error`: `NoSpaceLeft` says the response memory is full, and
+        // colibri's `Response.Error`: `NoSpaceLeft` says the response memory is full, and
         // `Full` that as many runs wait for the engine as a response holds. Each call changed
         // nothing then, and passes once the engine released octets, so the route calls it again.
         error.NoSpaceLeft, error.Full => return .wait,

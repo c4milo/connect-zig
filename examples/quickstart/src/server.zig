@@ -42,7 +42,7 @@ pub fn greet(app: *App, _: *rpc.Context, request: *const rpc.Request(greet_v1.Gr
     return null;
 }
 
-fn on_error(_: *App, _: *const server.Request, _: anyerror, response: *server.ResponseWriter) void {
+fn on_error(_: *App, _: *server.RequestContext, _: *const server.Request, _: anyerror, response: *server.Response) void {
     response.status = .internal_server_error;
 }
 
@@ -51,7 +51,7 @@ const route_options: rpc.RouteOptions = .{ .message_bytes = constants.message_by
 const Router = server.Router(App, .{
     .error_handler = on_error,
     .routes = Service.Routes(rpc, App, @This(), route_options).routes,
-}, .{ .requests = constants.requests, .body_bytes = constants.body_bytes, .response_bytes = constants.response_bytes });
+}, .{ .requests = constants.requests, .body_bytes = constants.body_bytes, .response_bytes = constants.response_bytes, .header_bytes = 0 });
 
 const Server = colibri.Server(.{ .tcp_connections = constants.tcp_connections, .quic_connections = constants.quic_connections }, .private);
 

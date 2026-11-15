@@ -78,8 +78,8 @@ pub const Transport = struct {
         assert(self.stream == null);
         self.peer = std.Io.net.IpAddress.parse(host, port) catch return error.InvalidHost;
         self.addresses = .{switch (self.peer) {
-            .ip4 => |address| .of(&address.bytes, 0),
-            .ip6 => |address| .of(&address.bytes, 0),
+            .ip4 => |address| .init(&address.bytes, 0),
+            .ip6 => |address| .init(&address.bytes, 0),
         }};
         // RFC 9110 §4.2.1 and RFC 3986 §3.2.2: an IPv6 literal goes in brackets in an authority.
         const written = switch (self.peer) {

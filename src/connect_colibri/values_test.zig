@@ -91,7 +91,7 @@ fn on_say(app: *App, ctx: *rpc.Context, _: *const rpc.Request(Note), _: *rpc.Res
     return null;
 }
 
-fn on_error(_: *App, _: *const server.Request, _: anyerror, response: *server.ResponseWriter) void {
+fn on_error(_: *App, _: *server.RequestContext, _: *const server.Request, _: anyerror, response: *server.Response) void {
     response.status = .internal_server_error;
 }
 
@@ -99,23 +99,23 @@ const options: rpc.RouteOptions = .{
     .message_bytes = message_bytes,
     .token_bytes = token_bytes,
     .interceptors = &.{ Plain, Stamp },
-    .Values = Values,
 };
 
 const Router = server.Router(App, .{
     .error_handler = on_error,
+    .Values = Values,
     .routes = .{
         rpc.post(App, support.chat, Listener, options),
         rpc.post(App, say, on_say, options),
     },
-}, .{ .requests = requests, .response_bytes = response_bytes, .body_bytes = response_bytes });
+}, .{ .requests = requests, .response_bytes = response_bytes, .body_bytes = response_bytes, .header_bytes = 0 });
 
 /// An engine that takes every octet at once, and keeps each request's user data apart.
 const Engine = struct {
     user_data: [requests]usize = @splat(0),
     ended: [requests]bool = @splat(false),
 
-    pub fn respond(engine: *Engine, id: server.RequestId, response: server.Response) server.SendError!void {
+    pub fn respond(engine: *Engine, id: server.RequestId, response: server.ResponseHeader) server.SendError!void {
         engine.ended[slot_of(id)] = response.end;
     }
 
@@ -164,6 +164,10 @@ const Fixture = struct {
     fn open(fixture: *Fixture, slot: usize, path: []const u8, content_type: []const u8) void {
         test_section.init();
         test_section.append("content-type", content_type) catch unreachable;
+        // colibri's `Headers` reads the lines through this slice while the router handles the head.
+        const lines = test_section.slice();
+        // The route reads its body through `on_data`, so the head's reader holds no octet.
+        var head_body: std.Io.Reader = .fixed(&.{});
         fixture.handle(.{ .request = .{
             .id = id_of(slot),
             .method = "POST",
@@ -173,7 +177,8 @@ const Fixture = struct {
             .authority = "example.com",
             .path = path,
             .query = null,
-            .headers = .of(&test_section),
+            .headers = .init(&lines),
+            .body = &head_body,
             .end = false,
         } });
     }

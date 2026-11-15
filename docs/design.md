@@ -87,12 +87,13 @@ Empty, FieldMask, Struct, Value, ListValue and Any. An Any names its type from a
 
 ## 7. connect_colibri
 
-`connect_colibri` maps a `connect.Method` onto a route of `server.Router`, and onto
-`client.Request` and `client.Response`. A function handler's route sets `.whole_body` and takes
-its stream whole (decision 12). A type handler's route reads the body as it arrives and answers
-each message at once, full-duplex over h2 (decision 18). A type handler with `next` gives one
-message at a time, at colibri's `on_writable`, so its stream may be longer than the router's
-response memory (decision 33). A client's streamed call writes each
+`connect_colibri` maps a `connect.Method` onto a stream route of `server.Router` (colibri
+decision 163, decision 45), and onto `client.Request` and `client.Response`. A function
+handler's route keeps the body in the router's memory and reads it whole, in place, at its end
+(decision 12). A type handler's route reads the body as it arrives and answers each message at
+once, full-duplex over h2 (decision 18). A type handler with `next` gives one message at a time,
+at colibri's `next`, so its stream may be longer than the router's response memory (decision
+33). A client's streamed call writes each
 message with its `Sender` and reads each answer as its piece arrives, full-duplex over h2 and h3
 (decision 18 as amended). Interceptors wrap a route's handler and a client's exchange (decision
 19). The client speaks Connect, gRPC-Web and gRPC (decision 11).
@@ -212,6 +213,11 @@ Each step names the check that proves it. A step is done when its check passes i
     names: none. Check: `zig build bench -- --quick` checks each reply's octets,
     `tools/bench_check.sh` compares them across the three, and `tools/perf_check.sh` counts the
     four calls.
+24. **colibri v0.17.0.** `connect_colibri` serves each method as a stream route, reads a whole
+    body in place at its end, and takes a call's values from colibri's request context
+    (decision 45, decision 35 as amended). New public names: none; `RouteOptions.Values` goes.
+    Check: `zig build test` on the tag, and `tools/perf_check.sh`, whose routed calls take a
+    new baseline.
 
 ### Step records
 
@@ -992,20 +998,32 @@ ran on Linux x86-64 with Zig 0.16.0.
   - The test of a streamed call reads what its interceptor saw through the call's context, in
     place of two thread-local statics.
 
+- **colibri v0.17.0** (step 24, decision 45). colibri v0.17.0 (`9d17c88a`), with chapulin v0.8.0
+  (`c45f661d`), Rotor `f2890f5` and stdx `22f5139`, the pins colibri names.
+  - The move ran on a branch at each of colibri's sub-step commits, and reported what the API
+    left out. colibri took two of the reports before the tag: one stdx pin for colibri and
+    connect-zig, since two stdx in one program failed to link, and the kept octets of a body
+    given once more at its end.
+  - Counted on x86-64-v2 under callgrind, a routed call took: small Connect 77,238 instructions
+    on v0.16.3 and 3,935 on v0.17.0; small gRPC 77,728 and 4,430; medium Connect 100,878 and
+    27,344; medium gRPC 101,336 and 27,806. The codec's 48 counts did not move.
+  - A copy of the body into the call's state cost the same within 0.7%, and needed a public
+    option to size it, so the route reads the body in place.
+  - Every router names `header_bytes = 0`, and an error handler takes the request context. A
+    test's request event gives `body` a reader of its own, `std.Io.Reader.fixed(&.{})`.
+  - Mutations, 10 of 10 CAUGHT: the first piece taken for the body, no piece kept, a longer
+    piece taken for the last, a body with no octets never served, a stream's cut envelope not
+    kept, a body cut inside an envelope accepted, `drain` that reads nothing, a done call that
+    drains nothing, and each of the two counters `on_request` sets left as it was.
+
 ### What a later step owes
 
 - A chart of the routed calls, beside the codec charts: connect-zig, connect-go and connect-rust
-  on one unary call, from CI's `bench-compare` job of one named run. It waits for colibri
-  v0.17.0's reset of a route's state field by field, without which colibri copies
-  `connect_colibri`'s whole state at each request (step 23).
+  on one unary call, from CI's `bench-compare` job of one named run, once the calls' new
+  baseline is in (step 24).
 - A stream that waits for an event of the program once its request ended (colibri issue 130).
-  The owner ruled on 2026-11-10 that colibri v0.16.0 does not wait for it. Neither v0.16.1 nor
-  v0.16.2 holds it: it ships in v0.17.0.
-- colibri v0.17.0 gives its router a per-request `RequestContext` with `values(T)`, and each
-  callback the shape `(app, ctx, request, response)` (approved by the owner in colibri on
-  2026-11-11). `connect_colibri` then reads `ctx.values` from colibri's entry, and
-  `RouteOptions.Values` goes for the route table's `.Values`. The owner ruled that v0.1.0
-  waits for it. The package check's server and the README's steps 4 and 5 move with it.
+  colibri v0.16.0 left it out, as ruled on 2026-11-10. No release up to v0.17.0 holds it, and
+  the issue is still open.
 - For `oidc`, a measurement before any change: a client sends one token with each call, and
   the verifier checks its signature each time. If that cost shows in a server's profile, a
   verifier may keep the last tokens it took.

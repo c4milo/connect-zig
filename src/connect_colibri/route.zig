@@ -1,12 +1,19 @@
-//! A `connect.Method` served as a struct route of colibri's `server.Router` (design §7).
+//! A `connect.Method` served as a struct route of colibri's `server.Router` (design §7). colibri
+//! runs a struct route as a stream: `on_request` at the head, `on_data` at each event of the body,
+//! and `next` while the response has room (colibri decision 163).
 //!
-//! A function handler's route reads the whole request body (`.whole_body`), decodes its messages,
-//! calls the handler, and writes the reply in the protocol the request spoke. A type handler's
-//! route reads the body as it arrives and passes each message on while the reply goes out, which
-//! is how a bidirectional stream runs full-duplex over h2 (decision 18). Every message a
-//! `ResponseStream` sends goes out at once, and what it writes in one call stays bounded by the
-//! router's `response_bytes` (decision 12). A type handler with `next` has no such bound: its
-//! route asks it for one message at a time, at colibri's `on_writable` (`pull.zig`, decision 33).
+//! A route that reads the request body whole keeps each piece, so colibri holds the body in the
+//! router's `body_bytes`. At the body's end colibri gives the kept octets once more as the last
+//! piece, and the route reads the whole body there, in place. It decodes the messages, calls the
+//! handler, and writes the reply in the protocol the request spoke. A type handler's route of a
+//! client or bidirectional stream passes on each whole message as it arrives, while the reply goes
+//! out. That is how a bidirectional stream runs full-duplex over h2 (decision 18). colibri keeps
+//! the octets of a cut message, and gives them again joined with the next piece.
+//!
+//! Every message a `ResponseStream` sends goes out at once, and what it writes in one call stays
+//! bounded by the router's `response_bytes` (decision 12). A type handler with `next` has no such
+//! bound: its route asks it for one message at a time, at colibri's `next` (`pull.zig`, decision
+//! 33).
 const std = @import("std");
 const assert = std.debug.assert;
 const connect = @import("connect");
@@ -28,15 +35,12 @@ pub const Options = struct {
     storage_bytes: ?usize = null,
     /// The interceptors around the handler, outermost first (`dispatch.zig`).
     interceptors: []const type = &.{},
-    /// The program's values for each call: a struct whose fields each have a default. Every call
-    /// starts with `.{}`, and an interceptor and a handler read it with `Context.values`
-    /// (decision 35).
-    Values: type = struct {},
 };
 
 /// What a route keeps in its request's entry of the router pool. The request and the reply each
 /// have their own areas, so a response may point into its request.
-pub fn CallState(comptime options: Options, comptime handler: anytype) type {
+pub fn CallState(comptime spec: RouteSpec, comptime handler: anytype) type {
+    const options = spec.options;
     return struct {
         /// The route reads no more of the request. A route with no `next` has then written its
         /// whole response too.
@@ -45,6 +49,9 @@ pub fn CallState(comptime options: Options, comptime handler: anytype) type {
         /// The longest request message the call reads (`receive_limit_of`).
         limit: usize = options.message_bytes,
         call: call_file.Call = undefined,
+        /// The octets at the end of the last piece that colibri keeps for the next one: the whole
+        /// body so far, for a route that reads it whole, or the start of a cut envelope.
+        kept: usize = 0,
         request_message: [options.message_bytes]u8 = undefined,
         request_work: [options.message_bytes]u8 = undefined,
         tokens: [options.token_bytes]u8 = undefined,
@@ -53,13 +60,14 @@ pub fn CallState(comptime options: Options, comptime handler: anytype) type {
         /// (`connect.server.Reply.prepare`).
         reply_message: [reply_bytes]u8 = undefined,
         reply_work: [reply_bytes]u8 = undefined,
-        room: call_file.Room = .{},
-        headers: call_file.RequestHeaders = .{},
-        query: call_file.RequestQuery = .{},
+        // colibri resets the state one top-level field at a time at each request, and a field
+        // whose default is `undefined` costs no store (colibri decision 163). A default of `.{}`
+        // writes each buffer the struct holds, so these default to `undefined`: `begin` writes
+        // what each one reads first.
+        room: call_file.Room = undefined,
+        headers: call_file.RequestHeaders = undefined,
+        query: call_file.RequestQuery = undefined,
         handler_state: dispatch.HandlerState(handler) = .{},
-        /// The program's values for the call (decision 35). colibri sets the state to its
-        /// defaults at each request, so each call starts with `.{}`.
-        values: options.Values = .{},
         /// How far a route with `next` wrote its response.
         outgoing: if (pulls) pull.Outgoing else struct {} = .{},
 
@@ -124,54 +132,47 @@ fn receive_limit_of(app: anytype, comptime message_bytes: usize) usize {
 /// longer than it, once decompressed, fails the call with `resource_exhausted`.
 pub fn Route(comptime App: type, comptime method: connect.Method, comptime handler: anytype, comptime options: Options) type {
     comptime dispatch.check(method, handler);
-    comptime check_values(options.Values);
-    const Spec = RouteSpec{ .method = method, .options = options };
-    const Whole = struct {
-        pub const State = CallState(options, handler);
+    const spec: RouteSpec = .{ .method = method, .options = options };
+    const Stream = struct {
+        pub const State = CallState(spec, handler);
 
-        pub fn on_request(app: *App, state: *State, request: *const server.Request, _: void, _: void, response: *server.ResponseWriter) !void {
-            return begin(Spec, handler, app, state, request, response);
+        pub fn on_request(app: *App, ctx: *server.RequestContext, state: *State, request: *const server.Request, response: *server.Response) !void {
+            return begin(spec, handler, app, ctx, state, request, response);
         }
 
-        pub fn on_body(app: *App, state: *State, body: *std.Io.Reader, response: *server.ResponseWriter) !void {
-            if (state.done) return;
+        pub fn on_data(app: *App, ctx: *server.RequestContext, state: *State, body: *server.RequestBodyStream, response: *server.Response) !void {
+            // A call that reads no more drops what arrives, so colibri holds none of it.
+            if (state.done) return drain(body);
             state.call.response = response;
-            if (comptime dispatch.reads_pieces(method, handler)) return serve_streaming(Spec, handler, app, state, body);
-            if (comptime dispatch.is_streaming(handler)) return serve_request(Spec, handler, app, state, body.buffered());
-            return serve_whole(Spec, handler, app, state, body.buffered());
+            state.call.context = ctx;
+            if (comptime dispatch.reads_pieces(method, handler)) return serve_streaming(spec, handler, app, state, body);
+            return serve_gathered(spec, handler, app, state, body);
         }
     };
-    if (comptime !dispatch.pulls(handler)) return Whole;
-    // colibri's router ends the response of a route with no `on_writable` once its body ended, so
-    // only a route with `next` declares one.
+    if (comptime !dispatch.pulls(handler)) return Stream;
+    // colibri ends the response of a route with no `next` once its body ended and `on_data` ran
+    // with the last piece, so only a route with `next` declares one.
     return struct {
-        pub const State = Whole.State;
-        pub const on_request = Whole.on_request;
-        pub const on_body = Whole.on_body;
+        pub const State = Stream.State;
+        pub const on_request = Stream.on_request;
+        pub const on_data = Stream.on_data;
 
-        pub fn on_writable(app: *App, state: *State, response: *server.ResponseWriter) !void {
-            return serve_writable(Spec, handler, app, state, response);
+        pub fn next(app: *App, ctx: *server.RequestContext, state: *State, response: *server.Response) !void {
+            return serve_writable(spec, handler, app, ctx, state, response);
         }
     };
-}
-
-/// Fails the build when `Values` is not a struct whose fields each have a default, so each call
-/// can start with `.{}` (decision 35).
-fn check_values(comptime Values: type) void {
-    if (@typeInfo(Values) != .@"struct") @compileError("RouteOptions.Values is a struct, not " ++ @typeName(Values));
-    for (@typeInfo(Values).@"struct".fields) |field| {
-        if (field.defaultValue() == null) @compileError("each field of RouteOptions.Values has a default, and " ++ field.name ++ " has none");
-    }
 }
 
 /// What a route's free functions need to know about it at compile time.
-const RouteSpec = struct { method: connect.Method, options: Options };
+pub const RouteSpec = struct { method: connect.Method, options: Options };
 
 /// Reads the head: copies the headers and the query, accepts or refuses the request, and starts
 /// the call.
-fn begin(comptime spec: RouteSpec, comptime handler: anytype, app: anytype, state: *CallState(spec.options, handler), request: *const server.Request, response: *server.ResponseWriter) !void {
+fn begin(comptime spec: RouteSpec, comptime handler: anytype, app: anytype, ctx: *server.RequestContext, state: *CallState(spec, handler), request: *const server.Request, response: *server.Response) !void {
     const codings = codings_of(app);
     state.limit = receive_limit_of(app, spec.options.message_bytes);
+    state.room.response_header_count = 0;
+    state.room.metadata_count = 0;
     state.headers.copy(request.headers) catch {
         refuse(state);
         // RFC 6585 §5: headers larger than the server keeps get 431.
@@ -195,22 +196,43 @@ fn begin(comptime spec: RouteSpec, comptime handler: anytype, app: anytype, stat
         .accepted => |accepted| accepted,
         .refused => |refused| {
             refuse(state);
-            return call_file.answer_refusal(refused, scratch_of(spec.options, handler, state, .reply), &state.room, &state.headers, response);
+            return call_file.answer_refusal(refused, scratch_of(spec, handler, state, .reply), &state.room, &state.headers, ctx, response);
         },
     };
     state.call = .{
-        .reply = .{ .accepted = accepted, .scratch = scratch_of(spec.options, handler, state, .reply), .encoders = codings.encoders },
+        .reply = .{ .accepted = accepted, .scratch = scratch_of(spec, handler, state, .reply), .encoders = codings.encoders },
         .response = response,
         .room = &state.room,
         .headers = &state.headers,
+        .context = ctx,
         .path = comptime spec.method.path(),
         .query = query orelse "",
-        .values_pointer = &state.values,
-        .values_name = @typeName(spec.options.Values),
     };
 }
 
-fn serve_whole(comptime spec: RouteSpec, comptime handler: anytype, app: anytype, state: *CallState(spec.options, handler), body: []const u8) !void {
+/// Keeps each piece of the body, so colibri holds the body in the router's `body_bytes`, and
+/// serves the call at the body's end. colibri gives a piece only with a new octet, but for the
+/// last one, which holds the kept octets alone: that piece is the whole body, read in place
+/// (colibri's docs/usage.md, "Router"). A body past `body_bytes` gets 413 from colibri.
+fn serve_gathered(comptime spec: RouteSpec, comptime handler: anytype, app: anytype, state: *CallState(spec, handler), body: *server.RequestBodyStream) !void {
+    for (0..constants.pieces_per_data_max) |_| {
+        const piece = body.next() orelse break;
+        if (state.kept > 0 and piece.len == state.kept) return serve_body(spec, handler, app, state, piece);
+        state.kept = piece.len;
+        body.keep(state.kept);
+    } else return stop_reading(dispatch.Interceptors(spec.options.interceptors), app, state, body, too_many_pieces);
+    // A body with no octets has no last piece: `next` finds its end at once.
+    if (!body.ended()) return;
+    assert(state.kept == 0);
+    return serve_body(spec, handler, app, state, "");
+}
+
+fn serve_body(comptime spec: RouteSpec, comptime handler: anytype, app: anytype, state: *CallState(spec, handler), whole: []const u8) !void {
+    if (comptime dispatch.is_streaming(handler)) return serve_request(spec, handler, app, state, whole);
+    return serve_whole(spec, handler, app, state, whole);
+}
+
+fn serve_whole(comptime spec: RouteSpec, comptime handler: anytype, app: anytype, state: *CallState(spec, handler), body: []const u8) !void {
     assert(!state.done);
     state.done = true;
     // A Connect unary body is the message itself, and an uncompressed one is read in place, so
@@ -218,48 +240,45 @@ fn serve_whole(comptime spec: RouteSpec, comptime handler: anytype, app: anytype
     if (read_in_place(state.call.reply.accepted) and body.len > state.limit) {
         return stop(dispatch.Interceptors(spec.options.interceptors), app, state, too_large);
     }
-    var messages = connect.server.Messages.init(&state.call.reply.accepted, body, &scratch_of(spec.options, handler, state, .request), &codings_of(app).decoders);
+    var messages = connect.server.Messages.init(&state.call.reply.accepted, body, &scratch_of(spec, handler, state, .request), &codings_of(app).decoders);
     return dispatch.whole(spec.method, handler, dispatch.Interceptors(spec.options.interceptors), app, &state.call, &messages);
 }
 
-/// Takes each whole envelope that arrived, and keeps a partial one for the next call.
-fn serve_streaming(comptime spec: RouteSpec, comptime handler: anytype, app: anytype, state: *CallState(spec.options, handler), body: *std.Io.Reader) !void {
+/// Takes each whole envelope of each piece that arrived, and keeps a cut one for the next piece.
+fn serve_streaming(comptime spec: RouteSpec, comptime handler: anytype, app: anytype, state: *CallState(spec, handler), body: *server.RequestBodyStream) !void {
     const I = dispatch.Interceptors(spec.options.interceptors);
     const call = &state.call;
-    if (start_once(I, app, state)) |refusal| return stop(I, app, state, refusal);
-    const buffered = body.buffered();
-    const whole_len = dispatch.whole_envelopes_len(buffered, state.limit) catch |failure|
-        return stop(I, app, state, connect.server.failure_of(failure));
-    var messages = connect.server.Messages.init(&state.call.reply.accepted, buffered[0..whole_len], &scratch_of(spec.options, handler, state, .request), &codings_of(app).decoders);
-    if (dispatch.each_message(spec.method, handler, app, call, &state.handler_state, &messages)) |failure| return stop(I, app, state, failure);
-    body.toss(whole_len);
-    // A read past the octets that arrived says whether the body ended or more will come.
-    _ = body.peek(body.bufferedLen() + 1) catch |failure| switch (failure) {
-        error.EndOfStream => {
-            // Connect protocol, "Streaming-Request", and gRPC's "Length-Prefixed-Message": a body
-            // ends between envelopes. One that stops inside an envelope fails the call.
-            if (body.bufferedLen() != 0) return stop(I, app, state, .{ .code = .invalid_argument, .message = "truncated message" });
-            state.done = true;
-            if (comptime !dispatch.pulls(handler)) return dispatch.end_stream(spec.method, handler, I, app, call, &state.handler_state);
-            // The handler's `next` ends the stream, at the `on_writable` that follows this call.
-            if (dispatch.end_input(spec.method, handler, app, call, &state.handler_state)) |rpc_failure| return stop(I, app, state, rpc_failure);
-            return;
-        },
-        // More bytes will come; the router keeps those left unread for the next call.
-        error.ReadFailed => return,
-    };
+    if (start_once(I, app, state)) |refusal| return stop_reading(I, app, state, body, refusal);
+    for (0..constants.pieces_per_data_max) |_| {
+        const piece = body.next() orelse break;
+        const whole_len = dispatch.whole_envelopes_len(piece, state.limit) catch |failure|
+            return stop_reading(I, app, state, body, connect.server.failure_of(failure));
+        var messages = connect.server.Messages.init(&call.reply.accepted, piece[0..whole_len], &scratch_of(spec, handler, state, .request), &codings_of(app).decoders);
+        if (dispatch.each_message(spec.method, handler, app, call, &state.handler_state, &messages)) |failure| return stop_reading(I, app, state, body, failure);
+        // colibri gives the cut envelope's octets again, joined with the next piece.
+        state.kept = piece.len - whole_len;
+        body.keep(state.kept);
+    } else return stop_reading(I, app, state, body, too_many_pieces);
+    if (!body.ended()) return;
+    // Connect protocol, "Streaming-Request", and gRPC's "Length-Prefixed-Message": a body ends
+    // between envelopes. One that stops inside an envelope fails the call.
+    if (state.kept != 0) return stop(I, app, state, .{ .code = .invalid_argument, .message = "truncated message" });
+    state.done = true;
+    if (comptime !dispatch.pulls(handler)) return dispatch.end_stream(spec.method, handler, I, app, call, &state.handler_state);
+    // The handler's `next` ends the stream, at colibri's `next` that follows this call.
+    if (dispatch.end_input(spec.method, handler, app, call, &state.handler_state)) |rpc_failure| return stop(I, app, state, rpc_failure);
 }
 
 /// Reads the one request of a server stream whose handler declares `next`, and passes it to the
-/// handler's `on_request`. The router then calls `on_writable`, which sends the stream.
-fn serve_request(comptime spec: RouteSpec, comptime handler: anytype, app: anytype, state: *CallState(spec.options, handler), body: []const u8) !void {
+/// handler's `on_request`. The router then calls `next`, which sends the stream.
+fn serve_request(comptime spec: RouteSpec, comptime handler: anytype, app: anytype, state: *CallState(spec, handler), body: []const u8) !void {
     comptime assert(spec.method.stream_type == .server_stream);
     assert(!state.done);
     state.done = true;
     const I = dispatch.Interceptors(spec.options.interceptors);
     const call = &state.call;
     if (start_once(I, app, state)) |refusal| return stop(I, app, state, refusal);
-    var messages = connect.server.Messages.init(&call.reply.accepted, body, &scratch_of(spec.options, handler, state, .request), &codings_of(app).decoders);
+    var messages = connect.server.Messages.init(&call.reply.accepted, body, &scratch_of(spec, handler, state, .request), &codings_of(app).decoders);
     var request: context_file.Request(spec.method.Request) = .{ .message = .{}, .any = .{ .call = call } };
     switch (call_file.read_one(spec.method.Request, call, &messages, &request.message)) {
         .failure => |failure| return stop(I, app, state, failure),
@@ -270,10 +289,11 @@ fn serve_request(comptime spec: RouteSpec, comptime handler: anytype, app: anyty
 }
 
 /// Sends what a stream with `next` has, while the response memory takes it (`pull.zig`).
-fn serve_writable(comptime spec: RouteSpec, comptime handler: anytype, app: anytype, state: *CallState(spec.options, handler), response: *server.ResponseWriter) !void {
+fn serve_writable(comptime spec: RouteSpec, comptime handler: anytype, app: anytype, ctx: *server.RequestContext, state: *CallState(spec, handler), response: *server.Response) !void {
     if (state.outgoing.phase == .done) return;
     const I = dispatch.Interceptors(spec.options.interceptors);
     state.call.response = response;
+    state.call.context = ctx;
     // A server stream sends nothing before its request arrived whole.
     if (comptime !dispatch.reads_pieces(spec.method, handler)) {
         if (!state.started) return;
@@ -296,6 +316,18 @@ fn stop(comptime I: type, app: anytype, state: anytype, failure: connect.RpcErro
     return call_file.finish(&state.call, I.on_finish(app, &state.call, failure));
 }
 
+/// Ends the call with `failure`, and drops the rest of the body.
+fn stop_reading(comptime I: type, app: anytype, state: anytype, body: *server.RequestBodyStream, failure: connect.RpcError) !void {
+    drain(body);
+    return stop(I, app, state, failure);
+}
+
+/// Reads and drops each piece that arrived, so colibri holds none of a body the call reads no
+/// more. A piece starts with the octets kept before, so they go too.
+fn drain(body: *server.RequestBodyStream) void {
+    for (0..constants.pieces_per_data_max) |_| _ = body.next() orelse return;
+}
+
 /// Marks a request the route refused at its head, which no handler sees.
 fn refuse(state: anytype) void {
     state.done = true;
@@ -311,27 +343,29 @@ fn read_in_place(accepted: connect.server.Accepted) bool {
 /// statuscodes.md, RESOURCE_EXHAUSTED: a message over the server's limit.
 const too_large: connect.RpcError = .{ .code = .resource_exhausted, .message = "message larger than the server reads" };
 
+/// statuscodes.md, RESOURCE_EXHAUSTED: a body in more pieces than one `on_data` reads.
+const too_many_pieces: connect.RpcError = .{ .code = .resource_exhausted, .message = "request body in more pieces than the server reads" };
+
 const Side = enum { request, reply };
 
-fn scratch_of(comptime options: Options, comptime handler: anytype, state: *CallState(options, handler), side: Side) connect.Scratch {
-    assert(state.limit <= options.message_bytes);
+fn scratch_of(comptime spec: RouteSpec, comptime handler: anytype, state: *CallState(spec, handler), side: Side) connect.Scratch {
+    assert(state.limit <= spec.options.message_bytes);
     return switch (side) {
         .request => .{ .message = state.request_message[0..state.limit], .work = &state.request_work, .tokens = &state.tokens, .storage = &state.storage },
         .reply => .{ .message = &state.reply_message, .work = &state.reply_work, .tokens = &state.tokens },
     };
 }
 
-/// The router entry that serves `method` as a POST. A type handler's route of a client or
-/// bidirectional stream reads the body as it arrives; every other route reads it whole.
-pub fn post(comptime App: type, comptime method: connect.Method, comptime handler: anytype, comptime options: Options) @TypeOf(.{ .post, method.path(), Route(App, method, handler, options), .{ .whole_body = !dispatch.reads_pieces(method, handler) } }) {
-    return .{ .post, comptime method.path(), Route(App, method, handler, options), .{ .whole_body = comptime !dispatch.reads_pieces(method, handler) } };
+/// The router entry that serves `method` as a POST.
+pub fn post(comptime App: type, comptime method: connect.Method, comptime handler: anytype, comptime options: Options) @TypeOf(.{ .post, method.path(), Route(App, method, handler, options) }) {
+    return .{ .post, comptime method.path(), Route(App, method, handler, options) };
 }
 
 /// The router entry that serves `method` as a GET, for a method with no side effects (Connect
 /// protocol, "Unary-Get-Request").
-pub fn get(comptime App: type, comptime method: connect.Method, comptime handler: anytype, comptime options: Options) @TypeOf(.{ .get, method.path(), Route(App, method, handler, options), .{ .whole_body = true } }) {
+pub fn get(comptime App: type, comptime method: connect.Method, comptime handler: anytype, comptime options: Options) @TypeOf(.{ .get, method.path(), Route(App, method, handler, options) }) {
     comptime assert(method.stream_type == .unary and method.idempotency == .no_side_effects);
-    return .{ .get, comptime method.path(), Route(App, method, handler, options), .{ .whole_body = true } };
+    return .{ .get, comptime method.path(), Route(App, method, handler, options) };
 }
 
 const testing = std.testing;
@@ -361,18 +395,19 @@ test "a request's scratch holds storage of message_bytes, or of storage_bytes wh
             return null;
         }
     }.on_say;
+    const say: connect.Method = .{ .service = "test.Notes", .name = "Say", .Request = Note, .Response = Note, .stream_type = .unary };
     const message_bytes = 64;
     const storage_bytes = 32;
     // A token's size differs from each other, so no size stands in for another.
     const token_bytes = 16;
-    const sized: Options = .{ .message_bytes = message_bytes, .token_bytes = token_bytes };
+    const sized: RouteSpec = .{ .method = say, .options = .{ .message_bytes = message_bytes, .token_bytes = token_bytes } };
     var state: CallState(sized, handler) = .{};
     try testing.expectEqual(@as(usize, message_bytes), scratch_of(sized, handler, &state, .request).storage.len);
     try testing.expectEqual(@as(usize, 0), scratch_of(sized, handler, &state, .reply).storage.len);
-    const set: Options = .{ .message_bytes = message_bytes, .token_bytes = token_bytes, .storage_bytes = storage_bytes };
+    const set: RouteSpec = .{ .method = say, .options = .{ .message_bytes = message_bytes, .token_bytes = token_bytes, .storage_bytes = storage_bytes } };
     var set_state: CallState(set, handler) = .{};
     try testing.expectEqual(@as(usize, storage_bytes), scratch_of(set, handler, &set_state, .request).storage.len);
-    const none: Options = .{ .message_bytes = message_bytes, .token_bytes = token_bytes, .storage_bytes = 0 };
+    const none: RouteSpec = .{ .method = say, .options = .{ .message_bytes = message_bytes, .token_bytes = token_bytes, .storage_bytes = 0 } };
     var none_state: CallState(none, handler) = .{};
     try testing.expectEqual(@as(usize, 0), scratch_of(none, handler, &none_state, .request).storage.len);
 }

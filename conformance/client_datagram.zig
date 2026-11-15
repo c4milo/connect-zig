@@ -57,8 +57,8 @@ pub const UdpSocket = struct {
         const bound = self.socket orelse return;
         const message = bound.receive(io, &self.incoming) catch return;
         const from: client.Address = switch (message.from) {
-            .ip4 => |address| .of(&address.bytes, address.port),
-            .ip6 => |address| .of(&address.bytes, address.port),
+            .ip4 => |address| .init(&address.bytes, address.port),
+            .ip6 => |address| .init(&address.bytes, address.port),
         };
         var rest: client.Input = .{ .datagram = .{ .bytes = message.data, .from = from } };
         for (0..constants.client_events_per_turn_max) |_| {

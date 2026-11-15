@@ -238,13 +238,15 @@ pub const Router = server.Router(App, .{
     .error_handler = on_error,
     .routes = Service.Routes(rpc, App, @This(), route_options).routes ++
         rpc.Refusals(App, Service.say).routes,
-}, .{ .requests = 8, .body_bytes = 8192, .response_bytes = 8192 });
+}, .{ .requests = 8, .body_bytes = 8192, .response_bytes = 8192, .header_bytes = 0 });
 ```
 
 The router's pool holds the memory of each call it answers at once. `body_bytes` holds a call's
-request body, and `response_bytes` holds a reply with its headers. Set both above the routes'
-`message_bytes`. colibri's defaults are 0 and 256 octets: with them a POST gets 413, and a reply
-past 256 octets gets 500.
+request body, which the route reads in place at the body's end, and `response_bytes` holds a reply
+with its headers. Set both above the routes' `message_bytes`: a body past `body_bytes` gets 413,
+and a reply past `response_bytes` gets 500. Each route reads its header at the head, so
+`header_bytes`, the memory of colibri's copy of a header, is 0. colibri gives none of the three a
+default.
 
 Each call of a route also holds storage of `message_bytes`. A binary request's repeated fields
 are read into it once, so a handler that reads them parses them once (decision 37). A route's
@@ -345,8 +347,13 @@ const Values = struct { oidc: ?oidc.Claims = null };
 
 // Each method of the service needs a valid token, except those you exclude.
 const Auth = oidc.Interceptor(Values, .{ .exclude = &.{ "/grpc.health.v1.Health/", "/auth.v1.Auth/Login" } });
-const options: rpc.RouteOptions = .{ .interceptors = &.{Auth}, .Values = Values };
-pub const routes = Service.Routes(rpc, App, @This(), options).routes;
+const options: rpc.RouteOptions = .{ .interceptors = &.{Auth} };
+// The route table names the type of each call's values.
+pub const Router = server.Router(App, .{
+    .error_handler = on_error,
+    .Values = Values,
+    .routes = Service.Routes(rpc, App, @This(), options).routes,
+}, router_options);
 
 // In any callback of a call behind the interceptor, a stream's tenth message included. A
 // lookup fails on a claim of another type, or on one longer than the claims' room.
@@ -363,11 +370,12 @@ the issuer, the audience, `exp` and `nbf` (decision 34). A call with no valid to
 `unauthenticated` and a `WWW-Authenticate: Bearer` header. On an excluded path, the call's
 `oidc` stays null.
 
-`RouteOptions.Values` serves any interceptor, not `oidc` alone: it is a struct you declare, and
-each call starts with its defaults. An interceptor and a handler read it with
+The route table's `.Values` serves any interceptor, not `oidc` alone: it is a struct you declare,
+and colibri starts each call with its defaults. An interceptor and a handler read it with
 `ctx.values(Values)` (decision 35). It holds your values alone: the call's path and timeout
 are on `ctx`, and the headers on the request. Your `App` is still the one value every call
-shares.
+shares. A table names one type of values for all its routes, so a table that joins services
+declares one struct with the fields of each.
 
 `oidc` checks signatures with [chapulin](https://github.com/c4milo/chapulin)'s `jws` calls, the
 TLS library colibri already links, so it adds no second crypto library to your program.

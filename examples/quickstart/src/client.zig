@@ -31,7 +31,7 @@ const server_name = "localhost";
 const name = "Ada";
 const greeting = "Hello, Ada";
 
-const addresses = [_]client.Address{.of(&constants.loopback, 0)};
+const addresses = [_]client.Address{.init(&constants.loopback, 0)};
 
 /// The CPU, which this program does not probe, so each TLS session runs ChaCha20 alone.
 const cpu: tls.Cpu = .{

@@ -54,7 +54,7 @@ fn on_chat(_: *App, _: *rpc.Context, request: *rpc.RequestStream(Note), response
     return null;
 }
 
-fn on_error(_: *App, _: *const server.Request, _: anyerror, response: *server.ResponseWriter) void {
+fn on_error(_: *App, _: *server.RequestContext, _: *const server.Request, _: anyerror, response: *server.Response) void {
     response.status = connect.constants.protocol.status.internal_server_error;
 }
 
@@ -74,7 +74,7 @@ const Router = server.Router(App, .{
         rpc.post(App, gather, on_gather, options),
         rpc.post(App, chat, on_chat, options),
     },
-}, .{ .requests = router_requests, .response_bytes = router_bytes, .body_bytes = router_bytes });
+}, .{ .requests = router_requests, .response_bytes = router_bytes, .body_bytes = router_bytes, .header_bytes = 0 });
 
 test "a route table holds a route of each stream type, and a GET beside a POST" {
     try testing.expect(@sizeOf(Router) > 0);

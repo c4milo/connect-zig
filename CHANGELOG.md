@@ -30,9 +30,12 @@ The first release.
   `rpc.Context`, `rpc.Request(T)` or `RequestStream(T)`, and `rpc.Response(T)` or
   `ResponseStream(T)`. An interceptor takes `rpc.AnyRequest` and `rpc.AnyResponse`, with no
   message (decision 36).
-- Values for each call, of a struct the program declares in `RouteOptions.Values`. An
+- Values for each call, of a struct the program names as the route table's `.Values`. An
   interceptor writes them, and each callback of the call reads them with `ctx.values`
   (decision 35).
+- Each method is a stream route of colibri v0.17.0's router, which reads a whole body in place
+  (decision 45). A small routed call takes about 20 times fewer instructions than on colibri
+  v0.16.3, whose router copied each call's state at each request.
 - A method Connect does not serve gets 405 with an `Allow` header, as connect-go answers.
 
 ### OpenID Connect
@@ -123,8 +126,8 @@ The first release.
 
 - A function handler writes its whole stream in one call, so the router's response memory
   bounds it (decision 12). A long stream takes a type handler with `next`.
-- A stream cannot wait for an event of the program once its request ended. colibri plans that
-  for v0.17.0 (colibri issue 130).
+- A stream cannot wait for an event of the program once its request ended. colibri issue 130,
+  which asks for it, is still open at v0.17.0.
 - Against Buffa, connect-rust's protobuf runtime, on CI's run 129. On x86-64, connect-zig is
   faster on all eight messages in binary decode and in JSON decode, and with every field read
   after a binary decode; on seven in JSON encode; and on five in binary encode. On arm64, it is

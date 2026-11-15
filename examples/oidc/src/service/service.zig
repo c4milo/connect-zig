@@ -38,7 +38,6 @@ pub const route_options: rpc.RouteOptions = .{
     .message_bytes = constants.message_len_max,
     .token_bytes = constants.message_len_max,
     .interceptors = &.{Auth},
-    .Values = Values,
 };
 
 /// Starts `verifier`, the field `oidc` of a program's `App`, with `keys_text`, the issuer's JWK

@@ -164,7 +164,7 @@ pub const Chatter = struct {
     }
 };
 
-fn on_error(_: *App, _: *const server.Request, _: anyerror, response: *server.ResponseWriter) void {
+fn on_error(_: *App, _: *server.RequestContext, _: *const server.Request, _: anyerror, response: *server.Response) void {
     response.status = .internal_server_error;
 }
 
@@ -176,7 +176,7 @@ pub const Router = server.Router(App, .{
         rpc.post(App, count, Counter, options),
         rpc.post(App, chat, Chatter, options),
     },
-}, .{ .requests = 1, .response_bytes = response_bytes, .body_bytes = response_bytes });
+}, .{ .requests = 1, .response_bytes = response_bytes, .body_bytes = response_bytes, .header_bytes = 0 });
 
 /// An engine that records each octet it takes. It copies each run, as h11 and h2 do, and takes
 /// `window` octets before it blocks; or, with `holds`, it keeps each run until a test
@@ -201,7 +201,7 @@ pub const Engine = struct {
     message_octets: [field_len_max]u8 = undefined,
     message_len: usize = 0,
 
-    pub fn respond(engine: *Engine, _: server.RequestId, response: server.Response) server.SendError!void {
+    pub fn respond(engine: *Engine, _: server.RequestId, response: server.ResponseHeader) server.SendError!void {
         engine.heads += 1;
         engine.ended = response.end;
         for (response.headers) |header| engine.read_field(header.name, header.value);
@@ -358,6 +358,10 @@ pub const Fixture = struct {
     pub fn open(fixture: *Fixture, path: []const u8, content_type: []const u8) void {
         test_section.init();
         test_section.append("content-type", content_type) catch unreachable;
+        // colibri's `Headers` reads the lines through this slice while the router handles the head.
+        const lines = test_section.slice();
+        // The route reads its body through `on_data`, so the head's reader holds no octet.
+        var head_body: std.Io.Reader = .fixed(&.{});
         fixture.handle(.{ .request = .{
             .id = request_id,
             .method = "POST",
@@ -367,7 +371,8 @@ pub const Fixture = struct {
             .authority = "example.com",
             .path = path,
             .query = null,
-            .headers = .of(&test_section),
+            .headers = .init(&lines),
+            .body = &head_body,
             .end = false,
         } });
     }

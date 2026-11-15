@@ -29,21 +29,23 @@ pub fn Refusals(comptime App: type, comptime method: connect.Method) type {
     const path = comptime method.path();
     const Refuse = RefuseWith(App, if (served_as_get(method)) allow_get_post else allow_post);
     const others = .{
-        .{ .put, path, Refuse.on_request },
-        .{ .delete, path, Refuse.on_request },
-        .{ .options, path, Refuse.on_request },
-        .{ .trace, path, Refuse.on_request },
-        .{ "PATCH", path, Refuse.on_request },
+        .{ .put, path, Refuse },
+        .{ .delete, path, Refuse },
+        .{ .options, path, Refuse },
+        .{ .trace, path, Refuse },
+        .{ "PATCH", path, Refuse },
     };
     return struct {
-        pub const routes = if (served_as_get(method)) others else .{.{ .get, path, Refuse.on_request }} ++ others;
+        pub const routes = if (served_as_get(method)) others else .{.{ .get, path, Refuse }} ++ others;
     };
 }
 
+/// A stream route with `on_request` alone, so colibri calls it at the head, before any body, and
+/// drops the body (colibri decision 163). A function route with a body is called at its end.
 fn RefuseWith(comptime App: type, comptime allow: []const u8) type {
     return struct {
         /// RFC 9110 §15.5.6: a 405 carries an Allow header that lists the methods the path serves.
-        fn on_request(_: *App, _: *const server.Request, _: void, _: void, response: *server.ResponseWriter) !void {
+        pub fn on_request(_: *App, _: *server.RequestContext, _: *void, _: *const server.Request, response: *server.Response) !void {
             response.status = constants.status_method_not_allowed;
             try response.header("allow", allow);
             return response.end();

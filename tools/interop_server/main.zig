@@ -25,7 +25,7 @@ comptime {
 /// interop service echoes.
 pub const protobuf_any_types: []const type = &.{ coverage.Everything, coverage.Nested, coverage.Scalars };
 
-fn on_error(_: *App, _: *const server.Request, _: anyerror, response: *server.ResponseWriter) void {
+fn on_error(_: *App, _: *server.RequestContext, _: *const server.Request, _: anyerror, response: *server.Response) void {
     response.status = .internal_server_error;
 }
 
@@ -33,7 +33,7 @@ fn on_error(_: *App, _: *const server.Request, _: anyerror, response: *server.Re
 const Router = server.Router(App, .{
     .error_handler = on_error,
     .routes = service.routes ++ rpc.Refusals(App, interop.InteropService.echo).routes,
-}, .{ .requests = constants.requests, .response_bytes = constants.response_bytes, .body_bytes = constants.body_bytes });
+}, .{ .requests = constants.requests, .response_bytes = constants.response_bytes, .body_bytes = constants.body_bytes, .header_bytes = 0 });
 
 const Server = colibri.Server(.{ .tcp_connections = constants.tcp_connections, .quic_connections = constants.quic_connections }, .private);
 

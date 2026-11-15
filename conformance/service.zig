@@ -16,7 +16,7 @@ const Service = service.ConformanceService;
 const options: rpc.RouteOptions = .{ .message_bytes = constants.message_bytes, .token_bytes = constants.token_bytes };
 
 /// A route's error that is not an RPC's: the router answers 500.
-fn on_error(_: *App, _: *const server.Request, failure: anyerror, response: *server.ResponseWriter) void {
+fn on_error(_: *App, _: *server.RequestContext, _: *const server.Request, failure: anyerror, response: *server.Response) void {
     @import("std").debug.print("route error: {s}\n", .{@errorName(failure)});
     response.status = .internal_server_error;
 }
@@ -38,4 +38,5 @@ pub const Router = server.Router(App, .{
     .requests = constants.requests_at_once,
     .response_bytes = constants.response_bytes,
     .body_bytes = constants.body_bytes,
+    .header_bytes = 0,
 });

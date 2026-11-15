@@ -25,10 +25,13 @@ pub const request_query_bytes = 8192;
 /// The messages one read of a streaming body passes on, at most. Each takes at least an
 /// envelope's 5-octet prefix, and a router entry holds far fewer octets than this many prefixes.
 pub const messages_per_read_max = 65_536;
-/// The passes one `on_writable` of a route with `next` makes, at most: a message, or a part of
-/// the stream's end, each. colibri calls `on_writable` again while the engine takes what it is
-/// given, and the response memory or the engine fills long before this many envelopes.
+/// The passes one `next` of a route with `next` makes, at most: a message, or a part of the
+/// stream's end, each. colibri calls `next` again while the engine takes what it is given, and
+/// the response memory or the engine fills long before this many envelopes.
 pub const messages_per_writable_max = 65_536;
+/// The pieces of a body one `on_data` reads, at most. Each holds one new octet at least. With no
+/// middleware's `wrap_body`, colibri gives an event's octets in one piece.
+pub const pieces_per_data_max = 65_536;
 /// RFC 9110 §15.5.6: Method Not Allowed.
 pub const status_method_not_allowed: http.Status = .method_not_allowed;
 /// RFC 9110 §15.5.15: URI Too Long.

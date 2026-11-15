@@ -1,5 +1,5 @@
 //! One call a route serves: what it read of the request, what it wrote of the reply, and the
-//! writing of the reply through colibri's `server.ResponseWriter`. A handler and an interceptor
+//! writing of the reply through colibri's `server.Response`. A handler and an interceptor
 //! see it through the views of `context.zig` (decision 36).
 const std = @import("std");
 const assert = std.debug.assert;
@@ -88,7 +88,7 @@ pub const Room = struct {
 
 pub const Call = struct {
     reply: connect.server.Reply,
-    response: *server.ResponseWriter,
+    response: *server.Response,
     room: *Room,
     headers: *const RequestHeaders,
     /// The path that names the method: "/connectrpc.eliza.v1.ElizaService/Say".
@@ -103,16 +103,14 @@ pub const Call = struct {
     /// call writes (`write_held`). It points into the reply's scratch storage, and is empty when
     /// the call holds none. Only a route with `next` holds one (`pull.zig`).
     held: []const u8 = "",
-    /// The program's values for the call in the route's state, and the name of their type
-    /// (decision 35).
-    values_pointer: ?*anyopaque = null,
-    values_name: []const u8 = "",
+    /// colibri's context of the request, which holds the program's values for the call (decision
+    /// 35). The route writes it again at each callback.
+    context: *server.RequestContext,
 
-    /// The program's values for the call, of the type `RouteOptions.Values` names (decision 35).
+    /// The program's values for the call, of the type the route table's `.Values` names (decision
+    /// 35). colibri halts a read with another type.
     pub fn values(call: *const Call, comptime Values: type) *Values {
-        // A read with another type than the route's is a programmer error.
-        assert(std.mem.eql(u8, call.values_name, @typeName(Values)));
-        return @ptrCast(@alignCast(call.values_pointer.?));
+        return call.context.values(Values);
     }
 
     /// The protocol the request spoke.
@@ -199,7 +197,7 @@ fn apply_head(call: *Call, head: *const connect.server.Head) !void {
 }
 
 /// Writes the message the call holds into the response memory, and returns whether the call
-/// then holds none. colibri's `ResponseWriter.body` takes one slice whole or not at all, so a
+/// then holds none. colibri's `Response.body` takes one slice whole or not at all, so a
 /// message that still finds no room stays held, whole.
 pub fn write_held(call: *Call) bool {
     if (call.held.len == 0) return true;
@@ -320,12 +318,12 @@ pub fn read_one(comptime T: type, call: *Call, messages: *connect.server.Message
 }
 
 /// Answers a request the route refused before it read the body.
-pub fn answer_refusal(refused: connect.server.Refused, scratch: connect.Scratch, room: *Room, headers: *const RequestHeaders, response: *server.ResponseWriter) !void {
+pub fn answer_refusal(refused: connect.server.Refused, scratch: connect.Scratch, room: *Room, headers: *const RequestHeaders, context: *server.RequestContext, response: *server.Response) !void {
     const reply = connect.server.refusal_reply(&refused, &scratch) orelse {
         response.status = @enumFromInt(refused.http_status);
         return response.end();
     };
-    var call: Call = .{ .reply = reply, .response = response, .room = room, .headers = headers, .path = "" };
+    var call: Call = .{ .reply = reply, .response = response, .room = room, .headers = headers, .context = context, .path = "" };
     return finish(&call, refused.failure.?);
 }
 
@@ -339,7 +337,7 @@ test "request headers copy every line, and find them by a name in any case (RFC 
     try test_section.append("authorization", "Bearer Ada");
     try test_section.append("x-trace", "7");
     var headers: RequestHeaders = .{};
-    try headers.copy(.of(&test_section));
+    try headers.copy(.init(&test_section.slice()));
     try testing.expectEqual(@as(usize, 2), headers.count);
     try testing.expectEqualStrings("Bearer Ada", headers.find("Authorization").?);
     try testing.expectEqualStrings("7", headers.lookup().find("X-TRACE").?);
@@ -351,8 +349,8 @@ test "a call lists its request headers in order, repeats included, and its query
     try test_section.append("x-a", "1");
     try test_section.append("x-a", "2");
     var headers: RequestHeaders = .{};
-    try headers.copy(.of(&test_section));
-    const call: Call = .{ .reply = undefined, .response = undefined, .room = undefined, .headers = &headers, .path = "", .query = "encoding=proto&connect=v1" };
+    try headers.copy(.init(&test_section.slice()));
+    const call: Call = .{ .reply = undefined, .response = undefined, .room = undefined, .headers = &headers, .context = undefined, .path = "", .query = "encoding=proto&connect=v1" };
     try testing.expectEqualStrings("encoding=proto&connect=v1", call.request_query());
     try testing.expectEqual(@as(usize, 2), call.request_headers().len);
     try testing.expectEqualStrings("2", call.request_headers()[1].value);
@@ -362,9 +360,9 @@ test "request headers refuse one line more than they hold" {
     test_section.init();
     for (0..constants.request_headers_max) |_| try test_section.append("a", "b");
     var headers: RequestHeaders = .{};
-    try headers.copy(.of(&test_section));
+    try headers.copy(.init(&test_section.slice()));
     try test_section.append("a", "b");
-    try testing.expectError(error.HeadersTooLarge, headers.copy(.of(&test_section)));
+    try testing.expectError(error.HeadersTooLarge, headers.copy(.init(&test_section.slice())));
 }
 
 test "request headers refuse octets beyond their storage" {
@@ -373,9 +371,9 @@ test "request headers refuse octets beyond their storage" {
     const value = [_]u8{'v'} ** value_len;
     try test_section.append("a", &value);
     var headers: RequestHeaders = .{};
-    try headers.copy(.of(&test_section));
+    try headers.copy(.init(&test_section.slice()));
     try test_section.append("b", &value);
-    try testing.expectError(error.HeadersTooLarge, headers.copy(.of(&test_section)));
+    try testing.expectError(error.HeadersTooLarge, headers.copy(.init(&test_section.slice())));
 }
 
 test "a request's query is copied, so it outlives the octets it came from" {
@@ -398,7 +396,7 @@ test "a request's query longer than its storage is refused" {
 test "a response header is refused once the head went out, or once the room is full" {
     var room: Room = .{};
     const headers: RequestHeaders = .{};
-    var call: Call = .{ .reply = undefined, .response = undefined, .room = &room, .headers = &headers, .path = "" };
+    var call: Call = .{ .reply = undefined, .response = undefined, .room = &room, .headers = &headers, .context = undefined, .path = "" };
     for (0..constants.fields_max) |_| try call.add_header("a", "b");
     try testing.expectError(error.TooManyHeaders, call.add_header("a", "b"));
     call.head_written = true;

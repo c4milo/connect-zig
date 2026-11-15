@@ -6,8 +6,8 @@
     .dependencies = .{
         // The HTTP transport of `connect_colibri`, and through its `tls` module, chapulin.
         .colibri = .{
-            .url = "git+https://github.com/c4milo/colibri?ref=v0.16.3#6ff19aa4b6e452a46b28478e3cb578cd2be39e66",
-            .hash = "colibri-0.10.0-Wo-Avv3DrgTzzW5JD_TGXggPWPZZua0jBxGG23KwUSK_",
+            .url = "git+https://github.com/c4milo/colibri?ref=v0.17.0#9d17c88ac9917257460fc79030fdb7181fca1cae",
+            .hash = "colibri-0.10.0-Wo-AvttrsgSRip3yj9Zxa8KTtAAXnrO-VJAJhMkT0Tad",
         },
         // JSON for proto3 JSON and the Connect error bodies, and the compression codecs.
         .stdx = .{
@@ -24,16 +24,16 @@
         // The event loop of the examples, at the commit colibri v0.16.2 pins: Rotor v0.10.0. Lazy, and requested
         // only when connect-zig is the root build, like pepegrillo.
         .rotor = .{
-            .url = "git+https://github.com/c4milo/rotor#933985882d693e4d8b876e1403618a3fc6d989ef",
-            .hash = "rotor-0.10.0-YZkxRFCxJABaRNenAUK5EC84mD-ZR3zmBesT76zmXoqu",
+            .url = "git+https://github.com/c4milo/rotor#f2890f5283fd5577243f6472648a05dda7a7f4e6",
+            .hash = "rotor-0.11.0-YZkxRH0dJwBgz9oa8yO6YOTVtpFTnV6Iiz7C0OwjTffl",
             .lazy = true,
         },
-        // The `jws` calls of the `oidc` module (decision 34): chapulin v0.6.0, at the commit colibri
+        // The `jws` calls of the `oidc` module (decision 34): chapulin v0.8.0, at the commit colibri
         // pins. `build/chapulin.zig` asks for its object with colibri's own request, so a program
         // that links colibri and `oidc` links one chapulin.
         .chapulin = .{
-            .url = "git+https://github.com/c4milo/chapulin#17fd1f0ba108232403cbeff6c6e00a017294c857",
-            .hash = "chapulin-0.6.0-btv9NkNbPADn8A1IcLoK3ZId48MfIeXkUxBtKK9u06Mq",
+            .url = "git+https://github.com/c4milo/chapulin#c45f661dd22150e5c8eee4530c77e201fcaadc75",
+            .hash = "chapulin-0.8.0-btv9NtaXPgAzJNj3yL-HBtNu5Z5jM4UBLiO4s9o3VwOh",
         },
     },
     // What a project that depends on connect-zig fetches. `build.zig` imports `build/`, so the

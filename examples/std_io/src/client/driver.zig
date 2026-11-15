@@ -16,7 +16,7 @@ const Io = std.Io;
 const net = std.Io.net;
 
 /// The server's address, as the pool names it: the port goes in the `Destination`.
-const server_addresses = [_]client.Address{.of(&constants.loopback, 0)};
+const server_addresses = [_]client.Address{.init(&constants.loopback, 0)};
 
 pub const Error = error{ CallUnfinished, CallWrong, InputTooLong };
 

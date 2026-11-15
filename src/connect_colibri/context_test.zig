@@ -41,6 +41,8 @@ const App = struct {
     query: []const u8 = "",
     received: u32 = 0,
     sent: u32 = 0,
+    /// The octets of the text the unary handler read.
+    text_len: usize = 0,
 };
 
 /// Reads the request through `AnyRequest`, marks the response through `AnyResponse`, and counts
@@ -68,6 +70,7 @@ fn on_say(app: *App, ctx: *rpc.Context, request: *const rpc.Request(Note), respo
     app.who = request.header("x-who");
     app.header_count = request.headers().len;
     app.query = request.query();
+    app.text_len = request.message.text.len;
     response.message.text = request.message.text;
     response.add_header("x-handler", "say") catch return .{ .code = .internal };
     response.add_trailer("x-said", "done") catch return .{ .code = .internal };
@@ -108,7 +111,7 @@ const Tally = struct {
     }
 };
 
-fn on_error(_: *App, _: *const server.Request, _: anyerror, response: *server.ResponseWriter) void {
+fn on_error(_: *App, _: *server.RequestContext, _: *const server.Request, _: anyerror, response: *server.Response) void {
     response.status = .internal_server_error;
 }
 
@@ -123,7 +126,7 @@ const Router = server.Router(App, .{
         rpc.post(App, watch, on_watch, options),
         rpc.post(App, tally, Tally, options),
     },
-}, .{ .requests = 1, .response_bytes = response_bytes, .body_bytes = response_bytes });
+}, .{ .requests = 1, .response_bytes = response_bytes, .body_bytes = response_bytes, .header_bytes = 0 });
 
 /// An engine that takes every octet at once, and keeps a copy of each response field.
 const Engine = struct {
@@ -158,7 +161,7 @@ const Engine = struct {
         return null;
     }
 
-    pub fn respond(engine: *Engine, _: server.RequestId, response: server.Response) server.SendError!void {
+    pub fn respond(engine: *Engine, _: server.RequestId, response: server.ResponseHeader) server.SendError!void {
         engine.record(response.headers);
         engine.ended = response.end;
     }
@@ -211,6 +214,10 @@ const Fixture = struct {
         if (head.content_type) |content_type| test_section.append("content-type", content_type) catch unreachable;
         test_section.append("x-who", "ada") catch unreachable;
         if (head.timeout) |timeout| test_section.append("grpc-timeout", timeout) catch unreachable;
+        // colibri's `Headers` reads the lines through this slice while the router handles the head.
+        const lines = test_section.slice();
+        // The route reads its body through `on_data`, so the head's reader holds no octet.
+        var head_body: std.Io.Reader = .fixed(&.{});
         fixture.handle(.{ .request = .{
             .id = request_id,
             .method = head.method,
@@ -220,7 +227,8 @@ const Fixture = struct {
             .authority = "example.com",
             .path = head.path,
             .query = head.query,
-            .headers = .of(&test_section),
+            .headers = .init(&lines),
+            .body = &head_body,
             .end = end,
         } });
     }
@@ -232,7 +240,12 @@ const Fixture = struct {
         var envelopes: [notes_bytes]u8 = undefined;
         var used: usize = 0;
         for (0..count) |_| used += (connect.envelope.write(.{}, encoded, envelopes[used..]) catch unreachable).len;
-        fixture.handle(.{ .body = .{ .id = request_id, .user_data = fixture.engine.user_data, .bytes = envelopes[0..used], .end = true } });
+        fixture.give(envelopes[0..used], true);
+    }
+
+    /// Hands the route one event of the request's body.
+    fn give(fixture: *Fixture, bytes: []const u8, end: bool) void {
+        fixture.handle(.{ .body = .{ .id = request_id, .user_data = fixture.engine.user_data, .bytes = bytes, .end = end } });
     }
 
     fn handle(fixture: *Fixture, received: server.Event) void {
@@ -267,12 +280,67 @@ test "a unary handler reads the call through ctx and request, and writes through
     try testing.expectEqualStrings("0", fixture.engine.field("grpc-status").?);
 }
 
+test "a Connect unary body that two events cut is read whole at the empty event that ends it" {
+    var fixture: Fixture = .{};
+    fixture.open(.{ .path = "/test.Svc/Say", .content_type = "application/proto" }, false);
+    var payload: [note_bytes]u8 = undefined;
+    const text = "hello";
+    const encoded = proto.encode(Note, &.{ .text = text }, &payload) catch unreachable;
+    fixture.give(encoded[0 .. encoded.len / 2], false);
+    fixture.give(encoded[encoded.len / 2 ..], false);
+    try testing.expect(!fixture.engine.ended);
+    // Over h11 and h3, colibri reports a body's end in an event of its own, with no octets.
+    fixture.give("", true);
+    try testing.expect(fixture.engine.ended);
+    try testing.expectEqual(@as(?connect.Protocol, .connect), fixture.app.protocol);
+    try testing.expectEqual(text.len, fixture.app.text_len);
+}
+
+test "a unary message longer than message_bytes fails with resource_exhausted at the body's end" {
+    var fixture: Fixture = .{};
+    fixture.open(.{ .path = "/test.Svc/Say" }, false);
+    var payload: [2 * message_bytes]u8 = undefined;
+    const text = [_]u8{'a'} ** message_bytes;
+    const encoded = proto.encode(Note, &.{ .text = &text }, &payload) catch unreachable;
+    var envelope: [2 * message_bytes]u8 = undefined;
+    fixture.give(connect.envelope.write(.{}, encoded, &envelope) catch unreachable, false);
+    // The route reads the body whole at its end, in place in the router's body memory.
+    try testing.expect(!fixture.engine.ended);
+    fixture.give("", true);
+    try testing.expect(fixture.engine.ended);
+    // statuscodes.md: RESOURCE_EXHAUSTED is 8.
+    try testing.expectEqualStrings("8", fixture.engine.field("grpc-status").?);
+    try testing.expectEqual(@as(usize, 0), fixture.app.text_len);
+}
+
+test "a stream's envelope that two events cut is read once, joined, and a cut end fails" {
+    var payload: [note_bytes]u8 = undefined;
+    const encoded = proto.encode(Note, &.{ .text = "hello" }, &payload) catch unreachable;
+    var envelope_storage: [notes_bytes]u8 = undefined;
+    const envelope = connect.envelope.write(.{}, encoded, &envelope_storage) catch unreachable;
+    var joined: Fixture = .{};
+    joined.open(.{ .path = "/test.Svc/Tally" }, false);
+    joined.give(envelope[0 .. envelope.len / 2], false);
+    joined.give(envelope[envelope.len / 2 ..], false);
+    joined.give("", true);
+    try testing.expect(joined.engine.ended);
+    try testing.expectEqual(@as(u32, 1), joined.app.received);
+    try testing.expectEqualStrings("0", joined.engine.field("grpc-status").?);
+    // gRPC's "Length-Prefixed-Message": a body that ends inside an envelope fails the call.
+    var cut: Fixture = .{};
+    cut.open(.{ .path = "/test.Svc/Tally" }, false);
+    cut.give(envelope[0 .. envelope.len / 2], true);
+    try testing.expect(cut.engine.ended);
+    // statuscodes.md: INVALID_ARGUMENT is 3.
+    try testing.expectEqualStrings("3", cut.engine.field("grpc-status").?);
+}
+
 test "a GET's handler reads its query through the request" {
     var fixture: Fixture = .{};
     const query = "connect=v1&encoding=proto&base64=1&message=";
     fixture.open(.{ .method = "GET", .path = "/test.Svc/Say", .query = query, .content_type = null }, true);
     try testing.expectEqualStrings(query, fixture.app.query);
-    try testing.expectEqual(connect.Protocol.connect, fixture.app.protocol.?);
+    try testing.expectEqual(@as(?connect.Protocol, .connect), fixture.app.protocol);
     try testing.expectEqual(@as(?u64, null), fixture.app.timeout_ns);
 }
 

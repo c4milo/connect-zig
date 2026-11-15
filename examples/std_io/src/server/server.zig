@@ -54,7 +54,7 @@ const App = struct {
     eliza: eliza_service.Room = .{},
 };
 
-fn on_error(_: *App, _: *const server.Request, _: anyerror, response: *server.ResponseWriter) void {
+fn on_error(_: *App, _: *server.RequestContext, _: *const server.Request, _: anyerror, response: *server.Response) void {
     response.status = .internal_server_error;
 }
 
@@ -62,7 +62,7 @@ fn on_error(_: *App, _: *const server.Request, _: anyerror, response: *server.Re
 const Router = server.Router(App, .{
     .error_handler = on_error,
     .routes = eliza_service.Service(App).routes ++ rpc.Refusals(App, eliza.ElizaService.say).routes,
-}, .{ .requests = constants.requests, .response_bytes = constants.response_bytes, .body_bytes = constants.body_bytes });
+}, .{ .requests = constants.requests, .response_bytes = constants.response_bytes, .body_bytes = constants.body_bytes, .header_bytes = 0 });
 
 /// What a task tells the owner.
 const Message = union(enum) {

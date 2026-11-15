@@ -13,8 +13,9 @@
 //! // Each call keeps its own claims, in its values (decisions 35 and 36).
 //! const Values = struct { oidc: ?oidc.Claims = null };
 //! const Auth = oidc.Interceptor(Values, .{ .exclude = &.{ "/grpc.health.v1.Health/", "/auth.v1.Auth/Login" } });
-//! const options: rpc.RouteOptions = .{ .interceptors = &.{Auth}, .Values = Values };
-//! pub const routes = Service.Routes(rpc, App, @This(), options).routes;
+//! const options: rpc.RouteOptions = .{ .interceptors = &.{Auth} };
+//! // The route table names the type of each call's values: `.Values = Values`.
+//! const routes = Service.Routes(rpc, App, @This(), options).routes;
 //!
 //! // In any callback of a call behind the interceptor:
 //! if (ctx.values(Values).oidc) |*claims| {

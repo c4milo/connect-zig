@@ -18,10 +18,10 @@ const server_side = @import("server_side.zig");
 const anchor_der_len = constants.der_len_max(identity.ca_pem.len);
 const anchors_max = 1;
 /// The server's address, and the address each of its datagrams comes from.
-const server_address: client.Address = .of(&constants.loopback, constants.server_port);
+const server_address: client.Address = .init(&constants.loopback, constants.server_port);
 /// What DNS knows of the server. The pool keeps the slice, and QUIC checks each datagram's address
 /// against it, so it lives as long as the program.
-const server_addresses = [_]client.Address{.of(&constants.loopback, 0)};
+const server_addresses = [_]client.Address{.init(&constants.loopback, 0)};
 
 pub const Error = error{ CallUnfinished, CallWrong };
 

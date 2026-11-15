@@ -14,7 +14,7 @@ pub const App = struct {
     oidc: oidc.Verifier = undefined,
 };
 
-fn on_error(_: *App, _: *const server.Request, _: anyerror, response: *server.ResponseWriter) void {
+fn on_error(_: *App, _: *server.RequestContext, _: *const server.Request, _: anyerror, response: *server.Response) void {
     response.status = .internal_server_error;
 }
 
@@ -22,5 +22,7 @@ fn on_error(_: *App, _: *const server.Request, _: anyerror, response: *server.Re
 /// table.
 pub const Router = server.Router(App, .{
     .error_handler = on_error,
+    // What each call keeps for itself: the claims `Auth` reads (decision 35).
+    .Values = service.Values,
     .routes = service.Service(App).routes ++ rpc.Refusals(App, account.AccountService.status).routes,
-}, .{ .requests = constants.requests, .response_bytes = constants.response_bytes, .body_bytes = constants.body_bytes });
+}, .{ .requests = constants.requests, .response_bytes = constants.response_bytes, .body_bytes = constants.body_bytes, .header_bytes = 0 });

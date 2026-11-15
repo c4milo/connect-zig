@@ -40,7 +40,7 @@ pub fn bearer_token(authorization: []const u8) ?[]const u8 {
 /// A server interceptor for `RouteOptions.interceptors`. Its `on_call` verifies the call's
 /// bearer token with the `Verifier` in the program's `App`, field `oidc`, into the call's
 /// values, field `oidc`, a `?oidc.Claims` (decisions 35 and 36). `Values` is the type the
-/// routes name in `RouteOptions.Values`. It refuses the call with `unauthenticated` when the
+/// route table names as `.Values`. It refuses the call with `unauthenticated` when the
 /// token is missing or not valid. A handler reads `ctx.values(Values).oidc` at any callback of
 /// its call, and finds null on an excluded path.
 ///
@@ -75,7 +75,7 @@ fn check_app(comptime App: type) void {
 
 /// The call's values hold a slot for the claims.
 fn check_values(comptime Values: type) void {
-    if (!@hasField(Values, "oidc") or @FieldType(Values, "oidc") != ?Claims) @compileError("oidc.Interceptor: RouteOptions.Values needs a field `oidc: ?oidc.Claims = null`");
+    if (!@hasField(Values, "oidc") or @FieldType(Values, "oidc") != ?Claims) @compileError("oidc.Interceptor: the route table's .Values needs a field `oidc: ?oidc.Claims = null`");
 }
 
 /// An entry names a service and may name a method. An entry that named neither would exclude

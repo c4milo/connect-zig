@@ -526,6 +526,12 @@ first. Cite an entry by number in code and commits ("decision 6").
     and the names `Local`, `Locals` and `RequestContext`, before the call's own object took the
     name `Context`. The owner chose `Values`, connect-es's word for the same values.
 
+    Amended on 2026-11-15, at colibri v0.17.0 (decision 45). The values live in colibri's request
+    context. The route table names their type as `.Values`, colibri starts each request with its
+    defaults, and `ctx.values(T)` reads them through colibri, which halts a read with another
+    type. `RouteOptions.Values` goes. A table names one type for all its routes, so a table that
+    joins services declares one struct with the fields of each.
+
 36. **A handler takes the call's context, its request and its response.** Ruled by the owner on
     2026-11-11 ("ctx, request and response split is cleaner"), as connect-go splits a call
     into a `context.Context`, a `Request` and a `Response`. `Call` goes; it held all three.
@@ -616,6 +622,31 @@ first. Cite an entry by number in code and commits ("decision 6").
     Beaten: a context pointer of `*anyopaque` in each call, which a hook would cast; the
     program's `App` as a type parameter of `ClientCall`, which every call names even with no
     interceptor; and a field the program writes after `init`, which a call can forget.
+
+45. **`connect_colibri` serves each method as a stream route of colibri v0.17.0.** Ruled on
+    2026-11-15. colibri decision 163 makes a struct route a stream: `on_request` at the head,
+    `on_data` at each event of the body, and `next` while the response has room. One request
+    context reaches every callback.
+    - Each method's route is a struct route, whose state holds the call. A function route reads
+      a body whole but holds no state, and a call's state takes tens of KiB.
+    - A route that reads its body whole keeps each piece, so colibri holds the body in the
+      router's `body_bytes`. At the body's end colibri gives the kept octets once more as the last
+      piece, with no new octet, and the route reads the whole body there, in place. A body past
+      `body_bytes` gets 413 from colibri, as it did before.
+    - A type handler's route of a client or bidirectional stream reads each whole envelope of a
+      piece as it arrives, and keeps a cut one for the next piece.
+    - The 405 refusals are struct routes with `on_request` alone, which answer at the head.
+    - Each route reads its header at the head, so every router names `header_bytes = 0`.
+    - A call's nested buffers default to `undefined`, and `on_request` sets their counters.
+      colibri v0.17.0 resets a state one field at a time, and a field whose default is
+      `undefined` costs no store. On v0.16.3 the router copied the whole state at each request:
+      about 375 KB at the default message size.
+    - Why: a small routed Connect call took 77,238 instructions on v0.16.3 and 3,935 on
+      v0.17.0, on x86-64-v2 (design §8 step 24).
+
+    Beaten: a copy of the body into the call's state, with a new `RouteOptions.body_bytes` to
+    size it, which cost the same within 0.7% and added a public option; and a function route for
+    each unary method, which holds no state for the call.
 
 ## Tooling
 

@@ -310,7 +310,7 @@ test "decision 33: a response stream's note whose flush fails still goes out, an
     }
 }
 
-test "decision 33: each call of on_writable hands its notes to the engine, before the stream ends" {
+test "decision 33: each call of next hands its notes to the engine, before the stream ends" {
     var fixture: Fixture = .{ .engine = .{ .window = support.response_bytes * 2 }, .app = .{ .early = true } };
     fixture.call("/test.Svc/Chat", "application/grpc+proto", 3, false);
     fixture.writable();
@@ -341,6 +341,22 @@ test "decision 33: an error from on_message ends the stream after the note the c
     try testing.expectEqual(@as(?connect.Code, .invalid_argument), fixture.app.outcome);
 }
 
+test "a stream that failed while its response is open drops the notes its client still sends" {
+    var fixture: Fixture = .{ .engine = .{ .window = window_echo }, .app = .{ .early = true } };
+    fixture.call("/test.Svc/Chat", "application/grpc+proto", 12, false);
+    fixture.writable();
+    fixture.send("x", false);
+    // The notes after the failure come to more octets than the router's body memory holds, so
+    // the route must read and drop them.
+    const late_notes = support.response_bytes;
+    for (0..late_notes) |_| fixture.send("1", false);
+    fixture.end_request();
+    try fixture.drain(window);
+    // statuscodes.md: INVALID_ARGUMENT is 3.
+    try testing.expectEqualStrings("3", fixture.engine.status());
+    try testing.expectEqual(@as(usize, 0), fixture.engine.cancelled);
+}
+
 test "decision 33: the interceptors run once around a stream with next" {
     var fixture: Fixture = .{ .engine = .{}, .app = .{ .fail_after = 50 } };
     fixture.call("/test.Svc/Count", "application/grpc+proto", notes_long, true);
@@ -354,14 +370,14 @@ test "decision 33: the interceptors run once around a stream with next" {
     try testing.expectEqual(@as(u32, 50), fixture.app.sent);
 }
 
-test "decision 33: a call the route refused at its head runs no interceptor at on_writable" {
+test "decision 33: a call the route refused at its head runs no interceptor at next" {
     const Chat = rpc.Route(App, support.chat, support.Chatter, support.options);
     var app: App = .{};
     var state: Chat.State = .{};
     // What `begin` leaves of a request it refused: no call, and a stream that is done.
     state.done = true;
     state.outgoing.phase = .done;
-    try Chat.on_writable(&app, &state, undefined);
+    try Chat.next(&app, undefined, &state, undefined);
     try testing.expectEqual(@as(usize, 0), app.calls);
 }
 
@@ -369,9 +385,9 @@ test "decision 33: a route table tells a stream with next from one with a respon
     var parameters: server.PathParameters = undefined;
     try testing.expect(support.Router.match("POST", "/test.Svc/Count", &parameters) == .found);
     try testing.expect(support.Router.match("POST", "/test.Svc/Chat", &parameters) == .found);
-    // A route with `next` declares `on_writable`, and a route with a response stream alone
+    // A route with `next` declares colibri's `next`, and a route with a response stream alone
     // declares none.
-    try testing.expect(@hasDecl(rpc.Route(App, support.count, support.Counter, support.options), "on_writable"));
-    try testing.expect(!@hasDecl(rpc.Route(App, support.count, support.on_count, support.options), "on_writable"));
+    try testing.expect(@hasDecl(rpc.Route(App, support.count, support.Counter, support.options), "next"));
+    try testing.expect(!@hasDecl(rpc.Route(App, support.count, support.on_count, support.options), "next"));
     try testing.expectEqual(connect.StreamType.server_stream, support.count.stream_type);
 }

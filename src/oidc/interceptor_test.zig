@@ -22,7 +22,7 @@ const App = struct {
     oidc: verifier_file.Verifier,
 };
 
-/// The call's values, as a program declares them in `RouteOptions.Values`.
+/// The call's values, as a program names them in the route table's `.Values`.
 const Values = struct {
     oidc: ?verifier_file.Claims = null,
 };

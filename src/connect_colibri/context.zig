@@ -50,9 +50,9 @@ pub const Context = struct {
         return ctx.call.sent;
     }
 
-    /// The program's values for this call, of the type `RouteOptions.Values` names (decision
-    /// 35). Every call starts with `.{}`, and the values last as long as the call: each callback
-    /// of a stream reads the same ones.
+    /// The program's values for this call, of the type the route table's `.Values` names
+    /// (decision 35). colibri starts each call with `.{}`, and the values last as long as the
+    /// call: each callback of a stream reads the same ones.
     pub fn values(ctx: *const Context, comptime Values: type) *Values {
         return ctx.call.values(Values);
     }

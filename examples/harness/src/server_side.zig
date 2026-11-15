@@ -21,7 +21,7 @@ const chain_der_len = constants.der_len_max(identity.chain_pem.len);
 /// are valid at this instant.
 pub const now_seconds = identity.now_seconds;
 
-const client_address: server.Address = .of(&constants.loopback, constants.client_port);
+const client_address: server.Address = .init(&constants.loopback, constants.client_port);
 
 /// What a program probes once and passes every TLS configuration: here no CPU feature is known
 /// and the thread's timing mode is not stated, so each session runs ChaCha20 alone.

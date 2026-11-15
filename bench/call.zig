@@ -49,7 +49,7 @@ const h2_version: server.Version = .{ .major = constants.h2_major, .minor = 0 };
 /// What the route reads: nothing. A program's own state would live here.
 const App = struct {};
 
-fn on_error(_: *App, _: *const server.Request, _: anyerror, response: *server.ResponseWriter) void {
+fn on_error(_: *App, _: *server.RequestContext, _: *const server.Request, _: anyerror, response: *server.Response) void {
     response.status = .internal_server_error;
 }
 
@@ -62,7 +62,7 @@ pub fn Calls(comptime Message: type, comptime name: []const u8) type {
         const Router = server.Router(App, .{
             .error_handler = on_error,
             .routes = .{rpc.post(App, echo, on_echo, .{})},
-        }, .{ .requests = constants.call_requests, .response_bytes = constants.call_response_bytes, .body_bytes = constants.call_body_bytes });
+        }, .{ .requests = constants.call_requests, .response_bytes = constants.call_response_bytes, .body_bytes = constants.call_body_bytes, .header_bytes = 0 });
 
         app: App,
         router: Router,
@@ -98,6 +98,10 @@ pub const Exchange = struct {
     context: *anyopaque,
     handle_fn: *const fn (context: *anyopaque, engine: *Engine, received: server.Event) bool,
     sections: [protocol_count]http.FieldSection,
+    /// Each section's lines, which colibri's `Headers` reads through a pointer.
+    lines: [protocol_count]http.FieldSection.Slice,
+    /// The reader of a head's body: the route reads the body through `on_data`.
+    head_body: std.Io.Reader,
     bodies: [protocol_count][constants.call_body_len]u8,
     body_lens: [protocol_count]usize,
     reply: [constants.call_body_len]u8,
@@ -110,6 +114,7 @@ pub const Exchange = struct {
         exchange.path = path;
         exchange.context = context;
         exchange.handle_fn = handle_fn;
+        exchange.head_body = .fixed(&.{});
         for (std.enums.values(Protocol)) |protocol| {
             const index = @intFromEnum(protocol);
             const section = &exchange.sections[index];
@@ -131,6 +136,7 @@ pub const Exchange = struct {
                     exchange.body_lens[index] = prefix_len + encoded.len;
                 },
             }
+            exchange.lines[index] = section.slice();
         }
         // A call writes the reply's buffer, which holds `encoded`, so the calls come after the
         // copies.
@@ -169,7 +175,8 @@ pub const Exchange = struct {
             .authority = "bench.example",
             .path = exchange.path,
             .query = null,
-            .headers = .of(&exchange.sections[index]),
+            .headers = .init(&exchange.lines[index]),
+            .body = &exchange.head_body,
             .end = false,
         } });
         try exchange.handle(.{ .body = .{ .id = request_id, .user_data = exchange.engine.user_data, .bytes = exchange.bodies[index][0..exchange.body_lens[index]], .end = true } });
@@ -206,7 +213,7 @@ const Engine = struct {
     body_len: usize = 0,
     kept: ?[]u8 = null,
 
-    pub fn respond(engine: *Engine, _: server.RequestId, response: server.Response) server.SendError!void {
+    pub fn respond(engine: *Engine, _: server.RequestId, response: server.ResponseHeader) server.SendError!void {
         engine.status = response.status;
         engine.ended = response.end;
     }
