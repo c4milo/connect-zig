@@ -388,7 +388,8 @@ too.
 
 ## Performance
 
-`zig build bench` times eight messages. `tools/bench_check.sh` runs two baselines beside it on
+`zig build bench` times eight messages, then a routed unary call of two of them.
+`tools/bench_check.sh` runs two baselines beside it on
 the same inputs: Go's `google.golang.org/protobuf` v1.36.12, the codec of connect-go, and Buffa,
 the codec of connect-rust. It checks that each writes the same bytes as connect-zig. The numbers come from
 CI's two `bench-compare` jobs of commit `493b3e0`
@@ -496,12 +497,14 @@ it by 1.38 on run 126's Xeon. Go's time on arm64 is 3.0 to 21.7 times connect-zi
   a service behind the interceptor, and `tools/interop_check.sh` reads its refusals with curl
   and `buf curl` in all three protocols.
 - `tools/perf_check.sh` counts the instructions of each benchmark operation under callgrind and
-  fails when one takes more than 2% above `bench/instructions.txt`. Counts do not move with a
+  fails when one takes more than 2% above `bench/instructions.txt`: the codec's operations, and a
+  routed unary call through `connect_colibri` and colibri's router. Counts do not move with a
   shared runner's load, so CI catches a regression that wall time would hide.
 
 CI runs each check as a job of its own, so each shows apart among a change's checks, and writes
 its results to the job's summary: the interop matrix, the instruction table, the conformance
-totals. A failure also shows as an annotation on the change.
+totals. A failure also shows as an annotation on the change. The tests and the comparison with
+Go and Rust run a second time on an arm64 runner.
 
 ## Good to know
 
@@ -556,7 +559,7 @@ tools/conformance_check.sh  # the connectrpc conformance suite against the serve
 tools/interop_languages_check.sh  # Go, TypeScript, Python and Rust clients against the server
 tools/interop_servers_check.sh    # the client against Go, TypeScript, Python and Rust servers
 tools/perf_check.sh       # instructions of each benchmark operation against the baseline
-tools/bench_check.sh      # the benchmark beside Go's
+tools/bench_check.sh      # the benchmark beside Go's and Rust's, the calls beside connect-go's and connect-rust's
 ```
 
 ## Changelog
