@@ -27,6 +27,26 @@ first. Cite an entry by number in code and commits ("decision 6").
    the library, and it uses the arena `std.process.Init` gives it. Beaten: an allocator parameter
    on decode, which colibri and stdx both refuse (colibri non-negotiable 4, stdx non-negotiable 2).
 
+39. **The package exports the colibri modules a program builds on.** Ruled by the owner on
+    2026-11-14.
+    - `build.zig` exports colibri's `server`, `client`, `http`, `tls` and `colibri` modules under
+      colibri's own names. A program takes them as it takes `connect_colibri`:
+      `dependency.module("server")`.
+    - A program thus builds its router, its server and its client on the one colibri that
+      `connect_colibri` uses. Two colibri instances in one build fail: Zig finds one file in two
+      modules.
+    - The build option `rotor` goes to colibri. With `.rotor = true`, a program gets the
+      `.private` kinds of `colibri.Server` and `colibri.Client`, which run on Rotor. Without it,
+      a dependent fetches no Rotor, and the library still needs none (decision 32).
+    - `tools/package_check.sh` proves it. A project that depends on connect-zig alone generates
+      code with the plugin, serves a method over TCP, and calls it with `connect_colibri`'s
+      client and with curl.
+    - Why: before this, a project that followed the README could not reach `server.Router` or
+      `client.ConnectionPool`. A project that added colibri itself got a second instance, unless
+      it passed connect-zig's three arguments exactly. It could not build on Rotor at all.
+    - Beaten: the README states the three arguments that colibri takes, and a `rotor` option. A
+      program then repeats connect-zig's request, and a change of that request breaks it.
+
 ## Protobuf
 
 5. **Unknown fields are dropped in v0.** `decode` skips a field it does not know, groups included,

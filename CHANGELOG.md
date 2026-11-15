@@ -82,6 +82,9 @@ The first release.
   modules alone and never names Rotor (decision 32).
 - The examples run on `colibri.Server` and colibri's in-memory links, and one serves ELIZA on
   colibri's engine over Zig's `std.Io`, with no Rotor at all.
+- The package exports colibri's `server`, `client`, `http`, `tls` and `colibri` modules, so a
+  program builds on the colibri that `connect_colibri` uses. `.rotor = true` builds
+  `colibri.Server` and `colibri.Client` on Rotor (decision 39).
 
 ### Checked
 
@@ -100,8 +103,9 @@ The first release.
   upb's.
 - A performance gate on instruction counts, and a benchmark beside Go's protobuf runtime and
   connect-rust's Buffa, published by CI.
-- A project that fetches connect-zig as a package builds against it, as `zig fetch` keeps the
-  files: `tools/package_check.sh`, a CI job of its own.
+- A project that fetches connect-zig as a package follows the README: it generates its code
+  with the plugin, serves a method over TCP, and calls it with connect-zig's client and with
+  curl. `tools/package_check.sh` runs it as a CI job of its own.
 - `oidc` verifies the RFCs' known answers for RS256, ES256 and EdDSA, and RS256 tokens that
   OpenSSL signs, and each of its checks was broken on purpose to prove a test catches it.
 

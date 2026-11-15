@@ -86,6 +86,9 @@ passes newer fields on.
 
 ## Use it in your project
 
+`tools/package_check.sh` runs these steps in a new project, from a fetched copy of connect-zig, on
+each push. It generates the code, serves a method over TCP and calls it.
+
 ### 1. Add the package
 
 ```sh
@@ -95,11 +98,22 @@ zig fetch --save git+https://github.com/c4milo/connect-zig
 Then import the modules in `build.zig`:
 
 ```zig
-const connect_zig = b.dependency("connect_zig", .{ .target = target });
+const connect_zig = b.dependency("connect_zig", .{ .target = target, .rotor = true });
 module.addImport("protobuf", connect_zig.module("protobuf"));
 module.addImport("connect", connect_zig.module("connect"));
 module.addImport("connect_colibri", connect_zig.module("connect_colibri"));
+// colibri's modules, which connect_colibri is built on.
+module.addImport("server", connect_zig.module("server"));
+module.addImport("client", connect_zig.module("client"));
+module.addImport("tls", connect_zig.module("tls"));
+module.addImport("colibri", connect_zig.module("colibri"));
 ```
+
+connect-zig exports colibri's `server`, `client`, `http`, `tls` and `colibri` modules (decision
+39). Take them from connect-zig, and do not add colibri to your own `build.zig.zon`: a second
+colibri fails the build. `.rotor = true` builds `colibri.Server` and `colibri.Client` on
+[Rotor](https://github.com/c4milo/rotor), colibri's event loop. Without it, your program drives
+colibri's engine and pool on its own loop.
 
 A program that imports `connect_colibri` or `oidc` links
 [chapulin](https://github.com/c4milo/chapulin), the TLS library under colibri. chapulin reports
@@ -116,10 +130,12 @@ Without the hook, the link fails with `undefined symbol: ch_assert_fail`. A prog
 
 ### 2. Generate code
 
-Install the plugin from your `build.zig`, so `zig build` writes it to `zig-out/bin`:
+Install the plugin from your `build.zig` in a step of its own, because your program imports the
+code that the plugin writes:
 
 ```zig
-b.installArtifact(connect_zig.artifact("protoc-gen-connect-zig"));
+const plugin = b.addInstallArtifact(connect_zig.artifact("protoc-gen-connect-zig"), .{});
+b.step("plugin", "Install protoc-gen-connect-zig").dependOn(&plugin.step);
 ```
 
 Then point `buf.gen.yaml` at it:
@@ -131,7 +147,8 @@ plugins:
     out: gen
 ```
 
-`buf generate` writes one `<file>.pb.zig` for each `.proto` file:
+Run `zig build plugin`, then `buf generate`, then `zig build`. `buf generate` writes one
+`<file>.pb.zig` for each `.proto` file:
 
 - a message becomes a struct, with a `FieldNumber` enum that names each field's number;
 - an enum becomes a non-exhaustive `enum(i32)`;
@@ -234,6 +251,24 @@ header on every path, as connect-go answers. A table names it once, for any one 
 To give methods different options, such as their own interceptors, list routes by hand:
 `rpc.post(App, Service.say, say, options)` for each method, and `rpc.get` for a GET.
 
+`colibri.Server` serves the router on Rotor:
+
+```zig
+const Server = colibri.Server(.{ .tcp_connections = 64, .quic_connections = 0 }, .private);
+var http_server: Server = undefined;
+var router: Router = .{};
+var state: App = .{};
+
+try http_server.init(&.{ .port = 8080, .cpu = cpu, .unix_seconds = unix_seconds }, &router, &state);
+defer http_server.deinit();
+try http_server.run();
+```
+
+With no `identity`, it serves h11 and h2 in cleartext. An `identity` adds TLS, and
+`quic_connections` adds h3 on the UDP socket of the same port. `cpu` is what your program
+probed of its CPU, for TLS. [examples/socket_server.zig](examples/socket_server.zig) serves all
+three.
+
 ### 5. Call it
 
 A client call is a `connect_colibri.ClientCall(method, .{})`. It writes a request for colibri's
@@ -250,6 +285,9 @@ if (response.failure) |failure| std.debug.print("{s}\n", .{failure.message});
 
 `.protocol` picks Connect, the default, gRPC or gRPC-Web, and the rest of the call stays the same.
 A gRPC call reads its status from the response's trailers.
+
+On Rotor, `colibri.Client(.{}, .private)` holds the pool. Its `request` takes the call as the
+pool's does, and `run` runs the pool until a handler's `on_finished` calls `shutdown`.
 
 A client or bidirectional stream can also stream both ways. `init_stream` builds the call, and its
 `Sender` sends each message, as the server's `ResponseStream` does. The program passes the pool's events for the

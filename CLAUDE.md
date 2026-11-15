@@ -141,7 +141,9 @@ confirm a test fails. Report `CAUGHT` or `NOT CAUGHT` per mutation in the commit
   and cargo.
 - Package: `tools/package_check.sh` builds a small project against connect-zig as `zig fetch`
   keeps it: the files `.paths` of `build.zig.zon` names, and no other. A new folder that
-  `build.zig` imports joins that list. It needs the network.
+  `build.zig` imports joins that list. The project generates its code with the plugin, serves a
+  method over TCP on colibri's exported modules, and calls it with connect-zig's client and
+  with curl (decision 39). It needs the network, buf and curl.
 - OIDC: `zig build test-oidc` runs the `oidc` module's tests. `build/chapulin.zig` asks for
   chapulin with colibri's own request, so a program links one chapulin object (decision 34); a
   colibri release that changes its request changes that file. `zig build example-oidc` runs a

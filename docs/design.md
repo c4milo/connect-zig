@@ -866,6 +866,23 @@ ran on Linux x86-64 with Zig 0.16.0.
     of the eight messages. On the AMD, Buffa leads deep's binary encode (0.87), as on each run on
     that CPU.
 
+- **A fetched project serves and calls, on colibri's exported modules** (decision 39). The owner
+  chose on 2026-11-14 to prove the package before v0.1.0, and to decide its build API now, not
+  at the move to colibri v0.17.0.
+  - `build.zig` exports colibri's `server`, `client`, `http`, `tls` and `colibri` modules, and
+    takes the option `rotor`, which it passes to colibri. A dependent's default stays
+    `rotor = false`, so it fetches no Rotor.
+  - `tools/package_check.sh` builds the README's steps in a fetched project. It installs the
+    plugin with `zig build plugin`, runs `buf generate`, and builds `greet-server` and
+    `greet-client` with `.rotor = true`. The server serves `greet.v1.GreetService/Greet` on
+    `colibri.Server`, in cleartext. The client calls it over h2 in Connect and in gRPC, on
+    `colibri.Client`, and curl calls it in JSON over h11.
+  - The first run found a fault that the README taught: a handler's `app` parameter shadows a
+    global `app`. The README's server now names its global `state`.
+  - The README's step 1 imports the colibri modules from connect-zig, and step 2 installs the
+    plugin in a step of its own. Step 4 serves the router on `colibri.Server`, and step 5 names
+    `colibri.Client`.
+
 ### What a later step owes
 
 - A stream that waits for an event of the program once its request ended (colibri issue 130).
@@ -875,7 +892,7 @@ ran on Linux x86-64 with Zig 0.16.0.
   callback the shape `(app, ctx, request, response)` (approved by the owner in colibri on
   2026-11-11). `connect_colibri` then reads `ctx.values` from colibri's entry, and
   `RouteOptions.Values` goes for the route table's `.Values`. The owner ruled that v0.1.0
-  waits for it.
+  waits for it. The package check's server and the README's steps 4 and 5 move with it.
 - For `oidc`, a measurement before any change: a client sends one token with each call, and
   the verifier checks its signature each time. If that cost shows in a server's profile, a
   verifier may keep the last tokens it took.

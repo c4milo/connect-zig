@@ -3,7 +3,8 @@
 //!
 //! A project that depends on connect-zig reaches the library modules by name:
 //! `dependency.module("protobuf")`, `"connect"`, `"connect_colibri"` and, on a host target,
-//! `"oidc"`.
+//! `"oidc"`. It reaches colibri's `"server"`, `"client"`, `"http"`, `"tls"` and `"colibri"` the
+//! same way, and `.rotor = true` builds colibri's `.private` kinds on Rotor (decision 39).
 const std = @import("std");
 const assert = std.debug.assert;
 const lint = @import("build/lint.zig");
@@ -15,6 +16,10 @@ const chapulin = @import("build/chapulin.zig");
 
 const Graph = @import("build/graph.zig").Graph;
 
+/// Decision 39: the colibri modules the package exports under colibri's own names, so a program
+/// builds its router, its server and its client on the colibri that `connect_colibri` uses.
+const colibri_exports = [_][]const u8{ "server", "client", "http", "tls", "colibri" };
+
 pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     // Assertions stay on in production (CLAUDE.md, Conventions), so the build offers Debug and
@@ -25,10 +30,14 @@ pub fn build(b: *std.Build) void {
 
     const stdx = b.dependency("stdx", .{ .target = target, .release = release });
     // colibri's `.private` kind of `colibri.Server`, which the example and conformance servers
-    // use, runs on Rotor (colibri decision 159). Only connect-zig's own build asks for it, as it
-    // asks for Rotor itself, so the library never needs Rotor (decision 32).
-    const colibri = b.dependency("colibri", .{ .target = target, .release = release, .rotor = b.pkg_hash.len == 0 });
+    // use, runs on Rotor (colibri decision 159). connect-zig's own build asks for it, and a
+    // program asks with `.rotor = true` (decision 39). The library never needs Rotor (decision 32).
+    const rotor = b.option(bool, "rotor", "Build colibri's .private kinds of colibri.Server and colibri.Client, on Rotor (decision 39)") orelse (b.pkg_hash.len == 0);
+    const colibri = b.dependency("colibri", .{ .target = target, .release = release, .rotor = rotor });
     const graph = modules(b, stdx, colibri, target, optimize);
+    for (colibri_exports) |name| {
+        b.modules.put(b.graph.arena, name, colibri.module(name)) catch @panic("OOM");
+    }
 
     const plugin = b.addExecutable(.{
         .name = "protoc-gen-connect-zig",
