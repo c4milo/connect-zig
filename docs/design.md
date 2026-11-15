@@ -184,6 +184,21 @@ Each step names the check that proves it. A step is done when its check passes i
     cases of `conformance/protobuf_known_failing.txt` as its expected failures. At its first
     run 5629 cases pass, 48 are skipped and 113 are listed. The fixes it led to leave 5635
     passing and 107 listed.
+18. **Checks out of the examples.** The coverage converter, the interop client and the test of
+    the generated code move to `tools/`, with the schemas that only they read (decision 41).
+    New public names: none. Check: `tools/coverage_check.sh`, `tools/interop_servers_check.sh`
+    and `zig build test-generated` pass from their new places.
+19. **Each example a project.** `examples/harness` and one project for each example, each
+    with its own manifest, schema and generated code, and `examples/quickstart`, the README's
+    steps (decision 41). New public names: none. Check: `zig build examples` runs `zig build
+    test` in each project; `tools/package_check.sh` builds `examples/quickstart` against a
+    fetched copy and calls it over h2 and h3.
+20. **The library's rules on every tree.** The lint reads `examples/`, `bench/` and
+    `conformance/` with every rule but the four of a library, and each program allocates its
+    one `State` at startup (decision 42). New public names: none. Check: `zig build lint`.
+21. **OpenTelemetry's trace export.** `examples/otlp` serves `TraceService`, and
+    `interop/otel` exports spans to it with OpenTelemetry's Go SDK (decision 40). New public
+    names: none. Check: `tools/interop_languages_check.sh otel`.
 
 ### Step records
 

@@ -48,6 +48,45 @@ first. Cite an entry by number in code and commits ("decision 6").
     - Beaten: the README states the three arguments that colibri takes, and a `rotor` option. A
       program then repeats connect-zig's request, and a change of that request breaks it.
 
+41. **Each example is a Zig project of its own.** Ruled by the owner on 2026-11-14.
+    - `examples/<name>/` holds `build.zig`, `build.zig.zon`, `buf.gen.yaml`, `proto/`, `gen/` and
+      `src/`. Its manifest names connect-zig by path, `../..`. A reader copies the folder, and
+      swaps the path for a URL.
+    - `examples/harness` is a package, not an example: colibri's in-memory links, the server and
+      client rounds over h11, h2 and h3, the test identity and chapulin's hook. Each project that
+      runs in memory depends on it by path. `socket_server` depends by path on the projects
+      whose services it serves.
+    - `examples/quickstart` is the README's "Use it in your project", as a project.
+      `tools/package_check.sh` builds it against a fetched copy of connect-zig, so no program
+      source lives in a script.
+    - The root's `zig build examples` runs `zig build test` in each project, with the root's
+      package folder and cache. So the tree fetches each package once and compiles each module
+      once. `zig build example-<name>` and `zig build run-eliza-server` stay.
+    - The coverage converter, the interop client and the test of the generated code are checks,
+      not examples. They move to `tools/`, with the schemas that only they read.
+    - Why: a reader copies one folder and has a program that builds. Each project writes the
+      build that a dependent writes, so the examples prove decision 39 too.
+    - Beaten: one build for every example, which hides the build a project writes; and a copy
+      of the harness in each project, which repeats about 900 lines in six places.
+
+42. **Every tree of hand-written Zig takes the library's rules.** Ruled by the owner on
+    2026-11-14.
+    - `examples/`, `bench/` and `conformance/` take every lint rule that `src/` takes, except the
+      four that state what a library is: no allocator, no I/O, no clock and no Rotor. A program
+      owns its memory, its sockets, its clock and its loop.
+    - Each tree names its limits in a `constants.zig`, as `src/` does (the `magic-numbers`
+      rule).
+    - A program holds no container-level `var` (the `global-state` rule). Its `main` allocates
+      one `State` from `init.arena` before the first call, and hands a pointer to each function.
+      TigerStyle allocates once, at startup, in the same way. The allocator gives the type's
+      alignment, which Zig 0.16's x86_64 backend does not always give a static.
+    - Why: a reader copies an example into a program, so the rules that hold the library to its
+      bar hold the copy to it too. The package check's program lived in a shell script that no
+      rule read, and a misaligned static reached CI that way.
+    - Beaten: one aligned static `State` that the rule allows by name, since pepegrillo's rule
+      has no such option; and `threadlocal` statics, which break `std_io_server`'s queue, which
+      its tasks share across threads.
+
 ## Protobuf
 
 5. **Unknown fields are dropped in v0.** `decode` skips a field it does not know, groups included,
@@ -582,3 +621,24 @@ first. Cite an entry by number in code and commits ("decision 6").
       Go's runtime on this repository's own cases. Neither holds the encoding's corner cases.
       This suite's first run found a generated name that did not compile, a JSON decoder that
       did not compile for a message of 150 fields, and 113 failing cases.
+
+40. **The examples serve OpenTelemetry's trace export, and OpenTelemetry's Go SDK calls it.**
+    Ruled by the owner on 2026-11-14.
+    - `examples/otlp/proto/opentelemetry` holds the four files of opentelemetry-proto v1.11.1
+      that trace export needs, as OpenTelemetry wrote them, under their Apache 2.0 license. The
+      denied-words rule skips the folder, as it skips `conformance/proto`.
+    - The project `examples/otlp` serves `opentelemetry.proto.collector.trace.v1.TraceService`,
+      and `socket_server` serves it beside the other services (decision 41). `Export` keeps the
+      encoding of each request, up to a named bound, and answers a request past the bound with
+      `partial_success.rejected_spans`.
+    - `otlpstore.v1.SpanStore/Received`, a method of this repository, answers with every request
+      the service kept, as one `ExportTraceServiceRequest`. Two encodings of one message, one
+      after the other, decode as one message whose repeated fields hold both.
+    - `interop/otel` exports spans with OpenTelemetry's Go SDK v1.47.0 and its gRPC exporter,
+      with gzip, over TLS under the test CA (decision 25). The SDK also records each span in
+      memory. The program then calls `Received`, and compares each span field by field.
+    - Why: the other clients call schemas of this repository. This schema and this client are
+      the work of others, and many programs use them, so the check shows connect-zig serve a
+      real API as its users would.
+    - Beaten: gRPC health and reflection, since reflection needs a design for the plugin first;
+      and ELIZA in the package check, which adds no client that others wrote.
