@@ -1,16 +1,13 @@
 //! The protobuf runtime's benchmark: binary and JSON, encode and decode, on eight messages from
-//! bench/proto: four shaped as services send them, and four that each hold one kind of field.
-//! Then the routed calls of bench/call.zig: a unary call of the small and of the medium message,
-//! in Connect and in gRPC, through `connect_colibri`'s route on colibri's router. It prints one
-//! Markdown table: the bytes each operation reads or writes, the median nanoseconds of one
-//! operation, and MB/s (10^6 bytes a second). A call's bytes are its request body's.
+//! bench/proto: four shaped as services send them, and four that each hold one kind of field. It
+//! prints one Markdown table: the bytes each operation reads or writes, the median nanoseconds of
+//! one operation, and MB/s (10^6 bytes a second).
 //!
 //! Run it with `zig build bench`, which builds it ReleaseFast. Flags:
 //!
 //! - `--quick` takes 3 short batches an operation instead of 11 long ones: a smoke test.
 //! - `--write <dir>` writes each message's binary encoding to `<dir>/<name>.bin` and its walk sum
-//!   to `<dir>/<name>.sum`, and each routed call's reply to `<dir>/<name>.<protocol>.reply`,
-//!   which tools/bench_check.sh compares with Go's and Rust's.
+//!   to `<dir>/<name>.sum`, which tools/bench_check.sh compares with Go's.
 //! - `--instructions` times nothing. Under `valgrind --tool=callgrind --collect-atstart=no`, it
 //!   collects around `instruction_iterations` runs of each operation and dumps the count under
 //!   the operation's name, which tools/perf_check.sh reads. Outside valgrind it does nothing.
@@ -28,7 +25,6 @@ const bench = @import("bench_v1");
 const inputs = @import("inputs.zig");
 const walk = @import("walk.zig");
 const cases = @import("cases.zig");
-const call = @import("call.zig");
 const measure = @import("measure.zig");
 const constants = @import("constants.zig");
 
@@ -52,8 +48,6 @@ const Options = struct {
 const State = struct {
     messages: inputs.Messages,
     buffers: cases.Buffers,
-    small_calls: call.Calls(bench.Small, "Small"),
-    medium_calls: call.Calls(bench.Medium, "Medium"),
     output: [constants.output_len]u8 align(constants.buffer_align),
 };
 
@@ -74,10 +68,6 @@ pub fn main(init: std.process.Init) !void {
     try run_message(context, bench.Strings, walk.strings, "strings", &inputs.strings);
     try run_message(context, bench.Tree, walk.tree, "tree", &messages.tree);
     try run_message(context, bench.Packed, walk.packed_scalars, "packed", &messages.packed_scalars);
-    try state.small_calls.prepare(&inputs.small);
-    try run_calls(context, "small", &state.small_calls.exchange);
-    try state.medium_calls.prepare(&messages.medium);
-    try run_calls(context, "medium", &state.medium_calls.exchange);
     try writer.flush();
 }
 
@@ -118,54 +108,37 @@ fn run_message(
     const case = try cases.Case(T, walk_message).prepare(input, context.buffers);
     if (context.options.write_directory) |directory| try write_outputs(context.io, directory, name, case.binary, case.sum);
     for (std.enums.values(Operation)) |operation| {
-        try run(context, name, operation.label(), case.bytes(operation), case.runner(operation));
-    }
-}
-
-/// Times or counts each protocol's routed call of one message, and writes its reply under
-/// `--write`.
-fn run_calls(context: Context, name: []const u8, exchange: *call.Exchange) !void {
-    for (std.enums.values(call.Protocol)) |protocol| {
-        if (context.options.write_directory) |directory| {
-            try write_file(context.io, directory, name, protocol.file_suffix(), try exchange.reply_of(protocol));
+        if (context.options.instructions) {
+            try count_instructions(name, operation, case.runner(operation));
+            continue;
         }
-        try run(context, name, protocol.label(), exchange.bytes(protocol), exchange.runner(protocol));
+        const ns = try measure.median_ns(context.io, context.options.settings, case.runner(operation));
+        const bytes = case.bytes(operation);
+        const megabytes_per_second = @as(f64, @floatFromInt(bytes)) / ns * std.time.ns_per_s / bytes_per_megabyte;
+        try context.writer.print("| {s} | {s} | {d} | {d:.1} | {d:.1} |\n", .{ name, operation.label(), bytes, ns, megabytes_per_second });
+        try context.writer.flush();
     }
-}
-
-/// Counts the instructions of one operation under `--instructions`, or else times it and prints
-/// its row.
-fn run(context: Context, name: []const u8, label: []const u8, bytes: usize, runner: anytype) !void {
-    if (context.options.instructions) return count_instructions(name, label, runner);
-    const ns = try measure.median_ns(context.io, context.options.settings, runner);
-    const megabytes_per_second = @as(f64, @floatFromInt(bytes)) / ns * std.time.ns_per_s / bytes_per_megabyte;
-    try context.writer.print("| {s} | {s} | {d} | {d:.1} | {d:.1} |\n", .{ name, label, bytes, ns, megabytes_per_second });
-    try context.writer.flush();
 }
 
 /// Collects the instructions of `instruction_iterations` runs of one operation, after one run that
 /// warms it, and dumps them under "<message> <operation>".
-fn count_instructions(name: []const u8, label: []const u8, runner: anytype) !void {
+fn count_instructions(name: []const u8, operation: Operation, runner: anytype) !void {
     try runner.run(1);
     const callgrind = std.valgrind.callgrind;
     callgrind.toggleCollect();
     try runner.run(instruction_iterations);
     callgrind.toggleCollect();
-    var dump_label: [constants.label_len]u8 = @splat(0);
-    _ = try std.fmt.bufPrint(dump_label[0 .. constants.label_len - 1], "{s} {s}", .{ name, label });
-    callgrind.dumpStatsAt(@ptrCast(&dump_label));
+    var label: [constants.label_len]u8 = @splat(0);
+    _ = try std.fmt.bufPrint(label[0 .. constants.label_len - 1], "{s} {s}", .{ name, operation.label() });
+    callgrind.dumpStatsAt(@ptrCast(&label));
 }
 
 fn write_outputs(io: std.Io, directory: []const u8, name: []const u8, binary: []const u8, sum: u64) !void {
-    try write_file(io, directory, name, "bin", binary);
-    var text: [std.fmt.count("{d}\n", .{std.math.maxInt(u64)})]u8 = @splat(0);
-    try write_file(io, directory, name, "sum", try std.fmt.bufPrint(&text, "{d}\n", .{sum}));
-}
-
-/// Writes `data` to `<directory>/<name>.<suffix>`.
-fn write_file(io: std.Io, directory: []const u8, name: []const u8, suffix: []const u8, data: []const u8) !void {
     const cwd = std.Io.Dir.cwd();
     try cwd.createDirPath(io, directory);
     var path: [constants.path_len]u8 = @splat(0);
-    try cwd.writeFile(io, .{ .sub_path = try std.fmt.bufPrint(&path, "{s}/{s}.{s}", .{ directory, name, suffix }), .data = data });
+    try cwd.writeFile(io, .{ .sub_path = try std.fmt.bufPrint(&path, "{s}/{s}.bin", .{ directory, name }), .data = binary });
+    var text: [std.fmt.count("{d}\n", .{std.math.maxInt(u64)})]u8 = @splat(0);
+    const sum_text = try std.fmt.bufPrint(&text, "{d}\n", .{sum});
+    try cwd.writeFile(io, .{ .sub_path = try std.fmt.bufPrint(&path, "{s}/{s}.sum", .{ directory, name }), .data = sum_text });
 }

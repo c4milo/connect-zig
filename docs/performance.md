@@ -50,8 +50,10 @@ medium message, in Connect and in gRPC, through `connect_colibri`'s route on col
 `server.Router`. The route takes the default options, as a program that names none does. The
 program hands the router an engine's events: the request's head, its body with its end, and the
 request's end. A stand-in engine takes each octet at once. So a count holds the router, the
-route, the protocol and the codec, and no framing, TLS or socket. The benchmark builds
-`connect`, `connect_colibri` and colibri's modules in ReleaseFast for them.
+route, the protocol and the codec, and no framing, TLS or socket. They are a program of their
+own, `bench-call` (`bench/call_main.zig`), which `zig build bench` runs after the codec's and
+`tools/perf_check.sh` counts beside it. The build makes `connect`, `connect_colibri` and colibri's
+modules in ReleaseFast for it.
 
 bench/go and bench/rust make the same calls in memory: connect-go's handler through `ServeHTTP`,
 and connect-rust's `ConnectRpcService`, which encodes with Buffa, as a tower service. Each
@@ -153,6 +155,7 @@ failed (the owner's ruling of 2026-11-09). A new fast path joins this list the s
 | callgrind in an x86-64 container on an Apple Mac stops at an AVX instruction. | Rosetta's x86-64 reports no AVX, and valgrind refuses it. | A local count builds for x86-64-v2; its counts track the judge's within 1% where no code is vectorized. |
 | Large binary encode took 11% more time on an EPYC 7763 with 4.79% fewer instructions. | The judge counts instructions. It does not count a missed branch or a load that waits for a store, and an M1 hides both. | Before a number is published, compare the times of two `bench-compare` runs on the same CPU. |
 | Tree's decode with every field read took 10.0 µs, and 4.5 µs once its walk read each node in place. | `next` returned each message by value, and its caller copied a 56-octet node three times through memory. | An iterator gives a message as a pointer; pass a message by its address from there on. |
+| Small binary encode took 9% more instructions, and small JSON encode 2.6%, when the routed calls joined the benchmark program. | The compiler lays out and inlines a program as a whole, and the calls' modules changed its choices for the codec's code. No library code changed. | A unit of work that links other modules is a program of its own, so each program's counts move only with its own code. |
 | Medium binary encode took 20% more time with `writer.len += n` after each inline write. | A store through the buffer, a `[]u8`, may be the length, so the compiler reads the length again from memory, and each write waits for the one before it. | A write reads the length once, stores its octets, then stores the length. Time such a change on x86: an M1 hides the wait. |
 
 A pitfall that belongs to Zig and not to connect-zig moves to pepegrillo's

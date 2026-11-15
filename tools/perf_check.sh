@@ -18,16 +18,20 @@ report="${PERF_REPORT:-/dev/null}"
 # A change may cost this much more than the baseline before the check fails, in percent. Counts
 # repeat exactly on one build; the margin covers what another compiler build may reorder.
 tolerance_percent=2
-# The runs of each operation the program counts (bench/main.zig, instruction_iterations).
+# The runs of each operation the programs count (bench/main.zig and bench/call_main.zig,
+# instruction_iterations).
 iterations=16
 zig build install-bench -Dcpu=x86_64_v3
 work="$(mktemp -d)"
 trap 'rm -rf "${work}"' EXIT
-valgrind --tool=callgrind --collect-atstart=no --callgrind-out-file="${work}/out.%p" \
-    zig-out/bin/bench --instructions >/dev/null 2>"${work}/valgrind.log" || {
-    cat "${work}/valgrind.log" >&2
-    exit 1
-}
+# The codec's operations, then the routed calls, each program alone (build/bench.zig says why).
+for program in bench bench-call; do
+    valgrind --tool=callgrind --collect-atstart=no --callgrind-out-file="${work}/out.${program}.%p" \
+        "zig-out/bin/${program}" --instructions >/dev/null 2>"${work}/valgrind.log" || {
+        cat "${work}/valgrind.log" >&2
+        exit 1
+    }
+done
 # One line for each operation: "<message> <operation>|<instructions of one run>".
 for dump in "${work}"/out.*; do
     label="$(sed -n 's/^desc: Trigger: Client Request: //p' "${dump}")"

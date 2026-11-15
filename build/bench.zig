@@ -1,6 +1,7 @@
-//! `zig build bench`: the protobuf runtime's benchmark in bench/, and the routed calls of
-//! bench/call.zig, built ReleaseFast. Arguments after `--` reach the program: `zig build bench --
-//! --quick` runs it as a smoke test.
+//! `zig build bench`: the protobuf runtime's benchmark in bench/, then the routed calls of
+//! bench/call_main.zig, each built ReleaseFast. Arguments after `--` reach both programs: `zig
+//! build bench -- --quick` runs them as a smoke test. The routed calls are a program of their
+//! own, so their code does not change how the compiler lays out the codec's.
 //!
 //! The library's own build offers Debug and ReleaseSafe alone. The benchmark builds its own copy
 //! of the protobuf module, and the generated code of bench/gen, in ReleaseFast. stdx's build
@@ -46,6 +47,19 @@ pub fn add(b: *std.Build, public_names: *std.Build.Module, target: std.Build.Res
             .imports = &.{
                 .{ .name = "protobuf", .module = protobuf },
                 .{ .name = "bench_v1", .module = messages },
+            },
+        }),
+    });
+    const call_exe = b.addExecutable(.{
+        .name = "bench-call",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("bench/call_main.zig"),
+            .target = target,
+            .optimize = optimize,
+            .valgrind = if (target.result.os.tag == .linux) true else null,
+            .imports = &.{
+                .{ .name = "protobuf", .module = protobuf },
+                .{ .name = "bench_v1", .module = messages },
                 .{ .name = "connect", .module = routed.connect },
                 .{ .name = "connect_colibri", .module = routed.connect_colibri },
                 .{ .name = "server", .module = routed.server },
@@ -56,9 +70,16 @@ pub fn add(b: *std.Build, public_names: *std.Build.Module, target: std.Build.Res
     const run = b.addRunArtifact(exe);
     if (b.args) |args| run.addArgs(args);
     run.has_side_effects = true;
-    // tools/perf_check.sh runs the program under valgrind, so it needs the binary itself.
-    b.step("install-bench", "Install the benchmark program into zig-out/bin").dependOn(&b.addInstallArtifact(exe, .{}).step);
-    b.step("bench", "Benchmark the protobuf runtime, ReleaseFast: zig build bench -- [--quick] [--write <dir>]").dependOn(&run.step);
+    // The routed calls print their rows after the codec's, so the two tables never interleave.
+    const call_run = b.addRunArtifact(call_exe);
+    if (b.args) |args| call_run.addArgs(args);
+    call_run.has_side_effects = true;
+    call_run.step.dependOn(&run.step);
+    // tools/perf_check.sh runs the programs under valgrind, so it needs the binaries themselves.
+    const install = b.step("install-bench", "Install the benchmark programs into zig-out/bin");
+    install.dependOn(&b.addInstallArtifact(exe, .{}).step);
+    install.dependOn(&b.addInstallArtifact(call_exe, .{}).step);
+    b.step("bench", "Benchmark the protobuf runtime and a routed call, ReleaseFast: zig build bench -- [--quick] [--write <dir>]").dependOn(&call_run.step);
 
     // `zig build costs`: the costs table of docs/performance.md, timed on the machine that runs it.
     const costs = b.addExecutable(.{
