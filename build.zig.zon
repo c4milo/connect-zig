@@ -17,8 +17,8 @@
         // Developer tooling only, never linked into the library (decision 15). Lazy, and requested
         // only when connect-zig is the root build.
         .pepegrillo = .{
-            .url = "git+https://github.com/c4milo/pepegrillo#9ae244b9ab55eb8c7259a656d08db85c9f8c42e8",
-            .hash = "pepegrillo-0.0.0-axiFUFeJDACO8UB_GWT7OSbSKD2QOChXCg68MdfzduJq",
+            .url = "git+https://github.com/c4milo/pepegrillo#580a9d18671013e1c5ba8b661f6f744f755ab54e",
+            .hash = "pepegrillo-0.0.0-axiFUDMpDQBYetBeYihxFqXr-_dGi1rf4GzSVeY-GzP4",
             .lazy = true,
         },
         // The event loop of the examples, at the commit colibri v0.16.2 pins: Rotor v0.10.0. Lazy, and requested

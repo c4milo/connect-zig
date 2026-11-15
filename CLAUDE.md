@@ -106,6 +106,10 @@ confirm a test fails. Report `CAUGHT` or `NOT CAUGHT` per mutation in the commit
   `std.Io` (`examples/std_io`, decision 32); port 0 lets the kernel choose, and each server prints
   `listening on port <port>`. Every project that depends on another passes connect-zig the same
   options, or Zig builds a second `connect` module.
+- Line coverage: `tools/line_coverage_check.sh` runs `zig build line-coverage`, pepegrillo's
+  `coverage` tool under kcov 43, on Linux, in an ubuntu:26.04 container when the host has no kcov
+  43, and prints each module's share of lines and the total (decision 43). The README's badge
+  takes the total from a named CI run.
 - Walkthroughs: `python3 tools/walkthrough/walkthrough.py [example...]` runs each example's README
   commands for real and renders the session with HyperFrames into `examples/<example>/
   walkthrough.gif`, which the README embeds. It needs Node 22 or later, FFmpeg and Chrome.

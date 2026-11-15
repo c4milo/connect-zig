@@ -12,7 +12,7 @@
 # job of its own, so each shows apart in GitHub.
 set -eu
 cd "$(dirname "$0")/.."
-checks="format commits test release package bench costs bench-compare perf generated interop interop-languages interop-servers coverage conformance protobuf-conformance"
+checks="format commits test release package bench costs bench-compare perf generated interop interop-languages interop-servers coverage line-coverage conformance protobuf-conformance"
 only=""
 case "${1:-}" in
     --list)
@@ -76,6 +76,12 @@ check() {
         interop-languages) tools/interop_languages_check.sh ;;
         interop-servers) tools/interop_servers_check.sh ;;
         coverage) tools/coverage_check.sh ;;
+        # Each module's share of lines that its tests run, under kcov: the README's badge takes the
+        # total from this report.
+        line-coverage) lines="$(tools/line_coverage_check.sh 2>&1)" && lines_status=0 || lines_status=$?
+            echo "${lines}"
+            report_only line-coverage "$(echo "${lines}" | grep '\[coverage\]')"
+            return "${lines_status}" ;;
         conformance) tools/conformance_check.sh ;;
         # Google's protobuf conformance suite, in binary and JSON (decision 38).
         protobuf-conformance) tools/protobuf_conformance_check.sh ;;

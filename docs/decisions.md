@@ -660,3 +660,19 @@ first. Cite an entry by number in code and commits ("decision 6").
       real API as its users would.
     - Beaten: gRPC health and reflection, since reflection needs a design for the plugin first;
       and ELIZA in the package check, which adds no client that others wrote.
+
+43. **Line coverage comes from pepegrillo's tool under kcov, and the badge from a named CI run.**
+    Ruled by the owner on 2026-11-14.
+    - Zig 0.16 has no line coverage of its own for tests. pepegrillo's `coverage` tool, pinned at
+      `580a9d1`, runs each library module's test binary under kcov 43, and prints each module's
+      share of lines and a total. The owner chose that the tool live in pepegrillo, so each of
+      the owner's Zig projects shares it.
+    - `zig build line-coverage` builds each module's tests in Debug with LLVM, since Zig's own
+      x86-64 backend writes an incomplete line table. `tools/line_coverage_check.sh` runs it on
+      Linux: GitHub's Ubuntu 24.04 has no kcov package, so the check runs it in an ubuntu:26.04
+      container, which packages kcov 43. `tools/ci.sh` holds it as the check `line-coverage`.
+    - Zig compiles only the functions that code references, so the share is of the lines the
+      tests compile, and a function no test references does not lower it.
+    - The README's badge is a static shields.io badge. A commit takes its number from a named CI
+      run of the check, as the README's charts take theirs. Beaten: Codecov, which needs an
+      account and a token in the repository's secrets.
