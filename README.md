@@ -389,8 +389,8 @@ too.
 ## Performance
 
 `zig build bench` times eight messages. `tools/bench_check.sh` runs two baselines beside it on
-the same inputs: Go's `google.golang.org/protobuf` v1.36.12, and Buffa, the Rust runtime of
-connect-rust. It checks that each writes the same bytes as connect-zig. The numbers come from
+the same inputs: Go's `google.golang.org/protobuf` v1.36.12, the codec of connect-go, and Buffa,
+the codec of connect-rust. It checks that each writes the same bytes as connect-zig. The numbers come from
 CI's two `bench-compare` jobs of commit `493b3e0`
 ([run 129](https://github.com/c4milo/connect-zig/actions/runs/43657281850)). One ran on GitHub's
 `ubuntu-24.04` runner, an AMD EPYC 9V45 core (x86-64). The other ran on
@@ -400,17 +400,20 @@ run names its machines and publishes the full tables in its summary: every time,
 one-kind messages.
 
 Each chart draws the speed of connect-zig and of Buffa in multiples of Go's speed. A longer bar
-is faster, and Go is the line at 1. A binary decode with every field read takes `decode_into`,
+is faster, and Go is the line at 1. The charts time the codecs alone: no code of connect-go or
+connect-rust runs in them. The benchmark's routed calls (`bench/call.zig`) time a whole unary
+call through connect-zig, connect-go and connect-rust, in memory, and CI's `bench-compare` job
+prints them in its table. A binary decode with every field read takes `decode_into`,
 which reads each repeated field once, and its iterators give each message in place
 (decision 37).
 
 On x86-64:
 
-![Bars of connect-zig's and Buffa's speed in multiples of Go's, on x86-64: connect-zig is 3.2 to 19.6 times faster than Go's protobuf runtime, and Buffa is faster than connect-zig in 1 of 16 cells](docs/images/speed-vs-go.svg)
+![Bars of the speed of connect-zig and of Buffa, connect-rust's codec, in multiples of Go's protobuf runtime, connect-go's codec, on x86-64: connect-zig is 3.2 to 19.6 times faster than Go's protobuf runtime, and Buffa is faster than connect-zig in 1 of 16 cells](docs/images/speed-vs-go.svg)
 
 On arm64:
 
-![Bars of connect-zig's and Buffa's speed in multiples of Go's, on arm64: connect-zig is 3.0 to 21.7 times faster than Go's protobuf runtime, and Buffa is faster than connect-zig in no cell](docs/images/speed-vs-go-arm64.svg)
+![Bars of the speed of connect-zig and of Buffa, connect-rust's codec, in multiples of Go's protobuf runtime, connect-go's codec, on arm64: connect-zig is 3.0 to 21.7 times faster than Go's protobuf runtime, and Buffa is faster than connect-zig in no cell](docs/images/speed-vs-go-arm64.svg)
 
 Each cell of the tables is a baseline's time over connect-zig's: above 1 means connect-zig is
 faster. Go's time over connect-zig's, on x86-64:

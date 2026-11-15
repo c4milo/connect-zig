@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 840 560" width="840" height="560" role="img" aria-labelledby="t d">
-<title id="t">connect-zig and Buffa against Go's protobuf runtime</title>
-<desc id="d">connect-zig is 3.0 to 21.7 times faster than Go and 1.1 to 2.0 times faster than Buffa. Each bar is a runtime's speed in multiples of Go's, which is the time of Go, google.golang.org/protobuf v1.36.12, over the runtime's time, for four messages and four operations. connect-zig: Small, 40 B: Binary encode 9.2x, Binary decode, every field read 7.0x, JSON encode 10.3x, JSON decode 11.5x; Medium, 1 KB: Binary encode 11.4x, Binary decode, every field read 11.2x, JSON encode 11.5x, JSON decode 18.4x; Large, 180 KB: Binary encode 3.2x, Binary decode, every field read 5.3x, JSON encode 7.9x, JSON decode 13.8x; Deep, 50 levels: Binary encode 3.0x, Binary decode, every field read 6.3x, JSON encode 21.7x, JSON decode 15.4x. Rust, Buffa 0.9.2: Small, 40 B: Binary encode 5.7x, Binary decode, every field read 4.6x, JSON encode 9.1x, JSON decode 10.7x; Medium, 1 KB: Binary encode 9.2x, Binary decode, every field read 6.7x, JSON encode 7.4x, JSON decode 9.9x; Large, 180 KB: Binary encode 2.3x, Binary decode, every field read 3.2x, JSON encode 5.2x, JSON decode 10.0x; Deep, 50 levels: Binary encode 2.3x, Binary decode, every field read 3.2x, JSON encode 17.9x, JSON decode 8.1x.</desc>
+<title id="t">connect-zig and Buffa, connect-rust's codec, against Go's protobuf runtime, connect-go's codec</title>
+<desc id="d">connect-zig is 3.0 to 21.7 times faster than Go and 1.1 to 2.0 times faster than Buffa. Each bar is a runtime's speed in multiples of Go's, which is the time of Go's google.golang.org/protobuf v1.36.12, connect-go's codec, over the runtime's time, for four messages and four operations. connect-zig: Small, 40 B: Binary encode 9.2x, Binary decode, every field read 7.0x, JSON encode 10.3x, JSON decode 11.5x; Medium, 1 KB: Binary encode 11.4x, Binary decode, every field read 11.2x, JSON encode 11.5x, JSON decode 18.4x; Large, 180 KB: Binary encode 3.2x, Binary decode, every field read 5.3x, JSON encode 7.9x, JSON decode 13.8x; Deep, 50 levels: Binary encode 3.0x, Binary decode, every field read 6.3x, JSON encode 21.7x, JSON decode 15.4x. Buffa 0.9.2, connect-rust's codec: Small, 40 B: Binary encode 5.7x, Binary decode, every field read 4.6x, JSON encode 9.1x, JSON decode 10.7x; Medium, 1 KB: Binary encode 9.2x, Binary decode, every field read 6.7x, JSON encode 7.4x, JSON decode 9.9x; Large, 180 KB: Binary encode 2.3x, Binary decode, every field read 3.2x, JSON encode 5.2x, JSON decode 10.0x; Deep, 50 levels: Binary encode 2.3x, Binary decode, every field read 3.2x, JSON encode 17.9x, JSON decode 8.1x.</desc>
 <style>
 svg { --surface:#fcfcfb; --ink:#0b0b0b; --ink2:#52514e; --muted:#8a8984; --grid:#e4e3df; --zig:#2a78d6; --rust:#eb6834; --unit:#52514e; }
 @media (prefers-color-scheme: dark) {
@@ -23,9 +23,9 @@ text { font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; fil
 <rect x="24" y="82" width="12" height="12" rx="2" fill="var(--zig)"/>
 <text class="legend" x="42" y="92">connect-zig</text>
 <rect x="143" y="82" width="12" height="12" rx="2" fill="var(--rust)"/>
-<text class="legend" x="161" y="92">Rust (Buffa 0.9.2)</text>
-<line x1="311" y1="88" x2="327" y2="88" stroke="var(--unit)" stroke-width="1.5" stroke-dasharray="4 3"/>
-<text class="legend" x="333" y="92">Go (google.golang.org/protobuf v1.36.12), the unit</text>
+<text class="legend" x="161" y="92">Buffa 0.9.2, connect-rust's codec</text>
+<line x1="416" y1="88" x2="432" y2="88" stroke="var(--unit)" stroke-width="1.5" stroke-dasharray="4 3"/>
+<text class="legend" x="438" y="92">Go protobuf v1.36.12, connect-go's codec: the unit</text>
 <text class="panel" x="24" y="130">Binary encode</text>
 <line x1="136.0" y1="142" x2="136.0" y2="292" stroke="var(--grid)" stroke-width="1"/>
 <text class="tick" x="136.0" y="306" text-anchor="middle">0×</text>

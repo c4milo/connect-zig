@@ -994,6 +994,10 @@ ran on Linux x86-64 with Zig 0.16.0.
 
 ### What a later step owes
 
+- A chart of the routed calls, beside the codec charts: connect-zig, connect-go and connect-rust
+  on one unary call, from CI's `bench-compare` job of one named run. It waits for colibri
+  v0.17.0's reset of a route's state field by field, without which colibri copies
+  `connect_colibri`'s whole state at each request (step 23).
 - A stream that waits for an event of the program once its request ended (colibri issue 130).
   The owner ruled on 2026-11-10 that colibri v0.16.0 does not wait for it. Neither v0.16.1 nor
   v0.16.2 holds it: it ships in v0.17.0.

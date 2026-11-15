@@ -6,7 +6,9 @@
 <table.md> holds the job's table, or the job's whole output: its "Machine:" line then names the
 machine in the chart's subtitle, so an x86-64 chart and an arm64 chart read apart. The chart
 draws a bar for connect-zig and a bar for Buffa: a runtime's speed in multiples of Go's, which
-is Go's time over the runtime's time. Go is the unit, a line at 1. The column "Go time / Zig
+is Go's time over the runtime's time. The chart times the codecs alone, so the legend names each
+baseline by its runtime, and the RPC framework that encodes with it: Buffa is connect-rust's
+codec, and google.golang.org/protobuf is connect-go's. Go is the unit, a line at 1. The column "Go time / Zig
 time" gives connect-zig's bar, and "Go ns/op" over "Rust ns/op" gives Buffa's. A cell that reads
 "absent" draws no bar. <run> and <commit> name the run in the subtitle, as docs/performance.md
 asks of a published number. The title states what the numbers show, so a row where Buffa beats
@@ -79,7 +81,7 @@ if None in zig_speed.values():
 # The two runtimes the chart draws: their speeds, the legend's name, and the CSS variable of the bar.
 series = [
     (zig_speed, "connect-zig", "--zig"),
-    (buffa_speed, f"Rust (Buffa {buffa_version})", "--rust"),
+    (buffa_speed, f"Buffa {buffa_version}, connect-rust's codec", "--rust"),
 ]
 
 
@@ -146,10 +148,11 @@ def describe(speeds):
 parts = []
 a = parts.append
 a(f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} {H}" width="{W}" height="{H}" role="img" aria-labelledby="t d">')
-a('<title id="t">connect-zig and Buffa against Go\'s protobuf runtime</title>')
-a(f'<desc id="d">{title}. Each bar is a runtime\'s speed in multiples of Go\'s, which is the time of Go, '
-  f'google.golang.org/protobuf {go_version}, over the runtime\'s time, for four messages and four '
-  f'operations. connect-zig: {describe(zig_speed)}. Rust, Buffa {buffa_version}: {describe(buffa_speed)}.</desc>')
+a('<title id="t">connect-zig and Buffa, connect-rust\'s codec, against Go\'s protobuf runtime, connect-go\'s codec</title>')
+a(f'<desc id="d">{title}. Each bar is a runtime\'s speed in multiples of Go\'s, which is the time of Go\'s '
+  f'google.golang.org/protobuf {go_version}, connect-go\'s codec, over the runtime\'s time, for four messages '
+  f'and four operations. connect-zig: {describe(zig_speed)}. Buffa {buffa_version}, connect-rust\'s codec: '
+  f'{describe(buffa_speed)}.</desc>')
 a('''<style>
 svg { --surface:#fcfcfb; --ink:#0b0b0b; --ink2:#52514e; --muted:#8a8984; --grid:#e4e3df; --zig:#2a78d6; --rust:#eb6834; --unit:#52514e; }
 @media (prefers-color-scheme: dark) {
@@ -178,7 +181,7 @@ for _, name, fill in series:
     legend_x += 18 + 7 * len(name) + 24
 # Go is the unit: the legend shows its line, not a bar.
 a(f'<line x1="{legend_x}" y1="{legend_y - 4}" x2="{legend_x + 16}" y2="{legend_y - 4}" stroke="var(--unit)" stroke-width="1.5" stroke-dasharray="4 3"/>')
-a(f'<text class="legend" x="{legend_x + 22}" y="{legend_y}">Go (google.golang.org/protobuf {go_version}), the unit</text>')
+a(f'<text class="legend" x="{legend_x + 22}" y="{legend_y}">Go protobuf {go_version}, connect-go\'s codec: the unit</text>')
 for k, op in enumerate(ops):
     px = pad_l + (k % 2) * (panel_w + gap_x)
     py = pad_t + (k // 2) * (panel_h + gap_y)
