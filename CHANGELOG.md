@@ -105,6 +105,7 @@ The first release.
   servers too.
 - Every protobuf type is compared with Go's runtime, and closed enums and unchecked strings with
   upb's.
+- The tests run 97.6% of the library's lines under kcov, on CI's run 136 (decision 43).
 - OpenTelemetry's Go SDK exports spans to `examples/otlp`, OTLP's trace receiver, over gRPC with
   gzip and TLS, and the check reads each span back as the SDK ended it (decision 40).
 - A performance gate on instruction counts, and a benchmark beside Go's protobuf runtime and

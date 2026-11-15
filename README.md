@@ -3,6 +3,7 @@
 [![CI](https://github.com/c4milo/connect-zig/actions/workflows/main.yml/badge.svg)](https://github.com/c4milo/connect-zig/actions/workflows/main.yml)
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 [![Zig 0.16](https://img.shields.io/badge/zig-0.16.0-f7a41d.svg)](https://ziglang.org/download/#release-0.16.0)
+[![Line coverage: 97.6%](https://img.shields.io/badge/line_coverage-97.6%25-brightgreen.svg)](https://github.com/c4milo/connect-zig/actions/runs/43680656658)
 
 **[Connect RPC](https://connectrpc.com/) for Zig.** Write a `.proto` file, run `buf generate`,
 and serve the same handlers to Connect, gRPC and gRPC-Web clients, in binary protobuf or JSON.
@@ -445,6 +446,11 @@ it by 1.38 on run 126's Xeon. Go's time on arm64 is 3.0 to 21.7 times connect-zi
 - `zig build test` runs every module's tests and the examples, and each check in the library was
   broken on purpose to prove a test catches it. The examples run a client against the server in
   memory over h11 and h2 in cleartext, and over h3 under a test-only TLS identity.
+- `tools/line_coverage_check.sh` runs each module's tests under kcov, through pepegrillo's
+  coverage tool (decision 43). On CI's [run 136](https://github.com/c4milo/connect-zig/actions/runs/43680656658)
+  they ran 97.6% of the library's 8489 lines: `protobuf` 98.2%, `connect` 98.6%,
+  `connect_colibri` 94.7%, `oidc` 98.5% and the plugin 97.6%. Zig compiles only the functions
+  that code references, so the share counts the lines the tests compile.
 - `tools/coverage_check.sh` converts every protobuf type, and edition and proto2 files, with
   connect-zig and with Go's runtime through `buf convert`, in each direction between binary and
   JSON, and requires the same message.
