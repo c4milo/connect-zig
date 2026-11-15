@@ -42,7 +42,17 @@ cpu_model() {
 zig_cpu="$(zig build-exe --show-builtin 2>/dev/null | sed -n '/pub const cpu/,/})/p' |
     sed -n -e 's/.*\.cpu\.\([a-z0-9_]*\),$/\1/p' -e 's/^ *\.\([a-z0-9_]*\),$/+\1/p' | tr -d '\n')"
 echo "Zig CPU: ${zig_cpu}"
-zig build bench -- ${quick} --write "${scratch}/zig" >"${scratch}/zig.md"
+# Zig 0.16's native aarch64 CPU leaves out the architecture version and the model's tuning
+# features, since no ID register it reads holds them. On the arm64 runner's Neoverse-N2, LLVM then
+# failed to build bench-call ("fixup value out of range"), and built it with `v8a` and
+# `use_postra_scheduler` back. So on aarch64 Linux the benchmarks build for the detected model,
+# with the features LLVM gives it.
+cpu_option=""
+if [ "$(uname -s)-$(uname -m)" = "Linux-aarch64" ]; then
+    cpu_option="-Dcpu=${zig_cpu%%+*}"
+    echo "Zig builds for: ${zig_cpu%%+*}, the model's features"
+fi
+zig build bench ${cpu_option} -- ${quick} --write "${scratch}/zig" >"${scratch}/zig.md"
 (cd bench/go && "${go}" run . ${quick} --write "${scratch}/go") >"${scratch}/go.md"
 baselines="go"
 if command -v "${cargo}" >/dev/null 2>&1; then
