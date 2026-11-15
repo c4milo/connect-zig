@@ -179,15 +179,14 @@ test "coding names are case-insensitive, and an unknown one is null" {
     try testing.expectEqual(@as(?Coding, null), Coding.from_name("snappy"));
 }
 
-/// The encoders the tests place: too large for a test's stack.
-threadlocal var test_gzip: GzipEncoder align(@alignOf(GzipEncoder)) = undefined;
-threadlocal var test_zstd: ZstdEncoder align(@alignOf(ZstdEncoder)) = undefined;
+/// The codecs the tests place: too large for a test's stack.
+const codecs = @import("codec_test_support.zig");
 
 test "a server answers in the first coding the peer lists that it writes" {
-    const both: Encoders = .{ .gzip = &test_gzip, .zstd = &test_zstd };
+    const both: Encoders = .{ .gzip = &codecs.gzip_encoder, .zstd = &codecs.zstd_encoder };
     try testing.expectEqual(Coding.gzip, choose("br, gzip", both));
     try testing.expectEqual(Coding.zstd, choose("br, zstd, gzip", both));
-    try testing.expectEqual(Coding.gzip, choose("zstd, gzip", .{ .gzip = &test_gzip }));
+    try testing.expectEqual(Coding.gzip, choose("zstd, gzip", .{ .gzip = &codecs.gzip_encoder }));
     try testing.expectEqual(Coding.identity, choose("br", both));
     try testing.expectEqual(Coding.identity, choose("gzip;q=0", both));
     try testing.expectEqual(Coding.gzip, choose("gzip;q=0.5", both));
@@ -199,7 +198,7 @@ test "gzip round-trips, and a coding with no decoder or a small buffer is refuse
     var decoder: gzip.Decoder = undefined;
     const message = "hello hello hello hello";
     var compressed: [128]u8 = undefined;
-    const packed_octets = try compress(.gzip, .{ .gzip = &test_gzip }, message, &compressed);
+    const packed_octets = try compress(.gzip, .{ .gzip = &codecs.gzip_encoder }, message, &compressed);
     var output: [64]u8 = undefined;
     const decoders: Decoders = .{ .gzip = &decoder };
     try testing.expectEqualStrings(message, try decompress(.gzip, decoders, packed_octets, &output));
@@ -210,15 +209,12 @@ test "gzip round-trips, and a coding with no decoder or a small buffer is refuse
     try testing.expectEqualStrings("gzip", decoders.accept_list(&list));
 }
 
-/// The zstd decoder the round trip places: too large for a test's stack.
-threadlocal var test_zstd_decoder: zstd.HttpDecoder align(@alignOf(zstd.HttpDecoder)) = undefined;
-
 test "zstd round-trips through stdx's encoder and decoder" {
     const message = "zstd zstd zstd zstd zstd zstd zstd zstd";
     var compressed: [128]u8 = undefined;
-    const packed_octets = try compress(.zstd, .{ .zstd = &test_zstd }, message, &compressed);
+    const packed_octets = try compress(.zstd, .{ .zstd = &codecs.zstd_encoder }, message, &compressed);
     // RFC 8878 §3.1.1: a Zstandard frame starts with its magic number, 0xFD2FB528, little-endian.
     try testing.expectEqualSlices(u8, &.{ 0x28, 0xb5, 0x2f, 0xfd }, packed_octets[0..4]);
     var output: [64]u8 = undefined;
-    try testing.expectEqualStrings(message, try decompress(.zstd, .{ .zstd = &test_zstd_decoder }, packed_octets, &output));
+    try testing.expectEqualStrings(message, try decompress(.zstd, .{ .zstd = &codecs.zstd_decoder }, packed_octets, &output));
 }

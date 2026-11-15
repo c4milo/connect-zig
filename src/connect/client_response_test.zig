@@ -35,8 +35,8 @@ const flag_end_stream = constants.protocol.flag_end_stream;
 const flag_trailers = constants.protocol.flag_trailers;
 const prefix_len = constants.protocol.envelope_prefix_len;
 
-threadlocal var test_encoder: compression.GzipEncoder align(@alignOf(compression.GzipEncoder)) = undefined;
-threadlocal var test_decoder: compression.GzipDecoder align(@alignOf(compression.GzipDecoder)) = undefined;
+/// The codecs the tests place: too large for a test's stack.
+const codecs = @import("codec_test_support.zig");
 
 /// A head's or a trailer section's lines, which a `Lookup` finds by name.
 const Lines = struct {
@@ -72,12 +72,12 @@ const Room = struct {
 };
 
 fn decoders() compression.Decoders {
-    return .{ .gzip = &test_decoder };
+    return .{ .gzip = &codecs.gzip_decoder };
 }
 
 /// `text` in gzip, written into `out`.
 fn gzipped(text: []const u8, out: []u8) ![]const u8 {
-    return compression.compress(.gzip, .{ .gzip = &test_encoder }, text, out);
+    return compression.compress(.gzip, .{ .gzip = &codecs.gzip_encoder }, text, out);
 }
 
 /// One envelope of `payload` with `flags`, written into `out`.

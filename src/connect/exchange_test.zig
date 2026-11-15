@@ -4,8 +4,7 @@ const std = @import("std");
 const rpc_error = @import("rpc_error.zig");
 const testing = std.testing;
 const proto = @import("protobuf");
-const gzip = @import("gzip");
-const zstd = @import("zstd");
+const test_codecs = @import("codec_test_support.zig");
 const connect = @import("connect.zig");
 const client_call = @import("client_call.zig");
 const client_response = @import("client_response.zig");
@@ -61,10 +60,6 @@ const Server = struct {
     trailers_storage: [trailers_storage_len]u8 = undefined,
     trailers: []const Header = &.{},
     trailer_out: [connect.trailers.trailers_max]Header = undefined,
-    encoder: connect.GzipEncoder = undefined,
-    decoder: gzip.Decoder = undefined,
-    zstd_encoder: connect.ZstdEncoder = undefined,
-    zstd_decoder: zstd.HttpDecoder = undefined,
 
     fn scratch(server: *Server) message_codec.Scratch {
         return .{ .message = &server.message, .work = &server.work, .tokens = &server.tokens };
@@ -77,8 +72,8 @@ const Server = struct {
         const target = request.target;
         const question = std.mem.indexOfScalar(u8, target, '?');
         const query = if (question) |at| target[at + 1 ..] else null;
-        const decoders: connect.Decoders = .{ .gzip = &server.decoder, .zstd = &server.zstd_decoder };
-        const encoders: connect.Encoders = .{ .gzip = &server.encoder, .zstd = &server.zstd_encoder };
+        const decoders = test_codecs.decoders();
+        const encoders = test_codecs.encoders();
         const decision = server_head.accept(request.http_method, query, list.lookup(), &.{
             .stream_type = method.stream_type,
             .idempotency = method.idempotency,
@@ -133,10 +128,6 @@ const Client = struct {
     response_octets: [buffer_len]u8 = undefined,
     details: [details_max]connect.Detail = undefined,
     metadata: [metadata_max]Header = undefined,
-    decoder: gzip.Decoder = undefined,
-    encoder: connect.GzipEncoder = undefined,
-    zstd_decoder: zstd.HttpDecoder = undefined,
-    zstd_encoder: connect.ZstdEncoder = undefined,
     head_list: List = .{ .entries = &.{} },
     trailer_list: List = .{ .entries = &.{} },
 
@@ -158,7 +149,7 @@ const Client = struct {
             .headers = client.head_list.lookup(),
             .body = server.body[0..server.body_len],
             .trailers = client.trailer_list.lookup(),
-        }, &storage, &.{ .gzip = &client.decoder, .zstd = &client.zstd_decoder });
+        }, &storage, &test_codecs.decoders());
     }
 };
 
@@ -166,7 +157,8 @@ fn speaks_of(comptime method: connect.Method, options: client_call.Options) conn
     return .{ .protocol = options.protocol, .codec = options.codec, .enveloped = options.protocol != .connect or method.stream_type.enveloped(), .stream_type = method.stream_type };
 }
 
-// Each test thread holds its own pair, which the test cases reuse.
+// Each test thread holds its own pair, which the test cases reuse. The two share the codecs of
+// `codec_test_support.zig`, one message at a time.
 threadlocal var server_state: Server align(@alignOf(Server)) = .{};
 threadlocal var client_state: Client align(@alignOf(Client)) = .{};
 
@@ -174,8 +166,8 @@ fn round_trip(comptime method: connect.Method, options: client_call.Options, mes
     var with_codings = options;
     // A case that names its decoders keeps them: its accept list is what the server chooses from.
     const named = options.decoders.gzip != null or options.decoders.zstd != null;
-    if (!named) with_codings.decoders = .{ .gzip = &client_state.decoder, .zstd = &client_state.zstd_decoder };
-    with_codings.encoders = .{ .gzip = &client_state.encoder, .zstd = &client_state.zstd_encoder };
+    if (!named) with_codings.decoders = test_codecs.decoders();
+    with_codings.encoders = test_codecs.encoders();
     const request = try client_call.request(method, &with_codings, messages, &client_state.call_buffers());
     try server_state.serve(method, &request, failure);
     return client_state.response(speaks_of(method, options), &server_state);
@@ -239,7 +231,7 @@ test "a GET, gzip both ways, and a timeout pass through" {
 
 test "zstd both ways: the client sends it, and a server answers in it to a client that takes it alone" {
     const long = "zstd " ** 300;
-    const zstd_only: connect.Decoders = .{ .zstd = &client_state.zstd_decoder };
+    const zstd_only: connect.Decoders = .{ .zstd = &test_codecs.zstd_decoder };
     var compressed = try round_trip(say, .{ .protocol = .grpc, .request_coding = .zstd, .decoders = zstd_only }, &.{.{ .text = long }}, null);
     try testing.expectEqualStrings("zstd", server_state.head.headers()[1].value);
     // The reply's envelope is flagged compressed, so the server wrote it in zstd.

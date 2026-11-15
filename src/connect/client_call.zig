@@ -257,12 +257,12 @@ test "a request carries the conformance runner's seven headers and a case's besi
     try testing.expectEqualStrings("Value2", call.headers()[call.headers().len - 1].value);
 }
 
-/// The encoder the tests below place: too large for a test's stack.
-threadlocal var test_gzip: compression.GzipEncoder align(@alignOf(compression.GzipEncoder)) = undefined;
+/// The codecs the tests below place: too large for a test's stack.
+const codecs = @import("codec_test_support.zig");
 
 test "a client asked for a coding compresses even a short message, and names the coding" {
     var buffers: [4][128]u8 = undefined;
-    const encoders: compression.Encoders = .{ .gzip = &test_gzip };
+    const encoders: compression.Encoders = .{ .gzip = &codecs.gzip_encoder };
     const call_buffers: Buffers = .{
         .body = &buffers[0],
         .scratch = .{ .message = &buffers[1], .work = &buffers[2], .tokens = &.{} },
