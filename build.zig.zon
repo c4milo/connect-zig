@@ -6,13 +6,13 @@
     .dependencies = .{
         // The HTTP transport of `connect_colibri`, and through its `tls` module, chapulin.
         .colibri = .{
-            .url = "git+https://github.com/c4milo/colibri?ref=v0.16.2#03d562236ae5d7e357ed7b43eafeeaef7a6f2c3e",
-            .hash = "colibri-0.10.0-Wo-Avv3DrgS9KfA01W6VRhqvl_xy3BM7peVPqdgTmpwd",
+            .url = "git+https://github.com/c4milo/colibri?ref=v0.16.3#6ff19aa4b6e452a46b28478e3cb578cd2be39e66",
+            .hash = "colibri-0.10.0-Wo-Avv3DrgTzzW5JD_TGXggPWPZZua0jBxGG23KwUSK_",
         },
         // JSON for proto3 JSON and the Connect error bodies, and the compression codecs.
         .stdx = .{
-            .url = "git+https://github.com/c4milo/stdx#89a021c37020f60b218559a9e186cb8724213766",
-            .hash = "stdx-0.0.0-BD60tlnDOADiKx-GhhQBxPwIZ-k_PKGqf2pcvcABDHz9",
+            .url = "git+https://github.com/c4milo/stdx#22f51392af546d121b1a585c6924982639ad7f98",
+            .hash = "stdx-0.0.0-BD60tk5hQADhsh5Ci-8JWOnafERy0dm9Gp9XySbPrRQh",
         },
         // Developer tooling only, never linked into the library (decision 15). Lazy, and requested
         // only when connect-zig is the root build.

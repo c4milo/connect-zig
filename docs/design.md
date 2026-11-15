@@ -838,6 +838,20 @@ ran on Linux x86-64 with Zig 0.16.0.
     time over connect-zig's for JSON decode, on the Neoverse-N2, from run 119 to this run:
     tree 1.22 to 1.53, deep 1.32 to 1.55, large 1.05 to 1.20, medium 1.51 to 1.61.
 
+- **colibri v0.16.3, with stdx `22f5139`.** connect-zig pins colibri v0.16.3 (`6ff19aa4`) and the
+  stdx it pins, `22f5139`, which is stdx's main of 2026-11-14. colibri's API does not change, and
+  chapulin v0.6.0 stays. The owner asked on 2026-11-14 to nudge colibri for a release with stdx's
+  main, and colibri cut v0.16.3 from v0.16.2 with that one change.
+  - The new stdx holds its decisions 76 to 79: the TextReader's token queue, the JSON writer's
+    write-back of its state, `TextWriter.member_*` and `TextReader.next_items`, and the base64
+    option `pad_bits`. connect-zig's code needs no change for any of them.
+  - On x86-64-v2 under callgrind, the new stdx alone takes connect-zig's JSON decode 11% to 34%
+    fewer instructions (tree 33.78%, deep 30.17%, packed 26.63%) and its JSON encode 3% to 12%
+    fewer; no count rises. On the Neoverse-N2, the lab measured JSON encode beating Buffa on
+    small, deep and packed with this stdx.
+  - connect-zig keeps its own base64 fallback: stdx's `.pad_bits = .drop` costs about 18
+    instructions a bytes field on a valid text, and the fallback costs none (owner, 2026-11-14).
+
 ### What a later step owes
 
 - A stream that waits for an event of the program once its request ended (colibri issue 130).
