@@ -111,11 +111,11 @@ The first release.
   bounds it (decision 12). A long stream takes a type handler with `next`.
 - A stream cannot wait for an event of the program once its request ended. colibri plans that
   for v0.17.0 (colibri issue 130).
-- Against Buffa, connect-rust's protobuf runtime, on CI's run 126. On x86-64, connect-zig is
-  faster on all eight messages in binary decode, with every field read too; on seven in binary
-  encode and in JSON encode; and on six in JSON decode. On arm64, it is faster on all eight in
-  binary encode and with every field read after a binary decode, on seven in binary decode, on
-  five in JSON decode and on three in JSON encode. A message of small nested objects takes its
-  JSON encode about 2.4 times Buffa's time there. The ratios move with the runner's CPU, and CI
-  publishes the tables with each run.
+- Against Buffa, connect-rust's protobuf runtime, on CI's run 129. On x86-64, connect-zig is
+  faster on all eight messages in binary decode and in JSON decode, and with every field read
+  after a binary decode; on seven in JSON encode; and on five in binary encode. On arm64, it is
+  faster on all eight in binary encode, in JSON decode, and with every field read after a binary
+  decode; on seven in binary decode; and on six in JSON encode. A message of small nested
+  objects takes its JSON encode about 2.3 times Buffa's time on x86-64, and 2.0 times on arm64.
+  The ratios move with the runner's CPU, and CI publishes the tables with each run.
 - The library does not report a missing required field (decision 23).

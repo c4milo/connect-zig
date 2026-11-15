@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 840 560" width="840" height="560" role="img" aria-labelledby="t d">
 <title id="t">connect-zig and Buffa against Go's protobuf runtime</title>
-<desc id="d">connect-zig is 3.9 to 14.9 times faster than Go; Buffa beats it in no cell. Each bar is a runtime's speed in multiples of Go's, which is the time of Go, google.golang.org/protobuf v1.36.12, over the runtime's time, for four messages and four operations. connect-zig: Small, 40 B: Binary encode 7.9x, Binary decode, every field read 6.4x, JSON encode 9.4x, JSON decode 9.7x; Medium, 1 KB: Binary encode 13.2x, Binary decode, every field read 9.0x, JSON encode 8.9x, JSON decode 14.2x; Large, 180 KB: Binary encode 4.1x, Binary decode, every field read 4.9x, JSON encode 7.8x, JSON decode 11.2x; Deep, 50 levels: Binary encode 3.9x, Binary decode, every field read 4.2x, JSON encode 14.9x, JSON decode 11.5x. Rust, Buffa 0.9.2: Small, 40 B: Binary encode 6.6x, Binary decode, every field read 2.9x, JSON encode 9.4x, JSON decode 8.0x; Medium, 1 KB: Binary encode 9.5x, Binary decode, every field read 6.6x, JSON encode 7.4x, JSON decode 8.1x; Large, 180 KB: Binary encode 3.2x, Binary decode, every field read 3.3x, JSON encode 5.2x, JSON decode 8.3x; Deep, 50 levels: Binary encode 2.8x, Binary decode, every field read 2.6x, JSON encode 14.4x, JSON decode 5.9x.</desc>
+<desc id="d">connect-zig is 3.2 to 19.6 times faster than Go; Buffa beats it in 1 of 16 cells. Each bar is a runtime's speed in multiples of Go's, which is the time of Go, google.golang.org/protobuf v1.36.12, over the runtime's time, for four messages and four operations. connect-zig: Small, 40 B: Binary encode 7.7x, Binary decode, every field read 6.1x, JSON encode 10.0x, JSON decode 11.8x; Medium, 1 KB: Binary encode 9.7x, Binary decode, every field read 8.2x, JSON encode 8.8x, JSON decode 15.7x; Large, 180 KB: Binary encode 3.2x, Binary decode, every field read 3.7x, JSON encode 8.2x, JSON decode 13.9x; Deep, 50 levels: Binary encode 4.2x, Binary decode, every field read 5.3x, JSON encode 19.6x, JSON decode 13.0x. Rust, Buffa 0.9.2: Small, 40 B: Binary encode 5.8x, Binary decode, every field read 2.9x, JSON encode 7.6x, JSON decode 8.9x; Medium, 1 KB: Binary encode 9.4x, Binary decode, every field read 6.1x, JSON encode 6.7x, JSON decode 8.2x; Large, 180 KB: Binary encode 2.8x, Binary decode, every field read 2.4x, JSON encode 3.7x, JSON decode 9.1x; Deep, 50 levels: Binary encode 4.8x, Binary decode, every field read 3.2x, JSON encode 13.8x, JSON decode 6.1x.</desc>
 <style>
 svg { --surface:#fcfcfb; --ink:#0b0b0b; --ink2:#52514e; --muted:#8a8984; --grid:#e4e3df; --zig:#2a78d6; --rust:#eb6834; --unit:#52514e; }
 @media (prefers-color-scheme: dark) {
@@ -17,9 +17,9 @@ text { font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; fil
 .legend { font-size: 12.5px; fill: var(--ink2); }
 </style>
 <rect width="840" height="560" rx="8" fill="var(--surface)"/>
-<text class="title" x="24" y="34">connect-zig is 3.9 to 14.9 times faster than Go; Buffa beats it in no cell</text>
+<text class="title" x="24" y="34">connect-zig is 3.2 to 19.6 times faster than Go; Buffa beats it in 1 of 16 cells</text>
 <text class="sub" x="24" y="56">Each bar is a runtime's speed in multiples of Go's: Go's time over the runtime's time. A longer bar is faster.</text>
-<text class="sub" x="24" y="74">One CI job ran all three, and each wrote the same octets: run 126, commit 80b8e69, x86_64, Intel(R) Xeon(R) 6975P-C.</text>
+<text class="sub" x="24" y="74">One CI job ran all three, and each wrote the same octets: run 129, commit 493b3e0, x86_64, AMD EPYC 9V45 96-Core Processor.</text>
 <rect x="24" y="82" width="12" height="12" rx="2" fill="var(--zig)"/>
 <text class="legend" x="42" y="92">connect-zig</text>
 <rect x="143" y="82" width="12" height="12" rx="2" fill="var(--rust)"/>
@@ -29,154 +29,178 @@ text { font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; fil
 <text class="panel" x="24" y="130">Binary encode</text>
 <line x1="136.0" y1="142" x2="136.0" y2="292" stroke="var(--grid)" stroke-width="1"/>
 <text class="tick" x="136.0" y="306" text-anchor="middle">0×</text>
-<line x1="166.4" y1="142" x2="166.4" y2="292" stroke="var(--grid)" stroke-width="1"/>
-<text class="tick" x="166.4" y="306" text-anchor="middle">2×</text>
-<line x1="196.8" y1="142" x2="196.8" y2="292" stroke="var(--grid)" stroke-width="1"/>
-<text class="tick" x="196.8" y="306" text-anchor="middle">4×</text>
+<line x1="158.8" y1="142" x2="158.8" y2="292" stroke="var(--grid)" stroke-width="1"/>
+<text class="tick" x="158.8" y="306" text-anchor="middle">2×</text>
+<line x1="181.6" y1="142" x2="181.6" y2="292" stroke="var(--grid)" stroke-width="1"/>
+<text class="tick" x="181.6" y="306" text-anchor="middle">4×</text>
+<line x1="204.4" y1="142" x2="204.4" y2="292" stroke="var(--grid)" stroke-width="1"/>
+<text class="tick" x="204.4" y="306" text-anchor="middle">6×</text>
 <line x1="227.2" y1="142" x2="227.2" y2="292" stroke="var(--grid)" stroke-width="1"/>
-<text class="tick" x="227.2" y="306" text-anchor="middle">6×</text>
-<line x1="257.6" y1="142" x2="257.6" y2="292" stroke="var(--grid)" stroke-width="1"/>
-<text class="tick" x="257.6" y="306" text-anchor="middle">8×</text>
-<line x1="288.0" y1="142" x2="288.0" y2="292" stroke="var(--grid)" stroke-width="1"/>
-<text class="tick" x="288.0" y="306" text-anchor="middle">10×</text>
+<text class="tick" x="227.2" y="306" text-anchor="middle">8×</text>
+<line x1="250.0" y1="142" x2="250.0" y2="292" stroke="var(--grid)" stroke-width="1"/>
+<text class="tick" x="250.0" y="306" text-anchor="middle">10×</text>
+<line x1="272.8" y1="142" x2="272.8" y2="292" stroke="var(--grid)" stroke-width="1"/>
+<text class="tick" x="272.8" y="306" text-anchor="middle">12×</text>
+<line x1="295.6" y1="142" x2="295.6" y2="292" stroke="var(--grid)" stroke-width="1"/>
+<text class="tick" x="295.6" y="306" text-anchor="middle">14×</text>
 <line x1="318.4" y1="142" x2="318.4" y2="292" stroke="var(--grid)" stroke-width="1"/>
-<text class="tick" x="318.4" y="306" text-anchor="middle">12×</text>
-<line x1="348.8" y1="142" x2="348.8" y2="292" stroke="var(--grid)" stroke-width="1"/>
-<text class="tick" x="348.8" y="306" text-anchor="middle">14×</text>
+<text class="tick" x="318.4" y="306" text-anchor="middle">16×</text>
+<line x1="341.2" y1="142" x2="341.2" y2="292" stroke="var(--grid)" stroke-width="1"/>
+<text class="tick" x="341.2" y="306" text-anchor="middle">18×</text>
+<line x1="364.0" y1="142" x2="364.0" y2="292" stroke="var(--grid)" stroke-width="1"/>
+<text class="tick" x="364.0" y="306" text-anchor="middle">20×</text>
 <text class="row" x="126" y="164.0" text-anchor="end">Small, 40 B</text>
-<path d="M136.0,146 h115.5 a4.0,4.0 0 0 1 4.0,4.0 v5.0 a4.0,4.0 0 0 1 -4.0,4.0 h-115.5 z" fill="var(--zig)"/>
-<text class="val" x="260.5" y="156">7.9×</text>
-<path d="M136.0,161 h96.8 a4.0,4.0 0 0 1 4.0,4.0 v5.0 a4.0,4.0 0 0 1 -4.0,4.0 h-96.8 z" fill="var(--rust)"/>
-<text class="val" x="241.8" y="171">6.6×</text>
+<path d="M136.0,146 h83.4 a4.0,4.0 0 0 1 4.0,4.0 v5.0 a4.0,4.0 0 0 1 -4.0,4.0 h-83.4 z" fill="var(--zig)"/>
+<text class="val" x="228.4" y="156">7.7×</text>
+<path d="M136.0,161 h62.2 a4.0,4.0 0 0 1 4.0,4.0 v5.0 a4.0,4.0 0 0 1 -4.0,4.0 h-62.2 z" fill="var(--rust)"/>
+<text class="val" x="207.2" y="171">5.8×</text>
 <text class="row" x="126" y="202.0" text-anchor="end">Medium, 1 KB</text>
-<path d="M136.0,184 h197.4 a4.0,4.0 0 0 1 4.0,4.0 v5.0 a4.0,4.0 0 0 1 -4.0,4.0 h-197.4 z" fill="var(--zig)"/>
-<text class="val" x="342.4" y="194">13.2×</text>
-<path d="M136.0,199 h140.2 a4.0,4.0 0 0 1 4.0,4.0 v5.0 a4.0,4.0 0 0 1 -4.0,4.0 h-140.2 z" fill="var(--rust)"/>
-<text class="val" x="285.2" y="209">9.5×</text>
+<path d="M136.0,184 h106.1 a4.0,4.0 0 0 1 4.0,4.0 v5.0 a4.0,4.0 0 0 1 -4.0,4.0 h-106.1 z" fill="var(--zig)"/>
+<text class="val" x="251.1" y="194">9.7×</text>
+<path d="M136.0,199 h103.4 a4.0,4.0 0 0 1 4.0,4.0 v5.0 a4.0,4.0 0 0 1 -4.0,4.0 h-103.4 z" fill="var(--rust)"/>
+<text class="val" x="248.4" y="209">9.4×</text>
 <text class="row" x="126" y="240.0" text-anchor="end">Large, 180 KB</text>
-<path d="M136.0,222 h58.0 a4.0,4.0 0 0 1 4.0,4.0 v5.0 a4.0,4.0 0 0 1 -4.0,4.0 h-58.0 z" fill="var(--zig)"/>
-<text class="val" x="203.0" y="232">4.1×</text>
-<path d="M136.0,237 h44.0 a4.0,4.0 0 0 1 4.0,4.0 v5.0 a4.0,4.0 0 0 1 -4.0,4.0 h-44.0 z" fill="var(--rust)"/>
-<text class="val" x="189.0" y="247">3.2×</text>
+<path d="M136.0,222 h33.1 a4.0,4.0 0 0 1 4.0,4.0 v5.0 a4.0,4.0 0 0 1 -4.0,4.0 h-33.1 z" fill="var(--zig)"/>
+<text class="val" x="178.1" y="232">3.2×</text>
+<path d="M136.0,237 h28.0 a4.0,4.0 0 0 1 4.0,4.0 v5.0 a4.0,4.0 0 0 1 -4.0,4.0 h-28.0 z" fill="var(--rust)"/>
+<text class="val" x="173.0" y="247">2.8×</text>
 <text class="row" x="126" y="278.0" text-anchor="end">Deep, 50 levels</text>
-<path d="M136.0,260 h55.7 a4.0,4.0 0 0 1 4.0,4.0 v5.0 a4.0,4.0 0 0 1 -4.0,4.0 h-55.7 z" fill="var(--zig)"/>
-<text class="val" x="200.7" y="270">3.9×</text>
-<path d="M136.0,275 h39.3 a4.0,4.0 0 0 1 4.0,4.0 v5.0 a4.0,4.0 0 0 1 -4.0,4.0 h-39.3 z" fill="var(--rust)"/>
-<text class="val" x="184.3" y="285">2.8×</text>
-<line x1="151.2" y1="138" x2="151.2" y2="292" stroke="var(--unit)" stroke-width="1.5" stroke-dasharray="4 3"/>
-<text class="note" x="155.2" y="136">1× = as fast as Go</text>
+<path d="M136.0,260 h44.2 a4.0,4.0 0 0 1 4.0,4.0 v5.0 a4.0,4.0 0 0 1 -4.0,4.0 h-44.2 z" fill="var(--zig)"/>
+<text class="val" x="189.2" y="270">4.2×</text>
+<path d="M136.0,275 h51.2 a4.0,4.0 0 0 1 4.0,4.0 v5.0 a4.0,4.0 0 0 1 -4.0,4.0 h-51.2 z" fill="var(--rust)"/>
+<text class="val" x="196.2" y="285">4.8×</text>
+<line x1="147.4" y1="138" x2="147.4" y2="292" stroke="var(--unit)" stroke-width="1.5" stroke-dasharray="4 3"/>
+<text class="note" x="151.4" y="136">1× = as fast as Go</text>
 <text class="panel" x="432" y="130">Binary decode, every field read</text>
 <line x1="544.0" y1="142" x2="544.0" y2="292" stroke="var(--grid)" stroke-width="1"/>
 <text class="tick" x="544.0" y="306" text-anchor="middle">0×</text>
-<line x1="574.4" y1="142" x2="574.4" y2="292" stroke="var(--grid)" stroke-width="1"/>
-<text class="tick" x="574.4" y="306" text-anchor="middle">2×</text>
-<line x1="604.8" y1="142" x2="604.8" y2="292" stroke="var(--grid)" stroke-width="1"/>
-<text class="tick" x="604.8" y="306" text-anchor="middle">4×</text>
+<line x1="566.8" y1="142" x2="566.8" y2="292" stroke="var(--grid)" stroke-width="1"/>
+<text class="tick" x="566.8" y="306" text-anchor="middle">2×</text>
+<line x1="589.6" y1="142" x2="589.6" y2="292" stroke="var(--grid)" stroke-width="1"/>
+<text class="tick" x="589.6" y="306" text-anchor="middle">4×</text>
+<line x1="612.4" y1="142" x2="612.4" y2="292" stroke="var(--grid)" stroke-width="1"/>
+<text class="tick" x="612.4" y="306" text-anchor="middle">6×</text>
 <line x1="635.2" y1="142" x2="635.2" y2="292" stroke="var(--grid)" stroke-width="1"/>
-<text class="tick" x="635.2" y="306" text-anchor="middle">6×</text>
-<line x1="665.6" y1="142" x2="665.6" y2="292" stroke="var(--grid)" stroke-width="1"/>
-<text class="tick" x="665.6" y="306" text-anchor="middle">8×</text>
-<line x1="696.0" y1="142" x2="696.0" y2="292" stroke="var(--grid)" stroke-width="1"/>
-<text class="tick" x="696.0" y="306" text-anchor="middle">10×</text>
+<text class="tick" x="635.2" y="306" text-anchor="middle">8×</text>
+<line x1="658.0" y1="142" x2="658.0" y2="292" stroke="var(--grid)" stroke-width="1"/>
+<text class="tick" x="658.0" y="306" text-anchor="middle">10×</text>
+<line x1="680.8" y1="142" x2="680.8" y2="292" stroke="var(--grid)" stroke-width="1"/>
+<text class="tick" x="680.8" y="306" text-anchor="middle">12×</text>
+<line x1="703.6" y1="142" x2="703.6" y2="292" stroke="var(--grid)" stroke-width="1"/>
+<text class="tick" x="703.6" y="306" text-anchor="middle">14×</text>
 <line x1="726.4" y1="142" x2="726.4" y2="292" stroke="var(--grid)" stroke-width="1"/>
-<text class="tick" x="726.4" y="306" text-anchor="middle">12×</text>
-<line x1="756.8" y1="142" x2="756.8" y2="292" stroke="var(--grid)" stroke-width="1"/>
-<text class="tick" x="756.8" y="306" text-anchor="middle">14×</text>
+<text class="tick" x="726.4" y="306" text-anchor="middle">16×</text>
+<line x1="749.2" y1="142" x2="749.2" y2="292" stroke="var(--grid)" stroke-width="1"/>
+<text class="tick" x="749.2" y="306" text-anchor="middle">18×</text>
+<line x1="772.0" y1="142" x2="772.0" y2="292" stroke="var(--grid)" stroke-width="1"/>
+<text class="tick" x="772.0" y="306" text-anchor="middle">20×</text>
 <text class="row" x="534" y="164.0" text-anchor="end">Small, 40 B</text>
-<path d="M544.0,146 h93.6 a4.0,4.0 0 0 1 4.0,4.0 v5.0 a4.0,4.0 0 0 1 -4.0,4.0 h-93.6 z" fill="var(--zig)"/>
-<text class="val" x="646.6" y="156">6.4×</text>
-<path d="M544.0,161 h40.7 a4.0,4.0 0 0 1 4.0,4.0 v5.0 a4.0,4.0 0 0 1 -4.0,4.0 h-40.7 z" fill="var(--rust)"/>
-<text class="val" x="593.7" y="171">2.9×</text>
+<path d="M544.0,146 h65.4 a4.0,4.0 0 0 1 4.0,4.0 v5.0 a4.0,4.0 0 0 1 -4.0,4.0 h-65.4 z" fill="var(--zig)"/>
+<text class="val" x="618.4" y="156">6.1×</text>
+<path d="M544.0,161 h29.5 a4.0,4.0 0 0 1 4.0,4.0 v5.0 a4.0,4.0 0 0 1 -4.0,4.0 h-29.5 z" fill="var(--rust)"/>
+<text class="val" x="582.5" y="171">2.9×</text>
 <text class="row" x="534" y="202.0" text-anchor="end">Medium, 1 KB</text>
-<path d="M544.0,184 h132.8 a4.0,4.0 0 0 1 4.0,4.0 v5.0 a4.0,4.0 0 0 1 -4.0,4.0 h-132.8 z" fill="var(--zig)"/>
-<text class="val" x="685.8" y="194">9.0×</text>
-<path d="M544.0,199 h96.2 a4.0,4.0 0 0 1 4.0,4.0 v5.0 a4.0,4.0 0 0 1 -4.0,4.0 h-96.2 z" fill="var(--rust)"/>
-<text class="val" x="649.2" y="209">6.6×</text>
+<path d="M544.0,184 h89.7 a4.0,4.0 0 0 1 4.0,4.0 v5.0 a4.0,4.0 0 0 1 -4.0,4.0 h-89.7 z" fill="var(--zig)"/>
+<text class="val" x="642.7" y="194">8.2×</text>
+<path d="M544.0,199 h65.1 a4.0,4.0 0 0 1 4.0,4.0 v5.0 a4.0,4.0 0 0 1 -4.0,4.0 h-65.1 z" fill="var(--rust)"/>
+<text class="val" x="618.1" y="209">6.1×</text>
 <text class="row" x="534" y="240.0" text-anchor="end">Large, 180 KB</text>
-<path d="M544.0,222 h70.6 a4.0,4.0 0 0 1 4.0,4.0 v5.0 a4.0,4.0 0 0 1 -4.0,4.0 h-70.6 z" fill="var(--zig)"/>
-<text class="val" x="623.6" y="232">4.9×</text>
-<path d="M544.0,237 h45.6 a4.0,4.0 0 0 1 4.0,4.0 v5.0 a4.0,4.0 0 0 1 -4.0,4.0 h-45.6 z" fill="var(--rust)"/>
-<text class="val" x="598.6" y="247">3.3×</text>
+<path d="M544.0,222 h38.6 a4.0,4.0 0 0 1 4.0,4.0 v5.0 a4.0,4.0 0 0 1 -4.0,4.0 h-38.6 z" fill="var(--zig)"/>
+<text class="val" x="591.6" y="232">3.7×</text>
+<path d="M544.0,237 h23.3 a4.0,4.0 0 0 1 4.0,4.0 v5.0 a4.0,4.0 0 0 1 -4.0,4.0 h-23.3 z" fill="var(--rust)"/>
+<text class="val" x="576.3" y="247">2.4×</text>
 <text class="row" x="534" y="278.0" text-anchor="end">Deep, 50 levels</text>
-<path d="M544.0,260 h60.6 a4.0,4.0 0 0 1 4.0,4.0 v5.0 a4.0,4.0 0 0 1 -4.0,4.0 h-60.6 z" fill="var(--zig)"/>
-<text class="val" x="613.6" y="270">4.2×</text>
-<path d="M544.0,275 h36.0 a4.0,4.0 0 0 1 4.0,4.0 v5.0 a4.0,4.0 0 0 1 -4.0,4.0 h-36.0 z" fill="var(--rust)"/>
-<text class="val" x="589.0" y="285">2.6×</text>
-<line x1="559.2" y1="138" x2="559.2" y2="292" stroke="var(--unit)" stroke-width="1.5" stroke-dasharray="4 3"/>
+<path d="M544.0,260 h56.5 a4.0,4.0 0 0 1 4.0,4.0 v5.0 a4.0,4.0 0 0 1 -4.0,4.0 h-56.5 z" fill="var(--zig)"/>
+<text class="val" x="609.5" y="270">5.3×</text>
+<path d="M544.0,275 h32.2 a4.0,4.0 0 0 1 4.0,4.0 v5.0 a4.0,4.0 0 0 1 -4.0,4.0 h-32.2 z" fill="var(--rust)"/>
+<text class="val" x="585.2" y="285">3.2×</text>
+<line x1="555.4" y1="138" x2="555.4" y2="292" stroke="var(--unit)" stroke-width="1.5" stroke-dasharray="4 3"/>
 <text class="panel" x="24" y="350">JSON encode</text>
 <line x1="136.0" y1="362" x2="136.0" y2="512" stroke="var(--grid)" stroke-width="1"/>
 <text class="tick" x="136.0" y="526" text-anchor="middle">0×</text>
-<line x1="166.4" y1="362" x2="166.4" y2="512" stroke="var(--grid)" stroke-width="1"/>
-<text class="tick" x="166.4" y="526" text-anchor="middle">2×</text>
-<line x1="196.8" y1="362" x2="196.8" y2="512" stroke="var(--grid)" stroke-width="1"/>
-<text class="tick" x="196.8" y="526" text-anchor="middle">4×</text>
+<line x1="158.8" y1="362" x2="158.8" y2="512" stroke="var(--grid)" stroke-width="1"/>
+<text class="tick" x="158.8" y="526" text-anchor="middle">2×</text>
+<line x1="181.6" y1="362" x2="181.6" y2="512" stroke="var(--grid)" stroke-width="1"/>
+<text class="tick" x="181.6" y="526" text-anchor="middle">4×</text>
+<line x1="204.4" y1="362" x2="204.4" y2="512" stroke="var(--grid)" stroke-width="1"/>
+<text class="tick" x="204.4" y="526" text-anchor="middle">6×</text>
 <line x1="227.2" y1="362" x2="227.2" y2="512" stroke="var(--grid)" stroke-width="1"/>
-<text class="tick" x="227.2" y="526" text-anchor="middle">6×</text>
-<line x1="257.6" y1="362" x2="257.6" y2="512" stroke="var(--grid)" stroke-width="1"/>
-<text class="tick" x="257.6" y="526" text-anchor="middle">8×</text>
-<line x1="288.0" y1="362" x2="288.0" y2="512" stroke="var(--grid)" stroke-width="1"/>
-<text class="tick" x="288.0" y="526" text-anchor="middle">10×</text>
+<text class="tick" x="227.2" y="526" text-anchor="middle">8×</text>
+<line x1="250.0" y1="362" x2="250.0" y2="512" stroke="var(--grid)" stroke-width="1"/>
+<text class="tick" x="250.0" y="526" text-anchor="middle">10×</text>
+<line x1="272.8" y1="362" x2="272.8" y2="512" stroke="var(--grid)" stroke-width="1"/>
+<text class="tick" x="272.8" y="526" text-anchor="middle">12×</text>
+<line x1="295.6" y1="362" x2="295.6" y2="512" stroke="var(--grid)" stroke-width="1"/>
+<text class="tick" x="295.6" y="526" text-anchor="middle">14×</text>
 <line x1="318.4" y1="362" x2="318.4" y2="512" stroke="var(--grid)" stroke-width="1"/>
-<text class="tick" x="318.4" y="526" text-anchor="middle">12×</text>
-<line x1="348.8" y1="362" x2="348.8" y2="512" stroke="var(--grid)" stroke-width="1"/>
-<text class="tick" x="348.8" y="526" text-anchor="middle">14×</text>
+<text class="tick" x="318.4" y="526" text-anchor="middle">16×</text>
+<line x1="341.2" y1="362" x2="341.2" y2="512" stroke="var(--grid)" stroke-width="1"/>
+<text class="tick" x="341.2" y="526" text-anchor="middle">18×</text>
+<line x1="364.0" y1="362" x2="364.0" y2="512" stroke="var(--grid)" stroke-width="1"/>
+<text class="tick" x="364.0" y="526" text-anchor="middle">20×</text>
 <text class="row" x="126" y="384.0" text-anchor="end">Small, 40 B</text>
-<path d="M136.0,366 h139.6 a4.0,4.0 0 0 1 4.0,4.0 v5.0 a4.0,4.0 0 0 1 -4.0,4.0 h-139.6 z" fill="var(--zig)"/>
-<text class="val" x="284.6" y="376">9.4×</text>
-<path d="M136.0,381 h138.9 a4.0,4.0 0 0 1 4.0,4.0 v5.0 a4.0,4.0 0 0 1 -4.0,4.0 h-138.9 z" fill="var(--rust)"/>
-<text class="val" x="283.9" y="391">9.4×</text>
+<path d="M136.0,366 h110.2 a4.0,4.0 0 0 1 4.0,4.0 v5.0 a4.0,4.0 0 0 1 -4.0,4.0 h-110.2 z" fill="var(--zig)"/>
+<text class="val" x="255.2" y="376">10.0×</text>
+<path d="M136.0,381 h82.7 a4.0,4.0 0 0 1 4.0,4.0 v5.0 a4.0,4.0 0 0 1 -4.0,4.0 h-82.7 z" fill="var(--rust)"/>
+<text class="val" x="227.7" y="391">7.6×</text>
 <text class="row" x="126" y="422.0" text-anchor="end">Medium, 1 KB</text>
-<path d="M136.0,404 h131.4 a4.0,4.0 0 0 1 4.0,4.0 v5.0 a4.0,4.0 0 0 1 -4.0,4.0 h-131.4 z" fill="var(--zig)"/>
-<text class="val" x="276.4" y="414">8.9×</text>
-<path d="M136.0,419 h107.8 a4.0,4.0 0 0 1 4.0,4.0 v5.0 a4.0,4.0 0 0 1 -4.0,4.0 h-107.8 z" fill="var(--rust)"/>
-<text class="val" x="252.8" y="429">7.4×</text>
+<path d="M136.0,404 h96.0 a4.0,4.0 0 0 1 4.0,4.0 v5.0 a4.0,4.0 0 0 1 -4.0,4.0 h-96.0 z" fill="var(--zig)"/>
+<text class="val" x="241.0" y="414">8.8×</text>
+<path d="M136.0,419 h72.5 a4.0,4.0 0 0 1 4.0,4.0 v5.0 a4.0,4.0 0 0 1 -4.0,4.0 h-72.5 z" fill="var(--rust)"/>
+<text class="val" x="217.5" y="429">6.7×</text>
 <text class="row" x="126" y="460.0" text-anchor="end">Large, 180 KB</text>
-<path d="M136.0,442 h114.1 a4.0,4.0 0 0 1 4.0,4.0 v5.0 a4.0,4.0 0 0 1 -4.0,4.0 h-114.1 z" fill="var(--zig)"/>
-<text class="val" x="259.1" y="452">7.8×</text>
-<path d="M136.0,457 h74.9 a4.0,4.0 0 0 1 4.0,4.0 v5.0 a4.0,4.0 0 0 1 -4.0,4.0 h-74.9 z" fill="var(--rust)"/>
-<text class="val" x="219.9" y="467">5.2×</text>
+<path d="M136.0,442 h89.3 a4.0,4.0 0 0 1 4.0,4.0 v5.0 a4.0,4.0 0 0 1 -4.0,4.0 h-89.3 z" fill="var(--zig)"/>
+<text class="val" x="234.3" y="452">8.2×</text>
+<path d="M136.0,457 h38.2 a4.0,4.0 0 0 1 4.0,4.0 v5.0 a4.0,4.0 0 0 1 -4.0,4.0 h-38.2 z" fill="var(--rust)"/>
+<text class="val" x="183.2" y="467">3.7×</text>
 <text class="row" x="126" y="498.0" text-anchor="end">Deep, 50 levels</text>
-<path d="M136.0,480 h221.9 a4.0,4.0 0 0 1 4.0,4.0 v5.0 a4.0,4.0 0 0 1 -4.0,4.0 h-221.9 z" fill="var(--zig)"/>
-<text class="val" x="366.9" y="490">14.9×</text>
-<path d="M136.0,495 h215.4 a4.0,4.0 0 0 1 4.0,4.0 v5.0 a4.0,4.0 0 0 1 -4.0,4.0 h-215.4 z" fill="var(--rust)"/>
-<text class="val" x="360.4" y="505">14.4×</text>
-<line x1="151.2" y1="358" x2="151.2" y2="512" stroke="var(--unit)" stroke-width="1.5" stroke-dasharray="4 3"/>
+<path d="M136.0,480 h219.0 a4.0,4.0 0 0 1 4.0,4.0 v5.0 a4.0,4.0 0 0 1 -4.0,4.0 h-219.0 z" fill="var(--zig)"/>
+<text class="val" x="364.0" y="490">19.6×</text>
+<path d="M136.0,495 h153.2 a4.0,4.0 0 0 1 4.0,4.0 v5.0 a4.0,4.0 0 0 1 -4.0,4.0 h-153.2 z" fill="var(--rust)"/>
+<text class="val" x="298.2" y="505">13.8×</text>
+<line x1="147.4" y1="358" x2="147.4" y2="512" stroke="var(--unit)" stroke-width="1.5" stroke-dasharray="4 3"/>
 <text class="panel" x="432" y="350">JSON decode</text>
 <line x1="544.0" y1="362" x2="544.0" y2="512" stroke="var(--grid)" stroke-width="1"/>
 <text class="tick" x="544.0" y="526" text-anchor="middle">0×</text>
-<line x1="574.4" y1="362" x2="574.4" y2="512" stroke="var(--grid)" stroke-width="1"/>
-<text class="tick" x="574.4" y="526" text-anchor="middle">2×</text>
-<line x1="604.8" y1="362" x2="604.8" y2="512" stroke="var(--grid)" stroke-width="1"/>
-<text class="tick" x="604.8" y="526" text-anchor="middle">4×</text>
+<line x1="566.8" y1="362" x2="566.8" y2="512" stroke="var(--grid)" stroke-width="1"/>
+<text class="tick" x="566.8" y="526" text-anchor="middle">2×</text>
+<line x1="589.6" y1="362" x2="589.6" y2="512" stroke="var(--grid)" stroke-width="1"/>
+<text class="tick" x="589.6" y="526" text-anchor="middle">4×</text>
+<line x1="612.4" y1="362" x2="612.4" y2="512" stroke="var(--grid)" stroke-width="1"/>
+<text class="tick" x="612.4" y="526" text-anchor="middle">6×</text>
 <line x1="635.2" y1="362" x2="635.2" y2="512" stroke="var(--grid)" stroke-width="1"/>
-<text class="tick" x="635.2" y="526" text-anchor="middle">6×</text>
-<line x1="665.6" y1="362" x2="665.6" y2="512" stroke="var(--grid)" stroke-width="1"/>
-<text class="tick" x="665.6" y="526" text-anchor="middle">8×</text>
-<line x1="696.0" y1="362" x2="696.0" y2="512" stroke="var(--grid)" stroke-width="1"/>
-<text class="tick" x="696.0" y="526" text-anchor="middle">10×</text>
+<text class="tick" x="635.2" y="526" text-anchor="middle">8×</text>
+<line x1="658.0" y1="362" x2="658.0" y2="512" stroke="var(--grid)" stroke-width="1"/>
+<text class="tick" x="658.0" y="526" text-anchor="middle">10×</text>
+<line x1="680.8" y1="362" x2="680.8" y2="512" stroke="var(--grid)" stroke-width="1"/>
+<text class="tick" x="680.8" y="526" text-anchor="middle">12×</text>
+<line x1="703.6" y1="362" x2="703.6" y2="512" stroke="var(--grid)" stroke-width="1"/>
+<text class="tick" x="703.6" y="526" text-anchor="middle">14×</text>
 <line x1="726.4" y1="362" x2="726.4" y2="512" stroke="var(--grid)" stroke-width="1"/>
-<text class="tick" x="726.4" y="526" text-anchor="middle">12×</text>
-<line x1="756.8" y1="362" x2="756.8" y2="512" stroke="var(--grid)" stroke-width="1"/>
-<text class="tick" x="756.8" y="526" text-anchor="middle">14×</text>
+<text class="tick" x="726.4" y="526" text-anchor="middle">16×</text>
+<line x1="749.2" y1="362" x2="749.2" y2="512" stroke="var(--grid)" stroke-width="1"/>
+<text class="tick" x="749.2" y="526" text-anchor="middle">18×</text>
+<line x1="772.0" y1="362" x2="772.0" y2="512" stroke="var(--grid)" stroke-width="1"/>
+<text class="tick" x="772.0" y="526" text-anchor="middle">20×</text>
 <text class="row" x="534" y="384.0" text-anchor="end">Small, 40 B</text>
-<path d="M544.0,366 h143.9 a4.0,4.0 0 0 1 4.0,4.0 v5.0 a4.0,4.0 0 0 1 -4.0,4.0 h-143.9 z" fill="var(--zig)"/>
-<text class="val" x="696.9" y="376">9.7×</text>
-<path d="M544.0,381 h117.6 a4.0,4.0 0 0 1 4.0,4.0 v5.0 a4.0,4.0 0 0 1 -4.0,4.0 h-117.6 z" fill="var(--rust)"/>
-<text class="val" x="670.6" y="391">8.0×</text>
+<path d="M544.0,366 h130.0 a4.0,4.0 0 0 1 4.0,4.0 v5.0 a4.0,4.0 0 0 1 -4.0,4.0 h-130.0 z" fill="var(--zig)"/>
+<text class="val" x="683.0" y="376">11.8×</text>
+<path d="M544.0,381 h97.9 a4.0,4.0 0 0 1 4.0,4.0 v5.0 a4.0,4.0 0 0 1 -4.0,4.0 h-97.9 z" fill="var(--rust)"/>
+<text class="val" x="650.9" y="391">8.9×</text>
 <text class="row" x="534" y="422.0" text-anchor="end">Medium, 1 KB</text>
-<path d="M544.0,404 h211.5 a4.0,4.0 0 0 1 4.0,4.0 v5.0 a4.0,4.0 0 0 1 -4.0,4.0 h-211.5 z" fill="var(--zig)"/>
-<text class="val" x="764.5" y="414">14.2×</text>
-<path d="M544.0,419 h119.6 a4.0,4.0 0 0 1 4.0,4.0 v5.0 a4.0,4.0 0 0 1 -4.0,4.0 h-119.6 z" fill="var(--rust)"/>
-<text class="val" x="672.6" y="429">8.1×</text>
+<path d="M544.0,404 h174.6 a4.0,4.0 0 0 1 4.0,4.0 v5.0 a4.0,4.0 0 0 1 -4.0,4.0 h-174.6 z" fill="var(--zig)"/>
+<text class="val" x="727.6" y="414">15.7×</text>
+<path d="M544.0,419 h89.0 a4.0,4.0 0 0 1 4.0,4.0 v5.0 a4.0,4.0 0 0 1 -4.0,4.0 h-89.0 z" fill="var(--rust)"/>
+<text class="val" x="642.0" y="429">8.2×</text>
 <text class="row" x="534" y="460.0" text-anchor="end">Large, 180 KB</text>
-<path d="M544.0,442 h166.8 a4.0,4.0 0 0 1 4.0,4.0 v5.0 a4.0,4.0 0 0 1 -4.0,4.0 h-166.8 z" fill="var(--zig)"/>
-<text class="val" x="719.8" y="452">11.2×</text>
-<path d="M544.0,457 h121.5 a4.0,4.0 0 0 1 4.0,4.0 v5.0 a4.0,4.0 0 0 1 -4.0,4.0 h-121.5 z" fill="var(--rust)"/>
-<text class="val" x="674.5" y="467">8.3×</text>
+<path d="M544.0,442 h154.8 a4.0,4.0 0 0 1 4.0,4.0 v5.0 a4.0,4.0 0 0 1 -4.0,4.0 h-154.8 z" fill="var(--zig)"/>
+<text class="val" x="707.8" y="452">13.9×</text>
+<path d="M544.0,457 h99.4 a4.0,4.0 0 0 1 4.0,4.0 v5.0 a4.0,4.0 0 0 1 -4.0,4.0 h-99.4 z" fill="var(--rust)"/>
+<text class="val" x="652.4" y="467">9.1×</text>
 <text class="row" x="534" y="498.0" text-anchor="end">Deep, 50 levels</text>
-<path d="M544.0,480 h171.1 a4.0,4.0 0 0 1 4.0,4.0 v5.0 a4.0,4.0 0 0 1 -4.0,4.0 h-171.1 z" fill="var(--zig)"/>
-<text class="val" x="724.1" y="490">11.5×</text>
-<path d="M544.0,495 h85.7 a4.0,4.0 0 0 1 4.0,4.0 v5.0 a4.0,4.0 0 0 1 -4.0,4.0 h-85.7 z" fill="var(--rust)"/>
-<text class="val" x="638.7" y="505">5.9×</text>
-<line x1="559.2" y1="358" x2="559.2" y2="512" stroke="var(--unit)" stroke-width="1.5" stroke-dasharray="4 3"/>
+<path d="M544.0,480 h143.7 a4.0,4.0 0 0 1 4.0,4.0 v5.0 a4.0,4.0 0 0 1 -4.0,4.0 h-143.7 z" fill="var(--zig)"/>
+<text class="val" x="696.7" y="490">13.0×</text>
+<path d="M544.0,495 h65.8 a4.0,4.0 0 0 1 4.0,4.0 v5.0 a4.0,4.0 0 0 1 -4.0,4.0 h-65.8 z" fill="var(--rust)"/>
+<text class="val" x="618.8" y="505">6.1×</text>
+<line x1="555.4" y1="358" x2="555.4" y2="512" stroke="var(--unit)" stroke-width="1.5" stroke-dasharray="4 3"/>
 </svg>
