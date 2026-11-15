@@ -1,0 +1,23 @@
+[
+  {
+    "command": "zig build run",
+    "output": [
+      "std_io: round over h2 answered",
+      "std_io: round over h11 answered",
+      "std_io: the idle socket closed at its first-request deadline",
+      "std_io: every call answered over h2 and h11, with no Rotor"
+    ]
+  },
+  {
+    "command": "zig build serve &",
+    "output": [
+      "listening on port 8443"
+    ]
+  },
+  {
+    "command": "curl --json '{\"sentence\":\"I feel tired\"}' http://127.0.0.1:8443/connectrpc.eliza.v1.ElizaService/Say",
+    "output": [
+      "{\"sentence\":\"You said \\\"I feel tired\\\". How does that make you feel?\"}"
+    ]
+  }
+]

@@ -5,6 +5,8 @@
 the error and its detail in Connect, gRPC and gRPC-Web, and calls a method the service does not
 have, which answers `unimplemented`.
 
+![A terminal session: zig build run checks the typed errors, then curl divides by zero and reads the DivisionByZero detail](walkthrough.gif)
+
 ## Files
 
 | Path | Holds |

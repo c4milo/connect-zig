@@ -1,0 +1,37 @@
+[
+  {
+    "command": "zig build run",
+    "output": [
+      "eliza: round over h2 answered",
+      "eliza: round over h11 answered",
+      "eliza: round over h3 answered",
+      "eliza: every call answered as expected over h2, h11 and h3"
+    ]
+  },
+  {
+    "command": "zig build serve &",
+    "output": [
+      "listening on port 8443"
+    ]
+  },
+  {
+    "command": "curl --cacert ../harness/tls/ca.pem --json '{\"sentence\":\"I feel tired\"}' https://127.0.0.1:8443/connectrpc.eliza.v1.ElizaService/Say",
+    "output": [
+      "{\"sentence\":\"You said \\\"I feel tired\\\". How does that make you feel?\"}"
+    ]
+  },
+  {
+    "command": "buf curl --cacert ../harness/tls/ca.pem --schema proto --protocol grpc -d '{\"name\":\"Ada\"}' https://127.0.0.1:8443/connectrpc.eliza.v1.ElizaService/Introduce",
+    "output": [
+      "{",
+      "  \"sentence\": \"Hi Ada, I am Eliza.\"",
+      "}",
+      "{",
+      "  \"sentence\": \"Before we begin, Ada, tell me how you came here.\"",
+      "}",
+      "{",
+      "  \"sentence\": \"How are you feeling today, Ada?\"",
+      "}"
+    ]
+  }
+]

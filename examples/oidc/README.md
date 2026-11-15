@@ -4,6 +4,8 @@
 with no I/O (decision 34): a JWT signed with RS256, ES256 or EdDSA, then its issuer, its audience
 and its times.
 
+![A terminal session: zig build run checks the bearer tokens, then zig build serve prints a token and curl calls Whoami with it](walkthrough.gif)
+
 - `Status` needs no token, since the interceptor excludes its path.
 - `Whoami` needs a valid token, and answers with its claims.
 - A call with no token, an expired one, or one for another audience is refused with

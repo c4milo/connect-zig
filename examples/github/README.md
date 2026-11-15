@@ -4,6 +4,8 @@
 API like GitHub's: bearer tokens, a rate limit, pages, field masks, private resources and
 streams. The store is a fixed table in memory, so each run starts the same.
 
+![A terminal session: zig build run plays a GitHub-style session, then curl creates and lists repositories](walkthrough.gif)
+
 - `Auth` reads a bearer token; a change needs one, and a read takes one or none.
 - `RateLimit` counts each caller's calls and sets GitHub's `x-ratelimit-*` headers. Anonymous
   callers have 10 calls in all, and each user has 100.

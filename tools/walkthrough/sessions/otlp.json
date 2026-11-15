@@ -1,0 +1,29 @@
+[
+  {
+    "command": "zig build run",
+    "output": [
+      "otlp: over h2, the receiver kept 3 spans of 1 exports",
+      "otlp: over h11, the receiver kept 6 spans of 2 exports",
+      "otlp: over h3, the receiver kept 9 spans of 3 exports",
+      "otlp: every export answered and read back as expected over h2, h11 and h3"
+    ]
+  },
+  {
+    "command": "zig build serve &",
+    "output": [
+      "listening on port 8443"
+    ]
+  },
+  {
+    "command": "../../interop/otel/run.sh https://127.0.0.1:8443 $PWD/../harness/tls/ca.pem",
+    "output": [
+      "ok: otel grpc export",
+      "ok: otel grpc received",
+      "ok: otel grpc span count",
+      "ok: otel grpc span SELECT cart",
+      "ok: otel grpc span charge card",
+      "ok: otel grpc span POST /checkout",
+      "ok: otel grpc span send receipt"
+    ]
+  }
+]

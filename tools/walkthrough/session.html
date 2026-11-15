@@ -1,0 +1,160 @@
+<!doctype html>
+<!--
+  The composition of an example's walkthrough (tools/walkthrough/walkthrough.py): a terminal
+  window that types each command of the session and shows its real output. The session is the
+  JSON in #session, which walkthrough.py records from a real run and writes here, with the
+  duration. render(t) draws the terminal from the time alone, so any seek gives the same frame.
+-->
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1280, height=720" />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.15.0/dist/gsap.min.js"></script>
+    <style>
+      html,
+      body {
+        margin: 0;
+        width: 1280px;
+        height: 720px;
+        overflow: hidden;
+        background: #000;
+      }
+      #root {
+        width: 1280px;
+        height: 720px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: radial-gradient(ellipse at center, #161616 0%, #000 75%);
+      }
+      .window {
+        width: 1200px;
+        height: 660px;
+        border-radius: 10px;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.9);
+      }
+      .titlebar {
+        height: 34px;
+        flex-shrink: 0;
+        background: #1c1c1c;
+        border-bottom: 1px solid #333;
+        display: flex;
+        align-items: center;
+        padding: 0 14px;
+        position: relative;
+      }
+      .lights span {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        display: inline-block;
+        margin-right: 7px;
+      }
+      .title {
+        position: absolute;
+        left: 50%;
+        transform: translateX(-50%);
+        font: 500 13px -apple-system, BlinkMacSystemFont, sans-serif;
+        color: #bbb;
+      }
+      #canvas {
+        flex: 1;
+        background: #000;
+        padding: 14px 18px;
+        overflow: hidden;
+        font: 15px/1.5 "SF Mono", Menlo, Monaco, monospace;
+        color: #c8c8c8;
+        white-space: pre-wrap;
+        word-break: break-all;
+      }
+      .prompt {
+        color: #88ff67;
+      }
+      .command {
+        color: #ffffff;
+      }
+      .output {
+        color: #a9a9a9;
+      }
+      .cursor {
+        background: #88ff67;
+        color: #000;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="__DURATION__" data-width="1280" data-height="720">
+      <div class="window">
+        <div class="titlebar">
+          <div class="lights">
+            <span style="background: #ff5f57"></span><span style="background: #ffbd2e"></span
+            ><span style="background: #28c840"></span>
+          </div>
+          <span class="title" id="title"></span>
+        </div>
+        <div id="canvas"></div>
+      </div>
+    </div>
+    <script type="application/json" id="session">
+      __SESSION__
+    </script>
+    <script>
+      const session = JSON.parse(document.getElementById("session").textContent);
+      const timing = session.timing;
+      document.getElementById("title").textContent = session.title;
+      const canvas = document.getElementById("canvas");
+
+      // The time each step starts, types and shows its output, from the timing walkthrough.py
+      // used to compute the duration.
+      const steps = [];
+      let at = timing.lead_s;
+      for (const step of session.steps) {
+        const typed = at + step.command.length * timing.char_s;
+        const shown = typed + timing.enter_s;
+        steps.push({ step, start: at, typed, shown });
+        at = shown + step.output.length * timing.line_s + timing.pause_s;
+      }
+
+      function escape(text) {
+        return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+      }
+
+      // Draws the terminal as it is at time t: each step that began, its command as far as it
+      // was typed, and the output lines shown so far, scrolled to the last lines that fit.
+      function render(t) {
+        const lines = [];
+        let typing = null;
+        for (const entry of steps) {
+          if (t < entry.start) break;
+          const chars = Math.min(entry.step.command.length, Math.floor((t - entry.start) / timing.char_s));
+          const command = entry.step.command.slice(0, chars);
+          lines.push('<span class="prompt">' + escape(session.prompt) + '</span><span class="command">' + escape(command) + "</span>");
+          if (t < entry.shown) {
+            typing = lines.length - 1;
+            continue;
+          }
+          const count = Math.min(entry.step.output.length, Math.floor((t - entry.shown) / timing.line_s) + 1);
+          for (const line of entry.step.output.slice(0, count)) lines.push('<span class="output">' + escape(line) + "</span>");
+        }
+        if (typing === null) {
+          lines.push('<span class="prompt">' + escape(session.prompt) + "</span>");
+          typing = lines.length - 1;
+        }
+        const blink = Math.floor(t / timing.blink_s) % 2 === 0;
+        lines[typing] += '<span class="cursor">' + (blink ? " " : "") + "</span>";
+        canvas.innerHTML = lines.slice(-timing.rows).join("\n");
+      }
+
+      const clock = { t: 0 };
+      const tl = gsap.timeline({ paused: true });
+      tl.to(clock, { t: __DURATION__, duration: __DURATION__, ease: "none", onUpdate: () => render(clock.t) }, 0);
+      window.__timelines = window.__timelines || {};
+      window.__timelines["main"] = tl;
+      render(0);
+      tl.seek(0);
+    </script>
+  </body>
+</html>

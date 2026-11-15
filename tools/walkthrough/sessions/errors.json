@@ -1,0 +1,28 @@
+[
+  {
+    "command": "zig build run",
+    "output": [
+      "errors: over connect: invalid_argument: division by zero, detail errors.v1.DivisionByZero{ dividend: 7 }",
+      "errors: over grpc: invalid_argument: division by zero, detail errors.v1.DivisionByZero{ dividend: 7 }",
+      "errors: over grpc_web: invalid_argument: division by zero, detail errors.v1.DivisionByZero{ dividend: 7 }",
+      "errors: over h2, /errors.v1.CalculatorService/Multiply answered unimplemented",
+      "errors: over connect: invalid_argument: division by zero, detail errors.v1.DivisionByZero{ dividend: 7 }",
+      "errors: over grpc: invalid_argument: division by zero, detail errors.v1.DivisionByZero{ dividend: 7 }",
+      "errors: over grpc_web: invalid_argument: division by zero, detail errors.v1.DivisionByZero{ dividend: 7 }",
+      "errors: over h3, /errors.v1.CalculatorService/Multiply answered unimplemented",
+      "errors: every call answered as expected over h2 and h3"
+    ]
+  },
+  {
+    "command": "zig build serve &",
+    "output": [
+      "listening on port 8443"
+    ]
+  },
+  {
+    "command": "curl --cacert ../harness/tls/ca.pem --json '{\"dividend\":7,\"divisor\":0}' https://127.0.0.1:8443/errors.v1.CalculatorService/Divide",
+    "output": [
+      "{\"code\":\"invalid_argument\",\"message\":\"division by zero\",\"details\":[{\"type\":\"errors.v1.DivisionByZero\",\"value\":\"CAc\"}]}"
+    ]
+  }
+]

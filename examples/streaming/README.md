@@ -8,6 +8,8 @@ Every kind of stream, in `streaming.v1.StreamingService`:
 - `Countdown`, a server stream of any length, whose handler gives one number at a time with
   `next` (decision 33).
 
+![A terminal session: zig build run checks every stream type, then buf curl calls Countdown and Chat on zig build serve](walkthrough.gif)
+
 ## Files
 
 | Path | Holds |

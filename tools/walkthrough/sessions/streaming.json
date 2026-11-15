@@ -1,0 +1,48 @@
+[
+  {
+    "command": "zig build run",
+    "output": [
+      "streaming: round over h2 answered",
+      "streaming: streamed round over h2 answered, full-duplex",
+      "streaming: round over h11 answered",
+      "streaming: streamed round over h11 answered, half-duplex",
+      "streaming: round over h3 answered",
+      "streaming: streamed round over h3 answered, full-duplex",
+      "streaming: every stream answered as expected over h2, h11 and h3"
+    ]
+  },
+  {
+    "command": "zig build serve &",
+    "output": [
+      "listening on port 8443"
+    ]
+  },
+  {
+    "command": "buf curl --schema proto --cacert ../harness/tls/ca.pem --data '{\"from\":3}' https://127.0.0.1:8443/streaming.v1.StreamingService/Countdown",
+    "output": [
+      "{",
+      "  \"number\": 3",
+      "}",
+      "{",
+      "  \"number\": 2",
+      "}",
+      "{",
+      "  \"number\": 1",
+      "}"
+    ]
+  },
+  {
+    "command": "buf curl --schema proto --cacert ../harness/tls/ca.pem --data '{\"text\":\"hello\"}{\"text\":\"goodbye\"}' https://127.0.0.1:8443/streaming.v1.StreamingService/Chat",
+    "output": [
+      "{",
+      "  \"text\": \"echo: hello\"",
+      "}",
+      "{",
+      "  \"text\": \"echo: goodbye\"",
+      "}",
+      "{",
+      "  \"text\": \"bye after 2\"",
+      "}"
+    ]
+  }
+]

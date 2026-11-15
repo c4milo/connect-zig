@@ -5,6 +5,8 @@ A real API that others wrote and many programs call (decision 40): OpenTelemetry
 which every OpenTelemetry SDK's gRPC exporter and the OpenTelemetry Collector call. Point an
 instrumented program at this server, and its spans arrive here.
 
+![A terminal session: zig build run exports a trace and reads it back, then OpenTelemetry's Go SDK exports to zig build serve](walkthrough.gif)
+
 - `Export` keeps the binary encoding of each request, up to 32 KiB, and answers a request past that
   bound with `partial_success.rejected_spans`, as OTLP says.
 - `otlpstore.v1.SpanStore/Received`, a method of this repository, answers with every request it

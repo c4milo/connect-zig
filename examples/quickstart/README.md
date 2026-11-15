@@ -5,6 +5,8 @@ The root README's "Use it in your project", as a project you can copy: one servi
 Rotor and over TLS. `tools/package_check.sh` builds this folder against a fetched copy of
 connect-zig on each push, so the README's steps stay true.
 
+![A terminal session: the quickstart generates its code and builds, the server starts over TLS, and the client and curl call Greet](walkthrough.gif)
+
 ## Files
 
 | Path | Holds |

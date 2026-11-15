@@ -8,6 +8,8 @@ an interceptor of its own:
   trailer;
 - the client's interceptor reads each response's HTTP status and protocol.
 
+![A terminal session: zig build run checks the interceptors, then curl calls Whoami with a bearer token](walkthrough.gif)
+
 Whoami has no side effects, so a Connect client may also send it as a GET.
 
 ## Files

@@ -1,0 +1,38 @@
+[
+  {
+    "command": "zig build run",
+    "output": [
+      "interceptors: client read HTTP 200 over connect",
+      "interceptors: whoami answered Ada, after 0 calls",
+      "interceptors: client read HTTP 200 over connect",
+      "interceptors: whoami answered Ada, after 1 calls",
+      "…",
+      "interceptors: over h2, server logged 3 calls, 1 failed; client read 3",
+      "interceptors: client read HTTP 200 over connect",
+      "interceptors: whoami answered Ada, after 3 calls",
+      "interceptors: client read HTTP 200 over connect",
+      "interceptors: whoami answered Ada, after 4 calls",
+      "interceptors: client read HTTP 200 over grpc_web",
+      "interceptors: refused without a token: unauthenticated: a bearer token is required",
+      "interceptors: over h3, server logged 3 calls, 1 failed; client read 3",
+      "interceptors: every call answered as expected over h2 and h3"
+    ]
+  },
+  {
+    "command": "zig build serve &",
+    "output": [
+      "listening on port 8443"
+    ]
+  },
+  {
+    "command": "curl -i --cacert ../harness/tls/ca.pem -H 'authorization: Bearer Ada' --json '{}' https://127.0.0.1:8443/interceptors.v1.WhoamiService/Whoami",
+    "output": [
+      "HTTP/2 200",
+      "content-type: application/json",
+      "demo-logged: yes",
+      "trailer-whoami-caller: Ada",
+      "content-length: 14",
+      "{\"name\":\"Ada\"}"
+    ]
+  }
+]

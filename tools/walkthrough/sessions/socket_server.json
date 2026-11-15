@@ -1,0 +1,20 @@
+[
+  {
+    "command": "zig build serve &",
+    "output": [
+      "listening on port 8443"
+    ]
+  },
+  {
+    "command": "curl --cacert ../harness/tls/ca.pem --json '{\"sentence\":\"Hello\"}' https://127.0.0.1:8443/connectrpc.eliza.v1.ElizaService/Say",
+    "output": [
+      "{\"sentence\":\"You said \\\"Hello\\\". How does that make you feel?\"}"
+    ]
+  },
+  {
+    "command": "curl --cacert ../harness/tls/ca.pem --json '{\"dividend\":7,\"divisor\":2}' https://127.0.0.1:8443/errors.v1.CalculatorService/Divide",
+    "output": [
+      "{\"quotient\":\"3\",\"remainder\":\"1\"}"
+    ]
+  }
+]

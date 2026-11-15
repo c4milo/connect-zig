@@ -1,0 +1,16 @@
+[
+  {
+    "command": "zig build run",
+    "output": [
+      "client: POST /connectrpc.eliza.v1.ElizaService/Say {\"sentence\":\"I feel tired\"}",
+      "server: Say over connect",
+      "client: 200 You said \"I feel tired\". How does that make you feel?",
+      "client: POST /connectrpc.eliza.v1.ElizaService/Introduce, 10 body bytes in envelopes",
+      "server: Introduce over grpc_web",
+      "client: Hi Ada, I am Eliza.",
+      "client: Before we begin, Ada, tell me how you came here.",
+      "client: How are you feeling today, Ada?",
+      "sans_io_call: both calls answered, with no socket and no allocation in the library"
+    ]
+  }
+]

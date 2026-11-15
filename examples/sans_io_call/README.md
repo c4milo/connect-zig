@@ -5,6 +5,8 @@ program plays both sides. Its client writes a request's path, headers and body; 
 them, runs the handler and writes the response; the client then reads the answer. This is what
 `connect_colibri` does for colibri, and what a program does for any other HTTP library.
 
+![A terminal session: zig build run makes two calls through the connect module alone, with no socket](walkthrough.gif)
+
 - `Say`, unary, over Connect in JSON;
 - `Introduce`, a server stream, over gRPC-Web, whose messages come back in envelopes.
 

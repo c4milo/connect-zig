@@ -1,0 +1,39 @@
+[
+  {
+    "command": "zig build run",
+    "output": [
+      "github: created octocat/hello-world; a second create and an anonymous one failed",
+      "github: octocat/secrets reads as not found to anyone but octocat",
+      "github: octocat imported issues #1 to #4 in one stream, hubot opened #5",
+      "github: octocat closed #1 through a field mask; hubot could not",
+      "…",
+      "github: created octocat/hello-world; a second create and an anonymous one failed",
+      "github: octocat/secrets reads as not found to anyone but octocat",
+      "github: octocat imported issues #1 to #4 in one stream, hubot opened #5",
+      "github: octocat closed #1 through a field mask; hubot could not",
+      "github: read 4 open issues in 2 pages, and the bugs #1 and #3",
+      "github: streamed 11 events, then the one after the cursor",
+      "github: of 6 anonymous calls at once, 2 answered and 4 hit the rate limit",
+      "github: over h3, the whole session answered as expected",
+      "github: every call answered as expected over h2 and h3"
+    ]
+  },
+  {
+    "command": "zig build serve &",
+    "output": [
+      "listening on port 8443"
+    ]
+  },
+  {
+    "command": "curl --cacert ../harness/tls/ca.pem -H 'authorization: Bearer ghp_octocat_example' --json '{\"name\":\"hello-world\",\"topics\":[\"zig\",\"rpc\"]}' https://127.0.0.1:8443/github.v1.RepositoryService/CreateRepository",
+    "output": [
+      "{\"id\":\"1\",\"owner\":{\"login\":\"octocat\",\"id\":\"583231\"},\"name\":\"hello-world\",\"fullName\":\"octocat/hello-world\",\"visibility\":\"VISIBILITY_PUBLIC\",\"topics\":[\"zig\",\"rpc\"],\"createdAt\":\"2027-01-15T08:00:01Z\"}"
+    ]
+  },
+  {
+    "command": "curl --cacert ../harness/tls/ca.pem --json '{\"owner\":\"octocat\"}' https://127.0.0.1:8443/github.v1.RepositoryService/ListRepositories",
+    "output": [
+      "{\"repositories\":[{\"id\":\"1\",\"owner\":{\"login\":\"octocat\",\"id\":\"583231\"},\"name\":\"hello-world\",\"fullName\":\"octocat/hello-world\",\"visibility\":\"VISIBILITY_PUBLIC\",\"topics\":[\"zig\",\"rpc\"],\"createdAt\":\"2027-01-15T08:00:01Z\"}]}"
+    ]
+  }
+]

@@ -5,6 +5,8 @@ Generated messages in binary and in proto3 JSON, with no RPC: the `protobuf` mod
 well-known types. The program builds one, encodes it in binary and in JSON, decodes both, and
 checks each value.
 
+![A terminal session: zig build run encodes a generated message in binary and JSON and reads both back](walkthrough.gif)
+
 ## Files
 
 | Path | Holds |

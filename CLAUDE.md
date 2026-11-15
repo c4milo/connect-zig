@@ -106,6 +106,9 @@ confirm a test fails. Report `CAUGHT` or `NOT CAUGHT` per mutation in the commit
   `std.Io` (`examples/std_io`, decision 32); port 0 lets the kernel choose, and each server prints
   `listening on port <port>`. Every project that depends on another passes connect-zig the same
   options, or Zig builds a second `connect` module.
+- Walkthroughs: `python3 tools/walkthrough/walkthrough.py [example...]` runs each example's README
+  commands for real and renders the session with HyperFrames into `examples/<example>/
+  walkthrough.gif`, which the README embeds. It needs Node 22 or later, FFmpeg and Chrome.
 - Generated code: `zig build test-generated` compiles the examples' generated code and runs its
   round trips.
   `tools/gen` holds the checks' generated code, from `tools/proto` (decision 41).

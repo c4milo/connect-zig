@@ -1,0 +1,10 @@
+[
+  {
+    "command": "zig build run",
+    "output": [
+      "binary: 67 bytes, name \"leaf\"",
+      "json: {\"name\":\"leaf\",\"parent\":{\"name\":\"root\"},\"children\":[{\"name\":\"child\"}],\"labels\":{\"7\":\"seven\"},\"scalars\":{\"aSint64\":\"-9\",\"maybe\":0,\"mood\":\"MOOD_HAPPY\"},\"created\":\"2023-11-14T22:13:20.005Z\",\"nickname\":\"sprout\"}",
+      "protobuf_messages: every value read back as written"
+    ]
+  }
+]

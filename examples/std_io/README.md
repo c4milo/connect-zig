@@ -4,6 +4,8 @@ ELIZA on colibri's `server.Engine`, driven over Zig 0.16's `std.Io` alone, with 
 (decision 32), and a client that calls it over TCP with a `client.ConnectionPool` it also drives
 over `std.Io`. The library takes octets and gives octets back, so any loop can run it.
 
+![A terminal session: zig build run calls the std.Io server over TCP, then curl calls ELIZA in cleartext](walkthrough.gif)
+
 The server's task owns the engine. An acceptor task, a reader task for each socket and a ticker
 only wait, and each sends what it got to the owner through one bounded `std.Io.Queue`. The owner
 hands it to the engine and writes what the engine owes. The ticks fire the engine's deadlines, at

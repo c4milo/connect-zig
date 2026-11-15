@@ -6,6 +6,8 @@ Connect tokens, and OpenTelemetry's trace receiver. It depends on each of those 
 exports, so its own code is the `App` that holds each service's room and the route table
 (decision 41).
 
+![A terminal session: zig build serve starts every example's service, and curl calls ELIZA and the calculator](walkthrough.gif)
+
 ```sh
 zig build serve -- 8443
 ```

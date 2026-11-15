@@ -1,0 +1,30 @@
+[
+  {
+    "command": "zig build run",
+    "output": [
+      "oidc: status answered ok, with no check of a token",
+      "oidc: refused: missing bearer token, with www-authenticate: Bearer",
+      "oidc: whoami answered ada, email \"ada@example.com\", admin true",
+      "oidc: refused: token expired, with www-authenticate: Bearer error=\"invalid_token\"",
+      "oidc: refused: invalid token, with www-authenticate: Bearer error=\"invalid_token\"",
+      "oidc: the verifier asked for the issuer's keys again, and took both",
+      "oidc: status answered ok, with no check of a token",
+      "oidc: whoami answered grace, email \"\", admin false",
+      "oidc: refused: invalid token, with www-authenticate: Bearer error=\"invalid_token\"",
+      "oidc: every call answered as expected over h2 and h3"
+    ]
+  },
+  {
+    "command": "zig build serve &",
+    "output": [
+      "token: eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6ImtleS0xIn0.eyJpc3MiOiJodHRwczovL2lzc3Vlci5leGFtcGxlIiwic3ViIjoiYWRhIiwiYXVkIjoiYWNjb3VudC1zZXJ2aWNlIiwiZXhwIjoxNzk0NzIzMDQ3LCJlbWFpbCI6ImFkYUBleGFtcGxlLmNvbSIsInJvbGVzIjpbInJlYWRlciIsImFkbWluIl19.SZulynXpRcPQBgj8qrUhQhs36WmXWJBaZkN-jN5u564gCQ62UYLO4HEFQwVP3Jz4DGKRDlrZ4dHT_mSYZaZ0LQ",
+      "listening on port 8443"
+    ]
+  },
+  {
+    "command": "curl --cacert ../harness/tls/ca.pem -H \"authorization: Bearer $TOKEN\" --json '{}' https://127.0.0.1:8443/account.v1.AccountService/Whoami",
+    "output": [
+      "{\"subject\":\"ada\",\"email\":\"ada@example.com\",\"admin\":true}"
+    ]
+  }
+]

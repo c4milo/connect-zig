@@ -7,6 +7,8 @@ connect-zig over colibri. It has one method of each kind:
 - `Introduce`, a server stream;
 - `Converse`, a bidirectional stream.
 
+![A terminal session: zig build run checks ELIZA over h2, h11 and h3, then zig build serve answers curl and buf curl](walkthrough.gif)
+
 ## Files
 
 | Path | Holds |
