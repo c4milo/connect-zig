@@ -66,13 +66,13 @@ pub fn main(init: std.process.Init) !void {
 fn round(state: *State, protocols: client.Protocols, expected: client.Protocol) !void {
     const rounds = &state.rounds;
     try rounds.begin(protocols);
-    try state.say_proto.init(&.{}, &.{.{ .sentence = service.said }});
-    try state.say_get.init(&.{ .codec = .json, .use_get = true }, &.{.{ .sentence = service.said }});
-    try state.introduce.init(&.{ .protocol = .grpc_web }, &.{.{ .name = service.name }});
-    try state.converse.init(&.{ .codec = .json }, &.{ .{ .sentence = service.conversation[0] }, .{ .sentence = service.conversation[1] } });
-    try state.say_empty.init(&.{ .protocol = .grpc }, &.{.{}});
-    try state.say_grpc.init(&.{ .protocol = .grpc }, &.{.{ .sentence = service.said }});
-    try state.introduce_grpc.init(&.{ .protocol = .grpc }, &.{.{ .name = service.name }});
+    try state.say_proto.init({}, &.{}, &.{.{ .sentence = service.said }});
+    try state.say_get.init({}, &.{ .codec = .json, .use_get = true }, &.{.{ .sentence = service.said }});
+    try state.introduce.init({}, &.{ .protocol = .grpc_web }, &.{.{ .name = service.name }});
+    try state.converse.init({}, &.{ .codec = .json }, &.{ .{ .sentence = service.conversation[0] }, .{ .sentence = service.conversation[1] } });
+    try state.say_empty.init({}, &.{ .protocol = .grpc }, &.{.{}});
+    try state.say_grpc.init({}, &.{ .protocol = .grpc }, &.{.{ .sentence = service.said }});
+    try state.introduce_grpc.init({}, &.{ .protocol = .grpc }, &.{.{ .name = service.name }});
     inline for (.{ "say_proto", "say_get", "introduce", "converse", "say_empty", "say_grpc", "introduce_grpc" }) |field| {
         const call = &@field(state, field).call;
         try rounds.request(&call.request, &call.response);

@@ -44,7 +44,7 @@ const Chat = struct {
         chat.closed = false;
         chat.ended = false;
         const call = &chat.call.call;
-        try chat.call.init_stream(&.{ .protocol = rpc_protocol });
+        try chat.call.init_stream({}, &.{ .protocol = rpc_protocol });
         try call.start(rounds.pool());
         try rounds.listen(.{ .id = call.id, .context = chat, .on_event = on_event });
         var sender = call.sender();
@@ -136,7 +136,7 @@ const Sum = struct {
         sum.taken = 0;
         sum.ended = false;
         const call = &sum.call.call;
-        try sum.call.init_stream(&.{ .protocol = .grpc });
+        try sum.call.init_stream({}, &.{ .protocol = .grpc });
         try call.start(rounds.pool());
         try rounds.listen(.{ .id = call.id, .context = sum, .on_event = on_event });
         try sum.send_next();

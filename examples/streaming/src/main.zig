@@ -80,17 +80,17 @@ pub fn main(init: std.process.Init) !void {
 fn round(state: *State, protocols: client.Protocols, expected: client.Protocol) !void {
     const rounds = &state.rounds;
     try rounds.begin(protocols);
-    try state.chat.init(&.{ .codec = .json }, &lines);
-    try state.chat_silent.init(&.{ .protocol = .grpc_web }, &.{});
-    try state.chat_refused.init(&.{}, &.{ .{ .text = "x" }, .{ .text = "" }, .{ .text = "never read" } });
+    try state.chat.init({}, &.{ .codec = .json }, &lines);
+    try state.chat_silent.init({}, &.{ .protocol = .grpc_web }, &.{});
+    try state.chat_refused.init({}, &.{}, &.{ .{ .text = "x" }, .{ .text = "" }, .{ .text = "never read" } });
     // A body that stops inside an envelope fails the call, after the answers already sent.
-    try state.chat_cut.init(&.{}, &lines);
+    try state.chat_cut.init({}, &.{}, &lines);
     const cut = &state.chat_cut.call.request;
     cut.body = cut.body[0 .. cut.body.len - 1];
-    try state.sum.init(&.{}, &numbers);
-    try state.sum_web.init(&.{ .protocol = .grpc_web, .codec = .json }, &numbers);
-    try state.countdown.init(&.{}, &.{.{ .from = constants.countdown_from }});
-    try state.countdown_far.init(&.{ .protocol = .grpc_web }, &.{.{ .from = service.countdown_max + 1 }});
+    try state.sum.init({}, &.{}, &numbers);
+    try state.sum_web.init({}, &.{ .protocol = .grpc_web, .codec = .json }, &numbers);
+    try state.countdown.init({}, &.{}, &.{.{ .from = constants.countdown_from }});
+    try state.countdown_far.init({}, &.{ .protocol = .grpc_web }, &.{.{ .from = service.countdown_max + 1 }});
     inline for (.{ "chat", "chat_silent", "chat_refused", "chat_cut", "sum", "sum_web", "countdown", "countdown_far" }) |field| {
         const call = &@field(state, field).call;
         try rounds.request(&call.request, &call.response);

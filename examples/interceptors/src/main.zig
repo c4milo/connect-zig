@@ -9,7 +9,9 @@
 //! On the client, a `ClientCall` takes interceptors of its own, in its options:
 //!
 //! - `BearerToken` adds the authorization header to each request it builds;
-//! - `Log` sees each response before the program reads it, and prints its HTTP status.
+//! - `Log` sees each response before the program reads it, and prints its HTTP status;
+//! - `Count` counts each response in the program's `Tally`, which each call's context points to
+//!   (decision 44).
 //!
 //! Two rounds run, one over h2 and one over h3: Whoami with a token over Connect as a POST, with a
 //! token over Connect as a GET in JSON, and without one over gRPC-Web, which `Auth` refuses. Run
@@ -35,31 +37,48 @@ const caller = "Ada";
 /// The HTTP status of a response whose head the server sent with no error (RFC 9110 §15.3.1).
 const http_ok = connect.constants.protocol.status.ok;
 
-/// Adds "authorization: Bearer Ada" to each request, as a program adds its credentials.
+/// Adds "authorization: Bearer Ada" to each request, as a program adds its credentials. It reads
+/// no context, so it takes any.
 const BearerToken = struct {
-    pub fn on_request(request: *connect.client.Request) !void {
+    pub fn on_request(_: anytype, request: *connect.client.Request) !void {
         try request.add_header("authorization", "Bearer " ++ caller);
     }
 };
 
 /// Prints the HTTP status of each response the client reads. It runs before the program reads a
 /// response's messages, so it sees the head alone. gRPC-Web answers 200 even when the call
-/// fails, and puts the outcome in its trailers. A client interceptor is a type with no state,
-/// so the program counts what it reads.
+/// fails, and puts the outcome in its trailers.
 const Log = struct {
-    pub fn on_response(response: *connect.client.Response) void {
+    pub fn on_response(_: anytype, response: *connect.client.Response) void {
         std.debug.print("interceptors: client read HTTP {d} over {s}\n", .{ response.incoming.status, @tagName(response.speaks.protocol) });
     }
 };
 
-const Signed = harness.Call(WhoamiService.whoami, .{ .interceptors = &.{ BearerToken, Log } });
-const Anonymous = harness.Call(WhoamiService.whoami, .{ .interceptors = &.{Log} });
+/// What `Count` counts: the responses the client read, and those with HTTP status 200.
+const Tally = struct {
+    read: u32 = 0,
+    http_ok: u32 = 0,
+};
+
+/// Counts each response the client reads in the call's context, a `*Tally`. A client
+/// interceptor keeps no state of its own: the program hands the call a context (decision 44).
+const Count = struct {
+    pub fn on_response(tally: *Tally, response: *connect.client.Response) void {
+        tally.read += 1;
+        if (response.incoming.status == http_ok) tally.http_ok += 1;
+    }
+};
+
+const Signed = harness.Call(WhoamiService.whoami, .{ .interceptors = &.{ BearerToken, Log, Count }, .Context = *Tally });
+const Anonymous = harness.Call(WhoamiService.whoami, .{ .interceptors = &.{ Log, Count }, .Context = *Tally });
 
 /// All the program holds, which `main` allocates once (decision 42). colibri reads and writes
 /// each call until its round ends, so the calls live here.
 const State = struct {
     app: App,
     rounds: harness.Rounds(App, Router),
+    /// What the client's `Count` counted, across both rounds.
+    tally: Tally,
     signed_post: Signed,
     signed_get: Signed,
     anonymous: Anonymous,
@@ -68,6 +87,7 @@ const State = struct {
 pub fn main(init: std.process.Init) !void {
     const state = try init.arena.allocator().create(State);
     state.app = .{};
+    state.tally = .{};
     try state.rounds.init(&state.app);
     defer state.rounds.deinit();
     try round(state, .{ .h11 = false, .h3 = false }, .h2);
@@ -82,11 +102,12 @@ fn round(state: *State, protocols: client.Protocols, expected: client.Protocol) 
     const logged_before = room.logged;
     const failed_before = room.failed;
     const queried_before = room.queried;
+    const tally_before = state.tally;
     const rounds = &state.rounds;
     try rounds.begin(protocols);
-    try state.signed_post.init(&.{}, &.{.{}});
-    try state.signed_get.init(&.{ .codec = .json, .use_get = true }, &.{.{}});
-    try state.anonymous.init(&.{ .protocol = .grpc_web }, &.{.{}});
+    try state.signed_post.init(&state.tally, &.{}, &.{.{}});
+    try state.signed_get.init(&state.tally, &.{ .codec = .json, .use_get = true }, &.{.{}});
+    try state.anonymous.init(&state.tally, &.{ .protocol = .grpc_web }, &.{.{}});
     inline for (.{ "signed_post", "signed_get", "anonymous" }) |field| {
         const call = &@field(state, field).call;
         try rounds.request(&call.request, &call.response);
@@ -106,7 +127,11 @@ fn round(state: *State, protocols: client.Protocols, expected: client.Protocol) 
     if (logged != constants.calls_count or failed != 1) return error.CallWrong;
     // The one GET reached the interceptor with its query.
     if (room.queried - queried_before != 1) return error.CallWrong;
-    std.debug.print("interceptors: over {s}, server logged {d} calls, {d} failed; client read {d}\n", .{ @tagName(expected), logged, failed, constants.calls_count });
+    // The client's `Count` saw each response as the program read it, each with HTTP 200: the
+    // refused call speaks gRPC-Web, whose outcome is in its trailers.
+    const read = state.tally.read - tally_before.read;
+    if (read != constants.calls_count or state.tally.http_ok - tally_before.http_ok != read) return error.CallWrong;
+    std.debug.print("interceptors: over {s}, server logged {d} calls, {d} failed; client read {d}\n", .{ @tagName(expected), logged, failed, read });
 }
 
 /// Reads a Whoami answer, checks the name, and returns the calls the server logged before it.

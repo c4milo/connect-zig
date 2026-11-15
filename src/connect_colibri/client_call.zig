@@ -36,16 +36,21 @@ pub const Options = struct {
     /// The interceptors that see each request before it goes and each response once it is
     /// read. A client interceptor is a type with any of:
     ///
-    /// - `on_request(*connect.client.Request) !void`, which may add headers with `add_header`;
-    /// - `on_response(*connect.client.Response) void`, which sees each response before the
-    ///   program reads its messages: its HTTP status and headers. A stream's outcome follows its
-    ///   messages, so `failure` is set here only when the head alone carries it.
+    /// - `on_request(Context, *connect.client.Request) !void`, which may add headers with
+    ///   `add_header`;
+    /// - `on_response(Context, *connect.client.Response) void`, which sees each response before
+    ///   the program reads its messages: its HTTP status and headers. A stream's outcome follows
+    ///   its messages, so `failure` is set here only when the head alone carries it.
     ///
     /// `on_request` runs in the order the list names the interceptors, and `on_response` in the
     /// reverse. A streamed call runs `on_request` in `init_stream`, before any message, so the
     /// request it sees has an empty body. It runs `on_response` once, in `on_headers`, or in
     /// `read` when the call ended before its response's head.
     interceptors: []const type = &.{},
+    /// What each interceptor's hook gets first: a value of this type, which `init` and
+    /// `init_stream` take, as `std.sort` takes a context (decision 44). A pointer, such as
+    /// `*State`, lets an interceptor count what it sees. With `void`, a call passes `{}`.
+    Context: type = void,
     /// The pool a call's `start` hands it to, which a streamed call hands its pieces to.
     pool: type = client.ConnectionPool(.{}),
 };
@@ -63,6 +68,8 @@ pub fn ClientCall(comptime method: connect.Method, comptime call_options: Option
         const Self = @This();
 
         options: connect.client.Options,
+        /// What the interceptors' hooks get first, from `init` until the call ends.
+        context: call_options.Context,
         call: connect.client.Request,
         fields: [connect.client.request_headers_max]http.Field,
         /// The names of `fields` that `init` wrote in lowercase.
@@ -97,12 +104,14 @@ pub fn ClientCall(comptime method: connect.Method, comptime call_options: Option
         };
 
         /// Builds the request of a call that sends `messages`. Each header name goes to colibri
-        /// in lowercase, the program's and its interceptors' included.
-        pub fn init(self: *Self, options: *const connect.client.Options, messages: []const method.Request, buffers: *const Buffers) connect.client.RequestError!void {
+        /// in lowercase, the program's and its interceptors' included. The interceptors' hooks
+        /// get `context` first.
+        pub fn init(self: *Self, context: call_options.Context, options: *const connect.client.Options, messages: []const method.Request, buffers: *const Buffers) connect.client.RequestError!void {
             self.streamed = false;
+            self.context = context;
             self.options = options.*;
             self.call = try connect.client.request(method, options, messages, &buffers.request);
-            try run_on_request(interceptors, &self.call);
+            try run_on_request(interceptors, context, &self.call);
             self.request = .{
                 .method = self.call.http_method,
                 .path = self.call.target,
@@ -118,10 +127,10 @@ pub fn ClientCall(comptime method: connect.Method, comptime call_options: Option
 
         /// Builds the request of a client or bidirectional stream whose messages its `Sender`
         /// writes, and whose response arrives in pieces in `buffers.piece`.
-        pub fn init_stream(self: *Self, options: *const connect.client.Options, buffers: *const Buffers) connect.client.RequestError!void {
+        pub fn init_stream(self: *Self, context: call_options.Context, options: *const connect.client.Options, buffers: *const Buffers) connect.client.RequestError!void {
             comptime assert(method.stream_type == .client_stream or method.stream_type == .bidi_stream);
             assert(buffers.piece.len > 0);
-            try self.init(options, &.{}, buffers);
+            try self.init(context, options, &.{}, buffers);
             self.streamed = true;
             // Colibri decision 153 ruling 7: both bodies go in pieces, and with no length stated
             // h2 and h3 end the request with its stream (RFC 9113 §8.1, RFC 9114 §4.1).
@@ -157,7 +166,7 @@ pub fn ClientCall(comptime method: connect.Method, comptime call_options: Option
             assert(self.streamed and !self.incoming.headers_seen);
             self.incoming.headers_seen = true;
             self.reader = connect.client.Response.init(self.call.speaks, &incoming_of(self, ""), &storage, &self.options.decoders);
-            run_on_response(interceptors, &self.reader);
+            run_on_response(interceptors, self.context, &self.reader);
         }
 
         /// The pool's `body` event for a streamed call: the piece of `len` octets is copied after
@@ -173,7 +182,7 @@ pub fn ClientCall(comptime method: connect.Method, comptime call_options: Option
         pub fn read(self: *const Self, storage: connect.client.Storage) connect.client.Response {
             if (self.streamed and self.incoming.headers_seen) return client_stream.read(self);
             var response = read_response(self, storage);
-            run_on_response(interceptors, &response);
+            run_on_response(interceptors, self.context, &response);
             return response;
         }
 
@@ -215,16 +224,16 @@ fn has_uppercase(name: []const u8) bool {
     return false;
 }
 
-fn run_on_request(comptime interceptors: []const type, request: *connect.client.Request) !void {
+fn run_on_request(comptime interceptors: []const type, context: anytype, request: *connect.client.Request) !void {
     inline for (interceptors) |Interceptor| {
-        if (comptime @hasDecl(Interceptor, "on_request")) try Interceptor.on_request(request);
+        if (comptime @hasDecl(Interceptor, "on_request")) try Interceptor.on_request(context, request);
     }
 }
 
-fn run_on_response(comptime interceptors: []const type, response: *connect.client.Response) void {
+fn run_on_response(comptime interceptors: []const type, context: anytype, response: *connect.client.Response) void {
     inline for (0..interceptors.len) |index| {
         const Interceptor = interceptors[interceptors.len - 1 - index];
-        if (comptime @hasDecl(Interceptor, "on_response")) Interceptor.on_response(response);
+        if (comptime @hasDecl(Interceptor, "on_response")) Interceptor.on_response(context, response);
     }
 }
 

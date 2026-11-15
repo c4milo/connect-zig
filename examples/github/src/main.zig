@@ -124,7 +124,7 @@ fn session(state: *State, protocols: client.Protocols, expected: client.Protocol
 /// Runs one call alone, so each step sees what the steps before it changed.
 fn call(state: *State, client_call: anytype, options: connect.client.Options, messages: MessagesOf(@TypeOf(client_call))) !void {
     try state.rounds.begin(state.protocols);
-    try client_call.init(&options, messages);
+    try client_call.init({}, &options, messages);
     try state.rounds.request(&client_call.call.request, &client_call.call.response);
     try state.rounds.finish(state.expected);
 }
@@ -311,7 +311,7 @@ fn rate_limit(state: *State) !void {
     try expect(left < constants.burst_len);
     try state.rounds.begin(state.protocols);
     for (&state.burst) |*client_call| {
-        try client_call.init(&.{}, &.{.{ .owner = "octocat", .name = "hello-world" }});
+        try client_call.init({}, &.{}, &.{.{ .owner = "octocat", .name = "hello-world" }});
         try state.rounds.request(&client_call.call.request, &client_call.call.response);
     }
     try state.rounds.finish(state.expected);

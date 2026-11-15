@@ -68,12 +68,12 @@ fn round(state: *State, protocols: client.Protocols, expected: client.Protocol) 
     const rounds = &state.rounds;
     try rounds.begin(protocols);
     for (&state.by_zero, zero_options) |*by_zero, options| {
-        try by_zero.init(&options, &.{.{ .dividend = constants.dividend, .divisor = 0 }});
+        try by_zero.init({}, &options, &.{.{ .dividend = constants.dividend, .divisor = 0 }});
         try rounds.request(&by_zero.call.request, &by_zero.call.response);
     }
-    try state.by_two.init(&.{ .codec = .json }, &.{.{ .dividend = constants.dividend, .divisor = constants.divisor }});
+    try state.by_two.init({}, &.{ .codec = .json }, &.{.{ .dividend = constants.dividend, .divisor = constants.divisor }});
     try rounds.request(&state.by_two.call.request, &state.by_two.call.response);
-    try state.multiply.init(&.{}, &.{.{}});
+    try state.multiply.init({}, &.{}, &.{.{}});
     try rounds.request(&state.multiply.call.request, &state.multiply.call.response);
     try rounds.finish(expected);
 

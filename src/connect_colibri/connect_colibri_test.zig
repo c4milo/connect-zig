@@ -87,7 +87,7 @@ test "a client call writes its request for colibri and reads what colibri filled
     const Call = rpc.ClientCall(say, .{});
     var call: Call = undefined;
     var buffers: [7][512]u8 = undefined;
-    try call.init(&.{ .protocol = .grpc_web }, &.{.{ .text = "hi" }}, &.{
+    try call.init({}, &.{ .protocol = .grpc_web }, &.{.{ .text = "hi" }}, &.{
         .request = .{ .body = &buffers[0], .scratch = .{ .message = &buffers[1], .work = &buffers[2], .tokens = &.{} }, .values = &buffers[3] },
         .headers = &buffers[4],
         .trailers = &buffers[5],
@@ -138,7 +138,7 @@ test "a gRPC client call reads its status from the response's trailers (PROTOCOL
     const Call = rpc.ClientCall(say, .{});
     var call: Call = undefined;
     var buffers: [7][512]u8 = undefined;
-    try call.init(&.{ .protocol = .grpc }, &.{.{ .text = "hi" }}, &.{
+    try call.init({}, &.{ .protocol = .grpc }, &.{.{ .text = "hi" }}, &.{
         .request = .{ .body = &buffers[0], .scratch = .{ .message = &buffers[1], .work = &buffers[2], .tokens = &.{} }, .values = &buffers[3] },
         .headers = &buffers[4],
         .trailers = &buffers[5],

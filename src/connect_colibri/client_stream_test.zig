@@ -61,21 +61,24 @@ const RecordingPool = struct {
     }
 };
 
-/// Sees what the interceptors of a streamed call see.
+/// What the interceptors of a streamed call see, which the call's context holds (decision 44).
 const Seen = struct {
-    threadlocal var request_body_len: usize = 1;
-    threadlocal var responses: u32 = 0;
+    request_body_len: usize = 1,
+    responses: u32 = 0,
+};
 
-    pub fn on_request(request: *connect.client.Request) !void {
-        request_body_len = request.body.len;
+/// Records what it sees in the call's context.
+const Watch = struct {
+    pub fn on_request(seen: *Seen, request: *connect.client.Request) !void {
+        seen.request_body_len = request.body.len;
     }
 
-    pub fn on_response(_: *connect.client.Response) void {
-        responses += 1;
+    pub fn on_response(seen: *Seen, _: *connect.client.Response) void {
+        seen.responses += 1;
     }
 };
 
-const Call = rpc.ClientCall(chat, .{ .interceptors = &.{Seen}, .pool = RecordingPool });
+const Call = rpc.ClientCall(chat, .{ .interceptors = &.{Watch}, .Context = *Seen, .pool = RecordingPool });
 /// The octets of a piece of the response, fewer than an envelope, and of the gathered response.
 const piece_len = 3;
 const gathered_len = 16;
@@ -90,6 +93,7 @@ const Buffer = [buffer_len]u8;
 const Fixture = struct {
     call: Call = undefined,
     pool: RecordingPool = .{},
+    seen: Seen = .{},
     request_body: Buffer = undefined,
     request_message: Buffer = undefined,
     request_work: Buffer = undefined,
@@ -106,7 +110,7 @@ const Fixture = struct {
     metadata: [entries_max]connect.Header = undefined,
 
     fn start(fixture: *Fixture, options: *const connect.client.Options) !void {
-        try fixture.call.init_stream(options, &.{
+        try fixture.call.init_stream(&fixture.seen, options, &.{
             .request = .{
                 .body = &fixture.request_body,
                 .scratch = .{ .message = &fixture.request_message, .work = &fixture.request_work, .tokens = &.{} },
@@ -155,7 +159,7 @@ test "a streamed call hands each message as a piece, and the next waits for body
     try fixture.start(&.{});
     try testing.expect(fixture.pool.streamed.request and fixture.pool.streamed.response);
     // The interceptors saw the request before any message.
-    try testing.expectEqual(@as(usize, 0), Seen.request_body_len);
+    try testing.expectEqual(@as(usize, 0), fixture.seen.request_body_len);
     var sender = fixture.call.sender();
     try sender.send(&.{ .text = "a" });
     try sender.send(&.{ .text = "b" });
@@ -201,9 +205,9 @@ test "a streamed response reads each message as its pieces arrive, and the outco
     try fixture.start(&.{});
     fixture.call.response.status = .ok;
     write_lines(&fixture.call.response.headers, &.{.{ .name = "content-type", .value = "application/connect+proto" }});
-    const responses = Seen.responses;
+    const responses = fixture.seen.responses;
     fixture.call.on_headers(fixture.storage());
-    try testing.expectEqual(responses + 1, Seen.responses);
+    try testing.expectEqual(responses + 1, fixture.seen.responses);
     // "a", then "bc", then the end-stream message "{}", in pieces of three octets.
     const body = [_]u8{ 0, 0, 0, 0, 3, 0x0a, 1, 'a', 0, 0, 0, 0, 4, 0x0a, 2, 'b', 'c', 2, 0, 0, 0, 2, '{', '}' };
     var texts: [8]u8 = undefined;
@@ -215,7 +219,7 @@ test "a streamed response reads each message as its pieces arrive, and the outco
     try testing.expect(response.done);
     try testing.expectEqual(@as(?connect.RpcError, null), response.failure);
     // `on_response` ran at the head alone.
-    try testing.expectEqual(responses + 1, Seen.responses);
+    try testing.expectEqual(responses + 1, fixture.seen.responses);
 }
 
 test "a streamed gRPC response reads its status from the trailers once it finished" {

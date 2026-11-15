@@ -1,12 +1,15 @@
 # Interceptors
 
 `interceptors.v1.WhoamiService/Whoami` behind two server interceptors, and a client that runs
-an interceptor of its own:
+interceptors of its own:
 
 - `Logging` counts each call it sees and each that fails, and sets a response header;
 - `Auth` refuses a call with no bearer token with `unauthenticated`, and puts the caller in a
   trailer;
-- the client's interceptor reads each response's HTTP status and protocol.
+- the client's `BearerToken` adds the token, and `Log` prints each response's HTTP status and
+  protocol;
+- the client's `Count` counts each response in the program's `Tally`, through the context each
+  call's `init` takes (decision 44).
 
 ![A terminal session: zig build run checks the interceptors, then curl calls Whoami with a bearer token](walkthrough.gif)
 

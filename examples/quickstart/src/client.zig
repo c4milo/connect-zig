@@ -80,7 +80,7 @@ const Call = struct {
             .trailers = &self.trailers,
             .body = &self.body,
         };
-        try self.call.init(options, &.{.{ .name = name }}, &buffers);
+        try self.call.init({}, options, &.{.{ .name = name }}, &buffers);
     }
 };
 

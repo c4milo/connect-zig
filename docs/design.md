@@ -200,6 +200,11 @@ Each step names the check that proves it. A step is done when its check passes i
     `interop/otel` exports spans to it with OpenTelemetry's Go SDK (decision 40). New public
     names: none. Check: `tools/interop_check.sh`, which runs `interop/otel` against the socket
     server, and `examples/otlp`'s own `zig build test`.
+22. **A client interceptor's context.** `ClientCallOptions.Context`, and a context argument of
+    `ClientCall.init` and `init_stream`, which each hook gets first (decision 44). New public
+    names: none; the options gain a field, and `init` and `init_stream` an argument. Check:
+    `zig build test-connect-colibri`, and `examples/interceptors`, whose `Count` counts each
+    response in the program's `Tally`.
 
 ### Step records
 
@@ -969,6 +974,16 @@ ran on Linux x86-64 with Zig 0.16.0.
   - The check moved from `tools/interop_languages_check.sh`, as design §8 first said, to
     `tools/interop_check.sh`: the languages check runs the interop server of `tools/`, and the
     receiver is an example, which the socket server serves.
+
+- **A client interceptor's context** (step 22, decision 44). A client interceptor's hooks get
+  the value that the call's `init` takes, of the type `ClientCallOptions.Context` names.
+  - `examples/interceptors` counts each response again, as it did before step 19: `Count`
+    adds to the program's `Tally`, one `State` field, through each call's `*Tally`. The check
+    asks for 3 responses a round, each with HTTP 200.
+  - Every call that names no context passes `{}`: the examples, the conformance client, the
+    interop client and the README's steps.
+  - The test of a streamed call reads what its interceptor saw through the call's context, in
+    place of two thread-local statics.
 
 ### What a later step owes
 

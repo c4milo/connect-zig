@@ -598,6 +598,25 @@ first. Cite an entry by number in code and commits ("decision 6").
     Cost: a second decode call, and a second copy of the decoder in a program that calls both. A
     run that is counted first reads its records' tags twice.
 
+44. **A client interceptor takes the program's context, as `std.sort` takes one.** Ruled on
+    2026-11-15. A client call's options name a `Context` type, `void` by default. `init` and
+    `init_stream` take a value of it, and each hook gets that value first.
+    - The hooks are `on_request(context, *connect.client.Request) !void` and
+      `on_response(context, *connect.client.Response) void`. A server interceptor gets the
+      program's `app` first in the same way (decision 36).
+    - The program chooses the type. A pointer, such as `*State`, lets an interceptor count or
+      record what it sees. A call with no interceptor, or one whose interceptors need nothing,
+      names no type and passes `{}`.
+    - The call keeps the value from `init` until it ends, since `on_response` runs at the
+      response's head, in `on_headers` or in `read`.
+    - Why: a client interceptor had no place for state but statics, and decision 42 removed
+      them. So the interceptors example lost its check that counts each response (design §8
+      step 19).
+
+    Beaten: a context pointer of `*anyopaque` in each call, which a hook would cast; the
+    program's `App` as a type parameter of `ClientCall`, which every call names even with no
+    interceptor; and a field the program writes after `init`, which a call can forget.
+
 ## Tooling
 
 15. **pepegrillo is lazy.** `build.zig` requests it only when `b.pkg_hash.len == 0`, so a project

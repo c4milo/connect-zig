@@ -67,7 +67,7 @@ pub fn main(init: std.process.Init) !void {
 /// Exports the trace once, and checks the receiver took every span.
 fn export_trace(state: *State, round: Round) !void {
     try state.rounds.begin(round.protocols);
-    try state.export_call.init(&round.options, &.{checkout});
+    try state.export_call.init({}, &round.options, &.{checkout});
     try state.rounds.request(&state.export_call.call.request, &state.export_call.call.response);
     try state.rounds.finish(round.expected);
     var response = state.export_call.call.read(state.rounds.storage());
@@ -81,7 +81,7 @@ fn export_trace(state: *State, round: Round) !void {
 /// Reads every export back, and checks it holds each export's spans, the first one whole.
 fn expect_received(state: *State, round: Round) !void {
     try state.rounds.begin(round.protocols);
-    try state.received_call.init(&round.options, &.{.{}});
+    try state.received_call.init({}, &round.options, &.{.{}});
     try state.rounds.request(&state.received_call.call.request, &state.received_call.call.response);
     try state.rounds.finish(round.expected);
     var response = state.received_call.call.read(state.rounds.storage());

@@ -55,7 +55,7 @@ pub fn Call(comptime method: connect.Method) type {
 
         /// Builds a call that sends `messages` whole.
         pub fn init(self: *Self, call_options: *const connect.client.Options, messages: []const method.Request) !void {
-            try self.call.init(call_options, messages, &CallBuffers.of(&self.buffers));
+            try self.call.init({}, call_options, messages, &CallBuffers.of(&self.buffers));
         }
     };
 }

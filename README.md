@@ -214,7 +214,10 @@ Interceptors are types a route lists in its options: `on_call(app, ctx, request,
 runs before the handler and may refuse the call, and `on_finish(app, ctx, response, failure)`
 sees the outcome. Their request and response are `rpc.AnyRequest` and `rpc.AnyResponse`: the
 headers, the query and the trailers, with no message. A client's `rpc.ClientCall` lists its own in
-its options, with `on_request`, which may add headers, and `on_response`.
+its options, with `on_request(context, request)`, which may add headers, and
+`on_response(context, response)`. The context is the value the call's `init` takes, of the type
+its options name as `Context`, such as a `*State` where an interceptor counts what it sees
+(decision 44). A call with no context passes `{}`.
 
 ### 4. Route it
 
@@ -284,7 +287,7 @@ A client call is a `connect_colibri.ClientCall(method, .{})`. It writes a reques
 `client.ConnectionPool` and reads the response the pool fills in:
 
 ```zig
-try say.init(&.{ .protocol = .grpc }, &.{.{ .sentence = "I feel tired" }}, &buffers);
+try say.init({}, &.{ .protocol = .grpc }, &.{.{ .sentence = "I feel tired" }}, &buffers);
 _ = try pool.request(&say.request, &say.response);
 // Once the pool reports the call finished:
 var response = say.read(storage);
@@ -310,7 +313,7 @@ A client or bidirectional stream can also stream both ways. `init_stream` builds
 call on, and reads each answer as it arrives:
 
 ```zig
-try chat.init_stream(&.{}, &buffers);
+try chat.init_stream({}, &.{}, &buffers);
 try chat.start(&pool);
 var sender = chat.sender();
 try sender.send(&.{ .text = "hello" });

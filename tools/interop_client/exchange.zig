@@ -65,9 +65,9 @@ pub fn Exchange(comptime method: connect.Method, comptime Watcher: type) type {
                 .give_up_ns = shared.transport.now_ns() + constants.call_ns_max,
             };
             if (streamed) {
-                try self.call.init_stream(options, &self.buffers.call(true));
+                try self.call.init_stream({}, options, &self.buffers.call(true));
             } else {
-                try self.call.init(options, messages, &self.buffers.call(false));
+                try self.call.init({}, options, messages, &self.buffers.call(false));
             }
             try self.call.start(self.transport.pool_of());
             self.transport.listen(.{ .context = self, .on_event = on_event });

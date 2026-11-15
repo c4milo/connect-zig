@@ -155,7 +155,7 @@ fn round_both_keys(state: *State) !void {
 fn ask(rounds: *Rounds, asked: anytype, call_options: connect.client.Options, token: ?[]const u8) !void {
     var options = call_options;
     if (token) |text| options.headers = try asked.bearer.of(text);
-    try asked.client.init(&options, &.{.{}});
+    try asked.client.init({}, &options, &.{.{}});
     try rounds.request(&asked.client.call.request, &asked.client.call.response);
 }
 
