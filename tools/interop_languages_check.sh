@@ -3,7 +3,7 @@
 # grpc-go, TypeScript's connect-es, Python's grpcio, and Rust's tonic and connect-rust
 # (interop/README.md). Each
 # calls interop.v1.InteropService in every protocol, codec and compression its library speaks,
-# with every case of examples/testdata/coverage, the cases that hold every protobuf type.
+# with every case of tools/testdata/coverage, the cases that hold every protobuf type.
 #
 #   tools/interop_languages_check.sh [client...]
 #
@@ -22,7 +22,7 @@ client_seconds=1800
 zig build
 work="$(mktemp -d)"
 trap 'kill "${server}" 2>/dev/null || true; rm -rf "${work}"' EXIT
-zig-out/bin/eliza-server 0 >"${work}/server.log" 2>&1 &
+zig-out/bin/interop-server 0 >"${work}/server.log" 2>&1 &
 server=$!
 port=""
 for _ in $(seq 1 50); do
@@ -36,11 +36,11 @@ base="https://127.0.0.1:${port}"
 ca="$(pwd)/examples/testdata/tls/ca.pem"
 # The cases in binary, which every runtime reads, and the schema for the clients that compile it.
 mkdir -p "${work}/cases"
-for case in examples/testdata/coverage/*.json; do
-    "${buf}" convert examples/proto --type coverage.v1.Everything --from "${case}#format=json" \
+for case in tools/testdata/coverage/*.json; do
+    "${buf}" convert tools/proto --type coverage.v1.Everything --from "${case}#format=json" \
         --to "${work}/cases/$(basename "${case}" .json).binpb#format=binpb"
 done
-"${buf}" build examples/proto --as-file-descriptor-set -o "${work}/descriptors.binpb"
+"${buf}" build tools/proto --as-file-descriptor-set -o "${work}/descriptors.binpb"
 
 # One row for each client and protocol: the scenarios that passed, and each one that failed.
 summarize() {

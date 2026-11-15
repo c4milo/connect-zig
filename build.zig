@@ -9,7 +9,7 @@ const std = @import("std");
 const assert = std.debug.assert;
 const lint = @import("build/lint.zig");
 const examples = @import("build/examples.zig");
-const generate = @import("build/generate.zig");
+const checks = @import("build/checks.zig");
 const bench = @import("build/bench.zig");
 const conformance = @import("build/conformance.zig");
 const chapulin = @import("build/chapulin.zig");
@@ -64,7 +64,7 @@ pub fn build(b: *std.Build) void {
     add_unit_tests(b, graph, plugin, test_step);
     test_step.dependOn(examples.add(b, graph));
     test_step.dependOn(conformance.add(b, graph));
-    test_step.dependOn(generate.add(b, graph.protobuf, graph.connect, target, optimize));
+    test_step.dependOn(checks.add(b, graph));
     if (lint.add(b)) |lint_step| test_step.dependOn(lint_step);
     bench.add(b, graph.public_names, target);
 }

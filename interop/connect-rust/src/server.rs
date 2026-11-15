@@ -1,7 +1,7 @@
 //! The connect-rust interop server: `connectrpc`'s standalone server, serving Connect, gRPC and
 //! gRPC-Web over TLS with the test identity, h2 and HTTP/1.1 picked by ALPN. connect-zig's
 //! interop client calls it (interop/README.md, "The server side"). It answers as connect-zig's
-//! own server of examples/services/interop.zig does.
+//! own server of tools/interop_server/interop.zig does.
 
 use std::sync::Arc;
 
@@ -16,7 +16,7 @@ use crate::proto::interop::v1::{
     CollectResponse, FailRequest, InspectRequest, InspectResponse, InteropService, RepeatRequest,
 };
 
-/// The most messages Repeat sends, as examples/services/interop.zig allows.
+/// The most messages Repeat sends, as tools/interop_server/interop.zig allows.
 const REPEAT_MAX: i32 = 16;
 /// The prefix of the request headers Inspect reports and sends back.
 const INSPECTED_PREFIX: &str = "x-interop-";

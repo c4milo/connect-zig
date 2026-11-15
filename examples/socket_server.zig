@@ -1,4 +1,4 @@
-//! Example: the ELIZA, demo, GitHub-style and interop services on a socket, through
+//! Example: the ELIZA, demo, GitHub-style and account services on a socket, through
 //! `colibri.Server` (colibri decision 150): h11 and h2 on a TCP socket, in cleartext, and h3 on
 //! the UDP socket of the same port, under the test-only identity of `examples/testdata/tls`
 //! (decision 28). Run it with `zig build run-eliza-server -- [port]`, then call it with any
@@ -21,7 +21,6 @@ const connect = @import("connect");
 const colibri = @import("colibri");
 const tls = @import("tls");
 const identity = @import("test_identity");
-const coverage = @import("coverage");
 const App = @import("services/app.zig").App;
 const Router = @import("services/routes.zig").Router;
 const account = @import("services/account.zig");
@@ -33,10 +32,6 @@ comptime {
 }
 
 const port_default = 8080;
-
-/// The types an Any in a JSON message may name: the coverage cases' (decision 21), which the
-/// interop service echoes.
-pub const protobuf_any_types: []const type = &.{ coverage.Everything, coverage.Nested, coverage.Scalars };
 
 /// 64 TCP connections and 8 QUIC connections at once. A connection past them is accepted and
 /// closed, so its client learns it at once.

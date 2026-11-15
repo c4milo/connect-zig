@@ -1,7 +1,7 @@
 #!/bin/sh
 # Runs the grpcio interop client against a connect-zig server.
 # Usage: interop/python/run.sh <base-url> <cases-dir> <descriptors> <ca>
-# The descriptors go unused: grpcio-tools compiles examples/proto itself.
+# The descriptors go unused: grpcio-tools compiles tools/proto itself.
 set -eu
 
 if [ "$#" -ne 4 ]; then
@@ -30,9 +30,9 @@ fi
 
 gen="$(mktemp -d)"
 trap 'rm -rf "${gen}"' EXIT INT TERM
-"${venv}/bin/python" -m grpc_tools.protoc -I "${repo}/examples/proto" \
+"${venv}/bin/python" -m grpc_tools.protoc -I "${repo}/tools/proto" \
     --python_out="${gen}" --grpc_python_out="${gen}" \
-    "${repo}/examples/proto/coverage/v1/coverage.proto" \
-    "${repo}/examples/proto/interop/v1/interop.proto"
+    "${repo}/tools/proto/coverage/v1/coverage.proto" \
+    "${repo}/tools/proto/interop/v1/interop.proto"
 
 "${venv}/bin/python" -I "${here}/client.py" "${gen}" "${base_url}" "${cases_dir}" "${ca}"

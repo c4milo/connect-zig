@@ -2,8 +2,8 @@
 # Runs connect-zig's client against servers written in other languages: Go's connect-go and
 # grpc-go, TypeScript's connect-node, Python's grpcio, and Rust's connect-rust (interop/README.md,
 # "The server side"). It is the mirror of tools/interop_languages_check.sh. The client,
-# examples/interop_client.zig, calls interop.v1.InteropService in every protocol the server
-# speaks, with every case of examples/testdata/coverage, the cases that hold every protobuf type.
+# tools/interop_client/main.zig, calls interop.v1.InteropService in every protocol the server
+# speaks, with every case of tools/testdata/coverage, the cases that hold every protobuf type.
 #
 #   tools/interop_servers_check.sh [server...]
 #
@@ -37,11 +37,11 @@ stop_server() {
 
 # The cases in binary, which every runtime reads, and the schema for the servers that compile it.
 mkdir -p "${work}/cases"
-for case in examples/testdata/coverage/*.json; do
-    "${buf}" convert examples/proto --type coverage.v1.Everything --from "${case}#format=json" \
+for case in tools/testdata/coverage/*.json; do
+    "${buf}" convert tools/proto --type coverage.v1.Everything --from "${case}#format=json" \
         --to "${work}/cases/$(basename "${case}" .json).binpb#format=binpb"
 done
-"${buf}" build examples/proto --as-file-descriptor-set -o "${work}/descriptors.binpb"
+"${buf}" build tools/proto --as-file-descriptor-set -o "${work}/descriptors.binpb"
 tls="$(pwd)/examples/testdata/tls"
 
 # What each server is: its directory under interop/, the client's runs it speaks, and each

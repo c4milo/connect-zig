@@ -1,6 +1,6 @@
 #!/bin/sh
 # Compares the protobuf runtime with Go's, through buf convert, on every case in
-# examples/testdata/<set>, where each set names a message: coverage.v1.Everything holds each
+# tools/testdata/<set>, where each set names a message: coverage.v1.Everything holds each
 # proto3 scalar in each cardinality, every map key type, oneofs, enums, recursion and each
 # well-known type; editions.v1.Everything holds edition 2023's features; legacy.v1.Everything
 # holds proto2 and its groups. For each case it checks:
@@ -29,7 +29,7 @@ mkdir -p "${work}/coverage" "${work}/editions" "${work}/legacy"
 converter=zig-out/bin/coverage
 failures=0
 go_convert() {
-    "${buf}" convert examples/proto --type "${set}.v1.Everything" --from "$1" --to "$2"
+    "${buf}" convert tools/proto --type "${set}.v1.Everything" --from "$1" --to "$2"
 }
 same() {
     jq -S . "$2" >"${work}/want.json"
@@ -42,7 +42,7 @@ same() {
         failures=$((failures + 1))
     fi
 }
-for case in examples/testdata/coverage/*.json examples/testdata/editions/*.json examples/testdata/legacy/*.json; do
+for case in tools/testdata/coverage/*.json tools/testdata/editions/*.json tools/testdata/legacy/*.json; do
     set="$(basename "$(dirname "${case}")")"
     name="${set}/$(basename "${case}" .json)"
     go_convert "${case}#format=json" "${work}/${name}.go.binpb#format=binpb"
@@ -95,11 +95,11 @@ if [ -z "${python}" ]; then
     fi
     python="${venv}/bin/python"
 fi
-"${buf}" build examples/proto --as-file-descriptor-set -o "${work}/descriptors.binpb"
+"${buf}" build tools/proto --as-file-descriptor-set -o "${work}/descriptors.binpb"
 upb() {
     "${python}" -I tools/upb_reference.py "$@"
 }
-for case in examples/testdata/legacy/*.binpb examples/testdata/editions/*.binpb; do
+for case in tools/testdata/legacy/*.binpb tools/testdata/editions/*.binpb; do
     set="$(basename "$(dirname "${case}")")"
     name="${set}/$(basename "${case}" .binpb)"
     type="${set}.v1.Everything"

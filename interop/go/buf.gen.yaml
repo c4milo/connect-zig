@@ -7,10 +7,10 @@ managed:
     - file_option: go_package_prefix
       value: github.com/c4milo/connect-zig/interop/go/gen
 inputs:
-  - directory: ../../examples/proto
+  - directory: ../../tools/proto
     paths:
-      - ../../examples/proto/coverage/v1
-      - ../../examples/proto/interop/v1
+      - ../../tools/proto/coverage/v1
+      - ../../tools/proto/interop/v1
 plugins:
   - local: protoc-gen-go
     out: gen

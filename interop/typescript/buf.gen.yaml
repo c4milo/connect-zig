@@ -1,10 +1,10 @@
 # run.sh generates the client's code with this file: protoc-gen-es writes plain ES modules to gen/.
 version: v2
 inputs:
-  - directory: ../../examples/proto
+  - directory: ../../tools/proto
     paths:
-      - ../../examples/proto/interop/v1/interop.proto
-      - ../../examples/proto/coverage/v1/coverage.proto
+      - ../../tools/proto/interop/v1/interop.proto
+      - ../../tools/proto/coverage/v1/coverage.proto
 plugins:
   - local: node_modules/.bin/protoc-gen-es
     out: gen

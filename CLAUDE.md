@@ -104,6 +104,7 @@ confirm a test fails. Report `CAUGHT` or `NOT CAUGHT` per mutation in the commit
   `std.Io`: h11 and h2 in cleartext, no TLS and no h3 (decision 32). `zig build example-std-io`,
   which `zig build examples` runs, starts it and calls it over TCP with a pool driven over `std.Io`.
 - Generated code: `zig build test-generated` compiles `examples/gen` and runs its round trips.
+  `tools/gen` holds the checks' generated code, from `tools/proto` (decision 41).
   `tools/generate_check.sh` regenerates it with `buf generate` and fails on a difference;
   `--write` rewrites it. It needs buf, or `BUF` naming it. It builds the plugin alone, with
   `zig build plugin`, so generated code that no longer compiles does not stop it.
@@ -116,7 +117,7 @@ confirm a test fails. Report `CAUGHT` or `NOT CAUGHT` per mutation in the commit
   Rust build needs buf, or `BUF` naming it. `tools/ci.sh` runs `zig build bench -- --quick`, and
   its `bench-compare` check runs `tools/bench_check.sh`.
 - Coverage: `tools/coverage_check.sh` compares every protobuf type with Go's runtime through
-  `buf convert`, over the JSON cases in `examples/testdata/`, and the binary cases with upb's,
+  `buf convert`, over the JSON cases in `tools/testdata/`, and the binary cases with upb's,
   Python's protobuf pinned in `tools/upb_requirements.txt`, for closed enums and unchecked
   strings. It needs buf, jq and python3 with venv.
 - Conformance: `tools/conformance_check.sh` runs connectrpc's conformance runner v1.0.4 against
@@ -132,8 +133,10 @@ confirm a test fails. Report `CAUGHT` or `NOT CAUGHT` per mutation in the commit
   macOS. A case that fails on purpose, or that does not pass yet, goes in
   `conformance/protobuf_known_failing.txt` under its reason.
 - Interop across languages: `tools/interop_languages_check.sh [client...]` runs the clients of
-  `interop/` (Go, TypeScript, Python, and Rust's tonic and connect-rust) against the socket
-  server; `interop/README.md` holds their contract. It needs buf, go, node with npm, python3 with venv, and cargo.
+  `interop/` (Go, TypeScript, Python, and Rust's tonic and connect-rust) against the interop
+  server of `tools/interop_server/`, which `zig build run-interop-server -- [port]` starts;
+  `interop/README.md` holds their contract. It needs buf, go, node with npm, python3 with venv,
+  and cargo.
 - Interop servers: `tools/interop_servers_check.sh [server...]` starts the servers of `interop/`
   (connect-go, grpc-go, connect-node, grpcio and connect-rust) and runs connect-zig's client,
   `zig build interop-client`, against each in every protocol it speaks; `interop/README.md`,

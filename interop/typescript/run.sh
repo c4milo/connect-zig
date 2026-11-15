@@ -2,7 +2,7 @@
 # Runs the connect-es interop client against connect-zig's socket server (interop/README.md).
 # Usage: interop/typescript/run.sh <base-url> <cases-dir> <descriptors> <ca>
 # It installs the pinned packages with npm ci, generates gen/ with buf ("${BUF:-buf}"), and runs
-# main.js on Node. The client compiles the schema from examples/proto, so it ignores <descriptors>.
+# main.js on Node. The client compiles the schema from tools/proto, so it ignores <descriptors>.
 set -eu
 
 if [ "$#" -ne 4 ]; then

@@ -47,7 +47,7 @@ const (
 	timeoutMaxMS = 5010
 )
 
-// A case of examples/testdata/coverage: its name and its message.
+// A case of tools/testdata/coverage: its name and its message.
 type testCase struct {
 	name    string
 	message *coveragev1.Everything

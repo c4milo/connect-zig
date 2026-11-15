@@ -134,17 +134,15 @@ A client interceptor is a type a `ClientCall`'s options list, with `on_request` 
 
 - `connectrpc/eliza/v1/eliza.proto`: the ELIZA service;
 - `demo/v1/demo.proto`: the demo service;
-- `editions/v1/editions.proto` and `legacy/v1/legacy.proto`: edition 2023's features, and proto2
-  with its groups, which the same check covers;
-- `coverage/v1/coverage.proto`: every protobuf type, which `tools/coverage_check.sh` converts with
-  [coverage.zig](coverage.zig) and with Go, over the cases in [testdata/coverage](testdata/coverage);
 - `kitchen/v1/kitchen.proto`: every shape the generator writes, from maps and oneofs to
   recursion and well-known types;
 - `large/v1/large.proto`: a file of many wide messages, past the 500 lines hand-written code
   keeps to, which the plugin still writes as one file.
 
-[generated_test.zig](generated_test.zig) compiles all of it and round-trips its messages, and
-`tools/generate_check.sh` fails when `buf generate` writes anything other than what is committed.
+`zig build test-generated`, from [tools/generated](../tools/generated), compiles all of it and
+round-trips its messages, and `tools/generate_check.sh` fails when `buf generate` writes anything
+other than what is committed. The checks' schemas, the coverage cases and the interop service,
+are in [tools/proto](../tools/proto) (decision 41).
 
 ## Try the socket server
 

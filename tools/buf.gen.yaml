@@ -1,0 +1,9 @@
+# `tools/generate_check.sh` runs `buf generate --template tools/buf.gen.yaml` from the root: the Zig
+# code of the checks' messages and the interop service, with the plugin this repository builds
+# (decision 41).
+version: v2
+inputs:
+  - directory: tools/proto
+plugins:
+  - local: zig-out/bin/protoc-gen-connect-zig
+    out: tools/gen

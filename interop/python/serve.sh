@@ -2,7 +2,7 @@
 # Serves the grpcio interop server for connect-zig's interop client (interop/README.md, "The
 # server side").
 # Usage: interop/python/serve.sh python <port> <chain> <key> <descriptors>
-# It installs the pinned packages into the cache run.sh uses, and compiles examples/proto itself,
+# It installs the pinned packages into the cache run.sh uses, and compiles tools/proto itself,
 # so the descriptors go unused.
 set -eu
 
@@ -29,9 +29,9 @@ fi
 gen="${venv}-server-gen"
 rm -rf "${gen}"
 mkdir -p "${gen}"
-"${venv}/bin/python" -m grpc_tools.protoc -I "${repo}/examples/proto" \
+"${venv}/bin/python" -m grpc_tools.protoc -I "${repo}/tools/proto" \
     --python_out="${gen}" --grpc_python_out="${gen}" \
-    "${repo}/examples/proto/coverage/v1/coverage.proto" \
-    "${repo}/examples/proto/interop/v1/interop.proto"
+    "${repo}/tools/proto/coverage/v1/coverage.proto" \
+    "${repo}/tools/proto/interop/v1/interop.proto"
 
 exec "${venv}/bin/python" -I "${here}/server.py" "${gen}" "$2" "$3" "$4"

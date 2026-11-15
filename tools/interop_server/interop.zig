@@ -26,7 +26,7 @@ const inspected_len = 1024;
 const detail_len = 256;
 const nanoseconds_per_millisecond = std.time.ns_per_ms;
 
-/// The service's part of the example server's `App`. A reply is encoded before its handler's
+/// The service's part of the interop server's `App`. A reply is encoded before its handler's
 /// call returns, so one room serves every call.
 pub const Room = struct {
     lines: [inspected_max][]const u8 = undefined,

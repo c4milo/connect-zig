@@ -23,14 +23,14 @@ const proto = @import("protobuf");
 const coverage = @import("coverage");
 const rpc = @import("connect_colibri");
 const transport = @import("client_transport");
-const scenarios = @import("interop_client/scenarios.zig");
-const verdict = @import("interop_client/verdict.zig");
+const scenarios = @import("scenarios.zig");
+const verdict = @import("verdict.zig");
 const Case = scenarios.Case;
 const Run = scenarios.Run;
 
 comptime {
     // chapulin's hook, which every program over colibri's `tls` defines (colibri decision 94).
-    _ = @import("services/hooks.zig");
+    _ = @import("hooks");
 }
 
 /// An Any in the cases names coverage types, which JSON reads and writes (decision 21).
@@ -259,5 +259,5 @@ fn run_calls(reporter: *Reporter, name: []const u8, run: *const Run, all: []cons
 }
 
 test {
-    _ = @import("interop_client/same.zig");
+    _ = @import("same.zig");
 }

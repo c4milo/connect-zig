@@ -3,9 +3,9 @@
 const std = @import("std");
 const testing = std.testing;
 const proto = @import("protobuf");
-const kitchen = @import("gen/kitchen/v1/kitchen.pb.zig");
-const eliza = @import("gen/connectrpc/eliza/v1/eliza.pb.zig");
-const large = @import("gen/large/v1/large.pb.zig");
+const kitchen = @import("kitchen");
+const eliza = @import("eliza");
+const large = @import("large");
 
 test "every generated declaration compiles" {
     testing.refAllDecls(kitchen);

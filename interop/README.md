@@ -1,8 +1,8 @@
 # Interop clients and servers
 
-Clients written in other languages call connect-zig's server, the socket server of
-`examples/socket_server.zig`, through `interop.v1.InteropService` from
-[examples/proto/interop/v1/interop.proto](../examples/proto/interop/v1/interop.proto).
+Clients written in other languages call connect-zig's server, the interop server of
+`tools/interop_server/main.zig`, through `interop.v1.InteropService` from
+[tools/proto/interop/v1/interop.proto](../tools/proto/interop/v1/interop.proto).
 `tools/interop_languages_check.sh` runs each one, and `tools/ci.sh` runs that script. The same
 directories hold servers in those languages, which connect-zig's client calls in turn: see
 [The server side](#the-server-side).
@@ -25,9 +25,9 @@ interop/<client>/run.sh <base-url> <cases-dir> <descriptors> <ca>
 
 - `<base-url>` is the server's origin, such as `https://127.0.0.1:41234`. The server speaks h11
   and h2 over TLS, and picks one by ALPN.
-- `<cases-dir>` holds one `<name>.binpb` file for each case of `examples/testdata/coverage`: a
+- `<cases-dir>` holds one `<name>.binpb` file for each case of `tools/testdata/coverage`: a
   `coverage.v1.Everything`, the message that holds every protobuf type, in binary.
-- `<descriptors>` is a `FileDescriptorSet` of `examples/proto`, from `buf build
+- `<descriptors>` is a `FileDescriptorSet` of `tools/proto`, from `buf build
   --as-file-descriptor-set`, for a client whose build compiles the schema itself.
 - `<ca>` is the PEM of the CA that signed the server's certificate, the test identity of
   `examples/testdata/tls`. The client trusts it, and no other.
@@ -81,7 +81,7 @@ Two notes on how it compares messages:
 ## The server side
 
 `tools/interop_servers_check.sh [server...]` runs the mirror check: it starts a server written in
-another language, and connect-zig's client, `examples/interop_client.zig`, calls it with every
+another language, and connect-zig's client, `tools/interop_client/main.zig`, calls it with every
 scenario above. `zig build interop-client` builds the client, and `tools/ci.sh` runs the check
 as `interop-servers`.
 
@@ -108,12 +108,12 @@ interop/<directory>/serve.sh <server> <port> <chain> <key> <descriptors>
   connect-go and grpc-go.
 - `<port>` is the TCP port on 127.0.0.1; 0 lets the kernel choose.
 - `<chain>` and `<key>` are the PEM files of the test identity.
-- `<descriptors>` is the `FileDescriptorSet` of `examples/proto`, for a server whose build
+- `<descriptors>` is the `FileDescriptorSet` of `tools/proto`, for a server whose build
   compiles the schema itself.
 
 `serve.sh` installs and builds what the server needs, as `run.sh` does, then runs it in its
 place. The server prints `listening on port <port>` once it listens, and answers each method as
-connect-zig's own server of `examples/services/interop.zig` does:
+connect-zig's own server of `tools/interop_server/interop.zig` does:
 
 - `Echo` and `EchoGet` answer with the message; `EchoGet` takes a Connect GET.
 - `Repeat` sends the message `count` times, and fails out_of_range past 16.

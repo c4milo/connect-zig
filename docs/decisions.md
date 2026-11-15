@@ -68,6 +68,14 @@ first. Cite an entry by number in code and commits ("decision 6").
       build that a dependent writes, so the examples prove decision 39 too.
     - Beaten: one build for every example, which hides the build a project writes; and a copy
       of the harness in each project, which repeats about 900 lines in six places.
+    - Amended the same day, on the owner's choice: each example owns the schema it is about, and
+      no project holds every proto. `demo.proto` splits into one schema for each of streaming,
+      interceptors and errors. A project that builds on another example's service, such as
+      `socket_server`, `std_io` and `sans_io_call`, depends on that project by path and imports
+      its exported modules. The interop service, which only the checks call, moves to
+      `tools/interop_server` with a server of its own. `large.proto` stays beside
+      `kitchen.proto`, whose `shared.proto` it imports. Beaten: one project of every proto,
+      which makes each example depend on schemas it does not use.
 
 42. **Every tree of hand-written Zig takes the library's rules.** Ruled by the owner on
     2026-11-14.

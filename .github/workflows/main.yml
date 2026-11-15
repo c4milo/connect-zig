@@ -16,8 +16,8 @@ env:
   ZIG_VERSION: 0.16.0
   ZIG_SHA256: 70e49664a74374b48b51e6f3fdfbf437f6395d42509050588bd49abe52ba3d00
   ZIG_SHA256_ARM64: ea4b09bfb22ec6f6c6ceac57ab63efb6b46e17ab08d21f69f3a48b38e1534f17
-  # buf runs the plugin over examples/proto, and tools/generate_check.sh compares its output with
-  # examples/gen (design §8 step 6).
+  # buf runs the plugin over examples/proto and tools/proto, and tools/generate_check.sh compares
+  # its output with examples/gen and tools/gen (design §8 step 6).
   BUF_VERSION: 1.74.0
   BUF_SHA256: 92326d957d613712669fb55f9e4340946a8142a92120e09008459118778273d2
   BUF_SHA256_ARM64: d42b471501a85dbadb40062960492dd81ce5ca4e413f4133d514d3ae3c0af4df

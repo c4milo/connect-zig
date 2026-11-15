@@ -86,14 +86,14 @@ pub const relative_import_outside = rules.relative_import.Rule(.{
 pub const magic_numbers = rules.magic_numbers.Rule(.{
     .scope = .{
         .extensions = &.{lint.paths.zig_extension},
-        .include_directories = &.{ "src", "examples/gen", "bench/gen", "conformance/gen" },
+        .include_directories = &.{ "src", "examples/gen", "tools/gen", "bench/gen", "conformance/gen" },
         .exclude_basenames = &.{"constants.zig"},
     },
 });
 
 /// The library keeps no state every thread shares.
 pub const global_state = rules.global_state.Rule(.{
-    .scope = .{ .extensions = &.{lint.paths.zig_extension}, .include_directories = &.{ "src", "examples/gen", "bench/gen", "conformance/gen" } },
+    .scope = .{ .extensions = &.{lint.paths.zig_extension}, .include_directories = &.{ "src", "examples/gen", "tools/gen", "bench/gen", "conformance/gen" } },
 });
 
 /// A container-level `var` states its alignment, which Zig 0.16's x86_64 backend needs.

@@ -5,7 +5,6 @@ const connect = @import("connect");
 const rpc = @import("connect_colibri");
 const oidc = @import("oidc");
 const github = @import("github.zig");
-const interop = @import("interop.zig");
 
 /// The longest sentence or detail a handler writes.
 pub const text_len_max = 4096;
@@ -30,8 +29,6 @@ pub const App = struct {
     counts: [count_digits_max]u8 = undefined,
     /// The GitHub-style service's store, and the room its replies take.
     github: github.Room = .{},
-    /// The interop service's room for its replies' headers and details.
-    interop: interop.Room = .{},
     /// The verifier of the account service's bearer tokens, which `account.start` starts before
     /// the server takes a call (decision 34). `oidc.Interceptor` reads it by this name.
     oidc: oidc.Verifier = undefined,
