@@ -1,0 +1,3 @@
+# The OTLP example's schema: OpenTelemetry's trace export, and the receiver's store, one buf
+# module (decision 40).
+version: v2

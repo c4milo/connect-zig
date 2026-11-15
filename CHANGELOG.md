@@ -105,6 +105,8 @@ The first release.
   servers too.
 - Every protobuf type is compared with Go's runtime, and closed enums and unchecked strings with
   upb's.
+- OpenTelemetry's Go SDK exports spans to `examples/otlp`, OTLP's trace receiver, over gRPC with
+  gzip and TLS, and the check reads each span back as the SDK ended it (decision 40).
 - A performance gate on instruction counts, and a benchmark beside Go's protobuf runtime and
   connect-rust's Buffa, published by CI.
 - A project that fetches connect-zig as a package follows the README: it generates its code

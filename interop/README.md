@@ -153,3 +153,24 @@ as 0. JSON's `"NaN"` holds no payload, so a NaN's bits do not count there.
 - Every run but `grpc` against grpc-go and grpcio, which speak gRPC alone.
 - h3: no server here serves it.
 - JSON over gRPC and gRPC-Web, which the client does not send.
+
+## The OpenTelemetry client
+
+[otel](otel) is not an interop client of `interop.v1`. It checks the OTLP trace receiver of
+[examples/otlp](../examples/otlp) with OpenTelemetry's Go SDK v1.47.0 (decision 40), and
+`tools/interop_check.sh` runs it against the example socket server:
+
+```sh
+interop/otel/run.sh <base-url> <ca>
+```
+
+The SDK's gRPC exporter sends a small trace, with gzip, over TLS under the test CA. The tracer
+provider also records each span in memory, as the SDK ended it. The program then calls
+`otlpstore.v1.SpanStore/Received`, and compares each span with the receiver's copy: its IDs, its
+parent, its name, its kind, its times, every attribute kind the API has, its events, its links
+and its status. It prints one line for each check, in the format of the other clients:
+
+```text
+ok: otel grpc span POST /checkout
+FAIL: otel grpc span charge card: status STATUS_CODE_UNSET ""
+```

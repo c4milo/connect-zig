@@ -2,7 +2,8 @@
 # Runs the example socket server and calls it with buf curl, whose client is connect-go's, in each
 # protocol, over h2 and h3, and with curl over h11 and h2, all over TLS under the test identity. It
 # requires each answer octet for octet, so connect-go checks the server as connect-zig's own client
-# checks it in the examples. It needs buf on the path, or BUF naming it, curl and python3.
+# checks it in the examples. OpenTelemetry's Go SDK exports spans to the OTLP receiver, and reads
+# them back (decision 40). It needs buf on the path, or BUF naming it, curl, python3 and go.
 set -eu
 cd "$(dirname "$0")/.."
 buf="${BUF:-buf}"
@@ -229,5 +230,12 @@ wait "${chat}" || true
 expect "grpc Chat answers before the client ends" 'yes' "${answered}"
 expect "grpc Chat" '{"text":"echo:first"}{"text":"echo:second"}{"text":"byeafter2"}' "$(unlogged <"${log}.chat" | tr -d ' \n')"
 rm -f "${fifo}" "${log}.chat"
+# OpenTelemetry's Go SDK exports spans to the OTLP receiver of examples/otlp, then reads them back
+# and compares each one (decision 40). Each of its lines is a check.
+otel_lines="$(sh interop/otel/run.sh "https://127.0.0.1:${port}" "$(pwd)/${ca}" 2>&1 || true)"
+echo "${otel_lines}" | grep -e '^ok: ' -e '^FAIL: ' || true
+expect "OpenTelemetry's Go SDK exports, and reads every span back" 'none' \
+    "$(echo "${otel_lines}" | grep -c '^FAIL: ' | sed 's/^0$/none/')"
+expect "OpenTelemetry's Go SDK compares each span" '7' "$(echo "${otel_lines}" | grep -c '^ok: ')"
 [ "${failures}" -eq 0 ] || exit 1
 echo "every interop call answered as expected"

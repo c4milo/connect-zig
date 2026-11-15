@@ -23,6 +23,7 @@ const projects = [_]Project{
     .{ .name = "github", .description = "Run a session against a GitHub-style API" },
     .{ .name = "oidc", .description = "Run calls behind OpenID Connect bearer tokens" },
     .{ .name = "std_io", .description = "Call the std.Io server over TCP, with no Rotor" },
+    .{ .name = "otlp", .description = "Export a trace to the OTLP receiver and read it back" },
     .{ .name = "quickstart", .description = "Serve the README's GreetService and call it over h11, h2 and h3" },
     .{ .name = "socket_server", .description = "Build the server of every example's service" },
 };

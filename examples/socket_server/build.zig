@@ -11,6 +11,7 @@ const services = [_]struct { project: []const u8, modules: []const []const u8 }{
     .{ .project = "errors", .modules = &.{"errors_service"} },
     .{ .project = "github", .modules = &.{"github_service"} },
     .{ .project = "oidc", .modules = &.{"account_service"} },
+    .{ .project = "otlp", .modules = &.{ "otlp", "otlp_service" } },
 };
 
 pub fn build(b: *std.Build) void {

@@ -1,0 +1,15 @@
+// What the example server's OTLP trace receiver kept (decision 40). `interop/otel` reads it back
+// after OpenTelemetry's Go SDK exported its spans, and compares each span with the one it sent.
+syntax = "proto3";
+
+package otlpstore.v1;
+
+import "opentelemetry/proto/collector/trace/v1/trace_service.proto";
+
+message ReceivedRequest {}
+
+service SpanStore {
+  // Every export request that TraceService/Export kept, in the order they arrived, as one
+  // request: its resource_spans hold those of each request in turn.
+  rpc Received(ReceivedRequest) returns (opentelemetry.proto.collector.trace.v1.ExportTraceServiceRequest) {}
+}

@@ -653,6 +653,8 @@ first. Cite an entry by number in code and commits ("decision 6").
     - `interop/otel` exports spans with OpenTelemetry's Go SDK v1.47.0 and its gRPC exporter,
       with gzip, over TLS under the test CA (decision 25). The SDK also records each span in
       memory. The program then calls `Received`, and compares each span field by field.
+      `tools/interop_check.sh` runs it against the socket server, beside the calls of curl and buf
+      curl to the other example services.
     - Why: the other clients call schemas of this repository. This schema and this client are
       the work of others, and many programs use them, so the check shows connect-zig serve a
       real API as its users would.

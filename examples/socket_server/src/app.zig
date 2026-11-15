@@ -10,6 +10,7 @@ const interceptors_service = @import("interceptors_service");
 const errors_service = @import("errors_service");
 const github_service = @import("github_service");
 const account_service = @import("account_service");
+const otlp_service = @import("otlp_service");
 const constants = @import("constants.zig");
 
 /// What the routes read: each service's room, the verifier of the account service's tokens, and
@@ -22,6 +23,7 @@ pub const App = struct {
     calculator: errors_service.Room = .{},
     github: github_service.Room = .{},
     oidc: oidc.Verifier = undefined,
+    otlp: otlp_service.Room = .{},
 };
 
 fn on_error(_: *App, _: *const server.Request, _: anyerror, response: *server.ResponseWriter) void {
@@ -37,5 +39,6 @@ pub const Router = server.Router(App, .{
         errors_service.Service(App).routes ++
         github_service.Service(App).routes ++
         account_service.Service(App).routes ++
+        otlp_service.Service(App).routes ++
         rpc.Refusals(App, eliza.ElizaService.say).routes,
 }, .{ .requests = constants.requests, .response_bytes = constants.response_bytes, .body_bytes = constants.body_bytes });

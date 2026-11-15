@@ -198,7 +198,8 @@ Each step names the check that proves it. A step is done when its check passes i
     one `State` at startup (decision 42). New public names: none. Check: `zig build lint`.
 21. **OpenTelemetry's trace export.** `examples/otlp` serves `TraceService`, and
     `interop/otel` exports spans to it with OpenTelemetry's Go SDK (decision 40). New public
-    names: none. Check: `tools/interop_languages_check.sh otel`.
+    names: none. Check: `tools/interop_check.sh`, which runs `interop/otel` against the socket
+    server, and `examples/otlp`'s own `zig build test`.
 
 ### Step records
 
@@ -956,6 +957,18 @@ ran on Linux x86-64 with Zig 0.16.0.
     as a program's own storage does. No library code changed.
   - The benchmark's message values stay named constants in `bench/inputs.zig`, which the Go and
     Rust benchmarks cite as their source.
+
+- **OpenTelemetry's trace export** (step 21, decision 40). `examples/otlp` serves
+  `TraceService/Export` of opentelemetry-proto v1.11.1 and `otlpstore.v1.SpanStore/Received`.
+  Its check exports a checkout trace of three spans over h2 in gRPC, over h11 in Connect and
+  over h3 in gRPC, and reads every export back each time.
+  - `interop/otel` exports spans with OpenTelemetry's Go SDK v1.47.0 and its gRPC exporter, with
+    gzip, over TLS under the test CA, through the socket server. Each span comes back equal to
+    the one the SDK ended: IDs, parent, name, kind, times, every attribute kind with the slices,
+    events, links and status. `tools/interop_check.sh` runs it.
+  - The check moved from `tools/interop_languages_check.sh`, as design §8 first said, to
+    `tools/interop_check.sh`: the languages check runs the interop server of `tools/`, and the
+    receiver is an example, which the socket server serves.
 
 ### What a later step owes
 

@@ -12,6 +12,7 @@
         .errors = .{ .path = "../errors" },
         .github = .{ .path = "../github" },
         .oidc = .{ .path = "../oidc" },
+        .otlp = .{ .path = "../otlp" },
     },
     .paths = .{ "build.zig", "build.zig.zon", "src" },
 }

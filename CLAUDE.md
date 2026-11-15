@@ -113,8 +113,9 @@ confirm a test fails. Report `CAUGHT` or `NOT CAUGHT` per mutation in the commit
   `--write` rewrites it. It needs buf, or `BUF` naming it. It builds the plugin alone, with
   `zig build plugin`, so generated code that no longer compiles does not stop it.
 - Interop: `tools/interop_check.sh` calls the socket server with `buf curl` in Connect, gRPC and
-  gRPC-Web, over h2 and h3, and with curl over h11 and h2, all over TLS with the test CA, and
-  checks that Chat answers full-duplex. It needs buf, curl and python3.
+  gRPC-Web, over h2 and h3, with curl over h11 and h2, and with OpenTelemetry's Go SDK, which
+  exports spans to the OTLP receiver and reads them back (decision 40), all over TLS with the
+  test CA, and checks that Chat answers full-duplex. It needs buf, curl, python3 and go.
 - Benchmark: `zig build bench` times binary and JSON encode and decode, ReleaseFast;
   `tools/bench_check.sh` runs the Go benchmark in `bench/go` and, when cargo is on the path, the
   Rust one on Buffa in `bench/rust` beside it, and checks each writes the same bytes as Zig. The
