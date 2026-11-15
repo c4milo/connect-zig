@@ -76,6 +76,13 @@ first. Cite an entry by number in code and commits ("decision 6").
       `tools/interop_server` with a server of its own. `large.proto` stays beside
       `kitchen.proto`, whose `shared.proto` it imports. Beaten: one project of every proto,
       which makes each example depend on schemas it does not use.
+    - Amended again the same day, on the owner's choice: each example is also a program to play
+      with. `zig build serve -- [port]` serves its service on a real socket, over TLS under the
+      test identity, on h11, h2 and h3, through the harness's `Served`. Each project keeps its
+      `App` and route table in `src/app.zig`, which the check and the server share.
+    - A project that depends on another passes connect-zig the same options, or Zig builds a
+      second `connect` module. `eliza` and the harness take a `rotor` option for a project with
+      no Rotor, such as `std_io` (decision 32).
 
 42. **Every tree of hand-written Zig takes the library's rules.** Ruled by the owner on
     2026-11-14.

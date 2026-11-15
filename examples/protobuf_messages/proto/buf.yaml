@@ -1,0 +1,3 @@
+# The protobuf_messages example's schemas, one buf module (decision 41). large.proto stays beside
+# kitchen.proto, whose shared.proto it imports.
+version: v2

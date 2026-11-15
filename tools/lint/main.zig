@@ -7,11 +7,20 @@ const lint = pepegrillo.lint;
 const rules = lint.rules;
 
 /// The plugin is an executable that reads stdin, writes stdout and uses `init.arena`
-/// (docs/decisions.md entry 4), so the heap and I/O rules skip it.
+/// (docs/decisions.md entry 4), so the heap and I/O rules skip it. A directory matches at any
+/// depth, so `src` names each example project's `src/` too: a program owns its memory, sockets,
+/// clock and loop, so the library's rules skip `examples` (decision 42).
 const library_scope: lint.Scope = .{
     .extensions = &.{lint.paths.zig_extension},
     .include_directories = &.{"src"},
-    .exclude_directories = &.{"src/protoc_gen"},
+    .exclude_directories = &.{ "src/protoc_gen", "examples" },
+};
+
+/// The library's `src/`, and no example project's.
+const library_tree: lint.Scope = .{
+    .extensions = &.{lint.paths.zig_extension},
+    .include_directories = &.{"src"},
+    .exclude_directories = &.{"examples"},
 };
 
 /// CLAUDE.md, Conventions: no `Allocator` in the library.
@@ -35,7 +44,7 @@ pub const io = rules.forbidden_references.Rule(.{
 /// `colibri` module, whose `Server` and `Client` own a Rotor loop.
 pub const layering = rules.forbidden_references.Rule(.{
     .name = "layering",
-    .scope = .{ .extensions = &.{lint.paths.zig_extension}, .include_directories = &.{"src"} },
+    .scope = library_tree,
     .prefixes = &.{ "rotor", "colibri" },
     .resolve_file_aliases = true,
     .reason = "the library runs on any event loop (docs/decisions.md entry 32)",
@@ -44,7 +53,7 @@ pub const layering = rules.forbidden_references.Rule(.{
 /// CLAUDE.md, Conventions: no clock and no randomness, anywhere in `src/`.
 pub const determinism = rules.forbidden_references.Rule(.{
     .name = "determinism",
-    .scope = .{ .extensions = &.{lint.paths.zig_extension}, .include_directories = &.{"src"} },
+    .scope = library_tree,
     .prefixes = &.{ "std.time", "std.Random", "std.crypto.random", "std.Io.Clock" },
     .reason = "time is a value the caller passes (docs/decisions.md entry 3)",
 });
@@ -72,7 +81,7 @@ pub const file_length = rules.file_length.Rule(.{
 /// CLAUDE.md, Conventions: a module reaches another by the name the build gives it. Inside `src/`
 /// a file stays in its module's directory; elsewhere no path climbs with `../`.
 pub const relative_import = rules.relative_import.Rule(.{
-    .scope = .{ .extensions = &.{lint.paths.zig_extension}, .include_directories = &.{"src"} },
+    .scope = library_tree,
     .mode = .leaves_subsystem,
 });
 pub const relative_import_outside = rules.relative_import.Rule(.{
@@ -82,18 +91,21 @@ pub const relative_import_outside = rules.relative_import.Rule(.{
 });
 
 /// CLAUDE.md, Conventions: every limit is a named constant, never an inline literal, in the
-/// library and in the code the plugin writes.
+/// library and in the code the plugin writes. A directory matches at any depth, so `src` and
+/// `gen` name each example project's too (decision 42).
 pub const magic_numbers = rules.magic_numbers.Rule(.{
     .scope = .{
         .extensions = &.{lint.paths.zig_extension},
-        .include_directories = &.{ "src", "examples/gen", "tools/gen", "bench/gen", "conformance/gen" },
+        .include_directories = &.{ "src", "gen" },
         .exclude_basenames = &.{"constants.zig"},
+        // colibri's in-memory links, kept as colibri wrote them.
+        .exclude_paths = &.{ "examples/harness/src/link.zig", "examples/harness/src/link_datagram.zig" },
     },
 });
 
 /// The library keeps no state every thread shares.
 pub const global_state = rules.global_state.Rule(.{
-    .scope = .{ .extensions = &.{lint.paths.zig_extension}, .include_directories = &.{ "src", "examples/gen", "tools/gen", "bench/gen", "conformance/gen" } },
+    .scope = .{ .extensions = &.{lint.paths.zig_extension}, .include_directories = &.{ "src", "gen" } },
 });
 
 /// A container-level `var` states its alignment, which Zig 0.16's x86_64 backend needs.
@@ -124,7 +136,7 @@ pub const undefined_fill = rules.undefined_fill.Rule(.{
     .stop_at_testing_import = true,
     // A copy of colibri's examples/link.zig, kept as colibri wrote it.
     .allowed = &.{
-        .{ .path = "examples/services/link.zig", .variable = "events" },
+        .{ .path = "examples/harness/src/link.zig", .variable = "events" },
     },
 });
 
@@ -186,7 +198,7 @@ test "undefined-fill reports a large local array and passes the copy of colibri'
     const arena = arena_state.allocator();
     const source: [:0]const u8 = "const T = struct { a: u64 };\nfn f() void {\n    var events: [16]T = undefined;\n    _ = &events;\n}\n";
     try testing.expect((try harness.run(arena, undefined_fill, "src/connect/reply.zig", source)).len == 1);
-    try testing.expect((try harness.run(arena, undefined_fill, "examples/services/link.zig", source)).len == 0);
+    try testing.expect((try harness.run(arena, undefined_fill, "examples/harness/src/link.zig", source)).len == 0);
 }
 
 test "denied-words refuses an unresolved marker in prose" {

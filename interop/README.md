@@ -30,7 +30,7 @@ interop/<client>/run.sh <base-url> <cases-dir> <descriptors> <ca>
 - `<descriptors>` is a `FileDescriptorSet` of `tools/proto`, from `buf build
   --as-file-descriptor-set`, for a client whose build compiles the schema itself.
 - `<ca>` is the PEM of the CA that signed the server's certificate, the test identity of
-  `examples/testdata/tls`. The client trusts it, and no other.
+  `examples/harness/tls`. The client trusts it, and no other.
 
 `run.sh` installs what the client needs, pinned by a lock file, into a cache outside the
 repository, generates or builds the client, and runs it. It prints one line for each scenario:
@@ -94,7 +94,7 @@ as `interop-servers`.
 | `connect-rust` | [connect-rust](connect-rust) | connect-rust's `connectrpc` on Buffa | `connect-proto`, `connect-json`, `connect-h1`, `grpc`, `grpc-web`, `grpc-web-h1` |
 
 Each server reuses its client's lock file. Each serves TLS with the test identity of
-`examples/testdata/tls`, h2 and HTTP/1.1 picked by ALPN; grpc-go and grpcio serve h2 alone.
+`examples/harness/tls`, h2 and HTTP/1.1 picked by ALPN; grpc-go and grpcio serve h2 alone.
 
 ### The server's contract
 

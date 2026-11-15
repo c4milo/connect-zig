@@ -85,27 +85,31 @@ confirm a test fails. Report `CAUGHT` or `NOT CAUGHT` per mutation in the commit
   heap, io, determinism, layering, unbounded-loop, file-length, markdown, relative-import,
   magic-numbers, global-state, static-alignment, defer-order, undefined-fill, unreleased-acquire and
   denied-words, all from pepegrillo. The rules read `conformance/` as they read `examples/`, and
-  `conformance/gen` as `examples/gen`; `conformance/proto` holds connectrpc's copy and
+  each `gen/` as generated code; `conformance/proto` holds connectrpc's copy and
   protobuf's test protos, which denied-words skips. `zig build test` also requires `.githooks/pre-push` to equal pepegrillo's
   hook (`zig build hook-check`).
 - Hooks: `zig build hooks` once after cloning points `core.hooksPath` at `.githooks`, whose
-  pre-push hook runs the commit linter that `zig build install-commit-lint` installs. They read `examples/gen` as they read hand-written code
+  pre-push hook runs the commit linter that `zig build install-commit-lint` installs. They read each `gen/` as they read hand-written code
   (decision 17).
 - Commit messages: `zig build lint-commits` checks `origin/main..HEAD`.
-- Examples: `zig build examples` runs every program in `examples/` that checks itself:
-  `protobuf_messages`, `sans_io_call`, and `eliza`, `streaming`, `interceptors`, `errors`,
-  `github` and `oidc`, which run a client against the server of `examples/services/` over colibri's h11, h2
-  and h3, in memory; the h3 rounds use the test-only identity of `examples/testdata/tls` (decision 25).
-  `zig build example-<name>` runs one; `examples/README.md` lists them. `zig build
-  run-eliza-server -- [port]` serves the ELIZA and demo services on `colibri.Server`: h11 and h2
-  over TLS on a TCP socket, and h3 on the UDP socket of the same port, under the test identity
-  (decision 31); port 0 lets the kernel choose, and the server prints `listening on port <port>`.
+- Examples: each folder of `examples/` is a Zig project of its own, with connect-zig as a path
+  dependency, its own `proto/` and `gen/`, and one `State` per program (decisions 41 and 42).
+  `zig build examples` runs `zig build test` in each, with the root's package folder and cache;
+  `zig build example-<name>` runs one project's check; `examples/README.md` lists them. The
+  in-memory checks (`eliza`, `streaming`, `interceptors`, `errors`, `github`, `oidc`) run over
+  `examples/harness`, whose h3 rounds use its test-only identity in `examples/harness/tls`
+  (decision 25). In a project's folder, run `zig build test --system ../../zig-pkg --cache-dir
+  ../../.zig-cache`, never a plain `zig build`, which fetches 500 MB again. `zig build serve --
+  [port]` serves a project's service over TLS on h11, h2 and h3. `zig build run-eliza-server --
+  [port]` serves every example's service on `colibri.Server` (`examples/socket_server`), and
   `zig build run-std-io-server -- [port]` serves ELIZA with no Rotor, on colibri's engine over
-  `std.Io`: h11 and h2 in cleartext, no TLS and no h3 (decision 32). `zig build example-std-io`,
-  which `zig build examples` runs, starts it and calls it over TCP with a pool driven over `std.Io`.
-- Generated code: `zig build test-generated` compiles `examples/gen` and runs its round trips.
+  `std.Io` (`examples/std_io`, decision 32); port 0 lets the kernel choose, and each server prints
+  `listening on port <port>`. Every project that depends on another passes connect-zig the same
+  options, or Zig builds a second `connect` module.
+- Generated code: `zig build test-generated` compiles the examples' generated code and runs its
+  round trips.
   `tools/gen` holds the checks' generated code, from `tools/proto` (decision 41).
-  `tools/generate_check.sh` regenerates it with `buf generate` and fails on a difference;
+  `tools/generate_check.sh` regenerates each `gen/` with `buf generate` and fails on a difference;
   `--write` rewrites it. It needs buf, or `BUF` naming it. It builds the plugin alone, with
   `zig build plugin`, so generated code that no longer compiles does not stop it.
 - Interop: `tools/interop_check.sh` calls the socket server with `buf curl` in Connect, gRPC and

@@ -1,0 +1,11 @@
+.{
+    .name = .protobuf_messages,
+    .version = "0.0.0",
+    .fingerprint = 0xbd452bb692b0a723,
+    .minimum_zig_version = "0.16.0",
+    .dependencies = .{
+        // A project of your own names connect-zig by URL: `zig fetch --save git+https://github.com/c4milo/connect-zig`.
+        .connect_zig = .{ .path = "../.." },
+    },
+    .paths = .{ "build.zig", "build.zig.zon", "buf.gen.yaml", "proto", "gen", "src" },
+}

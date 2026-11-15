@@ -1,0 +1,13 @@
+.{
+    .name = .sans_io_call,
+    .version = "0.0.0",
+    .fingerprint = 0x8358eaabf0045944,
+    .minimum_zig_version = "0.16.0",
+    .dependencies = .{
+        // A project of your own names connect-zig by URL: `zig fetch --save git+https://github.com/c4milo/connect-zig`.
+        .connect_zig = .{ .path = "../.." },
+        // The ELIZA schema, which the eliza example owns (decision 41).
+        .eliza = .{ .path = "../eliza" },
+    },
+    .paths = .{ "build.zig", "build.zig.zon", "src" },
+}

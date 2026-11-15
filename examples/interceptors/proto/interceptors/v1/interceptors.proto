@@ -1,0 +1,20 @@
+// The interceptors example's service: one unary method, which interceptors run around.
+syntax = "proto3";
+
+package interceptors.v1;
+
+service WhoamiService {
+  // Whoami answers with the caller's name, which an interceptor reads from the request's
+  // credentials before the handler runs.
+  rpc Whoami(WhoamiRequest) returns (WhoamiResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+}
+
+message WhoamiRequest {}
+
+message WhoamiResponse {
+  string name = 1;
+  // The calls the server answered before this one, which a logging interceptor counts.
+  int64 calls_before = 2;
+}

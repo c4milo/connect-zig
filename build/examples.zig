@@ -1,134 +1,84 @@
-//! `zig build examples` builds and runs every program in examples/, and `zig build example-<name>`
-//! runs one. Each checks what arrived and exits with an error otherwise (design §8 step 5).
-//! `zig build run-eliza-server -- [port]` serves the ELIZA and demo services on a TCP socket, and
-//! `zig build run-std-io-server -- [port]` serves ELIZA over `std.Io`, with no Rotor.
+//! The example projects of examples/ (decision 41). Each is a Zig project of its own, so this
+//! build runs its build as a child process, with this tree's package folder (`--system`) and its
+//! cache. The tree then fetches each package once and compiles each module once.
+//!
+//! - `zig build examples` runs `zig build test` in each project.
+//! - `zig build example-<name>` runs one project's `run` step.
+//! - `zig build run-eliza-server -- [port]` serves every example's service on a socket, and
+//!   `zig build run-std-io-server -- [port]` serves ELIZA over `std.Io`, with no Rotor.
+//! - `zig build` installs both servers to zig-out/bin, where the interop checks find them.
 const std = @import("std");
 
 const Graph = @import("graph.zig").Graph;
 
+/// Each project, in the order a reader meets them, and what its `zig build test` checks.
+const projects = [_]Project{
+    .{ .name = "harness", .description = "Run the harness's tests" },
+    .{ .name = "protobuf_messages", .description = "Encode and decode generated messages in binary and JSON" },
+    .{ .name = "sans_io_call", .description = "Run Connect and gRPC-Web calls through the connect module alone" },
+    .{ .name = "eliza", .description = "Run the ELIZA example over colibri's h2, h11 and h3" },
+    .{ .name = "streaming", .description = "Run bidirectional, client and server streams" },
+    .{ .name = "interceptors", .description = "Run calls through server and client interceptors" },
+    .{ .name = "errors", .description = "Run calls that fail with typed error details" },
+    .{ .name = "github", .description = "Run a session against a GitHub-style API" },
+    .{ .name = "oidc", .description = "Run calls behind OpenID Connect bearer tokens" },
+    .{ .name = "std_io", .description = "Call the std.Io server over TCP, with no Rotor" },
+    .{ .name = "quickstart", .description = "Serve the README's GreetService and call it over h11, h2 and h3" },
+    .{ .name = "socket_server", .description = "Build the server of every example's service" },
+};
+
+const Project = struct { name: []const u8, description: []const u8 };
+
 pub fn add(b: *std.Build, graph: Graph) *std.Build.Step {
-    const step = b.step("examples", "Build and run every example");
-    const rotor_dependency = b.lazyDependency("rotor", .{ .target = graph.target, .release = graph.optimize == .ReleaseSafe }) orelse return step;
-    const rotor = rotor_dependency.module("rotor");
-    // The example server's account service checks bearer tokens with `oidc`, which a host target
-    // alone has (decision 34), so another target builds the programs above and no server.
-    const oidc = graph.oidc orelse return step;
-    const eliza = generated(b, graph, "examples/gen/connectrpc/eliza/v1/eliza.pb.zig", &.{});
-    // The kitchen-sink messages, which reach shared.proto's through its module (decision 17).
-    const shared = generated(b, graph, "examples/gen/kitchen/v1/shared.pb.zig", &.{});
-    const kitchen = generated(b, graph, "examples/gen/kitchen/v1/kitchen.pb.zig", &.{.{ .name = "kitchen_v1_shared", .module = shared }});
-    for ([_]Small{
-        .{ .name = "protobuf_messages", .description = "Encode and decode generated messages in binary and JSON" },
-        .{ .name = "sans_io_call", .description = "Run Connect and gRPC-Web calls through the connect module alone" },
-    }) |small| {
-        const exe = b.addExecutable(.{ .name = small.name, .root_module = b.createModule(.{
-            .root_source_file = b.path(b.fmt("examples/{s}.zig", .{small.name})),
-            .target = graph.target,
-            .optimize = graph.optimize,
-            .imports = &.{
-                .{ .name = "protobuf", .module = graph.protobuf },
-                .{ .name = "connect", .module = graph.connect },
-                .{ .name = "eliza", .module = eliza },
-                .{ .name = "kitchen", .module = kitchen },
-            },
-        }) });
-        const small_run = b.addRunArtifact(exe);
-        b.step(b.fmt("example-{s}", .{small.name}), small.description).dependOn(&small_run.step);
-        step.dependOn(&small_run.step);
+    const step = b.step("examples", "Run zig build test in each example project");
+    // The examples run on Rotor, which this build fetches so that `--system` finds it: Zig then
+    // runs the build again with the package in place.
+    _ = b.lazyDependency("rotor", .{ .target = graph.target, .release = graph.optimize == .ReleaseSafe }) orelse return step;
+    for (projects) |project| {
+        const tested = child(b, graph, project.name, &.{"test"});
+        step.dependOn(&tested.step);
+        // The harness and the socket server have no self-check of their own to run.
+        if (std.mem.eql(u8, project.name, "harness") or std.mem.eql(u8, project.name, "socket_server")) continue;
+        const ran = child(b, graph, project.name, &.{"run"});
+        if (b.args) |args| {
+            ran.addArg("--");
+            ran.addArgs(args);
+        }
+        b.step(b.fmt("example-{s}", .{project.name}), project.description).dependOn(&ran.step);
     }
-
-    // The test-only TLS identity of the h3 rounds (decision 25), a module of its own so that
-    // `@embedFile` reaches its PEM files.
-    const test_identity = b.createModule(.{ .root_source_file = b.path("examples/testdata/tls/identity.zig"), .target = graph.target, .optimize = graph.optimize });
-    const services: Services = .{
-        .eliza = eliza,
-        .demo = generated(b, graph, "examples/gen/demo/v1/demo.pb.zig", &.{}),
-        .github = generated(b, graph, "examples/gen/github/v1/github.pb.zig", &.{}),
-        .account = generated(b, graph, "examples/gen/account/v1/account.pb.zig", &.{}),
-        .oidc = oidc,
-        .rotor = rotor,
-        .test_identity = test_identity,
-    };
-    for ([_]Small{
-        .{ .name = "eliza", .description = "Run the ELIZA example over colibri's h2 and h11" },
-        .{ .name = "interceptors", .description = "Run calls through server and client interceptors" },
-        .{ .name = "streaming", .description = "Run bidirectional, client and server streams" },
-        .{ .name = "errors", .description = "Run calls that fail with typed error details" },
-        .{ .name = "github", .description = "Run a session against a GitHub-style API" },
-        .{ .name = "oidc", .description = "Run calls behind OpenID Connect bearer tokens" },
-    }) |linked| {
-        const exe = program(b, graph, linked.name, b.fmt("examples/{s}.zig", .{linked.name}), services);
-        // The in-memory link runs on Rotor's loops.
-        exe.root_module.addImport("rotor", services.rotor);
-        const run = b.addRunArtifact(exe);
-        b.step(b.fmt("example-{s}", .{linked.name}), linked.description).dependOn(&run.step);
-        step.dependOn(&run.step);
-    }
-
-    const socket_server = program(b, graph, "eliza-server", "examples/socket_server.zig", services);
-    socket_server.root_module.addImport("colibri", graph.colibri.module("colibri"));
-    b.installArtifact(socket_server);
-    const serve = b.addRunArtifact(socket_server);
-    if (b.args) |args| serve.addArgs(args);
-    b.step("run-eliza-server", "Serve ELIZA on a TCP socket: zig build run-eliza-server -- [port]").dependOn(&serve.step);
-
-    // ELIZA on colibri's engine over std.Io, with no Rotor (decision 32).
-    const std_io_server = program(b, graph, "std-io-server", "examples/std_io_server.zig", services);
-    b.installArtifact(std_io_server);
-    const std_io_serve = b.addRunArtifact(std_io_server);
-    if (b.args) |args| std_io_serve.addArgs(args);
-    b.step("run-std-io-server", "Serve ELIZA over std.Io: zig build run-std-io-server -- [port]").dependOn(&std_io_serve.step);
-    // Its self-check starts that server and calls it over TCP, with no Rotor on either side.
-    const std_io_check = b.addRunArtifact(program(b, graph, "std_io", "examples/std_io.zig", services));
-    std_io_check.addArtifactArg(std_io_server);
-    b.step("example-std-io", "Call the std.Io server over TCP, with no Rotor").dependOn(&std_io_check.step);
-    step.dependOn(&std_io_check.step);
+    add_servers(b, graph);
     return step;
 }
 
-/// An example that needs no HTTP library: its name, which is its file's, and what it shows.
-const Small = struct { name: []const u8, description: []const u8 };
-
-fn generated(b: *std.Build, graph: Graph, path: []const u8, extra: []const std.Build.Module.Import) *std.Build.Module {
-    const module = b.createModule(.{ .root_source_file = b.path(path), .target = graph.target, .optimize = graph.optimize });
-    module.addImport("protobuf", graph.protobuf);
-    module.addImport("connect", graph.connect);
-    for (extra) |import| module.addImport(import.name, import.module);
-    return module;
+/// The two servers on a socket: `run-<name>` steps, and an install of each to this tree's
+/// zig-out/bin.
+fn add_servers(b: *std.Build, graph: Graph) void {
+    const servers = [_]struct { project: []const u8, step: []const u8, description: []const u8 }{
+        .{ .project = "socket_server", .step = "run-eliza-server", .description = "Serve every example's service on a socket: zig build run-eliza-server -- [port]" },
+        .{ .project = "std_io", .step = "run-std-io-server", .description = "Serve ELIZA over std.Io: zig build run-std-io-server -- [port]" },
+    };
+    for (servers) |server| {
+        const serve = child(b, graph, server.project, &.{"serve"});
+        if (b.args) |args| {
+            serve.addArg("--");
+            serve.addArgs(args);
+        }
+        b.step(server.step, server.description).dependOn(&serve.step);
+        const install = child(b, graph, server.project, &.{ "install", "--prefix", b.install_path });
+        b.getInstallStep().dependOn(&install.step);
+    }
 }
 
-/// The modules a program over colibri imports beyond the library's own.
-const Services = struct {
-    eliza: *std.Build.Module,
-    demo: *std.Build.Module,
-    github: *std.Build.Module,
-    account: *std.Build.Module,
-    oidc: *std.Build.Module,
-    rotor: *std.Build.Module,
-    test_identity: *std.Build.Module,
-};
-
-fn program(b: *std.Build, graph: Graph, name: []const u8, path: []const u8, services: Services) *std.Build.Step.Compile {
-    return b.addExecutable(.{
-        .name = name,
-        .root_module = b.createModule(.{
-            .root_source_file = b.path(path),
-            .target = graph.target,
-            .optimize = graph.optimize,
-            .imports = &.{
-                .{ .name = "protobuf", .module = graph.protobuf },
-                .{ .name = "connect", .module = graph.connect },
-                .{ .name = "connect_colibri", .module = graph.connect_colibri },
-                .{ .name = "server", .module = graph.colibri.module("server") },
-                .{ .name = "client", .module = graph.colibri.module("client") },
-                .{ .name = "tls", .module = graph.colibri.module("tls") },
-                .{ .name = "test_identity", .module = services.test_identity },
-                .{ .name = "eliza", .module = services.eliza },
-                .{ .name = "demo", .module = services.demo },
-                .{ .name = "github", .module = services.github },
-                .{ .name = "account", .module = services.account },
-                .{ .name = "oidc", .module = services.oidc },
-            },
-        }),
-    });
+/// `zig build <arguments>` in `examples/<name>`, with this tree's packages and cache, and the
+/// release mode of this build.
+fn child(b: *std.Build, graph: Graph, name: []const u8, arguments: []const []const u8) *std.Build.Step.Run {
+    const run = b.addSystemCommand(&.{ b.graph.zig_exe, "build" });
+    run.addArgs(arguments);
+    run.addArgs(&.{ "--system", b.pathFromRoot("zig-pkg") });
+    run.addArgs(&.{ "--cache-dir", b.pathFromRoot(".zig-cache") });
+    if (b.graph.global_cache_root.path) |path| run.addArgs(&.{ "--global-cache-dir", path });
+    if (graph.optimize == .ReleaseSafe) run.addArg("-Drelease");
+    run.setCwd(b.path(b.fmt("examples/{s}", .{name})));
+    run.has_side_effects = true;
+    return run;
 }

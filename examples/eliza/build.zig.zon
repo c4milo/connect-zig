@@ -1,0 +1,12 @@
+.{
+    .name = .eliza,
+    .version = "0.0.0",
+    .fingerprint = 0x4e637786852f161a,
+    .minimum_zig_version = "0.16.0",
+    .dependencies = .{
+        // A project of your own names connect-zig by URL: `zig fetch --save git+https://github.com/c4milo/connect-zig`.
+        .connect_zig = .{ .path = "../.." },
+        .harness = .{ .path = "../harness" },
+    },
+    .paths = .{ "build.zig", "build.zig.zon", "buf.gen.yaml", "proto", "gen", "src" },
+}

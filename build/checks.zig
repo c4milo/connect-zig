@@ -35,8 +35,8 @@ pub fn add(b: *std.Build, graph: Graph) *std.Build.Step {
     // The interop programs run colibri's TLS, which a program defines chapulin's hook for, and
     // the server runs on Rotor: a host target alone builds them, as the examples' servers.
     if (graph.oidc == null) return step;
-    const hooks = b.createModule(.{ .root_source_file = b.path("examples/services/hooks.zig"), .target = graph.target, .optimize = graph.optimize });
-    const test_identity = b.createModule(.{ .root_source_file = b.path("examples/testdata/tls/identity.zig"), .target = graph.target, .optimize = graph.optimize });
+    const hooks = b.createModule(.{ .root_source_file = b.path("examples/harness/src/hooks.zig"), .target = graph.target, .optimize = graph.optimize });
+    const test_identity = b.createModule(.{ .root_source_file = b.path("examples/harness/tls/identity.zig"), .target = graph.target, .optimize = graph.optimize });
     add_interop_server(b, graph, schemas, hooks, test_identity);
     step.dependOn(add_interop_client(b, graph, schemas, hooks));
     return step;
@@ -57,13 +57,13 @@ fn add_coverage(b: *std.Build, graph: Graph, schemas: Schemas) void {
     b.installArtifact(coverage);
 }
 
-/// `zig build test-generated`: the code `buf generate` wrote into examples/gen compiles, and its
+/// `zig build test-generated`: the code `buf generate` wrote for the examples compiles, and its
 /// messages round-trip. `tools/generate_check.sh` compares that code with what buf writes now,
 /// which needs buf, so it runs from `tools/ci.sh` and not from `zig build test` (design §8 step 6).
 fn add_generated(b: *std.Build, graph: Graph) *std.Build.Step {
     // A generated file reaches another by the module name its header states (design §8 step 6):
     // kitchen.proto and large.proto import shared.proto as `kitchen_v1_shared`.
-    const shared = generated(b, graph, "examples/gen/kitchen/v1/shared.pb.zig", &.{});
+    const shared = generated(b, graph, "examples/protobuf_messages/gen/kitchen/v1/shared.pb.zig", &.{});
     const shared_import: std.Build.Module.Import = .{ .name = "kitchen_v1_shared", .module = shared };
     const module = b.createModule(.{
         .root_source_file = b.path("tools/generated/generated_test.zig"),
@@ -71,13 +71,13 @@ fn add_generated(b: *std.Build, graph: Graph) *std.Build.Step {
         .optimize = graph.optimize,
         .imports = &.{
             .{ .name = "protobuf", .module = graph.protobuf },
-            .{ .name = "kitchen", .module = generated(b, graph, "examples/gen/kitchen/v1/kitchen.pb.zig", &.{shared_import}) },
-            .{ .name = "eliza", .module = generated(b, graph, "examples/gen/connectrpc/eliza/v1/eliza.pb.zig", &.{}) },
-            .{ .name = "large", .module = generated(b, graph, "examples/gen/large/v1/large.pb.zig", &.{shared_import}) },
+            .{ .name = "kitchen", .module = generated(b, graph, "examples/protobuf_messages/gen/kitchen/v1/kitchen.pb.zig", &.{shared_import}) },
+            .{ .name = "eliza", .module = generated(b, graph, "examples/eliza/gen/connectrpc/eliza/v1/eliza.pb.zig", &.{}) },
+            .{ .name = "large", .module = generated(b, graph, "examples/protobuf_messages/gen/large/v1/large.pb.zig", &.{shared_import}) },
         },
     });
     const run = b.addRunArtifact(b.addTest(.{ .name = "generated", .root_module = module }));
-    const step = b.step("test-generated", "Compile the generated code of examples/gen and run its round trips");
+    const step = b.step("test-generated", "Compile the examples' generated code and run its round trips");
     step.dependOn(&run.step);
     return step;
 }

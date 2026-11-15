@@ -1,0 +1,8 @@
+# `buf generate` writes gen/ from proto/ with connect-zig's plugin, which `zig build plugin`
+# installs to zig-out/bin.
+version: v2
+inputs:
+  - directory: proto
+plugins:
+  - local: zig-out/bin/protoc-gen-connect-zig
+    out: gen

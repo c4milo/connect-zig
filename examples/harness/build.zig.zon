@@ -1,0 +1,16 @@
+.{
+    .name = .harness,
+    .version = "0.0.0",
+    .fingerprint = 0x3d7431e43a43a7fe,
+    .minimum_zig_version = "0.16.0",
+    .dependencies = .{
+        .connect_zig = .{ .path = "../.." },
+        // The Rotor that colibri pins, at colibri's own request, so a program links one Rotor
+        // (decision 41).
+        .rotor = .{
+            .url = "git+https://github.com/c4milo/rotor#933985882d693e4d8b876e1403618a3fc6d989ef",
+            .hash = "rotor-0.10.0-YZkxRFCxJABaRNenAUK5EC84mD-ZR3zmBesT76zmXoqu",
+        },
+    },
+    .paths = .{ "build.zig", "build.zig.zon", "src", "tls" },
+}

@@ -1,5 +1,5 @@
 #!/bin/sh
-# Mints the test-only TLS identity of the examples' h3 rounds into examples/testdata/tls/: a P-256
+# Mints the test-only TLS identity of the examples' h3 rounds into examples/harness/tls/: a P-256
 # CA, and a leaf for localhost and 127.0.0.1 that the CA signs (decision 25). Both are valid from
 # 2020-01-01 to 2099-12-31, so the examples' fixed instant, 1_800_000_000, falls inside. The
 # profile is the one colibri's own test identity has, which chapulin's Web PKI mode accepts.
@@ -8,7 +8,7 @@
 set -eu
 cd "$(dirname "$0")/.."
 openssl="${OPENSSL:-openssl}"
-output="examples/testdata/tls"
+output="examples/harness/tls"
 scratch="$(mktemp -d)"
 trap 'rm -rf "${scratch}"' EXIT
 

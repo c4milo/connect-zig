@@ -85,6 +85,10 @@ The first release.
 - The package exports colibri's `server`, `client`, `http`, `tls` and `colibri` modules, so a
   program builds on the colibri that `connect_colibri` uses. `.rotor = true` builds
   `colibri.Server` and `colibri.Client` on Rotor (decision 39).
+- Each example is a Zig project of its own, which you can copy: its own manifest, schema and
+  generated code. `zig build test` runs its check, and `zig build serve` serves its service over
+  TLS on h11, h2 and h3, for curl and buf curl. `examples/quickstart` holds the README's steps
+  (decision 41).
 
 ### Checked
 

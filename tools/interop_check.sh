@@ -19,7 +19,9 @@ unlogged() {
 }
 # The server's TCP is TLS, as its h3 is, under the test identity: every client trusts its CA, and
 # picks h11 or h2 by ALPN.
-ca=examples/testdata/tls/ca.pem
+ca=examples/harness/tls/ca.pem
+# Each example project owns its schema (decision 41), and buf curl reads each.
+schemas="--schema examples/eliza/proto --schema examples/streaming/proto --schema examples/interceptors/proto --schema examples/errors/proto --schema examples/github/proto --schema examples/oidc/proto"
 zig build
 log="$(mktemp)"
 trap 'kill "${server}" 2>/dev/null || true; rm -f "${log}" "${log}.body" "${log}.fifo" "${log}.chat"' EXIT
@@ -47,7 +49,7 @@ expect() {
     fi
 }
 call() {
-    timeout "${call_seconds}" "${buf}" curl --cacert "${ca}" --schema examples/proto --protocol "$1" -d "$2" "${base}/$3" 2>&1 | unlogged | tr -d ' \n'
+    timeout "${call_seconds}" "${buf}" curl --cacert "${ca}" ${schemas} --protocol "$1" -d "$2" "${base}/$3" 2>&1 | unlogged | tr -d ' \n'
 }
 introduced='{"sentence":"HiAda,IamEliza."}{"sentence":"Beforewebegin,Ada,tellmehowyoucamehere."}{"sentence":"Howareyoufeelingtoday,Ada?"}'
 conversed='{"sentence":"Whydoyousay\"a\"?"}{"sentence":"Whydoyousay\"b\"?"}'
@@ -92,7 +94,7 @@ rm -f "${log}.body"
 h3_base="${base}"
 for protocol in connect grpc grpcweb; do
     expect "${protocol} Introduce over h3" "${introduced}" \
-        "$(timeout "${call_seconds}" "${buf}" curl --http3 --cacert "${ca}" --schema examples/proto \
+        "$(timeout "${call_seconds}" "${buf}" curl --http3 --cacert "${ca}" ${schemas} \
             --protocol "${protocol}" -d '{"name":"Ada"}' "${h3_base}/Introduce" 2>&1 | tr -d ' \n')"
 done
 
@@ -103,7 +105,7 @@ octocat='authorization: Bearer ghp_octocat_example'
 gh() {
     gh_protocol="$1"
     shift
-    timeout "${call_seconds}" "${buf}" curl --cacert "${ca}" --schema examples/proto --protocol "${gh_protocol}" "$@" 2>&1 |
+    timeout "${call_seconds}" "${buf}" curl --cacert "${ca}" ${schemas} --protocol "${gh_protocol}" "$@" 2>&1 |
         unlogged | tr -d ' \n'
 }
 expect "grpc CreateRepository" '"fullName":"octocat/secrets"' \
@@ -138,23 +140,26 @@ except (socket.timeout, ssl.SSLError, ConnectionResetError) as failure:
 PYTHON
 )"
 
-# The demo service: interceptors, every kind of stream, and error details.
-base="https://127.0.0.1:${port}/demo.v1.DemoService"
+# The services of the streaming, interceptors and errors examples: every kind of stream,
+# interceptors, and error details.
+streaming_base="https://127.0.0.1:${port}/streaming.v1.StreamingService"
+whoami_base="https://127.0.0.1:${port}/interceptors.v1.WhoamiService"
+calculator_base="https://127.0.0.1:${port}/errors.v1.CalculatorService"
 demo() {
     demo_protocol="$1"
     shift
-    timeout "${call_seconds}" "${buf}" curl --cacert "${ca}" --schema examples/proto --protocol "${demo_protocol}" "$@" 2>&1 | unlogged | tr -d ' \n'
+    timeout "${call_seconds}" "${buf}" curl --cacert "${ca}" ${schemas} --protocol "${demo_protocol}" "$@" 2>&1 | unlogged | tr -d ' \n'
 }
 for protocol in connect grpc grpcweb; do
     expect "${protocol} Whoami with a token" '{"name":"Ada"}' \
-        "$(demo "${protocol}" -H 'authorization: Bearer Ada' "${base}/Whoami" | sed 's/,"callsBefore":"[0-9]*"//')"
+        "$(demo "${protocol}" -H 'authorization: Bearer Ada' "${whoami_base}/Whoami" | sed 's/,"callsBefore":"[0-9]*"//')"
     expect "${protocol} Whoami without a token" '{"code":"unauthenticated","message":"abearertokenisrequired"}' \
-        "$(demo "${protocol}" "${base}/Whoami")"
-    expect "${protocol} Sum" '{"sum":"7","count":"2"}' "$(demo "${protocol}" -d '{"number":3} {"number":4}' "${base}/Sum")"
-    expect "${protocol} Countdown" '{"number":2}{"number":1}' "$(demo "${protocol}" -d '{"from":2}' "${base}/Countdown")"
+        "$(demo "${protocol}" "${whoami_base}/Whoami")"
+    expect "${protocol} Sum" '{"sum":"7","count":"2"}' "$(demo "${protocol}" -d '{"number":3} {"number":4}' "${streaming_base}/Sum")"
+    expect "${protocol} Countdown" '{"number":2}{"number":1}' "$(demo "${protocol}" -d '{"from":2}' "${streaming_base}/Countdown")"
     expect "${protocol} Divide error" \
-        '{"code":"invalid_argument","message":"divisionbyzero","details":[{"type":"demo.v1.DivisionByZero","value":"CAc"}]}' \
-        "$(demo "${protocol}" -d '{"dividend":7}' "${base}/Divide")"
+        '{"code":"invalid_argument","message":"divisionbyzero","details":[{"type":"errors.v1.DivisionByZero","value":"CAc"}]}' \
+        "$(demo "${protocol}" -d '{"dividend":7}' "${calculator_base}/Divide")"
 done
 # A server stream far longer than the router's response memory (decision 33): 200000 numbers are
 # about 1.6 MiB of envelopes, through 64 KiB of response memory. The check reads the first
@@ -169,23 +174,23 @@ counted() {
 }
 for protocol in connect grpc grpcweb; do
     expect "${protocol} Countdown from ${countdown_long}" "${countdown_long} 1 ${countdown_long} 0" \
-        "$(timeout "${long_seconds}" "${buf}" curl --cacert "${ca}" --schema examples/proto --protocol "${protocol}" \
-            -d "{\"from\":${countdown_long}}" "${base}/Countdown" 2>&1 | unlogged | counted)"
+        "$(timeout "${long_seconds}" "${buf}" curl --cacert "${ca}" ${schemas} --protocol "${protocol}" \
+            -d "{\"from\":${countdown_long}}" "${streaming_base}/Countdown" 2>&1 | unlogged | counted)"
 done
 # The same stream over h3, where the response memory frees only as the client acknowledges it
 # (RFC 9000 section 3.1).
 expect "grpc Countdown from ${countdown_long} over h3" "${countdown_long} 1 ${countdown_long} 0" \
-    "$(timeout "${long_seconds}" "${buf}" curl --http3 --cacert "${ca}" --schema examples/proto --protocol grpc \
-        -d "{\"from\":${countdown_long}}" "${base}/Countdown" 2>&1 | counted)"
+    "$(timeout "${long_seconds}" "${buf}" curl --http3 --cacert "${ca}" ${schemas} --protocol grpc \
+        -d "{\"from\":${countdown_long}}" "${streaming_base}/Countdown" 2>&1 | counted)"
 # A gRPC error before any message is Trailers-Only: one header section holds the status and the
 # call's own trailers, here Counting's.
 expect "grpc Trailers-Only carries trailers" 'call-received: 1|call-sent: 0|' \
-    "$(timeout "${call_seconds}" "${buf}" curl --cacert "${ca}" --schema examples/proto --protocol grpc -v \
-        -d '{"dividend":7}' "${base}/Divide" 2>&1 | sed -n 's/^buf: < (#1) //p' | tr -d '\r' |
+    "$(timeout "${call_seconds}" "${buf}" curl --cacert "${ca}" ${schemas} --protocol grpc -v \
+        -d '{"dividend":7}' "${calculator_base}/Divide" 2>&1 | sed -n 's/^buf: < (#1) //p' | tr -d '\r' |
         grep -i -e '^call-received:' -e '^call-sent:' | tr 'A-Z' 'a-z' | tr '\n' '|')"
 # Logging's response header, and Whoami's trailer, which a Connect unary reply sends as a header.
 expect "Connect unary headers" 'demo-logged: yes|trailer-whoami-caller: Ada|' \
-    "$(curl -sS -m 5 --cacert "${ca}" -H 'authorization: Bearer Ada' --json '{}' -D - -o /dev/null "${base}/Whoami" |
+    "$(curl -sS -m 5 --cacert "${ca}" -H 'authorization: Bearer Ada' --json '{}' -D - -o /dev/null "${whoami_base}/Whoami" |
         tr -d '\r' | grep -i -e '^demo-logged:' -e '^trailer-whoami-caller:' | tr '\n' '|')"
 # The account service sits behind `oidc.Interceptor` (decision 34). Status answers with no
 # token, since the interceptor excludes its path. Whoami is refused, with RFC 6750 section 3's
@@ -202,14 +207,14 @@ expect "oidc: Connect refuses a token that is no JWT" '401|www-authenticate: Bea
     "$(challenged -H 'authorization: Bearer not-a-token')"
 for protocol in grpc grpcweb; do
     expect "oidc: ${protocol} refuses a call with no token" '{"code":"unauthenticated","message":"missingbearertoken"}' \
-        "$(timeout "${call_seconds}" "${buf}" curl --cacert "${ca}" --schema examples/proto --protocol "${protocol}" \
+        "$(timeout "${call_seconds}" "${buf}" curl --cacert "${ca}" ${schemas} --protocol "${protocol}" \
             -d '{}' "${account}/Whoami" 2>&1 | unlogged | tr -d ' \n')"
 done
 # Full duplex: Chat's answer to the first message must arrive while the client still holds its
 # stream open, before it sends the second.
 fifo="${log}.fifo"
 mkfifo "${fifo}"
-timeout "${call_seconds}" "${buf}" curl --cacert "${ca}" --schema examples/proto --protocol grpc -d @- "${base}/Chat" <"${fifo}" >"${log}.chat" 2>&1 &
+timeout "${call_seconds}" "${buf}" curl --cacert "${ca}" ${schemas} --protocol grpc -d @- "${streaming_base}/Chat" <"${fifo}" >"${log}.chat" 2>&1 &
 chat=$!
 exec 3>"${fifo}"
 echo '{"text":"first"}' >&3

@@ -1,0 +1,9 @@
+//! The interceptors example's limits (decision 42).
+
+/// Calls the router answers at once, and room for one call's request body and for one reply with
+/// its headers.
+pub const requests = 8;
+pub const body_bytes = 16 * 1024;
+pub const response_bytes = 16 * 1024;
+/// The calls of one round.
+pub const calls_count = 3;

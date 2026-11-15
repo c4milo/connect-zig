@@ -1,0 +1,49 @@
+//! Every example's service on one socket, through `colibri.Server` (colibri decision 150): h11
+//! and h2 over TLS on a TCP port, and h3 on the UDP socket of the same port, under the test
+//! identity of the harness (decision 25). `tools/interop_check.sh` calls it with curl and buf
+//! curl. Run it with `zig build serve -- [port]`, 8443 by default, then call it with any Connect,
+//! gRPC or gRPC-Web client:
+//!
+//! ```sh
+//! curl --cacert ../harness/tls/ca.pem --json '{"sentence":"I feel tired"}' \
+//!   https://127.0.0.1:8443/connectrpc.eliza.v1.ElizaService/Say
+//! ```
+//!
+//! It reads gzip and zstd messages, and answers in the one a client accepts first.
+const std = @import("std");
+const connect = @import("connect");
+const harness = @import("harness");
+const account_service = @import("account_service");
+const app_file = @import("app.zig");
+const App = app_file.App;
+const issuer = account_service.issuer;
+
+comptime {
+    _ = harness.hooks;
+}
+
+/// All the program holds, which `main` allocates once before the first call (decision 42).
+const State = struct {
+    app: App,
+    served: harness.Served(App, app_file.Router),
+    gzip_decoder: connect.GzipDecoder,
+    gzip_encoder: connect.GzipEncoder,
+    zstd_decoder: connect.ZstdDecoder,
+    zstd_encoder: connect.ZstdEncoder,
+    jwks_text: [issuer.jwks_len_max]u8,
+};
+
+pub fn main(init: std.process.Init) !void {
+    const state = try init.arena.allocator().create(State);
+    state.app = .{ .codings = .{
+        .decoders = .{ .gzip = &state.gzip_decoder, .zstd = &state.zstd_decoder },
+        .encoders = .{ .gzip = &state.gzip_encoder, .zstd = &state.zstd_encoder },
+    } };
+    // The account service's verifier, with the test issuer's first key, at the time the server
+    // starts. A server that runs for long calls `set_time` again as its clock moves, and
+    // `set_keys` when `keys_stale` asks for it.
+    const started_seconds: i64 = @max(std.Io.Clock.real.now(init.io).toSeconds(), 0);
+    try account_service.start(&state.app.oidc, issuer.jwks(&state.jwks_text, &.{issuer.first_key()}), started_seconds);
+    defer state.app.oidc.deinit();
+    try state.served.run(init, &state.app);
+}

@@ -913,6 +913,36 @@ ran on Linux x86-64 with Zig 0.16.0.
     arm64 container, on Ubuntu 24.04 and 26.04, the client reads every answer over h2 and h3.
   - Mutations, 2, each CAUGHT: a server with no identity, and a server with no h3.
 
+- **Each example a project** (step 19, decisions 41 and 42). The owner ruled on 2026-11-14 that
+  each example is a Zig project of its own, on a shared harness, and that each owns the schema
+  it is about.
+  - `examples/harness` holds colibri's in-memory links, `Rounds(App, Router)`, `Call`, `Served`
+    for `zig build serve`, the test identity and chapulin's hook. Its two sides are plain
+    structs, and the route table reaches the server through a type-erased reference, so each
+    function scores 15 or less.
+  - Eleven projects: quickstart, protobuf_messages, sans_io_call, eliza, streaming,
+    interceptors, errors, github, oidc, std_io and socket_server. `demo.proto` split into the
+    streaming, interceptors and errors schemas. A service is generic over the program's `App`,
+    which holds its room in a field named after it, so `socket_server` joins every service
+    under one router.
+  - Each project's `zig build test` runs its check, and `zig build serve -- [port]` serves its
+    service over TLS on h11, h2 and h3, under the test identity. The owner chose on 2026-11-14
+    that each example is a program to play with.
+  - The root's `zig build examples` runs each project's build as a child, with `--system` on
+    the root's `zig-pkg` and the root's cache. A project's own `zig build` fetched 559 MB
+    before; the child builds fetch nothing.
+  - Every project asks connect-zig with the same options. Other options make Zig build a second
+    `connect` module, and the compile fails with "file exists in modules". `eliza` and the
+    harness take a `rotor` option, so `std_io` builds them with no Rotor (decision 32).
+  - `tools/package_check.sh` builds `examples/quickstart` against a fetched copy, and its
+    generated code must equal the fetched plugin's. No program source lives in a script.
+  - The lint matches a directory at any depth, so `src` named each project's `src/`. The four
+    library-only rules and the library's import rule now exclude `examples`; `magic-numbers`
+    and `global-state` read each project, and each `gen/`.
+  - One check went: `streaming`'s client interceptor counted responses in statics. A client
+    interceptor gets no context in `connect_colibri`, so it cannot count without one. The
+    program checks each response's status itself.
+
 ### What a later step owes
 
 - A stream that waits for an event of the program once its request ended (colibri issue 130).

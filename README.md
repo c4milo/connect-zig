@@ -31,7 +31,7 @@ zig build run-eliza-server -- 8080
 In a second terminal, talk to [ELIZA](https://en.wikipedia.org/wiki/ELIZA):
 
 ```sh
-curl --cacert examples/testdata/tls/ca.pem --json '{"sentence":"I feel tired"}' \
+curl --cacert examples/harness/tls/ca.pem --json '{"sentence":"I feel tired"}' \
   https://localhost:8080/connectrpc.eliza.v1.ElizaService/Say
 ```
 
@@ -43,7 +43,7 @@ The same server answers [`buf curl`](https://buf.build/docs/reference/cli/buf/cu
 protocol, over h2 or, with `--http3`, h3. Try `--protocol grpc` or `--protocol grpcweb`:
 
 ```sh
-buf curl --cacert examples/testdata/tls/ca.pem --protocol grpc --schema examples/proto \
+buf curl --cacert examples/harness/tls/ca.pem --protocol grpc --schema examples/eliza/proto \
   -d '{"name":"Ada"}' https://localhost:8080/connectrpc.eliza.v1.ElizaService/Introduce
 ```
 
@@ -86,8 +86,9 @@ passes newer fields on.
 
 ## Use it in your project
 
-`tools/package_check.sh` runs these steps in a new project, from a fetched copy of connect-zig, on
-each push. It generates the code, serves a method over TLS on h11, h2 and h3, and calls it.
+[examples/quickstart](examples/quickstart) holds these steps as a project, and
+`tools/package_check.sh` builds it against a fetched copy of connect-zig on each push. The check
+generates the code, serves a method over TLS on h11, h2 and h3, and calls it.
 
 ### 1. Add the package
 
@@ -366,18 +367,20 @@ shares.
 
 `oidc` checks signatures with [chapulin](https://github.com/c4milo/chapulin)'s `jws` calls, the
 TLS library colibri already links, so it adds no second crypto library to your program.
-[examples/oidc.zig](examples/oidc.zig) runs all of this over h2 and h3, with a test issuer that
+[examples/oidc](examples/oidc) runs all of this over h2 and h3, with a test issuer that
 signs its tokens and changes its key between the rounds.
 
-[examples/](examples) holds eleven programs, from generated messages alone to streaming,
-interceptors, error details, bearer tokens, a GitHub-style API with tokens, rate limits, pages
-and field masks, and a server on a socket. Each checks itself, and
-[examples/README.md](examples/README.md) says where to start.
+[examples/](examples) holds eleven projects, each a Zig project of its own that you can copy
+(decision 41): from generated messages alone to streaming, interceptors, error details, bearer
+tokens, a GitHub-style API with tokens, rate limits, pages and field masks, and a server on a
+socket. Each checks itself with `zig build test`, and serves its service with `zig build serve`
+for curl and buf curl. [examples/README.md](examples/README.md) says where to start.
 
 The library runs on any event loop (decision 32). The in-memory examples and the socket server
-run on [Rotor](https://github.com/c4milo/rotor). `examples/std_io_server.zig` runs on no loop at
-all: it drives colibri's `server.Engine` over Zig 0.16's `std.Io` sockets, tasks and clocks, and
-`zig build example-std-io` calls it over TCP with connect-zig's client, which runs on `std.Io` too.
+run on [Rotor](https://github.com/c4milo/rotor). [examples/std_io](examples/std_io) runs on no
+loop at all: its server drives colibri's `server.Engine` over Zig 0.16's `std.Io` sockets, tasks
+and clocks, and its client calls it over TCP with connect-zig's client, which runs on `std.Io`
+too.
 
 ## Performance
 
@@ -534,7 +537,7 @@ report a vulnerability. The rules of the tree are in [CLAUDE.md](CLAUDE.md), the
 tools/ci.sh               # every check below, as CI runs them
 zig build test            # the lint, every module's tests and the examples
 tools/package_check.sh    # a project that fetches connect-zig builds against it
-tools/generate_check.sh   # buf generate still writes examples/gen and bench/gen
+tools/generate_check.sh   # buf generate still writes each example's gen/, tools/gen and bench/gen
 tools/interop_check.sh    # buf curl and curl against the example server
 tools/coverage_check.sh   # every protobuf type against Go's runtime
 tools/conformance_check.sh  # the connectrpc conformance suite against the server and client

@@ -33,7 +33,7 @@ done
 [ -n "${port}" ] || { echo "the server printed no port" >&2; exit 1; }
 # The server's TCP is TLS under the test identity: each client trusts its CA.
 base="https://127.0.0.1:${port}"
-ca="$(pwd)/examples/testdata/tls/ca.pem"
+ca="$(pwd)/examples/harness/tls/ca.pem"
 # The cases in binary, which every runtime reads, and the schema for the clients that compile it.
 mkdir -p "${work}/cases"
 for case in tools/testdata/coverage/*.json; do

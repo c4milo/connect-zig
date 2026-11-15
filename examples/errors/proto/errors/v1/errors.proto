@@ -1,0 +1,24 @@
+// The errors example's service: one method that fails with a typed detail.
+syntax = "proto3";
+
+package errors.v1;
+
+service CalculatorService {
+  // Divide fails with invalid_argument and a DivisionByZero detail when the divisor is 0.
+  rpc Divide(DivideRequest) returns (DivideResponse) {}
+}
+
+message DivideRequest {
+  int64 dividend = 1;
+  int64 divisor = 2;
+}
+
+message DivideResponse {
+  int64 quotient = 1;
+  int64 remainder = 2;
+}
+
+// The detail a Divide error carries, which a client decodes from the error's details.
+message DivisionByZero {
+  int64 dividend = 1;
+}

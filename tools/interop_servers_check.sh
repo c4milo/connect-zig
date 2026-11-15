@@ -42,7 +42,7 @@ for case in tools/testdata/coverage/*.json; do
         --to "${work}/cases/$(basename "${case}" .json).binpb#format=binpb"
 done
 "${buf}" build tools/proto --as-file-descriptor-set -o "${work}/descriptors.binpb"
-tls="$(pwd)/examples/testdata/tls"
+tls="$(pwd)/examples/harness/tls"
 
 # What each server is: its directory under interop/, the client's runs it speaks, and each
 # scenario its library cannot express, which the client leaves out (interop/README.md).

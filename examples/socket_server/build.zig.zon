@@ -1,0 +1,17 @@
+.{
+    .name = .socket_server,
+    .version = "0.0.0",
+    .fingerprint = 0xb2611c8580d3119d,
+    .minimum_zig_version = "0.16.0",
+    .dependencies = .{
+        .connect_zig = .{ .path = "../.." },
+        .harness = .{ .path = "../harness" },
+        .eliza = .{ .path = "../eliza" },
+        .streaming = .{ .path = "../streaming" },
+        .interceptors = .{ .path = "../interceptors" },
+        .errors = .{ .path = "../errors" },
+        .github = .{ .path = "../github" },
+        .oidc = .{ .path = "../oidc" },
+    },
+    .paths = .{ "build.zig", "build.zig.zon", "src" },
+}
