@@ -851,6 +851,11 @@ ran on Linux x86-64 with Zig 0.16.0.
     small, deep and packed with this stdx.
   - connect-zig keeps its own base64 fallback: stdx's `.pad_bits = .drop` costs about 18
     instructions a bytes field on a valid text, and the fallback costs none (owner, 2026-11-14).
+  - The JSON encoder opens a `Lazy` child's object with `TextWriter.member_begin_object` (stdx
+    decision 78): one call writes the member's name and the brace. Deep's JSON encode takes 8.65%
+    fewer instructions on x86-64-v2, and no other count moves. A scalar member through
+    `member_*` took small's and varints' JSON encode 5% to 10% more instructions, and an optional
+    message field 0.09% more, so both keep `name` and `write`.
 
 ### What a later step owes
 

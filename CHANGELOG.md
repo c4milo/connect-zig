@@ -56,6 +56,8 @@ The first release.
   tree's JSON decode takes 23% fewer instructions, deep 17% and large 14%. An array of a packed
   field transcodes to one packed record, as the encoder writes it: packed JSON decode takes 18%
   fewer instructions.
+- JSON encode opens a nested message's object with its member's name in one stdx call: deep's
+  JSON encode takes 9% fewer instructions.
 - A repeated field's iterator gives a message in place: for a field of messages, `next`
   returns a pointer, and copies no message that `decode_into` stored or that a program set.
   The pointer holds until the next call. A number, a string or an enum still comes back by

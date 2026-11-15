@@ -121,6 +121,7 @@ failed (the owner's ruling of 2026-11-09). A new fast path joins this list the s
 | A message given in place by its iterator | `repeated.zig`, `next_message` | tree binary decode+walk +27.11%, large +4.09%, local x86-64-v2 |
 | The transcoder's binary decoded one level | `protobuf.zig`, `decode_transcoded` | tree JSON decode +30.31%, deep +20.58%, large +16.20%, medium +8.94%, local x86-64-v2 |
 | A JSON array of a packed field written as one record | `json_decode.zig`, `read_packed_array` | packed JSON decode+walk +38.06%, packed JSON decode +21.31%, medium JSON decode+walk +12.15%, large +11.14%, local x86-64-v2 |
+| A `Lazy` child's object opened with its member's name | `json_encode.zig`, `write_lazy` | deep JSON encode +9.47%, local x86-64-v2 |
 
 ## The pitfalls
 

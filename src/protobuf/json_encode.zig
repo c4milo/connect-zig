@@ -199,9 +199,18 @@ fn write_repeated(comptime field: Field, comptime F: type, item: *const F, text:
 
 /// A singular message field, and nothing when it is absent.
 fn write_lazy(comptime field: Field, comptime F: type, item: *const F, text: *json.TextWriter, comptime registry: []const type) Error!void {
+    // A `Lazy` field holds a message that holds its own type, and no well-known type with a JSON
+    // form of its own does, so the child is always an object of fields.
+    comptime assert(wkt.form(F.Message) == .message);
+    // `write_message` checks a message's descriptor; this path skips it, so it checks too.
+    comptime descriptor.check(F.Message);
     const child = try item.get() orelse return;
-    try @call(.always_inline, json.TextWriter.name, .{ text, field.json_name });
-    return write_message(F.Message, &child, text, registry);
+    // The member's name opens its object in one stdx call (stdx decision 78): deep's JSON encode
+    // took 8.65% fewer instructions. A scalar member through `member_*` took small's and
+    // varints' 5% to 10% more, so scalars keep `name` and `write`.
+    try @call(.always_inline, json.TextWriter.member_begin_object, .{ text, field.json_name });
+    try write_fields(F.Message, &child, text, registry);
+    return @call(.always_inline, json.TextWriter.end_object, .{text});
 }
 
 /// A scalar or optional field, and nothing when it holds its default or is absent.
