@@ -12,7 +12,8 @@ const proto = @import("protobuf");
 const service = @import("connectrpc_conformance_v1_service");
 const client_compat = @import("connectrpc_conformance_v1_client_compat");
 const constants = @import("constants.zig");
-const transport = @import("client_transport.zig");
+const Transport = @import("client_transport.zig").Transport;
+const Buffers = @import("client_buffers.zig").Buffers;
 const plan_module = @import("client_plan.zig");
 const Invocation = @import("client_invoke.zig").Invocation;
 const result_module = @import("client_result.zig");
@@ -28,46 +29,74 @@ comptime {
 const Service = service.ConformanceService;
 const Request = client_compat.ClientCompatRequest;
 
-var gzip_decoder: connect.GzipDecoder align(@alignOf(connect.GzipDecoder)) = undefined;
-var gzip_encoder: connect.GzipEncoder align(@alignOf(connect.GzipEncoder)) = undefined;
-var zstd_decoder: connect.ZstdDecoder align(@alignOf(connect.ZstdDecoder)) = undefined;
-var zstd_encoder: connect.ZstdEncoder align(@alignOf(connect.ZstdEncoder)) = undefined;
-var brotli_decoder: connect.BrotliDecoder align(@alignOf(connect.BrotliDecoder)) = undefined;
-const codings: plan_module.Codings = .{
-    .encoders = .{ .gzip = &gzip_encoder, .zstd = &zstd_encoder },
-    .decoders = .{ .gzip = &gzip_decoder, .zstd = &zstd_decoder, .brotli = &brotli_decoder },
+/// One method's call, and the request messages a case gives it. colibri reads and writes the
+/// call until it finished, so it lives in `State`.
+fn Slot(comptime method: connect.Method) type {
+    return struct {
+        invocation: Invocation(method),
+        messages: [constants.client_requests_max]method.Request,
+    };
+}
+
+/// A slot for each method of ConformanceService, named as `Service` names the method.
+const Slots = struct {
+    unary: Slot(Service.unary),
+    idempotent_unary: Slot(Service.idempotent_unary),
+    unimplemented: Slot(Service.unimplemented),
+    server_stream: Slot(Service.server_stream),
+    client_stream: Slot(Service.client_stream),
+    bidi_stream: Slot(Service.bidi_stream),
 };
 
-var request_bytes: [constants.client_compat_request_bytes]u8 = undefined;
-var result_bytes: [constants.client_compat_response_bytes]u8 = undefined;
-var response_bytes: [constants.client_compat_response_bytes]u8 = undefined;
-var header_lines: [connect.client.request_headers_max]connect.Header align(@alignOf(connect.Header)) = undefined;
-var stdin_buffer: [constants.length_prefix_len]u8 = undefined;
-var stdout_buffer: [constants.length_prefix_len]u8 = undefined;
+/// All the program holds, which `main` allocates once before the first case (decision 42).
+const State = struct {
+    transport: Transport,
+    buffers: Buffers,
+    plan_memory: plan_module.Memory,
+    result_lists: result_module.Lists,
+    slots: Slots,
+    gzip_decoder: connect.GzipDecoder,
+    gzip_encoder: connect.GzipEncoder,
+    zstd_decoder: connect.ZstdDecoder,
+    zstd_encoder: connect.ZstdEncoder,
+    brotli_decoder: connect.BrotliDecoder,
+    /// The coders above, as each call's options name them.
+    codings: plan_module.Codings,
+    request_bytes: [constants.client_compat_request_bytes]u8,
+    result_bytes: [constants.client_compat_response_bytes]u8,
+    response_bytes: [constants.client_compat_response_bytes]u8,
+    stdin_buffer: [constants.length_prefix_len]u8,
+    stdout_buffer: [constants.length_prefix_len]u8,
+};
 
 pub fn main(init: std.process.Init) !void {
-    transport.init(init.io);
-    var stdin = std.Io.File.stdin().reader(init.io, &stdin_buffer);
-    var stdout = std.Io.File.stdout().writer(init.io, &stdout_buffer);
+    const state = try init.arena.allocator().create(State);
+    state.transport.init(init.io);
+    state.codings = .{
+        .encoders = .{ .gzip = &state.gzip_encoder, .zstd = &state.zstd_encoder },
+        .decoders = .{ .gzip = &state.gzip_decoder, .zstd = &state.zstd_decoder, .brotli = &state.brotli_decoder },
+    };
+    var stdin = std.Io.File.stdin().reader(init.io, &state.stdin_buffer);
+    var stdout = std.Io.File.stdout().writer(init.io, &state.stdout_buffer);
     for (0..constants.client_cases_max) |_| {
-        const bytes = try read_request(&stdin.interface) orelse return;
+        const bytes = try read_request(state, &stdin.interface) orelse return;
         const request = try proto.decode(Request, bytes);
-        const response = try run_case(&request);
+        const response = try run_case(state, &request);
         try write_response(&stdout.interface, response);
     }
     return error.TooManyCases;
 }
 
 /// Reads one length-prefixed ClientCompatRequest, or null at the end of stdin.
-fn read_request(stdin: *std.Io.Reader) !?[]const u8 {
+fn read_request(state: *State, stdin: *std.Io.Reader) !?[]const u8 {
     // docs/testing_clients.md: "a network-byte-order (i.e. big-endian) 32-bit integer".
     const len = stdin.takeInt(u32, .big) catch |failure| switch (failure) {
         error.EndOfStream => return null,
         else => |other| return other,
     };
-    if (len > request_bytes.len) return error.RequestTooLarge;
-    try stdin.readSliceAll(request_bytes[0..len]);
-    return request_bytes[0..len];
+    if (len > state.request_bytes.len) return error.RequestTooLarge;
+    try stdin.readSliceAll(state.request_bytes[0..len]);
+    return state.request_bytes[0..len];
 }
 
 fn write_response(stdout: *std.Io.Writer, response: []const u8) !void {
@@ -78,32 +107,30 @@ fn write_response(stdout: *std.Io.Writer, response: []const u8) !void {
 
 /// Runs one case, and returns its ClientCompatResponse: the call's result, or why the client
 /// could not make it.
-fn run_case(request: *const Request) ![]const u8 {
-    var result: result_module.Result = .{ .bytes = &result_bytes };
-    dispatch(request, &result) catch |failure| return result_module.refusal(request.test_name, @errorName(failure), &response_bytes);
-    return result.finish(request.test_name, &response_bytes);
+fn run_case(state: *State, request: *const Request) ![]const u8 {
+    var result: result_module.Result = .{ .bytes = &state.result_bytes, .lists = &state.result_lists };
+    dispatch(state, request, &result) catch |failure| return result_module.refusal(request.test_name, @errorName(failure), &state.response_bytes);
+    return result.finish(request.test_name, &state.response_bytes);
 }
 
 /// Calls the method the case names. docs/testing_clients.md: a client "only needs to handle"
 /// ConformanceService, and sends back an error for any other.
-fn dispatch(request: *const Request, result: *result_module.Result) !void {
+fn dispatch(state: *State, request: *const Request, result: *result_module.Result) !void {
     if (request.service) |name| {
         if (!std.mem.eql(u8, name, Service.service_name)) return error.UnknownService;
     }
     const name = request.method orelse return error.NoMethod;
-    const plan = try plan_module.plan_of(request, &codings, &header_lines);
-    try transport.begin(request.host, std.math.cast(u16, request.port) orelse return error.InvalidPort, plan.protocols, plan.tls);
-    defer transport.end();
-    inline for (.{ Service.unary, Service.idempotent_unary, Service.unimplemented, Service.server_stream, Service.client_stream, Service.bidi_stream }) |method| {
-        if (std.mem.eql(u8, name, method.name)) return invoke(method, request, &plan, result);
+    const plan = try plan_module.plan_of(request, &state.codings, &state.plan_memory);
+    try state.transport.begin(request.host, std.math.cast(u16, request.port) orelse return error.InvalidPort, plan.protocols, plan.tls);
+    defer state.transport.end();
+    inline for (@typeInfo(Slots).@"struct".fields) |field| {
+        const method = @field(Service, field.name);
+        if (std.mem.eql(u8, name, method.name)) return invoke(method, state, &@field(state.slots, field.name), request, &plan, result);
     }
     return error.UnknownMethod;
 }
 
-fn invoke(comptime method: connect.Method, request: *const Request, plan: *const plan_module.Plan, result: *result_module.Result) !void {
-    const Messages = struct {
-        var held: [constants.client_requests_max]method.Request align(@alignOf(method.Request)) = undefined;
-    };
-    const messages = try plan_module.messages_of(method.Request, request, &Messages.held);
-    try Invocation(method).run(plan, messages, result);
+fn invoke(comptime method: connect.Method, state: *State, slot: *Slot(method), request: *const Request, plan: *const plan_module.Plan, result: *result_module.Result) !void {
+    const messages = try plan_module.messages_of(method.Request, request, &slot.messages);
+    try slot.invocation.run(&state.transport, &state.buffers, plan, messages, result);
 }

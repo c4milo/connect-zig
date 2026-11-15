@@ -91,21 +91,22 @@ pub const relative_import_outside = rules.relative_import.Rule(.{
 });
 
 /// CLAUDE.md, Conventions: every limit is a named constant, never an inline literal, in the
-/// library and in the code the plugin writes. A directory matches at any depth, so `src` and
-/// `gen` name each example project's too (decision 42).
+/// library, in the code the plugin writes, and in every program of the tree (decision 42). A
+/// directory matches at any depth, so `src` and `gen` name each example project's too.
 pub const magic_numbers = rules.magic_numbers.Rule(.{
     .scope = .{
         .extensions = &.{lint.paths.zig_extension},
-        .include_directories = &.{ "src", "gen" },
+        .include_directories = &.{ "src", "gen", "bench", "conformance", "tools" },
         .exclude_basenames = &.{"constants.zig"},
         // colibri's in-memory links, kept as colibri wrote them.
         .exclude_paths = &.{ "examples/harness/src/link.zig", "examples/harness/src/link_datagram.zig" },
     },
 });
 
-/// The library keeps no state every thread shares.
+/// The library keeps no state every thread shares, and a program allocates its one `State` at
+/// startup (decision 42).
 pub const global_state = rules.global_state.Rule(.{
-    .scope = .{ .extensions = &.{lint.paths.zig_extension}, .include_directories = &.{ "src", "gen" } },
+    .scope = .{ .extensions = &.{lint.paths.zig_extension}, .include_directories = &.{ "src", "gen", "bench", "conformance", "tools" } },
 });
 
 /// A container-level `var` states its alignment, which Zig 0.16's x86_64 backend needs.
@@ -150,11 +151,11 @@ pub const unreleased_acquire = rules.unreleased_acquire.Rule(.{
 /// No unresolved marker ships: open work is a GitHub issue (CLAUDE.md, Conventions).
 pub const denied_words = rules.denied_words.Rule(.{
     // This file names the words to deny them. conformance/proto is connectrpc's copy, kept as
-    // connectrpc wrote it.
+    // connectrpc wrote it, and examples/otlp/proto/opentelemetry is OpenTelemetry's (decision 40).
     .scope = .{
         .extensions = &.{ lint.paths.zig_extension, ".md", ".sh", ".yml", ".proto" },
         .exclude_paths = &.{"tools/lint/main.zig"},
-        .exclude_directories = &.{"conformance/proto"},
+        .exclude_directories = &.{ "conformance/proto", "examples/otlp/proto/opentelemetry" },
     },
     .words = &.{ "TODO", "FIXME", "XXX", "HACK" },
     .word_label = "unresolved marker",

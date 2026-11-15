@@ -86,9 +86,10 @@ first. Cite an entry by number in code and commits ("decision 6").
 
 42. **Every tree of hand-written Zig takes the library's rules.** Ruled by the owner on
     2026-11-14.
-    - `examples/`, `bench/` and `conformance/` take every lint rule that `src/` takes, except the
-      four that state what a library is: no allocator, no I/O, no clock and no Rotor. A program
-      owns its memory, its sockets, its clock and its loop.
+    - `examples/`, `bench/`, `conformance/` and the programs of `tools/` take every lint rule
+      that `src/` takes, except the four that state what a library is: no allocator, no I/O, no
+      clock and no Rotor. A program owns its memory, its sockets, its clock and its loop. `tools/`
+      joined when the checks moved there from `examples/` (decision 41).
     - Each tree names its limits in a `constants.zig`, as `src/` does (the `magic-numbers`
       rule).
     - A program holds no container-level `var` (the `global-state` rule). Its `main` allocates

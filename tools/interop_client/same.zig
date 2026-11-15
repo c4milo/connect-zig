@@ -9,45 +9,43 @@
 //! payload, so a NaN whose bits differ compares the same in JSON.
 const std = @import("std");
 const proto = @import("protobuf");
-const verdict = @import("verdict.zig");
-const buffers = @import("buffers.zig");
+const constants = @import("constants.zig");
+const Verdict = @import("verdict.zig").Verdict;
 
-/// The depth of JSON values the comparison reads, at most: the recursion case nests messages a
-/// few dozen deep.
-const depth_max = 256;
-/// Octets of the memory the two JSON trees are parsed into.
-const tree_bytes = 8 * 1024 * 1024;
-
-var wanted_octets: [buffers.message_bytes]u8 = undefined;
-var gotten_octets: [buffers.message_bytes]u8 = undefined;
-var wanted_json: [buffers.message_bytes]u8 = undefined;
-var gotten_json: [buffers.message_bytes]u8 = undefined;
-var tree_memory: [tree_bytes]u8 align(@alignOf(u64)) = undefined;
+/// The memory a comparison encodes the two messages into, and parses their JSON into. `main`
+/// keeps it in its `State` (decision 42).
+pub const Comparison = struct {
+    wanted_octets: [constants.message_bytes]u8,
+    gotten_octets: [constants.message_bytes]u8,
+    wanted_json: [constants.message_bytes]u8,
+    gotten_json: [constants.message_bytes]u8,
+    tree_memory: [constants.tree_bytes]u8 align(@alignOf(u64)),
+};
 
 /// How numbers compare.
 pub const Numbers = enum { by_text, by_value };
 
-/// Fails unless `got` is the same message of type `T` as `want`.
-pub fn expect(comptime T: type, want: *const T, got: *const T, numbers: Numbers) verdict.Error!void {
-    const wanted = proto.encode(T, want, &wanted_octets) catch |failure| return verdict.wrong("encoding the case: {s}", .{@errorName(failure)});
-    const gotten = proto.encode(T, got, &gotten_octets) catch |failure| return verdict.wrong("encoding the answer: {s}", .{@errorName(failure)});
+/// Fails unless `got` is the same message of type `T` as `want`, and records why in `verdict`.
+pub fn expect(comptime T: type, comparison: *Comparison, verdict: *Verdict, want: *const T, got: *const T, numbers: Numbers) Verdict.Error!void {
+    const wanted = proto.encode(T, want, &comparison.wanted_octets) catch |failure| return verdict.wrong("encoding the case: {s}", .{@errorName(failure)});
+    const gotten = proto.encode(T, got, &comparison.gotten_octets) catch |failure| return verdict.wrong("encoding the answer: {s}", .{@errorName(failure)});
     if (std.mem.eql(u8, wanted, gotten)) return;
-    const wanted_text = proto.encode_json(T, want, &wanted_json) catch |failure| return verdict.wrong("the case in JSON: {s}", .{@errorName(failure)});
-    const gotten_text = proto.encode_json(T, got, &gotten_json) catch |failure| return verdict.wrong("the answer in JSON: {s}", .{@errorName(failure)});
-    if (try same_json(wanted_text, gotten_text, numbers)) return;
+    const wanted_text = proto.encode_json(T, want, &comparison.wanted_json) catch |failure| return verdict.wrong("the case in JSON: {s}", .{@errorName(failure)});
+    const gotten_text = proto.encode_json(T, got, &comparison.gotten_json) catch |failure| return verdict.wrong("the answer in JSON: {s}", .{@errorName(failure)});
+    if (try same_json(comparison, verdict, wanted_text, gotten_text, numbers)) return;
     return verdict.wrong("the answer differs: wanted {d} octets, got {d}; wanted {s}, got {s}", .{ wanted.len, gotten.len, wanted_text, gotten_text });
 }
 
 /// Whether two JSON texts hold the same value.
-fn same_json(wanted_text: []const u8, gotten_text: []const u8, numbers: Numbers) verdict.Error!bool {
-    var memory: std.heap.FixedBufferAllocator = .init(&tree_memory);
+fn same_json(comparison: *Comparison, verdict: *Verdict, wanted_text: []const u8, gotten_text: []const u8, numbers: Numbers) Verdict.Error!bool {
+    var memory: std.heap.FixedBufferAllocator = .init(&comparison.tree_memory);
     const allocator = memory.allocator();
     const options: std.json.ParseOptions = .{ .parse_numbers = false };
     const wanted = std.json.parseFromSliceLeaky(std.json.Value, allocator, wanted_text, options) catch |failure|
         return verdict.wrong("reading the case's JSON: {s}", .{@errorName(failure)});
     const gotten = std.json.parseFromSliceLeaky(std.json.Value, allocator, gotten_text, options) catch |failure|
         return verdict.wrong("reading the answer's JSON: {s}", .{@errorName(failure)});
-    return same_value(&wanted, &gotten, numbers, depth_max);
+    return same_value(&wanted, &gotten, numbers, constants.depth_max);
 }
 
 fn same_value(wanted: *const std.json.Value, gotten: *const std.json.Value, numbers: Numbers, depth: u32) bool {
@@ -95,9 +93,13 @@ fn same_object(wanted: *const std.json.ObjectMap, gotten: *const std.json.Object
 const testing = std.testing;
 
 test "two JSON texts are the same whatever their key order, and numbers by text unless asked" {
-    try testing.expect(try same_json("{\"a\":1,\"m\":{\"x\":[1,2],\"y\":\"z\"}}", "{\"m\":{\"y\":\"z\",\"x\":[1,2]},\"a\":1}", .by_text));
-    try testing.expect(!try same_json("{\"a\":[1,2]}", "{\"a\":[2,1]}", .by_text));
-    try testing.expect(!try same_json("{\"d\":-0}", "{\"d\":0}", .by_text));
-    try testing.expect(try same_json("{\"d\":-0}", "{\"d\":0}", .by_value));
-    try testing.expect(!try same_json("{\"a\":1}", "{\"a\":1,\"b\":2}", .by_text));
+    // The trees take more room than a test's stack holds.
+    const comparison = try testing.allocator.create(Comparison);
+    defer testing.allocator.destroy(comparison);
+    var verdict: Verdict = .{};
+    try testing.expect(try same_json(comparison, &verdict, "{\"a\":1,\"m\":{\"x\":[1,2],\"y\":\"z\"}}", "{\"m\":{\"y\":\"z\",\"x\":[1,2]},\"a\":1}", .by_text));
+    try testing.expect(!try same_json(comparison, &verdict, "{\"a\":[1,2]}", "{\"a\":[2,1]}", .by_text));
+    try testing.expect(!try same_json(comparison, &verdict, "{\"d\":-0}", "{\"d\":0}", .by_text));
+    try testing.expect(try same_json(comparison, &verdict, "{\"d\":-0}", "{\"d\":0}", .by_value));
+    try testing.expect(!try same_json(comparison, &verdict, "{\"a\":1}", "{\"a\":1,\"b\":2}", .by_text));
 }

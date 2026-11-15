@@ -14,13 +14,6 @@ const client_compat = @import("connectrpc_conformance_v1_client_compat");
 const constants = @import("constants.zig");
 const echo = @import("echo.zig");
 
-/// A metadata section's groups and values, and an error's details as Anys with their type URLs,
-/// which one case at a time writes.
-var groups: [constants.client_fields_max]Header align(@alignOf(Header)) = undefined;
-var values: [constants.client_fields_max][]const u8 align(@alignOf([]const u8)) = undefined;
-var anys: [constants.client_details_max]Any align(@alignOf(Any)) = undefined;
-var urls: [constants.client_details_max * constants.client_type_url_bytes]u8 = undefined;
-
 const ResponseResult = client_compat.ClientResponseResult;
 const Header = service.Header;
 const Any = proto.wkt.Any;
@@ -55,8 +48,18 @@ fn write_varint(value: u64, room: []u8) proto.EncodeError!usize {
     unreachable;
 }
 
+/// A metadata section's groups and values, and an error's details as Anys with their type URLs,
+/// which one case at a time writes. The client holds one in its `State` (decision 42).
+pub const Lists = struct {
+    groups: [constants.client_fields_max]Header,
+    values: [constants.client_fields_max][]const u8,
+    anys: [constants.client_details_max]Any,
+    urls: [constants.client_details_max * constants.client_type_url_bytes]u8,
+};
+
 pub const Result = struct {
     bytes: []u8,
+    lists: *Lists,
     len: usize = 0,
     /// The payloads written, which a cancel after a number of responses counts.
     payloads: u32 = 0,
@@ -96,8 +99,9 @@ pub const Result = struct {
     /// Records a section of response metadata, grouped by name with each value in order.
     pub fn add_metadata(result: *Result, section: Section, lines: []const connect.Header) proto.EncodeError!void {
         if (lines.len == 0) return;
-        const count = @min(lines.len, groups.len);
-        const grouped = echo.group(lines[0..count], groups[0..count], values[0..count]);
+        const lists = result.lists;
+        const count = @min(lines.len, lists.groups.len);
+        const grouped = echo.group(lines[0..count], lists.groups[0..count], lists.values[0..count]);
         switch (section) {
             .headers => try result.append(&.{ .response_headers = .of(grouped) }),
             .trailers => try result.append(&.{ .response_trailers = .of(grouped) }),
@@ -126,13 +130,14 @@ pub const Result = struct {
     /// Any named by its full name.
     fn append_failure(result: *Result) proto.EncodeError!void {
         const failure = result.failure orelse return;
-        const count = @min(failure.details.len, anys.len);
+        const lists = result.lists;
+        const count = @min(failure.details.len, lists.anys.len);
         for (failure.details[0..count], 0..) |detail, index| {
-            const url = urls[index * constants.client_type_url_bytes ..][0..constants.client_type_url_bytes];
-            anys[index] = .{ .type_url = type_url_of(detail.type_name, url), .value = detail.value };
+            const url = lists.urls[index * constants.client_type_url_bytes ..][0..constants.client_type_url_bytes];
+            lists.anys[index] = .{ .type_url = type_url_of(detail.type_name, url), .value = detail.value };
         }
         // The suite's codes are gRPC's, number for number (config.proto, `Code`).
-        const wanted: service.Error = .{ .code = @enumFromInt(@intFromEnum(failure.code)), .message = failure.message, .details = .of(anys[0..count]) };
+        const wanted: service.Error = .{ .code = @enumFromInt(@intFromEnum(failure.code)), .message = failure.message, .details = .of(lists.anys[0..count]) };
         try result.append(&.{ .@"error" = wanted });
     }
 };
@@ -162,7 +167,9 @@ const testing = std.testing;
 test "payloads, metadata and an error merge into one result, with the test's name" {
     var room: [1024]u8 = undefined;
     var output: [1024]u8 = undefined;
-    var result: Result = .{ .bytes = &room };
+    const lists = try testing.allocator.create(Lists);
+    defer testing.allocator.destroy(lists);
+    var result: Result = .{ .bytes = &room, .lists = lists };
     try result.add_payload(.{ .data = "a" });
     try result.add_payload(null);
     try result.add_metadata(.trailers, &.{ .{ .name = "x-t", .value = "1" }, .{ .name = "X-T", .value = "2" } });

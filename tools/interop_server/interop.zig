@@ -10,28 +10,20 @@ const proto = @import("protobuf");
 const rpc = @import("connect_colibri");
 const interop = @import("interop");
 const coverage = @import("coverage");
+const constants = @import("constants.zig");
 const App = @import("app.zig").App;
 const Service = interop.InteropService;
 
-/// The largest message a route reads or writes: the largest coverage case, in JSON, with room.
-const message_bytes = 64 * 1024;
-const token_bytes = 16 * 1024;
-/// The most messages Repeat sends.
-pub const repeat_max = 16;
 /// The prefix of the request headers Inspect reports and sends back.
 const inspected_prefix = "x-interop-";
-/// The headers Inspect reports at most, and the octets of their "name: value" lines.
-const inspected_max = 4;
-const inspected_len = 1024;
-const detail_len = 256;
 const nanoseconds_per_millisecond = std.time.ns_per_ms;
 
 /// The service's part of the interop server's `App`. A reply is encoded before its handler's
 /// call returns, so one room serves every call.
 pub const Room = struct {
-    lines: [inspected_max][]const u8 = undefined,
-    line_octets: [inspected_len]u8 = undefined,
-    detail_bytes: [detail_len]u8 = undefined,
+    lines: [constants.inspected_max][]const u8 = undefined,
+    line_octets: [constants.inspected_len]u8 = undefined,
+    detail_bytes: [constants.detail_len]u8 = undefined,
     details: [1]connect.Detail = undefined,
 };
 
@@ -42,7 +34,7 @@ fn echo(_: *App, _: *rpc.Context, request: *const rpc.Request(coverage.Everythin
 
 fn repeat(_: *App, _: *rpc.Context, request: *const rpc.Request(interop.RepeatRequest), response: *rpc.ResponseStream(coverage.Everything)) ?connect.RpcError {
     const asked = &request.message;
-    if (asked.count < 0 or asked.count > repeat_max) return .{ .code = .out_of_range, .message = "count must be between 0 and 16" };
+    if (asked.count < 0 or asked.count > constants.repeat_max) return .{ .code = .out_of_range, .message = "count must be between 0 and 16" };
     const message = asked.message orelse coverage.Everything{};
     for (0..@as(usize, @intCast(asked.count))) |_| {
         response.send(&message) catch return .{ .code = .resource_exhausted, .message = "no room to send" };
@@ -55,7 +47,7 @@ fn repeat(_: *App, _: *rpc.Context, request: *const rpc.Request(interop.RepeatRe
 const Collect = struct {
     pub const State = struct {
         count: i32 = 0,
-        last: [message_bytes]u8 = undefined,
+        last: [constants.message_bytes]u8 = undefined,
         last_len: usize = 0,
     };
 
@@ -105,7 +97,7 @@ fn inspect(app: *App, ctx: *rpc.Context, request: *const rpc.Request(interop.Ins
     var used: usize = 0;
     for (request.headers()) |header| {
         if (!std.ascii.startsWithIgnoreCase(header.name, inspected_prefix)) continue;
-        if (count == inspected_max) return .{ .code = .resource_exhausted, .message = "too many x-interop headers" };
+        if (count == constants.inspected_max) return .{ .code = .resource_exhausted, .message = "too many x-interop headers" };
         const line = std.fmt.bufPrint(room.line_octets[used..], "{s}: {s}", .{ header.name, header.value }) catch
             return .{ .code = .resource_exhausted, .message = "x-interop headers too long" };
         room.lines[count] = line;
@@ -119,7 +111,7 @@ fn inspect(app: *App, ctx: *rpc.Context, request: *const rpc.Request(interop.Ins
     return null;
 }
 
-const options: rpc.RouteOptions = .{ .message_bytes = message_bytes, .token_bytes = token_bytes };
+const options: rpc.RouteOptions = .{ .message_bytes = constants.message_bytes, .token_bytes = constants.token_bytes };
 
 pub const routes = .{
     rpc.post(App, Service.echo, echo, options),

@@ -1,4 +1,5 @@
-//! The conformance server's named sizes (design §8 step 7).
+//! The conformance server's named sizes (design §8 step 7), the client's, and the protobuf
+//! testee's (decision 38).
 
 /// The runner's message receive limit is 200 KiB (connectconformance v1.0.4,
 /// `serverReceiveLimit`). A message holds at most this many octets, so the limit always fits.
@@ -100,3 +101,18 @@ pub const client_certificate_bytes = 8 * 1024;
 /// writes: what an Ethernet path carries (RFC 9000 §14 asks for 1200 at least).
 pub const client_datagram_in_bytes = 64 * 1024;
 pub const client_datagram_out_bytes = 1500;
+
+// The protobuf testee's named sizes (decision 38).
+
+/// The length before each request and each response of Google's protobuf conformance runner:
+/// 4 octets, little-endian ("conformance/conformance.proto").
+pub const testee_frame_prefix_len = 4;
+/// The largest test message, in either encoding, and the room a response takes beside it.
+pub const testee_message_len_max = 1 << 20;
+pub const testee_response_overhead_len = 64;
+/// The longest JSON token: a string's octets.
+pub const testee_token_len_max = 1 << 16;
+/// Octets of the testee's stdin buffer, and of its stdout buffer.
+pub const testee_io_buffer_len = 1 << 12;
+/// The requests one run of the runner sends stay far below this bound.
+pub const testee_requests_max = 1 << 24;

@@ -5,23 +5,25 @@
 //! its piece arrives, so a full-duplex program reads an answer before it sends the next message
 //! (decision 18 as amended).
 //!
-//! The client gives a call up `call_ns_max` after it started, so a server that never answers
-//! fails a scenario, not the run.
+//! The client gives a call up `constants.call_ns_max` after it started, so a server that never
+//! answers fails a scenario, not the run.
 const std = @import("std");
 const connect = @import("connect");
 const client = @import("client");
 const rpc = @import("connect_colibri");
 const transport = @import("client_transport");
-const buffers = @import("buffers.zig");
-const verdict = @import("verdict.zig");
+const constants = @import("constants.zig");
+const Buffers = @import("buffers.zig").Buffers;
+const Verdict = @import("verdict.zig").Verdict;
+const Transport = transport.Transport;
 
-/// The longest one call runs before the client gives it up: 10 s.
-pub const call_ns_max: u64 = 10 * std.time.ns_per_s;
-/// The turns of the transport one wait takes at most. A turn ends at an event, a timer, or a read
-/// of the socket, and waits 100 ms at most, so `call_ns_max` passes first.
-const wait_turns_max = 1_000_000;
-/// The messages one response piece holds, at most.
-const answers_per_piece_max = 4096;
+/// What an exchange works with, which the program's `State` holds (decision 42): the transport
+/// its call runs on, the buffers of the call, and the verdict a failure writes.
+pub const Shared = struct {
+    transport: *Transport,
+    buffers: *Buffers,
+    verdict: *Verdict,
+};
 
 /// A watcher of a call whose answers it does not read as they arrive.
 pub const Unwatched = struct {
@@ -40,6 +42,9 @@ pub fn Exchange(comptime method: connect.Method, comptime Watcher: type) type {
 
         call: rpc.ClientCall(method, .{ .pool = transport.Pool }),
         watcher: *Watcher,
+        transport: *Transport,
+        buffers: *Buffers,
+        verdict: *Verdict,
         give_up_ns: u64,
         /// The exchange finished, or the client stopped it: either way no event follows.
         finished: bool = false,
@@ -47,27 +52,31 @@ pub fn Exchange(comptime method: connect.Method, comptime Watcher: type) type {
         /// Why reading an answer as it arrived failed.
         failure: ?connect.RpcError = null,
 
-        /// colibri reads and writes the call until it finished, so it lives outside the stack.
-        var instance: Self align(@alignOf(Self)) = undefined;
-
-        /// Starts a call of `messages`, or a stream whose messages `send` writes.
-        pub fn begin(options: *const connect.client.Options, messages: []const method.Request, watcher: *Watcher) !*Self {
-            instance = .{ .call = undefined, .watcher = watcher, .give_up_ns = transport.now_ns() + call_ns_max };
-            const self = &instance;
+        /// Starts a call of `messages`, or a stream whose messages `send` writes, in `self`.
+        /// colibri reads and writes the call until it finished, so `self` lives outside the stack,
+        /// in the program's `State` (decision 42).
+        pub fn begin(self: *Self, shared: Shared, options: *const connect.client.Options, messages: []const method.Request, watcher: *Watcher) !void {
+            self.* = .{
+                .call = undefined,
+                .watcher = watcher,
+                .transport = shared.transport,
+                .buffers = shared.buffers,
+                .verdict = shared.verdict,
+                .give_up_ns = shared.transport.now_ns() + constants.call_ns_max,
+            };
             if (streamed) {
-                try self.call.init_stream(options, &buffers.call(true));
+                try self.call.init_stream(options, &self.buffers.call(true));
             } else {
-                try self.call.init(options, messages, &buffers.call(false));
+                try self.call.init(options, messages, &self.buffers.call(false));
             }
-            try self.call.start(transport.pool_of());
-            transport.listen(.{ .context = self, .on_event = on_event });
-            return self;
+            try self.call.start(self.transport.pool_of());
+            self.transport.listen(.{ .context = self, .on_event = on_event });
         }
 
         fn on_event(context: *anyopaque, event: client.Event) void {
             const self: *Self = @ptrCast(@alignCast(context));
             switch (event) {
-                .headers => self.call.on_headers(buffers.storage()),
+                .headers => self.call.on_headers(self.buffers.storage()),
                 .body => |piece| {
                     self.call.on_body(piece.len);
                     read_arrived(self);
@@ -85,7 +94,7 @@ pub fn Exchange(comptime method: connect.Method, comptime Watcher: type) type {
 fn read_arrived(self: anytype) void {
     const method = @TypeOf(self.*).rpc_method;
     if (method.stream_type != .bidi_stream) return;
-    for (0..answers_per_piece_max) |_| {
+    for (0..constants.answers_per_piece_max) |_| {
         if (self.stopped) return;
         const answer = self.call.reader.next(method.Response) catch |failure| {
             self.failure = connect.client.failure_of(failure);
@@ -102,16 +111,16 @@ fn ended(self: anytype) bool {
 /// Cancels the exchange. The pool reports nothing more of it.
 fn stop(self: anytype) void {
     if (ended(self)) return;
-    transport.pool_of().cancel(self.call.id, transport.now_ns());
+    self.transport.pool_of().cancel(self.call.id, self.transport.now_ns());
     self.stopped = true;
 }
 
 /// Turns the transport until `until` holds of the call, it ends, or the client gives it up.
 fn wait(self: anytype, comptime until: Until, wanted: u32) void {
-    for (0..wait_turns_max) |_| {
+    for (0..constants.wait_turns_max) |_| {
         if (ended(self) or holds(self, until, wanted)) return;
-        if (transport.now_ns() >= self.give_up_ns) return stop(self);
-        transport.turn(self.give_up_ns);
+        if (self.transport.now_ns() >= self.give_up_ns) return stop(self);
+        self.transport.turn(self.give_up_ns);
     }
     stop(self);
 }
@@ -129,44 +138,44 @@ fn holds(self: anytype, until: Until, wanted: u32) bool {
 
 /// Writes one message of a stream, waiting for the pool to take the piece before it when
 /// it must.
-pub fn send(self: anytype, message: anytype) verdict.Error!void {
+pub fn send(self: anytype, message: anytype) Verdict.Error!void {
     var sender = self.call.sender();
-    for (0..wait_turns_max) |_| {
-        if (ended(self)) return verdict.wrong("the call ended while the client sent", .{});
+    for (0..constants.wait_turns_max) |_| {
+        if (ended(self)) return self.verdict.wrong("the call ended while the client sent", .{});
         sender.send(message) catch |failure| switch (failure) {
             error.PieceHeld => {
                 wait(self, .piece_taken, 0);
                 continue;
             },
-            else => return verdict.wrong("sending a message: {s}", .{@errorName(failure)}),
+            else => return self.verdict.wrong("sending a message: {s}", .{@errorName(failure)}),
         };
         return;
     }
-    return verdict.wrong("the pool took no piece", .{});
+    return self.verdict.wrong("the pool took no piece", .{});
 }
 
 /// Ends the request stream.
-pub fn close_send(self: anytype) verdict.Error!void {
-    if (ended(self)) return verdict.wrong("the call ended before the client closed it", .{});
+pub fn close_send(self: anytype) Verdict.Error!void {
+    if (ended(self)) return self.verdict.wrong("the call ended before the client closed it", .{});
     var sender = self.call.sender();
-    sender.close_send() catch |failure| return verdict.wrong("closing the stream: {s}", .{@errorName(failure)});
+    sender.close_send() catch |failure| return self.verdict.wrong("closing the stream: {s}", .{@errorName(failure)});
 }
 
 /// Waits until the watcher counted `wanted` answers, and fails when the call ends or is
 /// given up first.
-pub fn wait_answers(self: anytype, wanted: u32) verdict.Error!void {
+pub fn wait_answers(self: anytype, wanted: u32) Verdict.Error!void {
     wait(self, .answered, wanted);
     if (self.watcher.answers >= wanted) return;
-    if (self.failure) |failure| return verdict.failed(failure);
-    return verdict.wrong("answer {d} did not arrive before the next message", .{wanted});
+    if (self.failure) |failure| return self.verdict.failed(failure);
+    return self.verdict.wrong("answer {d} did not arrive before the next message", .{wanted});
 }
 
 /// Waits for the call to end, and returns its response to read.
-pub fn finish(self: anytype) verdict.Error!connect.client.Response {
+pub fn finish(self: anytype) Verdict.Error!connect.client.Response {
     wait(self, .end, 0);
-    if (self.failure) |failure| return verdict.failed(failure);
-    if (self.stopped) return verdict.wrong("the call did not end within {d} s", .{call_ns_max / std.time.ns_per_s});
-    return self.call.read(buffers.storage());
+    if (self.failure) |failure| return self.verdict.failed(failure);
+    if (self.stopped) return self.verdict.wrong("the call did not end within {d} s", .{constants.call_ns_max / std.time.ns_per_s});
+    return self.call.read(self.buffers.storage());
 }
 
 /// A header of the response, or null.

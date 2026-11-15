@@ -943,6 +943,20 @@ ran on Linux x86-64 with Zig 0.16.0.
     interceptor gets no context in `connect_colibri`, so it cannot count without one. The
     program checks each response's status itself.
 
+- **The library's rules on every tree** (step 20, decision 42). `magic-numbers` and
+  `global-state` read `bench/`, `conformance/` and `tools/`, beside `src/`, each `gen/` and each
+  example project. Before the change they found 52 and 34 in `bench/`, 4 and 71 in
+  `conformance/`, and 32 and 37 in `tools/`; now none.
+  - Each program allocates one `State` from `init.arena` before the first call. The
+    conformance client's transport is a `Transport` struct, which the interop client holds too.
+  - The benchmark's buffers moved from statics to the heap. On x86-64-v2 under callgrind, 46 of
+    48 operations moved less than 0.1%. Medium binary decode+walk took 30 instructions more
+    (+0.19%), and small JSON decode 3 more (+0.11%): with a static, LLVM folded the buffer's
+    address into the alignment of `decode_run.zig`, and a heap buffer computes it at run time,
+    as a program's own storage does. No library code changed.
+  - The benchmark's message values stay named constants in `bench/inputs.zig`, which the Go and
+    Rust benchmarks cite as their source.
+
 ### What a later step owes
 
 - A stream that waits for an event of the program once its request ended (colibri issue 130).

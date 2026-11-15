@@ -54,9 +54,17 @@ pub const Refusal = error{
     RawRequestUnsupported,
 };
 
-/// Reads the plan of `request`. The header lines go into `headers`, which the plan's options
-/// name.
-pub fn plan_of(request: *const Request, codings: *const Codings, headers: []connect.Header) (Refusal || proto.Error)!Plan {
+/// The memory a plan points into: the case's header lines, which the plan's options name, and
+/// the server's certificate, which its TLS trusts. The client holds one in its `State`
+/// (decision 42).
+pub const Memory = struct {
+    headers: [connect.client.request_headers_max]connect.Header,
+    anchor_der: [constants.client_certificate_bytes]u8,
+    anchors: [1]tls.Anchor,
+};
+
+/// Reads the plan of `request`. The plan points into `memory`.
+pub fn plan_of(request: *const Request, codings: *const Codings, memory: *Memory) (Refusal || proto.Error)!Plan {
     // docs/testing_clients.md: raw_request is for the reference client alone.
     if (request.raw_request != null) return error.RawRequestUnsupported;
     // client_compat.proto: client_tls_creds asks for a client certificate, which the client
@@ -74,7 +82,7 @@ pub fn plan_of(request: *const Request, codings: *const Codings, headers: []conn
             .request_coding = coding,
             .encoders = codings.encoders,
             .decoders = codings.decoders,
-            .headers = try headers_of(request, headers),
+            .headers = try headers_of(request, &memory.headers),
         },
         .protocols = try protocols_of(request.http_version),
         .cancel = cancel_of(request.cancel),
@@ -82,7 +90,7 @@ pub fn plan_of(request: *const Request, codings: *const Codings, headers: []conn
         .delay_ns = @as(u64, request.request_delay_ms) * constants.nanos_per_milli,
         .full_duplex = request.stream_type == .stream_type_full_duplex_bidi_stream,
         .receive_limit = request.message_receive_limit,
-        .tls = try tls_of(request.server_tls_cert),
+        .tls = try tls_of(request.server_tls_cert, memory),
     };
 }
 
@@ -90,16 +98,14 @@ pub fn plan_of(request: *const Request, codings: *const Codings, headers: []conn
 /// "treat this certificate as a trusted certificate authority"), or null for cleartext. The
 /// runner's certificate names "localhost" (connectconformance v1.0.4, internal/tls.go), which
 /// the client sends as server_name and checks the certificate against (RFC 6125 §6).
-fn tls_of(certificate: []const u8) Refusal!?tls.Client {
+fn tls_of(certificate: []const u8, memory: *Memory) Refusal!?tls.Client {
     if (certificate.len == 0) return null;
-    const anchors = tls.pem.anchors(certificate, &anchor_der, &anchor_room) catch return error.InvalidServerCertificate;
+    const anchors = tls.pem.anchors(certificate, &memory.anchor_der, &memory.anchors) catch return error.InvalidServerCertificate;
     if (anchors.len == 0) return error.InvalidServerCertificate;
     return .{ .trust = .{ .web_pki = .{ .anchors = anchors, .server_name = server_name } }, .cpu = cpu };
 }
 
 const server_name = "localhost";
-var anchor_der: [constants.client_certificate_bytes]u8 = undefined;
-var anchor_room: [1]tls.Anchor align(@alignOf(tls.Anchor)) = undefined;
 
 /// The client states nothing of the CPU, so each TLS session runs chapulin's portable code.
 const cpu: tls.Cpu = .{

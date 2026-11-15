@@ -23,8 +23,9 @@ const proto = @import("protobuf");
 const coverage = @import("coverage");
 const rpc = @import("connect_colibri");
 const transport = @import("client_transport");
+const constants = @import("constants.zig");
 const scenarios = @import("scenarios.zig");
-const verdict = @import("verdict.zig");
+const Verdict = @import("verdict.zig").Verdict;
 const Case = scenarios.Case;
 const Run = scenarios.Run;
 
@@ -55,32 +56,30 @@ const known = [_]Protocol{
     .{ .name = "grpc-web-h1", .protocol = .grpc_web, .codec = .proto, .http = .h11 },
 };
 
-/// The cases the client reads at most, and the octets of all of them.
-const cases_max = 64;
-const cases_bytes = 1024 * 1024;
-const names_bytes = 4096;
-/// Octets of the CA's PEM and of its certificate's DER.
-const ca_pem_bytes = 16 * 1024;
-const certificate_bytes = 8 * 1024;
 /// The name the test identity's certificate carries, which the client asks for and judges it by
 /// (examples/testdata/tls/identity.zig).
 const server_name = "localhost";
-/// Octets of one output line.
-const line_bytes = 1024;
-/// The scenarios a run leaves out, at most, and the option that names each.
-const left_out_max = 16;
+/// The option that names each scenario a run leaves out.
 const leave_out_option = "--leave-out=";
 
-var case_octets: [cases_bytes]u8 = undefined;
-var case_names: [names_bytes]u8 = undefined;
-var cases: [cases_max]Case align(@alignOf(Case)) = undefined;
-var ca_pem: [ca_pem_bytes]u8 = undefined;
-var anchor_der: [certificate_bytes]u8 = undefined;
-var anchor_room: [1]tls.Anchor align(@alignOf(tls.Anchor)) = undefined;
-var output: [line_bytes]u8 = undefined;
-var left_out: [left_out_max][]const u8 align(@alignOf([]const u8)) = undefined;
-var gzip_decoder: connect.GzipDecoder align(@alignOf(connect.GzipDecoder)) = undefined;
-var gzip_encoder: connect.GzipEncoder align(@alignOf(connect.GzipEncoder)) = undefined;
+/// All the program holds, which `main` allocates once before the first call (decision 42).
+const State = struct {
+    case_octets: [constants.cases_bytes]u8,
+    case_names: [constants.names_bytes]u8,
+    cases: [constants.cases_max]Case,
+    ca_pem: [constants.ca_pem_bytes]u8,
+    anchor_der: [constants.certificate_bytes]u8,
+    anchor_room: [1]tls.Anchor,
+    output: [constants.line_bytes]u8,
+    left_out: [constants.left_out_max][]const u8,
+    /// The client sends gzip when a scenario asks for it, and reads gzip.
+    gzip_decoder: connect.GzipDecoder,
+    gzip_encoder: connect.GzipEncoder,
+    /// The pool and its socket, which every run starts afresh.
+    transport: transport.Transport,
+    /// The memory of the one call at a time, which every scenario uses.
+    room: scenarios.Room,
+};
 
 /// No CPU feature is known, so each TLS session runs chapulin's portable code.
 const cpu: tls.Cpu = .{
@@ -95,6 +94,8 @@ const Reporter = struct {
     failures: u32 = 0,
     /// Each `<protocol>/<scenario>` the server's library cannot express.
     left_out: []const []const u8,
+    /// The reason the last failed scenario recorded.
+    verdict: *const Verdict,
 
     /// Whether the run of `protocol` runs `scenario`.
     fn runs(reporter: *const Reporter, protocol: []const u8, scenario: []const u8) bool {
@@ -105,13 +106,13 @@ const Reporter = struct {
         return true;
     }
 
-    fn report(reporter: *Reporter, protocol: []const u8, scenario: []const u8, case: []const u8, outcome: verdict.Error!void) void {
+    fn report(reporter: *Reporter, protocol: []const u8, scenario: []const u8, case: []const u8, outcome: Verdict.Error!void) void {
         const separator = if (case.len == 0) "" else " ";
         if (outcome) |_| {
             reporter.writer.print("ok: {s} {s} {s}{s}{s}\n", .{ reporter.server, protocol, scenario, separator, case }) catch {};
         } else |_| {
             reporter.failures += 1;
-            reporter.writer.print("FAIL: {s} {s} {s}{s}{s}: {s}\n", .{ reporter.server, protocol, scenario, separator, case, verdict.reason() }) catch {};
+            reporter.writer.print("FAIL: {s} {s} {s}{s}{s}: {s}\n", .{ reporter.server, protocol, scenario, separator, case, reporter.verdict.reason() }) catch {};
         }
         reporter.writer.flush() catch {};
     }
@@ -119,31 +120,34 @@ const Reporter = struct {
 
 pub fn main(init: std.process.Init) !void {
     const io = init.io;
+    const state = try init.arena.allocator().create(State);
+    state.room.verdict = .{};
     var args = init.minimal.args.iterate();
     _ = args.skip();
-    const left = try read_left_out(&args);
+    const left = try read_left_out(state, &args);
     const base_url = args.next() orelse return error.UsageWrong;
-    const read = try read_cases(io, args.next() orelse return error.UsageWrong);
+    const read = try read_cases(state, io, args.next() orelse return error.UsageWrong);
     const origin = try Origin.parse(base_url);
     const ca_path = args.next() orelse return error.UsageWrong;
     // Over TLS the client trusts the CA alone; in cleartext it names none.
-    const trust: ?tls.Client = if (origin.secure) try trust_of(io, ca_path) else null;
-    transport.init(io);
-    var stdout = std.Io.File.stdout().writer(io, &output);
-    var reporter: Reporter = .{ .writer = &stdout.interface, .server = left.server, .left_out = left.left_out };
+    const trust: ?tls.Client = if (origin.secure) try trust_of(state, io, ca_path) else null;
+    state.transport.init(io);
+    var stdout = std.Io.File.stdout().writer(io, &state.output);
+    var reporter: Reporter = .{ .writer = &stdout.interface, .server = left.server, .left_out = left.left_out, .verdict = &state.room.verdict };
     for (0..known.len + 1) |_| {
         const name = args.next() orelse break;
-        try run_all(&reporter, try protocol_named(name), &origin, trust, read);
+        try run_all(state, &reporter, try protocol_named(name), &origin, trust, read);
     }
     if (reporter.failures > 0) std.process.exit(1);
 }
 
 /// Reads each `--leave-out=` option, then the server's name.
-fn read_left_out(args: anytype) Error!struct { server: []const u8, left_out: []const []const u8 } {
-    for (0..left_out_max + 1) |count| {
+fn read_left_out(state: *State, args: anytype) Error!struct { server: []const u8, left_out: []const []const u8 } {
+    const left_out = &state.left_out;
+    for (0..constants.left_out_max + 1) |count| {
         const arg = args.next() orelse return error.UsageWrong;
         if (!std.mem.startsWith(u8, arg, leave_out_option)) return .{ .server = arg, .left_out = left_out[0..count] };
-        if (count == left_out_max) return error.TooManyLeftOut;
+        if (count == constants.left_out_max) return error.TooManyLeftOut;
         left_out[count] = arg[leave_out_option.len..];
     }
     return error.TooManyLeftOut;
@@ -167,7 +171,7 @@ const Origin = struct {
         if (!secure and !std.mem.startsWith(u8, url, "http://")) return error.BaseUrlWrong;
         const authority = url[(std.mem.indexOf(u8, url, "://") orelse unreachable) + "://".len ..];
         const colon = std.mem.lastIndexOfScalar(u8, authority, ':') orelse return error.BaseUrlWrong;
-        const port = std.fmt.parseInt(u16, authority[colon + 1 ..], 10) catch return error.BaseUrlWrong;
+        const port = std.fmt.parseInt(u16, authority[colon + 1 ..], constants.decimal) catch return error.BaseUrlWrong;
         // RFC 3986 §3.2.2: an IPv6 literal goes in brackets.
         const host = std.mem.trim(u8, authority[0..colon], "[]");
         return .{ .host = host, .port = port, .secure = secure };
@@ -175,25 +179,28 @@ const Origin = struct {
 };
 
 /// The TLS the client speaks: it trusts the CA in the PEM file at `path`, and no other.
-fn trust_of(io: std.Io, path: []const u8) !tls.Client {
-    const pem = try std.Io.Dir.cwd().readFile(io, path, &ca_pem);
-    const anchors = try tls.pem.anchors(pem, &anchor_der, &anchor_room);
+fn trust_of(state: *State, io: std.Io, path: []const u8) !tls.Client {
+    const pem = try std.Io.Dir.cwd().readFile(io, path, &state.ca_pem);
+    const anchors = try tls.pem.anchors(pem, &state.anchor_der, &state.anchor_room);
     if (anchors.len == 0) return error.NoAnchor;
     return .{ .trust = .{ .web_pki = .{ .anchors = anchors, .server_name = server_name } }, .cpu = cpu };
 }
 
 /// Reads each `<name>.binpb` of `path`, a `coverage.v1.Everything`, in the order of their names.
-fn read_cases(io: std.Io, path: []const u8) ![]const Case {
+fn read_cases(state: *State, io: std.Io, path: []const u8) ![]const Case {
+    const case_names = &state.case_names;
+    const case_octets = &state.case_octets;
+    const cases = &state.cases;
     var directory = try std.Io.Dir.cwd().openDir(io, path, .{ .iterate = true });
     defer directory.close(io);
     var entries = directory.iterate();
     var count: usize = 0;
     var octets_used: usize = 0;
     var names_used: usize = 0;
-    for (0..cases_max + 1) |_| {
+    for (0..constants.cases_max + 1) |_| {
         const entry = try entries.next(io) orelse break;
         if (!std.mem.endsWith(u8, entry.name, ".binpb")) continue;
-        if (count == cases_max) return error.TooManyCases;
+        if (count == constants.cases_max) return error.TooManyCases;
         const name = entry.name[0 .. entry.name.len - ".binpb".len];
         if (name.len > case_names.len - names_used) return error.CasesTooLarge;
         @memcpy(case_names[names_used..][0..name.len], name);
@@ -213,22 +220,24 @@ fn by_name(_: void, left: Case, right: Case) bool {
 }
 
 /// Runs every scenario of one protocol on one pool, which speaks the run's HTTP version alone.
-fn run_all(reporter: *Reporter, protocol: *const Protocol, origin: *const Origin, trust: ?tls.Client, all: []const Case) !void {
+fn run_all(state: *State, reporter: *Reporter, protocol: *const Protocol, origin: *const Origin, trust: ?tls.Client, all: []const Case) !void {
     const versions: client.Protocols = switch (protocol.http) {
         .h2 => .{ .h11 = false, .h2 = true, .h3 = false },
         .h11 => .{ .h11 = true, .h2 = false, .h3 = false },
         .h3 => unreachable,
     };
-    try transport.begin(origin.host, origin.port, versions, trust);
-    defer transport.end();
+    try state.transport.begin(origin.host, origin.port, versions, trust);
+    defer state.transport.end();
     const run: Run = .{
         .options = .{
             .protocol = protocol.protocol,
             .codec = protocol.codec,
-            .encoders = .{ .gzip = &gzip_encoder },
-            .decoders = .{ .gzip = &gzip_decoder },
+            .encoders = .{ .gzip = &state.gzip_encoder },
+            .decoders = .{ .gzip = &state.gzip_decoder },
         },
         .full_duplex = rpc.full_duplex(protocol.http),
+        .transport = &state.transport,
+        .room = &state.room,
     };
     run_cases(reporter, protocol, &run, all);
     run_calls(reporter, protocol.name, &run, all);

@@ -10,17 +10,19 @@
 //! "Timeout": the deadline binds the client too).
 //!
 //! `Invocation(method)` holds a call's state; the steps are functions of it, in this file and in
-//! `client_reading.zig`.
+//! `client_reading.zig`. The client holds one `Invocation` of each method in its `State`
+//! (decision 42), since colibri reads and writes a call until it finished.
 const std = @import("std");
 const assert = std.debug.assert;
 const connect = @import("connect");
 const client = @import("client");
 const rpc = @import("connect_colibri");
 const constants = @import("constants.zig");
-const transport = @import("client_transport.zig");
+const client_transport = @import("client_transport.zig");
+const Transport = client_transport.Transport;
 const Plan = @import("client_plan.zig").Plan;
 const Result = @import("client_result.zig").Result;
-const buffers = @import("client_buffers.zig");
+const Buffers = @import("client_buffers.zig").Buffers;
 const reading = @import("client_reading.zig");
 
 /// What a call reports when the client stops it.
@@ -44,7 +46,10 @@ pub fn Invocation(comptime method: connect.Method) type {
         /// call that fails has no payload, so its response is read once it ended.
         pub const single_response = method.stream_type == .unary or method.stream_type == .client_stream;
 
-        call: rpc.ClientCall(method, .{ .pool = transport.Pool }),
+        call: rpc.ClientCall(method, .{ .pool = client_transport.Pool }),
+        transport: *Transport,
+        /// The memory of the call's request and response, and of the reading of it.
+        buffers: *Buffers,
         plan: *const Plan,
         result: *Result,
         messages: []const method.Request,
@@ -61,13 +66,14 @@ pub fn Invocation(comptime method: connect.Method) type {
         /// What the streamed response's end-stream message or trailers frame carried.
         metadata: []const connect.Header = &.{},
 
-        var instance: Self align(@alignOf(Self)) = undefined;
-
-        /// Runs the call of `messages` as `plan` says, and records its outcome in `result`.
-        pub fn run(plan: *const Plan, messages: []const method.Request, result: *Result) StartError!void {
+        /// Runs the call of `messages` over `transport` as `plan` says, and records its outcome in
+        /// `result`.
+        pub fn run(self: *Self, transport: *Transport, buffers: *Buffers, plan: *const Plan, messages: []const method.Request, result: *Result) StartError!void {
             const now = transport.now_ns();
-            instance = .{
+            self.* = .{
                 .call = undefined,
+                .transport = transport,
+                .buffers = buffers,
                 .plan = plan,
                 .result = result,
                 .messages = messages,
@@ -75,8 +81,8 @@ pub fn Invocation(comptime method: connect.Method) type {
                 .deadline_ns = if (plan.timeout_ns) |timeout_ns| now + timeout_ns else null,
                 .give_up_ns = now + (plan.timeout_ns orelse 0) + constants.client_call_ns_max,
             };
-            if (streamed) try run_stream(&instance) else try run_whole(&instance);
-            reading.record_metadata(&instance);
+            if (streamed) try run_stream(self) else try run_whole(self);
+            reading.record_metadata(self);
         }
 
         fn on_event(context: *anyopaque, event: client.Event) void {
@@ -88,7 +94,7 @@ pub fn Invocation(comptime method: connect.Method) type {
 
 fn listen(self: anytype) void {
     const Self = @TypeOf(self.*);
-    transport.listen(.{ .context = self, .on_event = Self.on_event });
+    self.transport.listen(.{ .context = self, .on_event = Self.on_event });
 }
 
 /// Hands the call one event of its exchange.
@@ -116,7 +122,7 @@ pub fn ended(self: anytype) bool {
 /// Cancels the exchange, and the call ends with `failure`. The pool reports nothing more of it.
 pub fn stop(self: anytype, failure: connect.RpcError) void {
     assert(!ended(self));
-    transport.pool_of().cancel(self.call.id, transport.now_ns());
+    self.transport.pool_of().cancel(self.call.id, self.transport.now_ns());
     self.stopped = true;
     self.result.failure = failure;
 }
@@ -138,12 +144,12 @@ fn done(self: anytype, until: Until) bool {
 fn wait(self: anytype, until_ns: u64, until: Until) void {
     for (0..constants.client_turns_max) |_| {
         if (ended(self) or done(self, until)) return;
-        const now = transport.now_ns();
+        const now = self.transport.now_ns();
         const deadline_ns = self.deadline_ns orelse forever;
         if (now >= deadline_ns) return stop(self, past_deadline);
         if (now >= self.give_up_ns) return stop(self, given_up);
         if (now >= until_ns) return;
-        transport.turn(@min(until_ns, deadline_ns, self.give_up_ns));
+        self.transport.turn(@min(until_ns, deadline_ns, self.give_up_ns));
     }
     stop(self, given_up);
 }
@@ -152,8 +158,8 @@ fn wait(self: anytype, until_ns: u64, until: Until) void {
 /// stream").
 fn run_whole(self: anytype) StartError!void {
     if (self.messages.len != 1) return error.WrongMessageCount;
-    try self.call.init(&self.plan.options, self.messages, &buffers.call(false));
-    try self.call.start(transport.pool_of());
+    try self.call.init(&self.plan.options, self.messages, &self.buffers.call(false));
+    try self.call.start(self.transport.pool_of());
     listen(self);
     cancel_after_close(self);
     wait(self, forever, .end);
@@ -168,15 +174,15 @@ fn cancel_after_close(self: anytype) void {
         .after_close_send_ms => |delay_ms| delay_ms,
         else => return,
     };
-    wait(self, transport.now_ns() + @as(u64, delay_ms) * constants.nanos_per_milli, .end);
+    wait(self, self.transport.now_ns() + @as(u64, delay_ms) * constants.nanos_per_milli, .end);
     if (!ended(self)) stop(self, canceled);
 }
 
 /// The steps of a client or bidirectional stream (docs/testing_clients.md, "Client stream",
 /// "Half-Duplex Bidi Stream" and "Full-Duplex Bidi Stream").
 fn run_stream(self: anytype) StartError!void {
-    try self.call.init_stream(&self.plan.options, &buffers.call(true));
-    try self.call.start(transport.pool_of());
+    try self.call.init_stream(&self.plan.options, &self.buffers.call(true));
+    try self.call.start(self.transport.pool_of());
     listen(self);
     send_all(self);
     if (!ended(self)) close_or_cancel(self);
@@ -200,7 +206,7 @@ fn close_or_cancel(self: anytype) void {
 /// answers' end.
 fn send_all(self: anytype) void {
     for (self.messages, 0..) |*message, index| {
-        if (self.plan.delay_ns > 0) wait(self, transport.now_ns() + self.plan.delay_ns, .end);
+        if (self.plan.delay_ns > 0) wait(self, self.transport.now_ns() + self.plan.delay_ns, .end);
         if (ended(self) or !send(self, message)) {
             self.result.unsent = @intCast(self.messages.len - index);
             return;

@@ -82,5 +82,5 @@ fn port_of(init: std.process.Init) !u16 {
     var args = try init.minimal.args.iterateAllocator(init.arena.allocator());
     _ = args.skip();
     const text = args.next() orelse return constants.port_default;
-    return std.fmt.parseInt(u16, text, 10);
+    return std.fmt.parseInt(u16, text, constants.decimal);
 }

@@ -20,61 +20,61 @@ const proto = @import("protobuf");
 const coverage = @import("coverage");
 const editions = @import("editions");
 const legacy = @import("legacy");
+const constants = @import("constants.zig");
 
 pub const protobuf_any_types: []const type = &.{ coverage.Everything, coverage.Nested, coverage.Scalars };
 
 pub const Error = error{ UsageWrong, InputTooLarge };
 
-/// The largest message a case holds, in either encoding.
-const message_len_max = 1 << 20;
-/// The longest JSON token: a string's octets.
-const token_len_max = 1 << 16;
-const io_buffer_len = 1 << 12;
-
 const Direction = enum { @"json-to-binary", @"binary-to-json", @"binary-to-binary", @"through-partial" };
 const Message = enum { coverage, editions, legacy };
 
-var input: [message_len_max]u8 = undefined;
-var output: [message_len_max]u8 = undefined;
-var binary: [message_len_max]u8 = undefined;
-var tokens: [token_len_max]u8 = undefined;
-var io_buffer: [io_buffer_len]u8 = undefined;
+/// All the program holds, which `main` allocates once before the first call (decision 42).
+const State = struct {
+    input: [constants.message_len_max]u8,
+    output: [constants.message_len_max]u8,
+    binary: [constants.message_len_max]u8,
+    tokens: [constants.token_len_max]u8,
+    io_buffer: [constants.io_buffer_len]u8,
+};
 
 pub fn main(init: std.process.Init) !void {
+    const state = try init.arena.allocator().create(State);
     var args = init.minimal.args.iterate();
     _ = args.skip();
     const message = std.meta.stringToEnum(Message, args.next() orelse return error.UsageWrong) orelse return error.UsageWrong;
     const direction = std.meta.stringToEnum(Direction, args.next() orelse return error.UsageWrong) orelse return error.UsageWrong;
-    var stdin = std.Io.File.stdin().reader(init.io, &io_buffer);
-    const len = try stdin.interface.readSliceShort(&input);
-    if (len == input.len) return error.InputTooLarge;
+    var stdin = std.Io.File.stdin().reader(init.io, &state.io_buffer);
+    const len = try stdin.interface.readSliceShort(&state.input);
+    if (len == state.input.len) return error.InputTooLarge;
+    const input = state.input[0..len];
     const written = switch (message) {
-        .coverage => try convert(coverage.Everything, direction, input[0..len]),
-        .editions => try convert(editions.Everything, direction, input[0..len]),
-        .legacy => try convert(legacy.Everything, direction, input[0..len]),
+        .coverage => try convert(coverage.Everything, state, direction, input),
+        .editions => try convert(editions.Everything, state, direction, input),
+        .legacy => try convert(legacy.Everything, state, direction, input),
     };
-    var stdout = std.Io.File.stdout().writer(init.io, &io_buffer);
+    var stdout = std.Io.File.stdout().writer(init.io, &state.io_buffer);
     try stdout.interface.writeAll(written);
     try stdout.interface.flush();
 }
 
-fn convert(comptime T: type, direction: Direction, bytes: []const u8) ![]const u8 {
+fn convert(comptime T: type, state: *State, direction: Direction, bytes: []const u8) ![]const u8 {
     switch (direction) {
         .@"json-to-binary" => {
-            const message = try proto.decode_json(T, bytes, &binary, &tokens);
-            return proto.encode(T, &message, &output);
+            const message = try proto.decode_json(T, bytes, &state.binary, &state.tokens);
+            return proto.encode(T, &message, &state.output);
         },
         .@"binary-to-json" => {
             const message = try proto.decode(T, bytes);
-            return proto.encode_json(T, &message, &output);
+            return proto.encode_json(T, &message, &state.output);
         },
         .@"binary-to-binary" => {
             const message = try proto.decode(T, bytes);
-            return proto.encode(T, &message, &output);
+            return proto.encode(T, &message, &state.output);
         },
         .@"through-partial" => {
             const message = try proto.decode(coverage.Partial, bytes);
-            return proto.encode(coverage.Partial, &message, &output);
+            return proto.encode(coverage.Partial, &message, &state.output);
         },
     }
 }

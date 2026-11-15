@@ -6,10 +6,6 @@ const connect = @import("connect");
 const constants = @import("constants.zig");
 const invoke = @import("client_invoke.zig");
 
-/// The response's header lines and trailer lines, which one case at a time records.
-var header_lines: [constants.client_fields_max]connect.Header align(@alignOf(connect.Header)) = undefined;
-var trailer_lines: [constants.client_fields_max]connect.Header align(@alignOf(connect.Header)) = undefined;
-
 const out_of_room: connect.RpcError = .{ .code = .internal, .message = "the client's result ran out of room" };
 
 /// Reads each message of a streamed response that arrived whole. A unary-response call reads
@@ -61,22 +57,23 @@ fn read_messages(self: anytype, response: *connect.client.Response) ?connect.Rpc
     return out_of_room;
 }
 
-/// Records the response's headers and trailers, when its head arrived.
+/// Records the response's headers and trailers, when its head arrived. Their lines go into the
+/// call's buffers.
 pub fn record_metadata(self: anytype) void {
     const Self = @TypeOf(self.*);
     const arrived = if (Self.streamed) self.headers_seen else self.call.response.result == .response;
     if (!arrived) return;
-    const headers = lines_of(&self.call.response.headers, &header_lines);
+    const headers = lines_of(&self.call.response.headers, &self.buffers.header_lines);
     self.result.add_metadata(.headers, headers) catch {};
     if (self.stopped) return;
     const speaks = self.call.call.speaks;
     const trailers = switch (speaks.protocol) {
         // PROTOCOL-HTTP2.md, "Responses": gRPC's trailers are HTTP trailers.
-        .grpc => lines_of(&self.call.response.trailers, &trailer_lines),
+        .grpc => lines_of(&self.call.response.trailers, &self.buffers.trailer_lines),
         // Connect protocol, "Unary-Response": a unary call's trailers are headers whose names
         // start with "trailer-". A stream's are in its end-stream message, and gRPC-Web's in its
         // trailers frame (PROTOCOL-WEB.md).
-        .connect => if (speaks.enveloped) self.metadata else unary_trailers(headers, &trailer_lines),
+        .connect => if (speaks.enveloped) self.metadata else unary_trailers(headers, &self.buffers.trailer_lines),
         .grpc_web => self.metadata,
     };
     self.result.add_metadata(.trailers, trailers) catch {};
