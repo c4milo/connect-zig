@@ -79,6 +79,12 @@ for baseline in ${baselines}; do
 done
 echo
 echo "Machine: $(uname -m), $(cpu_model), $(getconf _NPROCESSORS_ONLN 2>/dev/null || echo "?") CPUs, features ${cpu_features}"
+# The CPU Zig builds for: its model and the features it read from this machine. On aarch64 they
+# come from the CPU's ID registers, not from the model, so `-Dcpu` with the model alone builds
+# other code. With this line, a build can be repeated elsewhere.
+zig_cpu="$(zig build-exe --show-builtin 2>/dev/null | sed -n '/pub const cpu/,/})/p' |
+    sed -n -e 's/.*\.cpu\.\([a-z0-9_]*\),$/\1/p' -e 's/^ *\.\([a-z0-9_]*\),$/+\1/p' | tr -d '\n')"
+echo "Zig CPU: ${zig_cpu}"
 echo
 
 # Each table row is "| message | operation | bytes | ns/op | MB/s |". The Zig row and the Go and
