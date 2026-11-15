@@ -2,8 +2,9 @@
 # entry 16). `plan` asks tools/ci.sh for its checks, and `check` runs each in a job of its own, so
 # each shows apart in GitHub's checks with its own summary: a new check joins tools/ci.sh alone.
 # Each job's work is `tools/ci.sh --only <check>`, which a person runs by hand for the same
-# answer. Each download is pinned by checksum. `bench-compare` runs a second time on an arm64
-# runner: the README's arm64 chart comes from that job.
+# answer. Each download is pinned by checksum. `test` and `bench-compare` run a second time on an
+# arm64 runner: the first because an aarch64 Linux link can fail where x86-64's passes, and the
+# second for the README's arm64 chart.
 name: main
 on:
   push:
@@ -46,6 +47,10 @@ jobs:
         # alone, as each run's do (docs/performance.md).
         include:
           - check: bench-compare
+            runner: ubuntu-24.04-arm
+          # aarch64 Linux reaches a test binary's thread-local data through local-exec
+          # relocations, which reach 16 MiB, and x86-64's reach 2 GiB.
+          - check: test
             runner: ubuntu-24.04-arm
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

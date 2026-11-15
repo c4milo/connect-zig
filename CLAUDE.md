@@ -173,5 +173,6 @@ confirm a test fails. Report `CAUGHT` or `NOT CAUGHT` per mutation in the commit
   which the commit that pays for it explains. It needs valgrind.
 - CI: `tools/ci.sh` runs every check and writes a report; `--only <check>` runs one and `--list`
   names them. `.github/workflows/main.yml` runs each check of `--list` as a job of its own on each
-  push and pull request. A new check joins `tools/ci.sh`, never the workflow file. `bench-compare`
-  runs a second time on an arm64 runner, for the README's arm64 chart.
+  push and pull request. A new check joins `tools/ci.sh`, never the workflow file. `test` and
+  `bench-compare` run a second time on an arm64 runner: `test` because an aarch64 Linux link can
+  fail where x86-64's passes, and `bench-compare` for the README's arm64 chart.
