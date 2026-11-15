@@ -8,9 +8,10 @@ are in [docs/decisions.md](docs/decisions.md), and the steps and their measureme
 connect-zig follows [Semantic Versioning](https://semver.org/). Before 1.0, a minor version may
 change the public API, and the entry marks each change that does.
 
-## Unreleased: v0.1.0
+## v0.1.0 (2026-11-15)
 
-The first release.
+The first release. It builds on colibri v0.17.0, and on the stdx (`22f5139`) and chapulin
+(v0.8.0) commits colibri pins, with Zig 0.16.0.
 
 ### Protocols
 
@@ -34,8 +35,9 @@ The first release.
   interceptor writes them, and each callback of the call reads them with `ctx.values`
   (decision 35).
 - Each method is a stream route of colibri v0.17.0's router, which reads a whole body in place
-  (decision 45). A small routed call takes about 20 times fewer instructions than on colibri
-  v0.16.3, whose router copied each call's state at each request.
+  (decision 45). A small routed Connect call takes 4,204 instructions on CI's judge
+  (x86-64-v3), where colibri v0.16.3, which copied each call's state at each request, took
+  34,682.
 - A method Connect does not serve gets 405 with an `Allow` header, as connect-go answers.
 
 ### OpenID Connect
@@ -113,8 +115,10 @@ The first release.
 - The tests run 97.6% of the library's lines under kcov, on CI's run 136 (decision 43).
 - OpenTelemetry's Go SDK exports spans to `examples/otlp`, OTLP's trace receiver, over gRPC with
   gzip and TLS, and the check reads each span back as the SDK ended it (decision 40).
-- A performance gate on instruction counts, and a benchmark beside Go's protobuf runtime and
-  connect-rust's Buffa, published by CI.
+- A performance gate on instruction counts, for the codec and for a routed unary call. A
+  benchmark beside Go's protobuf runtime and connect-rust's Buffa, and a routed call beside
+  connect-go and connect-rust, which CI publishes.
+- CI runs the tests on x86-64 Linux and on arm64 Linux.
 - A project that fetches connect-zig as a package follows the README: it generates its code
   with the plugin, and serves a method over TLS on h11, h2 and h3. It calls the method with
   connect-zig's client over h2 and h3, and with curl over h11. `tools/package_check.sh` runs it
