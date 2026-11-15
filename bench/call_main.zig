@@ -87,8 +87,10 @@ fn parse(args: std.process.Args) !Options {
 }
 
 /// Times or counts each protocol's routed call of one message, and writes its reply under
-/// `--write`.
-fn run_calls(context: Context, name: []const u8, exchange: *call.Exchange) !void {
+/// `--write`. It, `count_instructions` and `Exchange.call` stay out of line: inlined into `main`
+/// with the router, they made one function whose jump tables LLVM failed to encode on CI's arm64
+/// runner ("fixup value out of range").
+noinline fn run_calls(context: Context, name: []const u8, exchange: *call.Exchange) !void {
     for (std.enums.values(call.Protocol)) |protocol| {
         if (context.options.write_directory) |directory| {
             try write_reply(context.io, directory, name, protocol, try exchange.reply_of(protocol));
@@ -108,7 +110,7 @@ fn run_calls(context: Context, name: []const u8, exchange: *call.Exchange) !void
 
 /// Collects the instructions of `instruction_iterations` calls, after one call that warms them,
 /// and dumps them under "<message> <call>".
-fn count_instructions(name: []const u8, label: []const u8, runner: call.Runner) !void {
+noinline fn count_instructions(name: []const u8, label: []const u8, runner: call.Runner) !void {
     try runner.run(1);
     const callgrind = std.valgrind.callgrind;
     callgrind.toggleCollect();

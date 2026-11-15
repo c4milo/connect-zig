@@ -154,8 +154,9 @@ pub const Exchange = struct {
         return exchange.body_lens[@intFromEnum(protocol)];
     }
 
-    /// One call: its head, its body with its end, and its end, as an engine reports them.
-    fn call(exchange: *Exchange, protocol: Protocol) !void {
+    /// One call: its head, its body with its end, and its end, as an engine reports them. Out of
+    /// line, so the router's code makes a function of its own (bench/call_main.zig says why).
+    noinline fn call(exchange: *Exchange, protocol: Protocol) !void {
         const index = @intFromEnum(protocol);
         exchange.engine.ended = false;
         exchange.engine.body_len = 0;
