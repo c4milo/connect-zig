@@ -1,5 +1,6 @@
 // Command bench is the Go counterpart of bench/main.zig: google.golang.org/protobuf on the same
-// eight messages, timed the same way, printed as the same Markdown table.
+// eight messages, timed the same way, printed as the same Markdown table. Then the routed calls
+// of call.go: a unary call of the small and of the medium message through connect-go's handler.
 //
 // Run it from bench/go with `go run . [--quick] [--write <dir>]`. Binary encoding uses
 // deterministic marshaling, which writes map entries in key order, as the Zig benchmark does.
@@ -102,7 +103,7 @@ func run(current settings, directory string) error {
 			fmt.Printf("| %s | %s | %d | %.1f | %.1f |\n", m.name, operation, size, ns, megabytesPerSecond)
 		}
 	}
-	return nil
+	return runCalls(current, directory, messages[0], messages[1])
 }
 
 // prepare encodes the message once in each form, and checks that both decode back to it.

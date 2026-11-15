@@ -205,11 +205,13 @@ Each step names the check that proves it. A step is done when its check passes i
     names: none; the options gain a field, and `init` and `init_stream` an argument. Check:
     `zig build test-connect-colibri`, and `examples/interceptors`, whose `Count` counts each
     response in the program's `Tally`.
-23. **A routed call in the benchmark.** `bench/call.zig` runs a unary call of the small message
-    through `connect_colibri`'s route on colibri's router, in Connect and in gRPC, so the judge
-    counts what a call costs beside the codec (`docs/performance.md`). New public names: none.
-    Check: `zig build bench -- --quick` checks each reply's octets, and `tools/perf_check.sh`
-    counts both calls.
+23. **A routed call in the benchmark.** `bench/call.zig` runs a unary call of the small and of
+    the medium message through `connect_colibri`'s route on colibri's router, in Connect and in
+    gRPC, so the judge counts what a call costs beside the codec (`docs/performance.md`).
+    bench/go and bench/rust make the same calls through connect-go and connect-rust. New public
+    names: none. Check: `zig build bench -- --quick` checks each reply's octets,
+    `tools/bench_check.sh` compares them across the three, and `tools/perf_check.sh` counts the
+    four calls.
 
 ### Step records
 

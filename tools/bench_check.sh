@@ -1,7 +1,8 @@
 #!/bin/sh
 # Runs the protobuf benchmark in Zig (`zig build bench`), in Go (bench/go) and, when cargo is on
 # the path, in Rust (bench/rust, on Buffa). It checks that each baseline encodes each message to
-# the same bytes as Zig and decodes it to the same walk sum, and prints the tables side by side.
+# the same bytes as Zig and decodes it to the same walk sum, and that each routed call, through
+# connect-go and connect-rust, answers with the same octets. It prints the tables side by side.
 # `--quick` passes on to every program. It needs go on the path, or GO naming it; the Rust
 # program also needs buf, or BUF naming it, for the descriptor set its build compiles.
 set -eu
@@ -59,15 +60,21 @@ status=0
 for baseline in ${baselines}; do
     label="Go"
     [ "${baseline}" = "rust" ] && label="Rust"
+    # Each message's encoding and walk sum, then each routed call's reply (bench/call.zig).
+    files=""
     for message in small medium large deep varints strings tree packed; do
-        for kind in bin sum; do
-            if cmp -s "${scratch}/zig/${message}.${kind}" "${scratch}/${baseline}/${message}.${kind}"; then
-                echo "${message}.${kind}: Zig and ${label} match"
-            else
-                echo "${message}.${kind}: Zig and ${label} differ" >&2
-                status=1
-            fi
-        done
+        files="${files} ${message}.bin ${message}.sum"
+    done
+    for message in small medium; do
+        files="${files} ${message}.connect.reply ${message}.grpc.reply"
+    done
+    for file in ${files}; do
+        if cmp -s "${scratch}/zig/${file}" "${scratch}/${baseline}/${file}"; then
+            echo "${file}: Zig and ${label} match"
+        else
+            echo "${file}: Zig and ${label} differ" >&2
+            status=1
+        fi
     done
 done
 echo

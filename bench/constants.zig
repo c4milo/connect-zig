@@ -47,9 +47,9 @@ pub const call_requests = 1;
 /// The example projects name the same 16 KiB.
 pub const call_response_bytes = 16 * 1024;
 pub const call_body_bytes = 16 * 1024;
-/// Room for a routed call's request body, and for the reply `prepare` checks: the small message
-/// in an envelope.
-pub const call_body_len = 256;
+/// Room for a routed call's request body, and for the reply it checks: the medium message, about
+/// 1 KB, in an envelope.
+pub const call_body_len = 2048;
 /// The HTTP version the routed calls name: h2 (RFC 9113).
 pub const h2_major = 2;
 

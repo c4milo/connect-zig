@@ -1,5 +1,6 @@
 //! The Rust counterpart of bench/main.zig and bench/go: Buffa on the same eight messages, timed
-//! the same way, printed as the same Markdown table.
+//! the same way, printed as the same Markdown table. Then the routed calls of call.rs: a unary
+//! call of the small and of the medium message through connect-rust, which encodes with Buffa.
 //!
 //! tools/bench_check.sh builds and runs it from bench/rust, with BENCH_DESCRIPTORS naming the
 //! descriptor set of bench/proto: `cargo run --release --locked -- [--quick] [--write <dir>]`.
@@ -16,6 +17,7 @@ use buffa::HasMessageView;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
+mod call;
 mod inputs;
 mod measure;
 mod walk;
@@ -98,7 +100,9 @@ fn run(current: &Settings, directory: Option<&str>) -> Result<(), String> {
         "tree",
         inputs::tree(inputs::TREE_LEVELS_COUNT),
     )?;
-    bench(current, directory, "packed", inputs::packed())
+    bench(current, directory, "packed", inputs::packed())?;
+    call::run_calls(current, directory, "small", "Small", &inputs::small())?;
+    call::run_calls(current, directory, "medium", "Medium", &inputs::medium())
 }
 
 fn bench<T: Benched>(

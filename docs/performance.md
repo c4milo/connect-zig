@@ -45,14 +45,19 @@ with every field read takes `decode_into`, as a program that reads every field d
 `bench/instructions.txt` holds the count of each pair. The benchmark builds stdx's modules in
 ReleaseFast too, so no count includes a safety check.
 
-Two more operations are routed calls (`bench/call.zig`): one unary call of the small message, in
-Connect and in gRPC, through `connect_colibri`'s route on colibri's `server.Router`. The route
-takes the default options, as a program that names none does. The program hands the router an
-engine's events: the request's head, its body with its end, and the request's end. A stand-in
-engine takes each octet at once. So a count holds the router, the route, the protocol and the
-codec, and no framing, TLS or socket. The rows read "small Connect unary call" and "small gRPC
-unary call"; Go and Rust have none. The benchmark builds `connect`, `connect_colibri` and
-colibri's modules in ReleaseFast for them.
+Four more operations are routed calls (`bench/call.zig`): one unary call of the small and of the
+medium message, in Connect and in gRPC, through `connect_colibri`'s route on colibri's
+`server.Router`. The route takes the default options, as a program that names none does. The
+program hands the router an engine's events: the request's head, its body with its end, and the
+request's end. A stand-in engine takes each octet at once. So a count holds the router, the
+route, the protocol and the codec, and no framing, TLS or socket. The benchmark builds
+`connect`, `connect_colibri` and colibri's modules in ReleaseFast for them.
+
+bench/go and bench/rust make the same calls in memory: connect-go's handler through `ServeHTTP`,
+and connect-rust's `ConnectRpcService`, which encodes with Buffa, as a tower service. Each
+handler answers the message with itself, and `tools/bench_check.sh` checks that each reply's
+octets equal Zig's. Go builds a `net/http` request and Rust an `http::Request` for each call, so
+the three do close to the same work, not the same work.
 
 ## The admission rule
 
