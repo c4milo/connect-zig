@@ -1080,6 +1080,10 @@ ran on Linux x86-64 with Zig 0.16.0.
     before passed each case.
   - `examples/socket_server` reads and writes br, and `tools/interop_check.sh` asks it for a br
     answer that curl decodes.
+  - CI's [run 156](https://github.com/c4milo/connect-zig/actions/runs/43956832740) on
+    `2e31fdb` agreed: 3536 and 10758 cases, curl's read of a br answer, the tests on the arm64
+    runner, and on the judge 10 to 22 instructions fewer for each routed call (small Connect
+    4,204 to 4,194, small gRPC 4,711 to 4,699).
   - Mutations, 12 of 12 CAUGHT: br written never, always, and when the zstd encoder is placed;
     the window at WBITS 18; level 5; the gzip encoder in br's arm; the export gone; the
     conformance client's refusal of br; and no encoders handed to a POST's choice, to a GET's
@@ -1088,9 +1092,22 @@ ran on Linux x86-64 with Zig 0.16.0.
 
 ### What a later step owes
 
-- The README's conformance counts (step 26). The README names the counts of one CI run: 2714
-  server cases and 8264 client cases. With br they are 3536 and 10758 on runner v1.0.4, so the
-  README takes them, and the run's link, once CI ran this step.
+- The base64 change of stdx v0.1.1, and 8 instructions a bytes field on the judge. CI's
+  [run 156](https://github.com/c4milo/connect-zig/actions/runs/43956832740) counted large JSON
+  decode at 4,969,617 instructions on stdx v0.1.1, where the baseline on stdx `22f5139` is
+  4,961,617: 8 more for each of its 1000 bytes fields, +0.16%. The local judge counts
+  x86-64-v2, and saw no count move.
+  - stdx v0.1.1 made the base64 decoder's `init` inline. The decoder keeps its options, and
+    whether the CPU has AVX2, in fields of one or two bits. Zig 0.16 stores such a field at its
+    width and loads it as an octet, and LLVM carries no such store to the load. So a decode
+    knows its options at compile time only when each of them is zero, and on x86-64-v3 the AVX2
+    field is not.
+  - stdx `847345cb`, on a branch, keeps each of those fields as a whole octet. With it,
+    `pad_bits = .drop` and no fallback of connect-zig's own takes 26 instructions a field fewer
+    than today's code on x86-64-v2, and 7 to 8 more on aarch64. On stdx v0.1.1 that change
+    takes 6.4 more and 17.0 more, so it did not land.
+  - The change lands, and the judge counts again, at the colibri tag that pins a stdx with
+    that commit.
 
 - The pin of the conformance runner at v1.0.7 (step 25). It waits for two changes in colibri.
   - Over h11, colibri v0.17.0 and v0.17.1 close a connection with no `Connection: close` after
