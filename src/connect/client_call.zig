@@ -237,7 +237,7 @@ test "a client stream over gRPC-Web is envelopes, and a GET carries its message 
     try testing.expectEqualStrings("1", find(stream.headers(), "x-grpc-web").?);
     const fetch = try request(say, &.{ .use_get = true, .codec = .json }, &.{.{ .text = "x" }}, &.{ .body = &buffers[0], .scratch = scratch, .values = &buffers[3] });
     try testing.expectEqualStrings("GET", fetch.http_method);
-    try testing.expectEqualStrings("/test.Svc/Say?connect=v1&encoding=json&base64=1&message=eyJ0ZXh0IjoieCJ9", fetch.target);
+    try testing.expectEqualStrings("/test.Svc/Say?connect=v1&base64=1&encoding=json&message=eyJ0ZXh0IjoieCJ9", fetch.target);
 }
 
 test "a request carries the conformance runner's seven headers and a case's beside them" {

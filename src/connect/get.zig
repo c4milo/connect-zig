@@ -1,10 +1,14 @@
 //! A unary request sent as a GET, for a method with no side effects (Connect protocol,
 //! "Unary-Get-Request"). The query carries the message and how to read it:
 //!
-//! - `message`: the encoded message, in URL-safe base64 when `base64=1`, else percent-encoded;
-//! - `encoding`: the codec's name, "proto" or "json";
+//! - `connect=v1`: the protocol version;
+//! - `base64=1`: the message is in URL-safe base64, else it is percent-encoded;
 //! - `compression`: the coding, when the message is compressed;
-//! - `connect=v1`: the protocol version.
+//! - `encoding`: the codec's name, "proto" or "json";
+//! - `message`: the encoded message.
+//!
+//! A client writes them in that order, so a shared cache sees one URL for one request (Connect
+//! protocol, "Query-Get"). A server reads them in any order.
 const std = @import("std");
 const base64 = @import("base64");
 const Features = @import("codec").Features;
@@ -31,10 +35,11 @@ pub const Error = error{
 
 /// Writes the query of a GET for an encoded message, without the "?".
 pub fn write_query(codec: Codec, coding: Coding, message: []const u8, buffer: []u8) error{NoSpaceLeft}![]const u8 {
+    // Connect protocol, "Query-Get": connect, base64, compression, encoding, then message.
     const head = if (coding == .identity)
-        std.fmt.bufPrint(buffer, "connect=v1&encoding={s}&base64=1&message=", .{codec.name()})
+        std.fmt.bufPrint(buffer, "connect=v1&base64=1&encoding={s}&message=", .{codec.name()})
     else
-        std.fmt.bufPrint(buffer, "connect=v1&encoding={s}&compression={s}&base64=1&message=", .{ codec.name(), coding.name() });
+        std.fmt.bufPrint(buffer, "connect=v1&base64=1&compression={s}&encoding={s}&message=", .{ coding.name(), codec.name() });
     const written = head catch return error.NoSpaceLeft;
     // Connect protocol, "Unary-Get-Request": the URL-safe alphabet, padding omitted.
     var encoder: base64.Encoder = undefined;
@@ -132,7 +137,7 @@ const testing = std.testing;
 test "a GET query carries the message in URL-safe base64 and reads back" {
     var buffer: [128]u8 = undefined;
     const query = try write_query(.proto, .gzip, &.{ 0xfb, 0xff }, &buffer);
-    try testing.expectEqualStrings("connect=v1&encoding=proto&compression=gzip&base64=1&message=-_8", query);
+    try testing.expectEqualStrings("connect=v1&base64=1&compression=gzip&encoding=proto&message=-_8", query);
     const read = try read_query(query);
     try testing.expectEqual(Codec.proto, read.codec);
     try testing.expectEqual(Coding.gzip, read.coding);
