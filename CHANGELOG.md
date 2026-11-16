@@ -18,6 +18,8 @@ change the public API, and the entry marks each change that does.
 
 ### Changed
 
+- JSON encode writes a message with no member, `{}`, in one stdx call: tree's JSON encode takes
+  27% fewer instructions.
 - **Changes the API.** `compression.compress` and `compression.choose` take the encoders as
   `*const Encoders`, since `Encoders` holds three pointers now. A call passes `&encoders`.
 - connect-zig builds on colibri v0.17.1 and on stdx v0.1.1, the tag colibri pins. A program that

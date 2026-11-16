@@ -1090,6 +1090,19 @@ ran on Linux x86-64 with Zig 0.16.0.
     choice, to a unary reply and to a stream's reply. The GET's was NOT CAUGHT first: no test
     asked a GET for a compressed answer, and one does now.
 
+- **A message with no member in one call** (a hot-path change, `docs/performance.md`). On stdx
+  v0.1.1, whose `TextWriter.empty_object` writes `{}` in one call (stdx decision 82).
+  - `write_message` tests each field as its writer does, and writes `{}` through
+    `empty_object` when no field writes a member. An empty `Any` takes the same call. The tree
+    benchmark holds 341 messages, and 256 of them write no member.
+  - Local judges, under callgrind: tree JSON encode 64,928 to 47,626 instructions on
+    x86-64-v2 (26.65% fewer), and 57,175 to 42,177 on aarch64 (26.23% fewer). Small, strings
+    and varints JSON encode take 2 more for each message, +0.05% to +0.16%, and large on
+    aarch64 2 more for each of its 1000 records, +0.07%. No other count moved.
+  - Mutations, 8 of 9 CAUGHT: the test always true, the test inverted, and each of the five
+    kinds of field left out of the test. The one NOT CAUGHT never calls `empty_object`, and
+    writes the same text: the judge catches it once the baseline holds the new counts.
+
 ### What a later step owes
 
 - The base64 change of stdx v0.1.1, and 8 instructions a bytes field on the judge. CI's

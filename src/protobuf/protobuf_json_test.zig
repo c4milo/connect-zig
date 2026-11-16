@@ -66,6 +66,29 @@ test "a message is written with JSON names, defaults left off" {
     try testing.expectEqualStrings("{}", try proto.encode_json(Inner, &.{}, &buffers.text));
 }
 
+test "a message writes {} only when no field of any kind writes a member" {
+    var buffers: Buffers = .{};
+    const node: Node = .{};
+    const entry: binary_test.Entry = .{ .key = "k" };
+    // Each kind set alone, at its default where a set field still writes: an optional, a message
+    // field and a oneof's member.
+    const alone = [_]All{
+        .{ .int32_field = 1 },
+        .{ .optional_int = 0 },
+        .{ .inner = .{} },
+        .{ .numbers = .of(&.{1}) },
+        .{ .counts = .of(&.{entry}) },
+        .{ .choice = .{ .name = "" } },
+        .{ .node = .of(&node) },
+    };
+    for (&alone) |*each| try testing.expect(!std.mem.eql(u8, "{}", try proto.encode_json(All, each, &buffers.text)));
+    try testing.expectEqualStrings("{}", try proto.encode_json(All, &.{}, &buffers.text));
+    // Empty messages as an array's elements, as the leaves of a tree are.
+    const empties = [_]Inner{ .{}, .{} };
+    const listed: All = .{ .inners = .of(&empties) };
+    try testing.expectEqualStrings("{\"inners\":[{},{}]}", try proto.encode_json(All, &listed, &buffers.text));
+}
+
 test "every kind round-trips through JSON" {
     var buffers: Buffers = .{};
     const node: Node = .{ .value = -3 };

@@ -43,9 +43,33 @@ pub fn write_message(comptime T: type, message: *const T, text: *json.TextWriter
         .list_value => return write_list(message, text, constants.limits.json_depth_max),
         .any => return write_any(message, text, registry),
     }
+    // A message with no member to write is `{}`, which stdx writes in one call where its braces
+    // take two (stdx decision 82).
+    if (writes_none(T, message)) return @call(.always_inline, json.TextWriter.empty_object, .{text});
     try @call(.always_inline, json.TextWriter.begin_object, .{text});
     try write_fields(T, message, text, registry);
     try @call(.always_inline, json.TextWriter.end_object, .{text});
+}
+
+/// Whether `write_fields` writes no member: each field holds its default or is absent ("JSON
+/// Mapping": "fields with default values are omitted").
+fn writes_none(comptime T: type, message: *const T) bool {
+    inline for (T.protobuf.fields) |field| {
+        if (writes_member(T, field, message)) return false;
+    }
+    return true;
+}
+
+/// Whether `field` writes a member, as its writer below tests it.
+inline fn writes_member(comptime T: type, comptime field: Field, message: *const T) bool {
+    // A oneof's member writes whenever it is set, at its default too.
+    if (field.oneof) |oneof| return @field(message, oneof) != null;
+    const F = @FieldType(T, field.name);
+    const item = &@field(message, field.name);
+    if (comptime repeated.is_repeated(F)) return !item.is_empty();
+    if (comptime repeated.is_lazy(F)) return item.present();
+    if (comptime @typeInfo(F) == .optional) return item.* != null;
+    return !scalar.is_default(F, item.*);
 }
 
 /// Writes a message's fields as members of an object already open. A repeated or lazy field is
@@ -116,8 +140,7 @@ fn write_list(list: *const wkt.ListValue, text: *json.TextWriter, depth_left: u3
 /// well-known type and beside "@type" otherwise. An empty Any is an empty object.
 fn write_any(message: *const wkt.Any, text: *json.TextWriter, comptime registry: []const type) Error!void {
     if (message.type_url.len == 0 and message.value.len == 0) {
-        try @call(.always_inline, json.TextWriter.begin_object, .{text});
-        return @call(.always_inline, json.TextWriter.end_object, .{text});
+        return @call(.always_inline, json.TextWriter.empty_object, .{text});
     }
     const name = any.full_name_of(message.type_url);
     inline for (registry) |A| {
