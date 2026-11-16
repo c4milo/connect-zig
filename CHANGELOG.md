@@ -12,6 +12,8 @@ change the public API, and the entry marks each change that does.
 
 ### Changed
 
+- connect-zig builds on colibri v0.17.1 and on stdx v0.1.1, the tag colibri pins. A program that
+  names stdx itself pins that tag too, so it links one stdx.
 - **Changes the API.** `rpc.failure_of` takes the pool's response, `*const client.Response`, in
   place of its `client.Result`, so it reads the code of a reset stream.
 - A call whose stream the server reset ends with the code gRPC's table gives the reset, over h2

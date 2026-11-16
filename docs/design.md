@@ -1052,11 +1052,21 @@ ran on Linux x86-64 with Zig 0.16.0.
 
 ### What a later step owes
 
-- The pin of the conformance runner at v1.0.7 (step 25). The server half fails 1 or 2 of 2852
-  cases a run over h11: colibri v0.17.0 closes a connection with no `Connection: close` after an
-  early answer whose request body it does not drain. colibri v0.17.2 holds the correction. The
-  pin moves with it, and the "Client Message Size" entry of `client_known_flaky.txt` goes then:
-  v1.0.5 removed that suite.
+- The pin of the conformance runner at v1.0.7 (step 25). It waits for two changes in colibri.
+  - Over h11, colibri v0.17.0 and v0.17.1 close a connection with no `Connection: close` after
+    an early answer whose request body they do not drain. The server half then fails 1 or 2 of
+    2852 cases a run. colibri v0.17.2 says the close in each head that goes out while a chunked
+    request body is open, and no h11 case failed in 19 runs. But a stream that answers before
+    its request ends then costs its h11 connection, and a call that waits behind it on the
+    client's pool ends refused: the `streaming` example's third chat over h11 does. So
+    connect-zig stays on v0.17.1.
+  - Over h2, colibri's router cancels an answer that has no entry when the connection has no
+    room for its head (`answer` in its `router_pool.zig`). A call to a path with no route then
+    reads a reset with CANCEL in place of `unimplemented`. Runner v1.0.7 failed 1 or 2 such
+    cases in 4 runs of 19. Runner v1.0.4, which sends its calls about 6 times slower, failed
+    none in 12.
+  - The "Client Message Size" entry of `client_known_flaky.txt` goes with the pin: v1.0.5
+    removed that suite.
 - A chart of the routed calls, beside the codec charts: connect-zig, connect-go and connect-rust
   on one unary call, from CI's `bench-compare` job of one named run, once the calls' new
   baseline is in (step 24).
