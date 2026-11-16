@@ -89,7 +89,7 @@ pub fn read(call: anytype) connect.client.Response {
     response.end_body(call.incoming.rest());
     if (call.response.result != .response and !response.done) {
         response.done = true;
-        response.failure = client_call.failure_of(call.response.result);
+        response.failure = client_call.failure_of(&call.response);
     }
     return response;
 }

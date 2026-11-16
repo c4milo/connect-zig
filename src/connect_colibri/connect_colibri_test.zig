@@ -6,7 +6,9 @@ const testing = std.testing;
 const connect = @import("connect");
 const proto = @import("protobuf");
 const server = @import("server");
+const client = @import("client");
 const rpc = @import("connect_colibri.zig");
+const limits = @import("constants.zig");
 
 const Note = struct {
     text: []const u8 = "",
@@ -116,6 +118,10 @@ test "a client call writes its request for colibri and reads what colibri filled
     try testing.expectEqual(@as(?connect.RpcError, null), response.failure);
     call.response.result = .closed;
     try testing.expectEqual(connect.Code.unavailable, call.read(response.storage).failure.?.code);
+    // gRFC G2, "Errors": a stream the server reset with H3_REQUEST_CANCELLED ends the call canceled.
+    call.response.result = .reset;
+    call.response.error_code = limits.h3_error_request_cancelled;
+    try testing.expectEqual(connect.Code.canceled, call.read(response.storage).failure.?.code);
 }
 
 /// Writes field lines into a section's buffer as colibri's client does: each name's and value's
@@ -180,8 +186,33 @@ test "a gRPC client call reads its status from the response's trailers (PROTOCOL
 }
 
 test "a client call that ends with no response maps to the code a client retries on" {
-    try testing.expectEqual(connect.Code.unavailable, rpc.failure_of(.refused).code);
-    try testing.expectEqual(connect.Code.unavailable, rpc.failure_of(.closed).code);
-    try testing.expectEqual(connect.Code.resource_exhausted, rpc.failure_of(.too_large).code);
-    try testing.expectEqual(connect.Code.internal, rpc.failure_of(.malformed).code);
+    try testing.expectEqual(connect.Code.unavailable, failure_code(.refused, 0));
+    try testing.expectEqual(connect.Code.unavailable, failure_code(.closed, 0));
+    try testing.expectEqual(connect.Code.resource_exhausted, failure_code(.too_large, 0));
+    try testing.expectEqual(connect.Code.internal, failure_code(.malformed, 0));
+}
+
+test "a stream the server reset maps by the code of its reset, in h2 and in h3" {
+    // The codes as RFC 9113 §7 and RFC 9114 §8.1 number them, apart from the module's constants.
+    const cancel = 0x8;
+    const enhance_your_calm = 0xb;
+    const inadequate_security = 0xc;
+    const excessive_load = 0x107;
+    const request_cancelled = 0x10c;
+    // PROTOCOL-HTTP2.md, "Errors", and gRFC G2, "Errors".
+    try testing.expectEqual(connect.Code.canceled, failure_code(.reset, cancel));
+    try testing.expectEqual(connect.Code.canceled, failure_code(.reset, request_cancelled));
+    try testing.expectEqual(connect.Code.resource_exhausted, failure_code(.reset, enhance_your_calm));
+    try testing.expectEqual(connect.Code.resource_exhausted, failure_code(.reset, excessive_load));
+    try testing.expectEqual(connect.Code.permission_denied, failure_code(.reset, inadequate_security));
+    // NO_ERROR, INTERNAL_ERROR, H3_NO_ERROR and a code neither protocol names.
+    const others = [_]u32{ 0x0, 0x2, 0x100, 0xffff };
+    for (others) |code| try testing.expectEqual(connect.Code.internal, failure_code(.reset, code));
+    // A code reads only for a reset: a closed connection stays one the client retries on.
+    try testing.expectEqual(connect.Code.unavailable, failure_code(.closed, cancel));
+}
+
+fn failure_code(result: client.Result, error_code: u32) connect.Code {
+    const response: client.Response = .{ .result = result, .error_code = error_code };
+    return rpc.failure_of(&response).code;
 }

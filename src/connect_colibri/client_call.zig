@@ -248,7 +248,7 @@ fn read_response(self: anytype, storage: connect.client.Storage) connect.client.
     if (self.response.result != .response) {
         var response = connect.client.Response.init(speaks, &.{ .status = connect.constants.protocol.status.ok, .headers = lookup, .body = "" }, &storage, &self.options.decoders);
         response.done = true;
-        response.failure = failure_of(self.response.result);
+        response.failure = failure_of(&self.response);
         return response;
     }
     return connect.client.Response.init(speaks, &incoming_of(self, self.response.body[0..self.response.body_len]), &storage, &self.options.decoders);
@@ -269,17 +269,38 @@ fn incoming_of(self: anytype, body: []const u8) connect.client.Incoming {
     };
 }
 
-/// The error a client gives a call that ended with no whole response.
-pub fn failure_of(result: client.Result) connect.RpcError {
-    assert(result != .response);
-    return switch (result) {
+/// The error a client gives a call that ended with no whole response: what `response.result`
+/// says, and for a stream the server reset, what its code says.
+pub fn failure_of(response: *const client.Response) connect.RpcError {
+    assert(response.result != .pending);
+    assert(response.result != .response);
+    return switch (response.result) {
         .pending, .response => unreachable,
         // The server processed none of it, so the call may be sent again.
         .refused => .{ .code = .unavailable, .message = "the server refused the stream" },
-        .reset, .closed => .{ .code = .unavailable, .message = "the connection ended before the response" },
+        .reset => reset_failure(response.error_code),
+        .closed => .{ .code = .unavailable, .message = "the connection ended before the response" },
         .malformed => .{ .code = .internal, .message = "malformed HTTP response" },
         .invalid => .{ .code = .internal, .message = "the HTTP client refused the request" },
         .too_large => .{ .code = .resource_exhausted, .message = "the response did not fit the client's buffers" },
+    };
+}
+
+/// The error of a stream the server reset with `code`. h2's codes end at 0xd (RFC 9113 §7) and
+/// h3's start at 0x100 (RFC 9114 §8.1), so one table reads both. colibri reports REFUSED_STREAM
+/// and H3_REQUEST_REJECTED as `refused`, never as a reset.
+fn reset_failure(code: u32) connect.RpcError {
+    return switch (code) {
+        // PROTOCOL-HTTP2.md, "Errors": a server's CANCEL maps to CANCELLED. gRFC G2, "Errors":
+        // so does H3_REQUEST_CANCELLED.
+        constants.h2_error_cancel, constants.h3_error_request_cancelled => .{ .code = .canceled, .message = "the server canceled the stream" },
+        // PROTOCOL-HTTP2.md, "Errors": ENHANCE_YOUR_CALM maps to RESOURCE_EXHAUSTED, and the
+        // resource is bandwidth. gRFC G2, "Errors": so does H3_EXCESSIVE_LOAD.
+        constants.h2_error_enhance_your_calm, constants.h3_error_excessive_load => .{ .code = .resource_exhausted, .message = "the server reset the stream: bandwidth exhausted" },
+        // PROTOCOL-HTTP2.md, "Errors": INADEQUATE_SECURITY maps to PERMISSION_DENIED.
+        constants.h2_error_inadequate_security => .{ .code = .permission_denied, .message = "the server reset the stream: the transport is not secure enough" },
+        // PROTOCOL-HTTP2.md and gRFC G2, "Errors": each other code maps to INTERNAL.
+        else => .{ .code = .internal, .message = "the server reset the stream" },
     };
 }
 

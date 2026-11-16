@@ -39,3 +39,13 @@ pub const status_uri_too_long: http.Status = .uri_too_long;
 /// RFC 6585 §5: Request Header Fields Too Large.
 /// colibri's `http.Status` names no 431, so the value goes through its open end.
 pub const status_headers_too_large: http.Status = @enumFromInt(431);
+/// RFC 9113 §7: CANCEL, the sender needs the stream no longer.
+pub const h2_error_cancel = 0x8;
+/// RFC 9113 §7: ENHANCE_YOUR_CALM, the peer makes too much load.
+pub const h2_error_enhance_your_calm = 0xb;
+/// RFC 9113 §7: INADEQUATE_SECURITY, the transport is less secure than the sender needs.
+pub const h2_error_inadequate_security = 0xc;
+/// RFC 9114 §8.1: H3_EXCESSIVE_LOAD, the peer makes too much load.
+pub const h3_error_excessive_load = 0x107;
+/// RFC 9114 §8.1: H3_REQUEST_CANCELLED, the sender needs the request or its response no longer.
+pub const h3_error_request_cancelled = 0x10c;

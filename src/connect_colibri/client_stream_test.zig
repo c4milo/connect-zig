@@ -8,6 +8,7 @@ const connect = @import("connect");
 const client = @import("client");
 const proto = @import("protobuf");
 const rpc = @import("connect_colibri.zig");
+const constants = @import("constants.zig");
 const write_lines = @import("connect_colibri_test.zig").write_lines;
 
 const Note = struct {
@@ -258,9 +259,11 @@ test "a streamed response cut inside an envelope, or reset, fails" {
     var cut = fixture.call.read(fixture.storage());
     try testing.expectEqual(@as(?Note, null), try cut.next(Note));
     try testing.expectEqualStrings("truncated message", cut.failure.?.message);
+    // PROTOCOL-HTTP2.md, "Errors": a stream the server reset with CANCEL ends the call canceled.
     fixture.call.response.result = .reset;
+    fixture.call.response.error_code = constants.h2_error_cancel;
     fixture.call.incoming.len = fixture.call.incoming.fed_len;
-    try testing.expectEqual(connect.Code.unavailable, fixture.call.read(fixture.storage()).failure.?.code);
+    try testing.expectEqual(connect.Code.canceled, fixture.call.read(fixture.storage()).failure.?.code);
 }
 
 test "a response envelope longer than the call gathers fails the call resource_exhausted" {
