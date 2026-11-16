@@ -8,6 +8,21 @@ are in [docs/decisions.md](docs/decisions.md), and the steps and their measureme
 connect-zig follows [Semantic Versioning](https://semver.org/). Before 1.0, a minor version may
 change the public API, and the entry marks each change that does.
 
+## Unreleased
+
+### Changed
+
+- **Changes the API.** `rpc.failure_of` takes the pool's response, `*const client.Response`, in
+  place of its `client.Result`, so it reads the code of a reset stream.
+- A call whose stream the server reset ends with the code gRPC's table gives the reset, over h2
+  and h3: CANCEL gives `canceled`, ENHANCE_YOUR_CALM `resource_exhausted`, INADEQUATE_SECURITY
+  `permission_denied`, and each other code `internal`. Before, each reset gave `unavailable`.
+
+### Fixed
+
+- A Connect GET writes its query in the protocol's order: `connect`, `base64`, `compression`,
+  `encoding`, then `message`. connectrpc's conformance suite v1.0.7 checks it.
+
 ## v0.1.0 (2026-11-15)
 
 The first release. It builds on colibri v0.17.0, and on the stdx (`22f5139`) and chapulin

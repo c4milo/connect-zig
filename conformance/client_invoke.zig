@@ -154,6 +154,28 @@ fn wait(self: anytype, until_ns: u64, until: Until) void {
     stop(self, given_up);
 }
 
+/// Reads the response of a call that finished, and its outcome at `now_ns` against the client's
+/// deadline.
+fn read_end(self: anytype, now_ns: u64) void {
+    assert(self.finished);
+    assert(!self.stopped);
+    var response = self.call.read(self.storage);
+    reading.read_rest(self, &response);
+    self.result.failure = outcome_at(self.result.failure, self.deadline_ns, now_ns);
+}
+
+/// The outcome of a finished call, read at `now_ns`. A server may end a call at its deadline
+/// with a reset whose code is CANCEL, which reads `canceled` (PROTOCOL-HTTP2.md, "Errors"), and
+/// the reset may arrive before the client's own timer runs. The deadline binds the client too
+/// (PROTOCOL-HTTP2.md, "Timeout"): past it, a call the server canceled is `deadline_exceeded`,
+/// as grpc-go's and grpc-java's clients report it.
+fn outcome_at(failure: ?connect.RpcError, deadline_ns: ?u64, now_ns: u64) ?connect.RpcError {
+    const seen = failure orelse return null;
+    const at_ns = deadline_ns orelse return failure;
+    if (seen.code != .canceled) return failure;
+    return if (now_ns >= at_ns) past_deadline else failure;
+}
+
 /// The steps of a unary or server-stream call (docs/testing_clients.md, "Unary" and "Server
 /// stream").
 fn run_whole(self: anytype) StartError!void {
@@ -163,9 +185,7 @@ fn run_whole(self: anytype) StartError!void {
     listen(self);
     cancel_after_close(self);
     wait(self, forever, .end);
-    if (self.stopped) return;
-    var response = self.call.read(self.storage);
-    reading.read_rest(self, &response);
+    if (!self.stopped) read_end(self, self.transport.now_ns());
 }
 
 /// A cancel after the send side closed waits its delay, then cancels a call still running.
@@ -187,9 +207,7 @@ fn run_stream(self: anytype) StartError!void {
     send_all(self);
     if (!ended(self)) close_or_cancel(self);
     wait(self, forever, .end);
-    if (self.stopped) return;
-    var response = self.call.read(self.storage);
-    reading.read_rest(self, &response);
+    if (!self.stopped) read_end(self, self.transport.now_ns());
 }
 
 /// Cancels in place of closing the send side, or closes it, as the plan says.
@@ -232,4 +250,69 @@ fn send(self: anytype, message: anytype) bool {
         return true;
     }
     return false;
+}
+
+test "a call the server canceled past the client's deadline is deadline_exceeded" {
+    const testing = std.testing;
+    const deadline_ns = 2 * constants.nanos_per_milli;
+    const server_canceled: connect.RpcError = .{ .code = .canceled, .message = "the server canceled the stream" };
+    const refused: connect.RpcError = .{ .code = .unavailable, .message = "the server refused the stream" };
+    try testing.expectEqual(connect.Code.deadline_exceeded, outcome_at(server_canceled, deadline_ns, deadline_ns).?.code);
+    try testing.expectEqual(connect.Code.deadline_exceeded, outcome_at(server_canceled, deadline_ns, deadline_ns + 1).?.code);
+    // Before the deadline, and with no deadline, the cancel stays the server's.
+    try testing.expectEqual(connect.Code.canceled, outcome_at(server_canceled, deadline_ns, deadline_ns - 1).?.code);
+    try testing.expectEqual(connect.Code.canceled, outcome_at(server_canceled, null, deadline_ns).?.code);
+    // Another failure, and no failure, stay as they are past the deadline.
+    try testing.expectEqual(connect.Code.unavailable, outcome_at(refused, deadline_ns, deadline_ns + 1).?.code);
+    try testing.expectEqual(@as(?connect.RpcError, null), outcome_at(null, deadline_ns, deadline_ns + 1));
+}
+
+/// A finished call for the test of `read_end`: its response is the one the test gives it.
+const Finished = struct {
+    pub const rpc_method = @import("connectrpc_conformance_v1_service").ConformanceService.unary;
+    pub const single_response = true;
+
+    call: struct {
+        response: connect.client.Response,
+
+        fn read(call: *const @This(), _: connect.client.Storage) connect.client.Response {
+            return call.response;
+        }
+    },
+    storage: connect.client.Storage,
+    plan: *const struct { cancel: @FieldType(Plan, "cancel") },
+    result: *Result,
+    metadata: []const connect.Header = &.{},
+    deadline_ns: ?u64,
+    finished: bool = true,
+    stopped: bool = false,
+
+    fn find(_: *const anyopaque, _: []const u8) ?[]const u8 {
+        return null;
+    }
+};
+
+test "a finished call reads its outcome against the client's deadline" {
+    const testing = std.testing;
+    const deadline_ns = 2 * constants.nanos_per_milli;
+    var room: [4][64]u8 = undefined;
+    const storage: connect.client.Storage = .{
+        .scratch = .{ .message = &room[0], .work = &room[1], .tokens = &room[2] },
+        .octets = &room[3],
+        .details = &.{},
+        .metadata = &.{},
+    };
+    const speaks: connect.Speaks = .{ .protocol = .grpc, .codec = .proto, .enveloped = true };
+    const lookup: connect.Lookup = .{ .context = &room, .find_fn = Finished.find };
+    var response = connect.client.Response.init(speaks, &.{ .status = connect.constants.protocol.status.ok, .headers = lookup, .body = "" }, &storage, &.{});
+    response.done = true;
+    response.failure = .{ .code = .canceled, .message = "the server canceled the stream" };
+    const lists = try testing.allocator.create(@import("client_result.zig").Lists);
+    defer testing.allocator.destroy(lists);
+    var result: Result = .{ .bytes = &room[3], .lists = lists };
+    var finished: Finished = .{ .call = .{ .response = response }, .storage = storage, .plan = &.{ .cancel = .none }, .result = &result, .deadline_ns = deadline_ns };
+    read_end(&finished, deadline_ns - 1);
+    try testing.expectEqual(connect.Code.canceled, result.failure.?.code);
+    read_end(&finished, deadline_ns);
+    try testing.expectEqual(connect.Code.deadline_exceeded, result.failure.?.code);
 }

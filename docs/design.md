@@ -218,6 +218,12 @@ Each step names the check that proves it. A step is done when its check passes i
     (decision 45, decision 35 as amended). New public names: none; `RouteOptions.Values` goes.
     Check: `zig build test` on the tag, and `tools/perf_check.sh`, whose routed calls take a
     new baseline.
+25. **What conformance suite v1.0.7 asks of the client.** A Connect GET writes its query in the
+    protocol's order, and a call whose stream the server reset ends with the code gRPC's table
+    gives the reset. New public names: none; `rpc.failure_of` takes the pool's response,
+    `*const client.Response`, in place of its `client.Result`. Check: `zig build test-connect`,
+    `zig build test-connect-colibri`, `zig build test-conformance`, and runner v1.0.7 in client
+    mode.
 
 ### Step records
 
@@ -1016,8 +1022,41 @@ ran on Linux x86-64 with Zig 0.16.0.
     kept, a body cut inside an envelope accepted, `drain` that reads nothing, a done call that
     drains nothing, and each of the two counters `on_request` sets left as it was.
 
+- **What conformance suite v1.0.7 asks of the client** (step 25). Runner v1.0.7 in client mode
+  failed 58 to 60 of its 8232 cases, in three groups.
+  - A Connect GET's query, 10 cases. The suite now checks the order the protocol gives:
+    `connect`, `base64`, `compression`, `encoding`, then `message` ("Query-Get"). `write_query`
+    wrote `encoding` before `base64`.
+  - gRPC-Web's Trailers-Only, 46 cases. A stream that ends with no message carries its status
+    and its trailers in the HTTP head. The library read the status there already. The
+    conformance client reported the trailers of the body's frame alone, so it now reports the
+    head's fields when the head holds `grpc-status`.
+  - A reset stream, 2 to 4 cases a run, in "Timeouts" against the reference gRPC server over
+    h2. That server ends a call at its deadline with a reset whose code is CANCEL, and the
+    reset may arrive before the client's own timer runs. The client then answered
+    `unavailable`, where the suite takes `deadline_exceeded` alone.
+  - `failure_of` now reads the reset's code. gRPC's table maps h2's codes (PROTOCOL-HTTP2.md,
+    "Errors") and h3's (gRFC G2, "Errors"): CANCEL and H3_REQUEST_CANCELLED give `canceled`,
+    ENHANCE_YOUR_CALM and H3_EXCESSIVE_LOAD `resource_exhausted`, INADEQUATE_SECURITY
+    `permission_denied`, and each other code `internal`. Before, each reset gave `unavailable`.
+  - colibri's response names no HTTP version. h2's codes end at 0xd and h3's start at 0x100, so
+    one table reads both.
+  - The conformance client keeps the call's deadline, since the library reads no clock. Past
+    that deadline it reports a call the server canceled as `deadline_exceeded`, as grpc-go's and
+    grpc-java's clients do. A program with a deadline of its own owes the same rule.
+  - With the four changes, runner v1.0.7 passed its 8232 client cases, and its "Timeouts" suite
+    alone 8 times of 8. The pinned runner v1.0.4 passed its 8264.
+  - Mutations, 28 of 28 CAUGHT: 2 on the query's order, 8 on the trailers' source, 11 on the
+    reset's code, and 7 on the deadline's rule. The two on the query first passed in a copy of
+    the tree whose cloned `.zig-cache` gave a false hit. An empty cache caught them.
+
 ### What a later step owes
 
+- The pin of the conformance runner at v1.0.7 (step 25). The server half fails 1 or 2 of 2852
+  cases a run over h11: colibri v0.17.0 closes a connection with no `Connection: close` after an
+  early answer whose request body it does not drain. colibri v0.17.2 holds the correction. The
+  pin moves with it, and the "Client Message Size" entry of `client_known_flaky.txt` goes then:
+  v1.0.5 removed that suite.
 - A chart of the routed calls, beside the codec charts: connect-zig, connect-go and connect-rust
   on one unary call, from CI's `bench-compare` job of one named run, once the calls' new
   baseline is in (step 24).
