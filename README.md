@@ -67,7 +67,7 @@ buf curl --cacert examples/harness/tls/ca.pem --protocol grpc --schema examples/
 | Server: unary, all streams | ✅ | ✅ | ✅ |
 | Client: unary, all streams | ✅ | ✅ | ✅ |
 | Proto and JSON codecs | ✅ | ✅ | ✅ |
-| gzip and zstd both ways, brotli read | ✅ | ✅ | ✅ |
+| gzip, zstd and brotli both ways | ✅ | ✅ | ✅ |
 | Unary GET for `NO_SIDE_EFFECTS` | ✅ | n/a[^get] | n/a[^get] |
 | Full-duplex bidirectional streams, server and client, over h2 and h3[^duplex] | ✅ | ✅ | ✅ |
 | Interceptors, server and client | ✅ | ✅ | ✅ |
@@ -414,7 +414,6 @@ missing required field (decision 23).
 
 Not yet done:
 
-- brotli compression of messages, which waits for an encoder in stdx (decision 10);
 - a stream that waits for an event of the program once its request ended (colibri issue 130).
 
 ## Contributing

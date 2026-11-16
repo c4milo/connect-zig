@@ -13,8 +13,8 @@ zig build serve -- 8443
 ```
 
 It serves h11 and h2 over TLS on the TCP port, and h3 on the UDP socket of the same port, under the
-examples' test identity (decision 25). It reads gzip and zstd messages, and answers in the one a
-client accepts first. Port 0 lets the kernel choose, and the server prints `listening on port
+examples' test identity (decision 25). It reads gzip, zstd and br messages, and answers in the
+one a client accepts first. Port 0 lets the kernel choose, and the server prints `listening on port
 <port>`.
 
 From the root of the repository, `zig build run-eliza-server -- [port]` runs it, and `zig build`

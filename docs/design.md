@@ -224,6 +224,11 @@ Each step names the check that proves it. A step is done when its check passes i
     `*const client.Response`, in place of its `client.Result`. Check: `zig build test-connect`,
     `zig build test-connect-colibri`, `zig build test-conformance`, and runner v1.0.7 in client
     mode.
+26. **brotli written.** A program places stdx v0.1.1's brotli encoder in `Encoders.brotli`, and
+    a server or a client then writes `br` as it writes gzip and zstd (decision 10 as amended).
+    New public names: `connect.BrotliEncoder`; `Encoders` gains the field `brotli`. Check:
+    `zig build test-connect`, the conformance suite with `COMPRESSION_BR` in both halves'
+    features, and `tools/interop_check.sh`, where curl reads a br answer.
 
 ### Step records
 
@@ -1050,7 +1055,42 @@ ran on Linux x86-64 with Zig 0.16.0.
     reset's code, and 7 on the deadline's rule. The two on the query first passed in a copy of
     the tree whose cloned `.zig-cache` gave a false hit. An empty cache caught them.
 
+- **brotli written** (step 26, decision 10 as amended). On colibri v0.17.1 and stdx v0.1.1.
+  - `connect.BrotliEncoder` is stdx's encoder at level 1 with WBITS 17. It takes 519 KiB, where
+    the gzip encoder takes 293 KiB and the zstd encoder 1.4 MiB. `Encoders.brotli` places it, and
+    `writes`, `compress` and `choose` take br as they take gzip and zstd.
+  - `Encoders` grew from two pointers to three, 24 octets. So `compression.compress`,
+    `compression.choose` and `Encoders.writes` take it as `*const Encoders`, and the server's
+    head passes its options by pointer. By value, a routed call took 5 instructions more in
+    Connect and 8 more in gRPC. By pointer it takes 12 and 16 fewer than before the step: small
+    Connect 3,934 to 3,922, and small gRPC 4,434 to 4,418, on x86-64-v2 under callgrind. The
+    codec's 48 counts did not move.
+  - The tests' shared codecs hold the encoder, and a decoder of the encoder's window alone. The
+    decoder a program places takes 19.5 MB, which overruns the reach of thread-local data on
+    aarch64 Linux beside the zstd decoder. With the two, the test binary's thread-local data
+    takes 14.0 MiB of the 16 MiB that reach allows, and its tests pass on aarch64 Linux.
+  - Both conformance programs place the encoder, and both features files declare
+    `COMPRESSION_BR`. Runner v1.0.4 then ran 3536 server cases, where it ran 2714, and 10758
+    client cases, where it ran 8264. Each passed. The runner's reference server and client read
+    and write br with a Go library.
+  - One client run of three failed 2 of the 10758 cases, on a Mac whose load was near 45. Both
+    were identity cases of a half-duplex stream over h11 against the reference gRPC server, with
+    "invalid Read on closed Body": the race `client_known_flaky.txt` describes, in two other
+    suites. Those cases alone passed 6 runs of 6, and a full run beside the client of the commit
+    before passed each case.
+  - `examples/socket_server` reads and writes br, and `tools/interop_check.sh` asks it for a br
+    answer that curl decodes.
+  - Mutations, 12 of 12 CAUGHT: br written never, always, and when the zstd encoder is placed;
+    the window at WBITS 18; level 5; the gzip encoder in br's arm; the export gone; the
+    conformance client's refusal of br; and no encoders handed to a POST's choice, to a GET's
+    choice, to a unary reply and to a stream's reply. The GET's was NOT CAUGHT first: no test
+    asked a GET for a compressed answer, and one does now.
+
 ### What a later step owes
+
+- The README's conformance counts (step 26). The README names the counts of one CI run: 2714
+  server cases and 8264 client cases. With br they are 3536 and 10758 on runner v1.0.4, so the
+  README takes them, and the run's link, once CI ran this step.
 
 - The pin of the conformance runner at v1.0.7 (step 25). It waits for two changes in colibri.
   - Over h11, colibri v0.17.0 and v0.17.1 close a connection with no `Connection: close` after

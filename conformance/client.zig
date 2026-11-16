@@ -60,6 +60,7 @@ const State = struct {
     zstd_decoder: connect.ZstdDecoder,
     zstd_encoder: connect.ZstdEncoder,
     brotli_decoder: connect.BrotliDecoder,
+    brotli_encoder: connect.BrotliEncoder,
     /// The coders above, as each call's options name them.
     codings: plan_module.Codings,
     request_bytes: [constants.client_compat_request_bytes]u8,
@@ -73,7 +74,7 @@ pub fn main(init: std.process.Init) !void {
     const state = try init.arena.allocator().create(State);
     state.transport.init(init.io);
     state.codings = .{
-        .encoders = .{ .gzip = &state.gzip_encoder, .zstd = &state.zstd_encoder },
+        .encoders = .{ .gzip = &state.gzip_encoder, .zstd = &state.zstd_encoder, .brotli = &state.brotli_encoder },
         .decoders = .{ .gzip = &state.gzip_decoder, .zstd = &state.zstd_decoder, .brotli = &state.brotli_decoder },
     };
     var stdin = std.Io.File.stdin().reader(init.io, &state.stdin_buffer);

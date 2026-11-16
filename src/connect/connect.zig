@@ -41,8 +41,10 @@ pub const Status = files.rpc_error.Status;
 pub const Coding = files.compression.Coding;
 pub const Decoders = files.compression.Decoders;
 pub const GzipEncoder = files.compression.GzipEncoder;
-/// The zstd encoder a caller places, and the encoders a server or a client compresses with.
+/// The zstd and brotli encoders a caller places, and the encoders a server or a client
+/// compresses with.
 pub const ZstdEncoder = files.compression.ZstdEncoder;
+pub const BrotliEncoder = files.compression.BrotliEncoder;
 pub const Encoders = files.compression.Encoders;
 /// The gzip decoder a caller places for `Decoders.gzip`.
 pub const GzipDecoder = files.compression.GzipDecoder;
@@ -171,13 +173,13 @@ pub const status = struct {
 
 test "the root exports the names a program calls" {
     try @import("public_names").expect(@This(), &.{
-        "constants",   "Code",          "Protocol",    "Codec",         "Speaks",         "Method",
-        "StreamType",  "Idempotency",   "Header",      "Detail",        "RpcError",       "Status",
-        "Coding",      "Decoders",      "GzipEncoder", "ZstdEncoder",   "Encoders",       "GzipDecoder",
-        "ZstdDecoder", "BrotliDecoder", "Envelope",    "EnvelopeFlags", "EnvelopeReader", "EndStream",
-        "envelope",    "protocol",      "timeout",     "compression",   "error_json",     "end_stream",
-        "trailers",    "get",           "status",      "Scratch",       "Lookup",         "server",
-        "client",
+        "constants",   "Code",        "Protocol",      "Codec",       "Speaks",        "Method",
+        "StreamType",  "Idempotency", "Header",        "Detail",      "RpcError",      "Status",
+        "Coding",      "Decoders",    "GzipEncoder",   "ZstdEncoder", "BrotliEncoder", "Encoders",
+        "GzipDecoder", "ZstdDecoder", "BrotliDecoder", "Envelope",    "EnvelopeFlags", "EnvelopeReader",
+        "EndStream",   "envelope",    "protocol",      "timeout",     "compression",   "error_json",
+        "end_stream",  "trailers",    "get",           "status",      "Scratch",       "Lookup",
+        "server",      "client",
     });
 }
 

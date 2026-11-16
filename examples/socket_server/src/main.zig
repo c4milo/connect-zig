@@ -9,7 +9,7 @@
 //!   https://127.0.0.1:8443/connectrpc.eliza.v1.ElizaService/Say
 //! ```
 //!
-//! It reads gzip and zstd messages, and answers in the one a client accepts first.
+//! It reads gzip, zstd and br messages, and answers in the one a client accepts first.
 const std = @import("std");
 const connect = @import("connect");
 const harness = @import("harness");
@@ -30,14 +30,16 @@ const State = struct {
     gzip_encoder: connect.GzipEncoder,
     zstd_decoder: connect.ZstdDecoder,
     zstd_encoder: connect.ZstdEncoder,
+    brotli_decoder: connect.BrotliDecoder,
+    brotli_encoder: connect.BrotliEncoder,
     jwks_text: [issuer.jwks_len_max]u8,
 };
 
 pub fn main(init: std.process.Init) !void {
     const state = try init.arena.allocator().create(State);
     state.app = .{ .codings = .{
-        .decoders = .{ .gzip = &state.gzip_decoder, .zstd = &state.zstd_decoder },
-        .encoders = .{ .gzip = &state.gzip_encoder, .zstd = &state.zstd_encoder },
+        .decoders = .{ .gzip = &state.gzip_decoder, .zstd = &state.zstd_decoder, .brotli = &state.brotli_decoder },
+        .encoders = .{ .gzip = &state.gzip_encoder, .zstd = &state.zstd_encoder, .brotli = &state.brotli_encoder },
     } };
     // The account service's verifier, with the test issuer's first key, at the time the server
     // starts. A server that runs for long calls `set_time` again as its clock moves, and

@@ -68,7 +68,7 @@ pub const Reply = struct {
         const scratch = reply.scratch;
         if (scratch.message.len < headroom or scratch.work.len < headroom) return error.NoSpaceLeft;
         const room: message_codec.Scratch = .{ .message = scratch.message[headroom..], .work = scratch.work[headroom..], .tokens = scratch.tokens };
-        return message_codec.prepare(T, reply.accepted.speaks.codec, reply.accepted.response_coding, reply.encoders, message, room);
+        return message_codec.prepare(T, reply.accepted.speaks.codec, reply.accepted.response_coding, &reply.encoders, message, room);
     }
 
     /// The envelope of a message `prepare` encoded: the prefix, written into the octets `prepare`
@@ -136,7 +136,7 @@ pub const Reply = struct {
     fn shrink(reply: *const Reply, encoded: []const u8) Prepared {
         // An enveloped message is compressed one by one; a unary body only through `prepare`.
         if (!reply.accepted.speaks.enveloped) return .{ .octets = encoded, .compressed = false };
-        return message_codec.compress(reply.accepted.response_coding, reply.encoders, encoded, reply.scratch.work);
+        return message_codec.compress(reply.accepted.response_coding, &reply.encoders, encoded, reply.scratch.work);
     }
 
     /// Writes one message: the whole body of a Connect unary response, or one envelope. Either

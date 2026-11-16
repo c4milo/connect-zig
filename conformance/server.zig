@@ -38,11 +38,14 @@ const State = struct {
     http_server: Server,
     router: Router,
     app: App,
-    /// The server reads gzip and zstd messages, and answers in the one a client accepts first.
+    /// The server reads gzip, zstd and br messages, and answers in the one a client accepts
+    /// first.
     gzip_decoder: connect.GzipDecoder,
     gzip_encoder: connect.GzipEncoder,
     zstd_decoder: connect.ZstdDecoder,
     zstd_encoder: connect.ZstdEncoder,
+    brotli_decoder: connect.BrotliDecoder,
+    brotli_encoder: connect.BrotliEncoder,
     compat_request_bytes: [constants.compat_request_bytes_max]u8 align(@alignOf(u64)),
     compat_response_bytes: [constants.compat_response_bytes]u8,
     stdin_buffer: [constants.length_prefix_len]u8,
@@ -65,8 +68,8 @@ pub fn main(init: std.process.Init) !void {
         .message_receive_limit = request.message_receive_limit,
         .io = init.io,
         .codings = .{
-            .decoders = .{ .gzip = &state.gzip_decoder, .zstd = &state.zstd_decoder },
-            .encoders = .{ .gzip = &state.gzip_encoder, .zstd = &state.zstd_encoder },
+            .decoders = .{ .gzip = &state.gzip_decoder, .zstd = &state.zstd_decoder, .brotli = &state.brotli_decoder },
+            .encoders = .{ .gzip = &state.gzip_encoder, .zstd = &state.zstd_encoder, .brotli = &state.brotli_encoder },
         },
     };
     try state.http_server.init(&.{

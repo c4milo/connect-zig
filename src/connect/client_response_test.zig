@@ -77,7 +77,7 @@ fn decoders() compression.Decoders {
 
 /// `text` in gzip, written into `out`.
 fn gzipped(text: []const u8, out: []u8) ![]const u8 {
-    return compression.compress(.gzip, .{ .gzip = &codecs.gzip_encoder }, text, out);
+    return compression.compress(.gzip, &.{ .gzip = &codecs.gzip_encoder }, text, out);
 }
 
 /// One envelope of `payload` with `flags`, written into `out`.

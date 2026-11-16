@@ -63,7 +63,7 @@ pub const Options = struct {
 
 /// Reads the head of a request for a method of `options.stream_type`.
 pub fn accept(http_method: []const u8, query: ?[]const u8, headers: Lookup, options: *const Options) Decision {
-    if (std.mem.eql(u8, http_method, "GET")) return accept_get(query orelse "", headers, options.*);
+    if (std.mem.eql(u8, http_method, "GET")) return accept_get(query orelse "", headers, options);
     // Connect protocol, "Unary-Request": a request is a POST, or a GET of a NO_SIDE_EFFECTS method.
     if (!std.mem.eql(u8, http_method, "POST")) return .{ .refused = .{ .http_status = status.method_not_allowed } };
     const content_type = headers.find("content-type") orelse return .{ .refused = .{ .http_status = status.unsupported_media_type } };
@@ -72,7 +72,7 @@ pub fn accept(http_method: []const u8, query: ?[]const u8, headers: Lookup, opti
     if (speaks.protocol == .connect and speaks.enveloped != options.stream_type.enveloped()) {
         return .{ .refused = .{ .http_status = status.unsupported_media_type } };
     }
-    return accept_post(speaks, headers, options.*);
+    return accept_post(speaks, headers, options);
 }
 
 const Names = struct { encoding: []const u8, accept: []const u8, timeout: []const u8 };
@@ -89,7 +89,7 @@ fn names_of(speaks: Speaks) Names {
     };
 }
 
-fn accept_post(speaks: Speaks, headers: Lookup, options: Options) Decision {
+fn accept_post(speaks: Speaks, headers: Lookup, options: *const Options) Decision {
     const names = names_of(speaks);
     if (speaks.protocol == .connect and !speaks.enveloped) {
         if (headers.find("connect-protocol-version")) |version| {
@@ -102,18 +102,18 @@ fn accept_post(speaks: Speaks, headers: Lookup, options: Options) Decision {
     const request_coding = coding_of(headers.find(names.encoding)) orelse return refuse(speaks, .unimplemented, "unknown request compression");
     if (!options.decoders.accepts(request_coding)) return refuse(speaks, .unimplemented, "unsupported request compression");
     const timeout_ns = read_timeout(speaks, headers.find(names.timeout)) catch return refuse(speaks, .invalid_argument, "malformed timeout");
-    const response_coding = compression.choose(headers.find(names.accept) orelse "", options.encoders);
+    const response_coding = compression.choose(headers.find(names.accept) orelse "", &options.encoders);
     return .{ .accepted = .{ .speaks = speaks, .request_coding = request_coding, .response_coding = response_coding, .timeout_ns = timeout_ns } };
 }
 
-fn accept_get(query: []const u8, headers: Lookup, options: Options) Decision {
+fn accept_get(query: []const u8, headers: Lookup, options: *const Options) Decision {
     // Connect protocol, "Unary-Get-Request": only methods with no side effects take a GET.
     if (options.stream_type != .unary or options.idempotency != .no_side_effects) return .{ .refused = .{ .http_status = status.method_not_allowed } };
     const read = get.read_query(query) catch return .{ .refused = .{ .http_status = status.bad_request } };
     const speaks: Speaks = .{ .protocol = .connect, .codec = read.codec, .enveloped = false };
     if (!options.decoders.accepts(read.coding)) return refuse(speaks, .unimplemented, "unsupported request compression");
     const timeout_ns = read_timeout(speaks, headers.find("connect-timeout-ms")) catch return refuse(speaks, .invalid_argument, "malformed timeout");
-    const response_coding = compression.choose(headers.find("accept-encoding") orelse "", options.encoders);
+    const response_coding = compression.choose(headers.find("accept-encoding") orelse "", &options.encoders);
     return .{ .accepted = .{ .speaks = speaks, .request_coding = read.coding, .response_coding = response_coding, .timeout_ns = timeout_ns, .query = read } };
 }
 
@@ -192,4 +192,11 @@ test "a GET of a method with no side effects is accepted with its query" {
     const headers: TestHeaders = .{ .entries = &.{} };
     const decision = accept("GET", "encoding=json&message=e30", headers.lookup(), &.{ .stream_type = .unary, .idempotency = .no_side_effects });
     try testing.expectEqual(protocol.Codec.json, decision.accepted.query.?.codec);
+    try testing.expectEqual(Coding.identity, decision.accepted.response_coding);
+    // Connect protocol, "Unary-Get-Request": Accept-Encoding names the response's codings, as it
+    // does for a POST.
+    const accepting: TestHeaders = .{ .entries = &.{.{ .name = "accept-encoding", .value = "gzip" }} };
+    var encoder: compression.GzipEncoder = undefined;
+    const options: Options = .{ .stream_type = .unary, .idempotency = .no_side_effects, .encoders = .{ .gzip = &encoder } };
+    try testing.expectEqual(Coding.gzip, accept("GET", "encoding=json&message=e30", accepting.lookup(), &options).accepted.response_coding);
 }

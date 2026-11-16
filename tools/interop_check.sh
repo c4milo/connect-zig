@@ -85,6 +85,12 @@ expect "zstd answer" 'zstd' \
         sed -n 's/^content-encoding: *\([a-z]*\).*$/\1/Ip' | tr -d '\r')"
 expect "zstd answer decodes" "{\"sentence\":\"You said \\\"${long}\\\". How does that make you feel?\"}" \
     "$(curl -sS -m 5 --cacert "${ca}" -H 'accept-encoding: zstd' --compressed --json "{\"sentence\":\"${long}\"}" "${base}/Say")"
+# A client that lists br first gets br, which curl decodes back to the same answer.
+expect "br answer" 'br' \
+    "$(curl -sS -m 5 --cacert "${ca}" -H 'accept-encoding: br, gzip' --json "{\"sentence\":\"${long}\"}" -D - -o /dev/null "${base}/Say" |
+        sed -n 's/^content-encoding: *\([a-z]*\).*$/\1/Ip' | tr -d '\r')"
+expect "br answer decodes" "{\"sentence\":\"You said \\\"${long}\\\". How does that make you feel?\"}" \
+    "$(curl -sS -m 5 --cacert "${ca}" -H 'accept-encoding: br' --compressed --json "{\"sentence\":\"${long}\"}" "${base}/Say")"
 # A unary request with two messages is refused with UNIMPLEMENTED, in gRPC-Web's trailers frame.
 printf '\000\000\000\000\003\012\001a\000\000\000\000\003\012\001a' >"${log}.body"
 expect "two messages for a unary call" '1' \

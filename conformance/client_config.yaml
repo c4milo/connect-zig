@@ -14,10 +14,11 @@ features:
   codecs:
     - CODEC_PROTO
     - CODEC_JSON
-  # The client reads br too, but writes identity, gzip and zstd alone (decision 10).
+  # The codings connect-zig reads and writes (decision 10).
   compressions:
     - COMPRESSION_IDENTITY
     - COMPRESSION_GZIP
+    - COMPRESSION_BR
     - COMPRESSION_ZSTD
   stream_types:
     - STREAM_TYPE_UNARY

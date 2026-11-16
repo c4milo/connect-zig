@@ -67,14 +67,14 @@ pub const Body = enum { plain, compressed };
 
 /// Encodes `message` into `scratch.message`, then compresses it into `scratch.work` as `compress`
 /// decides.
-pub fn prepare(comptime T: type, codec: Codec, coding: compression.Coding, encoders: compression.Encoders, message: *const T, scratch: Scratch) EncodeError!Prepared {
+pub fn prepare(comptime T: type, codec: Codec, coding: compression.Coding, encoders: *const compression.Encoders, message: *const T, scratch: Scratch) EncodeError!Prepared {
     const octets = try encode(T, codec, message, scratch.message);
     return compress(coding, encoders, octets, scratch.work);
 }
 
 /// Compresses a reply's `octets` into `buffer` when `encoders` writes `coding`, the message is
 /// long enough, and the coding makes it shorter, and says whether it did.
-pub fn compress(coding: compression.Coding, encoders: compression.Encoders, octets: []const u8, buffer: []u8) Prepared {
+pub fn compress(coding: compression.Coding, encoders: *const compression.Encoders, octets: []const u8, buffer: []u8) Prepared {
     if (coding == .identity or octets.len < compress_len_min) return .{ .octets = octets, .compressed = false };
     if (!encoders.writes(coding)) return .{ .octets = octets, .compressed = false };
     const packed_octets = compression.compress(coding, encoders, octets, buffer) catch return .{ .octets = octets, .compressed = false };
@@ -87,7 +87,7 @@ pub fn compress(coding: compression.Coding, encoders: compression.Encoders, octe
 /// message holds `len_min` octets or more, whether or not the coding shrinks it: the request's
 /// head names the coding its message is in, as connect-go sends it (decision 22). A shorter
 /// message goes as it is. `encoders` must write `coding`.
-pub fn compress_request(coding: compression.Coding, encoders: compression.Encoders, octets: []const u8, buffer: []u8, len_min: usize) error{NoSpaceLeft}!Prepared {
+pub fn compress_request(coding: compression.Coding, encoders: *const compression.Encoders, octets: []const u8, buffer: []u8, len_min: usize) error{NoSpaceLeft}!Prepared {
     assert(encoders.writes(coding));
     if (coding == .identity or octets.len < len_min) return .{ .octets = octets, .compressed = false };
     return .{ .octets = try compression.compress(coding, encoders, octets, buffer), .compressed = true };
@@ -99,7 +99,7 @@ test "gzip is used only when it shrinks the message" {
     var encoder: compression.GzipEncoder = undefined;
     var buffer: [compress_len_min * 2]u8 = undefined;
     const repetitive = [_]u8{'a'} ** (compress_len_min + 1);
-    try testing.expect(compress(.gzip, .{ .gzip = &encoder }, &repetitive, &buffer).compressed);
+    try testing.expect(compress(.gzip, &.{ .gzip = &encoder }, &repetitive, &buffer).compressed);
     // Hash output has no redundancy gzip can find, so its stored form is longer than the input.
     const Sha256 = std.crypto.hash.sha2.Sha256;
     var noise: [compress_len_min]u8 = undefined;
@@ -108,7 +108,7 @@ test "gzip is used only when it shrinks the message" {
         Sha256.hash(&block, &block, .{});
         @memcpy(noise[index * block.len ..][0..block.len], &block);
     }
-    const kept = compress(.gzip, .{ .gzip = &encoder }, &noise, &buffer);
+    const kept = compress(.gzip, &.{ .gzip = &encoder }, &noise, &buffer);
     try testing.expect(!kept.compressed);
     try testing.expectEqual(@as(usize, compress_len_min), kept.octets.len);
 }
@@ -118,15 +118,15 @@ test "a request is compressed from its floor on, even when the coding cannot shr
     var buffer: [compress_len_min]u8 = undefined;
     const encoders: compression.Encoders = .{ .gzip = &encoder };
     // gzip's header and trailer make a two-octet message longer, and it goes compressed all the same.
-    const tiny = try compress_request(.gzip, encoders, "hi", &buffer, 0);
+    const tiny = try compress_request(.gzip, &encoders, "hi", &buffer, 0);
     try testing.expect(tiny.compressed);
     try testing.expect(tiny.octets.len > "hi".len);
-    try testing.expect((try compress_request(.gzip, encoders, "hi", &buffer, "hi".len)).compressed);
-    const below = try compress_request(.gzip, encoders, "hi", &buffer, "hi".len + 1);
+    try testing.expect((try compress_request(.gzip, &encoders, "hi", &buffer, "hi".len)).compressed);
+    const below = try compress_request(.gzip, &encoders, "hi", &buffer, "hi".len + 1);
     try testing.expect(!below.compressed);
     try testing.expectEqualStrings("hi", below.octets);
-    try testing.expect(!(try compress_request(.identity, encoders, "hi", &buffer, 0)).compressed);
-    try testing.expectError(error.NoSpaceLeft, compress_request(.gzip, encoders, "hi", buffer[0..1], 0));
+    try testing.expect(!(try compress_request(.identity, &encoders, "hi", &buffer, 0)).compressed);
+    try testing.expectError(error.NoSpaceLeft, compress_request(.gzip, &encoders, "hi", buffer[0..1], 0));
 }
 
 /// A message with a repeated field, which `decode_into` reads into storage.

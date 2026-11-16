@@ -170,6 +170,12 @@ first. Cite an entry by number in code and commits ("decision 6").
     complete a quantum of four (RFC 4648 §4), which connect-zig's own reader dropped before.
     Beaten: `std.base64`, which reads one alphabet in a call, so a reader that takes either one
     tried each in turn.
+    Amended on 2026-11-16: brotli encodes too, since stdx v0.1.1 holds an encoder.
+    `connect.BrotliEncoder` runs at level 1 with a window of 128 KiB (WBITS 17, RFC 7932 §9.1),
+    as the zstd encoder does, and takes 519 KiB, where the zstd encoder takes 1.4 MiB. A program
+    places it in `Encoders.brotli`. Beaten: stdx's default window of 256 KiB at level 1, which
+    costs 128 KiB more for the messages past 128 KiB alone, and level 5, which takes 3.2 MiB at
+    the least.
 
 11. **Plain gRPC waits on colibri for the client.** colibri's `client.Response` holds no
     trailers, so a client cannot read `grpc-status` over h2. The server speaks gRPC now. The

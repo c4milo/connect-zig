@@ -153,13 +153,14 @@ fn codec_of(codec: config.Codec) Refusal!connect.Codec {
     };
 }
 
-/// The coding the client compresses its requests with. It reads br too, but writes no br
-/// (decision 10), so a case that sends br is refused.
+/// The coding the client compresses its requests with: gzip, zstd or br (decision 10). A case
+/// that sends another coding is refused.
 fn coding_of(compression: config.Compression) Refusal!connect.Coding {
     return switch (compression) {
         .compression_unspecified, .compression_identity => .identity,
         .compression_gzip => .gzip,
         .compression_zstd => .zstd,
+        .compression_br => .br,
         else => error.UnsupportedCompression,
     };
 }
@@ -218,7 +219,8 @@ test "a case's versions, protocol, codec and coding map to the client's, and oth
     try testing.expectEqual(connect.Codec.json, try codec_of(.codec_json));
     try testing.expectError(error.UnsupportedCodec, codec_of(.codec_text));
     try testing.expectEqual(connect.Coding.zstd, try coding_of(.compression_zstd));
-    try testing.expectError(error.UnsupportedCompression, coding_of(.compression_br));
+    try testing.expectEqual(connect.Coding.br, try coding_of(.compression_br));
+    try testing.expectError(error.UnsupportedCompression, coding_of(.compression_snappy));
 }
 
 test "a cancel with no timing cancels right after the send side closes" {

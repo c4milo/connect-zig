@@ -10,8 +10,16 @@ change the public API, and the entry marks each change that does.
 
 ## Unreleased
 
+### Added
+
+- brotli both ways. A program places `connect.BrotliEncoder` in `Encoders.brotli`, and a server
+  or a client then writes `br`: stdx's encoder at level 1 with a 128 KiB window, in 519 KiB.
+  Before, `br` was read and not written.
+
 ### Changed
 
+- **Changes the API.** `compression.compress` and `compression.choose` take the encoders as
+  `*const Encoders`, since `Encoders` holds three pointers now. A call passes `&encoders`.
 - connect-zig builds on colibri v0.17.1 and on stdx v0.1.1, the tag colibri pins. A program that
   names stdx itself pins that tag too, so it links one stdx.
 - **Changes the API.** `rpc.failure_of` takes the pool's response, `*const client.Response`, in
