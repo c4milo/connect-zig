@@ -8,6 +8,11 @@
 //! handler answers the message with itself, so each reply's octets equal its request's: `prepare`
 //! checks that once for each protocol, before any run. bench/go and bench/rust make the same call
 //! through connect-go and connect-rust, and `--write` writes each reply for tools/bench_check.sh.
+//!
+//! The route sits in a table of 1, 16 or 256 routes (`constants.call_route_counts`), as many
+//! services as methods in each: the echo method's service holds it and more methods, and each
+//! other service as many. The calls never reach the other routes, which stand for the rest of
+//! an API, so a count shows what the router's match costs as a table grows.
 const std = @import("std");
 const assert = std.debug.assert;
 const connect = @import("connect");
@@ -53,15 +58,56 @@ fn on_error(_: *App, _: *server.RequestContext, _: *const server.Request, _: any
     response.status = .internal_server_error;
 }
 
+/// A route the calls never reach: one more method of a larger API, which the router's match
+/// searches past. It would answer 404 Not Found.
+const Filler = struct {
+    pub fn on_request(_: *App, _: *server.RequestContext, _: *void, _: *const server.Request, response: *server.Response) !void {
+        response.status = .not_found;
+        return response.end();
+    }
+};
+
+/// The route table of `routes` routes around `echo_entry`, in a square: `side` services of
+/// `side` methods. Route 0 is the echo method's. Routes 1 to `side - 1` are the methods
+/// `Filler<j>` of its service, and route `i * side + j` past them the method `Call<j>` of the
+/// service `bench.v1.Filler<i>`. bench/go and bench/rust name the same paths.
+fn RouteTable(comptime echo_entry: anytype, comptime routes: usize) type {
+    const side = std.math.sqrt(routes);
+    comptime assert(side * side == routes);
+    // An entry as colibri's table takes it: the method, the path, and the route's type.
+    const Entry = struct { http.method.Standard, []const u8, type };
+    return struct {
+        const types = types: {
+            var held: [routes]type = @splat(Entry);
+            held[0] = @TypeOf(echo_entry);
+            break :types held;
+        };
+        pub const value: std.meta.Tuple(&types) = value: {
+            @setEvalBranchQuota(constants.call_routes_quota);
+            var held: std.meta.Tuple(&types) = undefined;
+            held[0] = echo_entry;
+            for (1..routes) |index| held[index] = .{ .post, filler_path(index, side), Filler };
+            break :value held;
+        };
+    };
+}
+
+/// The path of route `index` past the echo method's in a table of `side` services.
+fn filler_path(comptime index: usize, comptime side: usize) []const u8 {
+    if (index < side) return std.fmt.comptimePrint("/bench.v1.Bench/Filler{d:0>2}", .{index});
+    return std.fmt.comptimePrint("/bench.v1.Filler{d:0>2}/Call{d:0>2}", .{ index / side, index % side });
+}
+
 /// The routed calls of `Message`, on the route of the method `Echo<name>`, which answers the
-/// message with itself. `main` holds one for each message in its `State` (decision 42).
-pub fn Calls(comptime Message: type, comptime name: []const u8) type {
+/// message with itself, in a table of `routes` routes. `main` holds one for each message and
+/// table in its `State` (decision 42).
+pub fn Calls(comptime Message: type, comptime name: []const u8, comptime routes: usize) type {
     return struct {
         const Self = @This();
         const echo: connect.Method = .{ .service = "bench.v1.Bench", .name = "Echo" ++ name, .Request = Message, .Response = Message, .stream_type = .unary };
         const Router = server.Router(App, .{
             .error_handler = on_error,
-            .routes = .{rpc.post(App, echo, on_echo, .{})},
+            .routes = RouteTable(rpc.post(App, echo, on_echo, .{}), routes).value,
         }, .{ .requests = constants.call_requests, .response_bytes = constants.call_response_bytes, .body_bytes = constants.call_body_bytes, .header_bytes = 0 });
 
         app: App,

@@ -6,6 +6,10 @@
 //!
 //! The handler answers the message with itself. A map field is a BTreeMap, so each reply's
 //! octets equal its request's, as Zig's do.
+//!
+//! The router holds 1, 16 or 225 routes, as bench/call.zig's tables do: the echo method's, then
+//! more methods of its service, then more services of as many methods. The calls never reach the
+//! other routes.
 
 use std::path::Path;
 
@@ -45,6 +49,10 @@ const CALL_PROTOCOLS: [CallProtocol; 2] = [
 
 /// gRPC's "Length-Prefixed-Message": a flag octet, then the length in four octets.
 const PREFIX_LEN: usize = 5;
+
+/// The sizes of the route tables the small message's calls run on, as bench/constants.zig's
+/// call_route_counts: each a square of services and methods.
+pub const CALL_ROUTE_COUNTS: [usize; 3] = [1, 16, 225];
 
 /// A routed call of one message in one protocol.
 struct RoutedCall {
@@ -145,37 +153,67 @@ impl RoutedCall {
     }
 }
 
-/// connect-rust's router with one unary method, `Echo<name>` of bench.v1.Bench, which answers a
-/// message with itself.
-fn echo_router<T>(name: &str) -> Router
+/// connect-rust's router of `routes` unary methods: `Echo<name>` of bench.v1.Bench, which answers
+/// a message with itself, then the paths of bench/call.zig's filler_path: `Filler<j>` of its
+/// service, then `Call<j>` of the services `bench.v1.Filler<i>`.
+fn echo_router<T>(name: &str, routes: usize) -> Router
 where
     T: buffa::Message + JsonDeserialize + JsonSerialize + Send + 'static,
 {
-    Router::new().route(
+    let side = (routes as f64).sqrt() as usize;
+    assert_eq!(
+        side * side,
+        routes,
+        "a route table is a square of services and methods"
+    );
+    let mut router = Router::new().route(
         "bench.v1.Bench",
         &format!("Echo{name}"),
         handler_fn(|_context: RequestContext, request: T| async move { Response::ok(request) }),
-    )
+    );
+    for index in 1..routes {
+        let (service, method) = if index < side {
+            ("bench.v1.Bench".to_owned(), format!("Filler{index:02}"))
+        } else {
+            (
+                format!("bench.v1.Filler{:02}", index / side),
+                format!("Call{:02}", index % side),
+            )
+        };
+        router = router.route(
+            &service,
+            &method,
+            handler_fn(|_context: RequestContext, request: T| async move { Response::ok(request) }),
+        );
+    }
+    router
 }
 
-/// Times the routed calls of one message, each after its reply is checked, and writes each reply
-/// into `directory` when it is set.
+/// Times the routed calls of one message in a table of `routes` routes, each after its reply is
+/// checked, and writes each reply into `directory` when it is set, from the table of one route. A
+/// call in a larger table names the count after its own name, as "Connect unary call, 16 routes".
 pub fn run_calls<T>(
     current: &Settings,
     directory: Option<&str>,
     name: &'static str,
     method: &str,
     input: &T,
+    routes: usize,
 ) -> Result<(), String>
 where
     T: buffa::Message + JsonDeserialize + JsonSerialize + Send + 'static,
 {
     let encoded = input.encode_to_vec();
     for protocol in &CALL_PROTOCOLS {
-        let label = protocol.label;
-        let mut call = RoutedCall::new(protocol, method, echo_router::<T>(method), &encoded);
+        let label = if routes > 1 {
+            format!("{}, {routes} routes", protocol.label)
+        } else {
+            protocol.label.to_owned()
+        };
+        let mut call =
+            RoutedCall::new(protocol, method, echo_router::<T>(method, routes), &encoded);
         let reply = call.reply().map_err(|error| format!("{name}: {error}"))?;
-        if let Some(directory) = directory {
+        if let (Some(directory), 1) = (directory, routes) {
             let path = Path::new(directory).join(format!("{name}.{}", protocol.file_suffix));
             std::fs::write(path, &reply).map_err(|error| format!("{name}: {error}"))?;
         }

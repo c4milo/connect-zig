@@ -1,7 +1,9 @@
 //! The routed calls' benchmark: a unary call of the small and of the medium message, in Connect
-//! and in gRPC, through `connect_colibri`'s route on colibri's router (bench/call.zig). It prints
-//! the rows of bench/main.zig's table, in the same columns: a call's bytes are its request
-//! body's.
+//! and in gRPC, through `connect_colibri`'s route on colibri's router (bench/call.zig). The small
+//! message's call runs in tables of 1, 16 and 256 routes, and the medium message's in a table of
+//! one. It prints the rows of bench/main.zig's table, in the same columns: a call's bytes are its
+//! request body's, and a call in a table of more than one route names the count after its own
+//! name, as "Connect unary call, 16 routes".
 //!
 //! It is a program apart from bench/main.zig. The compiler lays out and inlines a program as a
 //! whole, and in one program with the routed calls the codec's own counts moved: small binary
@@ -37,11 +39,17 @@ const Options = struct {
     instructions: bool = false,
 };
 
+const routes_one = constants.call_route_counts[0];
+const routes_some = constants.call_route_counts[1];
+const routes_many = constants.call_route_counts[constants.call_route_counts.len - 1];
+
 /// All the program holds, which `main` allocates once before the first call (decision 42).
 const State = struct {
     messages: inputs.Messages,
-    small_calls: call.Calls(bench.Small, "Small"),
-    medium_calls: call.Calls(bench.Medium, "Medium"),
+    small_calls: call.Calls(bench.Small, "Small", routes_one),
+    medium_calls: call.Calls(bench.Medium, "Medium", routes_one),
+    small_calls_some: call.Calls(bench.Small, "Small", routes_some),
+    small_calls_many: call.Calls(bench.Small, "Small", routes_many),
     output: [constants.output_len]u8 align(constants.buffer_align),
 };
 
@@ -60,9 +68,13 @@ pub fn main(init: std.process.Init) !void {
     const context: Context = .{ .io = init.io, .writer = writer, .options = options };
     try writer.print("| message | operation | bytes | ns/op | MB/s |\n| --- | --- | ---: | ---: | ---: |\n", .{});
     try state.small_calls.prepare(&inputs.small);
-    try run_calls(context, "small", &state.small_calls.exchange);
+    try run_calls(context, "small", &state.small_calls.exchange, routes_one);
     try state.medium_calls.prepare(&state.messages.medium);
-    try run_calls(context, "medium", &state.medium_calls.exchange);
+    try run_calls(context, "medium", &state.medium_calls.exchange, routes_one);
+    try state.small_calls_some.prepare(&inputs.small);
+    try run_calls(context, "small", &state.small_calls_some.exchange, routes_some);
+    try state.small_calls_many.prepare(&inputs.small);
+    try run_calls(context, "small", &state.small_calls_many.exchange, routes_many);
     try writer.flush();
 }
 
@@ -86,26 +98,39 @@ fn parse(args: std.process.Args) !Options {
     return error.TooManyArguments;
 }
 
-/// Times or counts each protocol's routed call of one message, and writes its reply under
-/// `--write`. It, `count_instructions` and `Exchange.call` stay out of line: inlined into `main`
-/// with the router, they made one function whose jump tables LLVM failed to encode on CI's arm64
-/// runner ("fixup value out of range").
-noinline fn run_calls(context: Context, name: []const u8, exchange: *call.Exchange) !void {
-    for (std.enums.values(call.Protocol)) |protocol| {
+/// Times or counts each protocol's routed call of one message in a table of `routes` routes,
+/// and writes its reply under `--write` from the table of one route. It, `count_instructions`
+/// and `Exchange.call` stay out of line: inlined into `main` with the router, they made one
+/// function whose jump tables LLVM failed to encode on CI's arm64 runner ("fixup value out of
+/// range").
+noinline fn run_calls(context: Context, name: []const u8, exchange: *call.Exchange, comptime routes: usize) !void {
+    inline for (comptime std.enums.values(call.Protocol)) |protocol| {
         if (context.options.write_directory) |directory| {
-            try write_reply(context.io, directory, name, protocol, try exchange.reply_of(protocol));
+            const reply = try exchange.reply_of(protocol);
+            if (routes == routes_one) try write_reply(context.io, directory, name, protocol, reply);
         }
+        const label = comptime label_of(protocol, routes);
         const runner = exchange.runner(protocol);
         if (context.options.instructions) {
-            try count_instructions(name, protocol.label(), runner);
-            continue;
+            try count_instructions(name, label, runner);
+        } else {
+            try time_call(context, name, label, exchange.bytes(protocol), runner);
         }
-        const ns = try measure.median_ns(context.io, context.options.settings, runner);
-        const bytes = exchange.bytes(protocol);
-        const megabytes_per_second = @as(f64, @floatFromInt(bytes)) / ns * std.time.ns_per_s / bytes_per_megabyte;
-        try context.writer.print("| {s} | {s} | {d} | {d:.1} | {d:.1} |\n", .{ name, protocol.label(), bytes, ns, megabytes_per_second });
-        try context.writer.flush();
     }
+}
+
+/// Times one routed call and writes its row.
+fn time_call(context: Context, name: []const u8, label: []const u8, bytes: usize, runner: call.Runner) !void {
+    const ns = try measure.median_ns(context.io, context.options.settings, runner);
+    const megabytes_per_second = @as(f64, @floatFromInt(bytes)) / ns * std.time.ns_per_s / bytes_per_megabyte;
+    try context.writer.print("| {s} | {s} | {d} | {d:.1} | {d:.1} |\n", .{ name, label, bytes, ns, megabytes_per_second });
+    try context.writer.flush();
+}
+
+/// A call's name in the table: the protocol's, and the count of routes past one.
+fn label_of(comptime protocol: call.Protocol, comptime routes: usize) []const u8 {
+    if (routes == routes_one) return protocol.label();
+    return std.fmt.comptimePrint("{s}, {d} routes", .{ protocol.label(), routes });
 }
 
 /// Collects the instructions of `instruction_iterations` calls, after one call that warms them,

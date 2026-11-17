@@ -229,6 +229,12 @@ Each step names the check that proves it. A step is done when its check passes i
     New public names: `connect.BrotliEncoder`; `Encoders` gains the field `brotli`. Check:
     `zig build test-connect`, the conformance suite with `COMPRESSION_BR` in both halves'
     features, and `tools/interop_check.sh`, where curl reads a br answer.
+27. **Route tables in the routed call.** The small message's routed call runs in tables of 1,
+    16 and 225 routes, in connect-zig, connect-go and connect-rust, each a square of services
+    and methods with the same paths. connect-go's call goes through an `http.ServeMux`, as a
+    connect-go server's does. New public names: none. Check: `tools/bench_check.sh`, which fails
+    when a table size lacks its row, and `tools/routes_chart.py`, which draws each call's time
+    against its time with one route.
 
 ### Step records
 
@@ -1158,6 +1164,25 @@ ran on Linux x86-64 with Zig 0.16.0.
     grpc-go client's cases failed to connect.
   - `tools/conformance_report.awk` reads both runners' names for the grpc-go peer: v1.0.4's
     "(grpc)" and v1.0.7's "grpc-reference-".
+
+- **Route tables in the routed call** (step 27). On colibri v0.17.3.
+  - Each implementation built a router of one route, and connect-go none: its benchmark called
+    the handler itself. So the routed call held no routing cost.
+  - The small message's call now runs in tables of 1, 16 and 225 routes: 1, 4 and 15 services,
+    each of as many methods. The echo method's service holds it and `Filler<j>` methods, and
+    each service `bench.v1.Filler<i>` holds `Call<j>` methods. The calls never reach those.
+  - colibri finds a route by binary search over each segment's sorted literals, connect-rust by
+    a hash map of the whole path, and Go's `ServeMux` by a tree of maps.
+  - 225, not 256: colibri v0.17.3's router does not compile a table of 256 routes, since two of
+    its functions switch over each route with Zig's default branch quota. colibri's session has
+    the report, and the largest table moves to 256 at the release that fixes it.
+  - A quick local run on an M1 Pro, from 1 to 225 routes: connect-zig's call took 11% to 13%
+    more time, connect-rust's 1% more, and connect-go's moved within its noise.
+  - The local judge on x86-64-v2, small Connect call: 3,962 instructions with 1 route, 3,988
+    with 16, and 4,203 with 225 (+6.1%); gRPC 4,458, 4,485 and 4,699 (+5.4%). Of the 241 more
+    at 225 routes, about 110 are the binary search's steps, about 13 instructions each, about
+    40 a copy that the one-route build left out, and about 30 calls that the compiler no longer
+    inlines into the larger router.
 
 ### What a later step owes
 

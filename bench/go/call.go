@@ -1,6 +1,11 @@
-// The routed calls: the counterpart of bench/call.zig. One unary call of a message through
-// connect-go's handler, in memory: ServeHTTP on a request that httptest builds, with a recorder
-// for the response. No socket, no framing and no TLS, as on the Zig side.
+// The routed calls: the counterpart of bench/call.zig. One unary call of a message through an
+// http.ServeMux that routes it to connect-go's handler, in memory: ServeHTTP on a request that
+// httptest builds, with a recorder for the response. No socket, no framing and no TLS, as on the
+// Zig side.
+//
+// The mux holds 1, 16 or 225 routes, as bench/call.zig's tables do: the echo method's, then more
+// methods of its service, then more services of as many methods. The calls never reach the other
+// routes.
 //
 // The handler answers the message with itself. Its proto codec marshals deterministically, so a
 // map's entries go in key order and each reply's octets equal its request's, as Zig's do.
@@ -13,6 +18,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"math"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -41,6 +47,10 @@ var callProtocols = []callProtocol{
 // gRPC's "Length-Prefixed-Message": a flag octet, then the length in four octets.
 const prefixLen = 5
 
+// The sizes of the route tables the small message's calls run on, as bench/constants.zig's
+// call_route_counts: each a square of services and methods.
+var callRouteCounts = []int{1, 16, 225}
+
 // deterministicCodec is connect-go's proto codec with deterministic marshaling.
 type deterministicCodec struct{}
 
@@ -61,6 +71,29 @@ func echoHandler[T any](name string) (string, http.Handler) {
 		return connect.NewResponse(request.Msg), nil
 	}, connect.WithCodec(deterministicCodec{}))
 	return procedure, handler
+}
+
+// echoMux routes `Echo<name>` of bench.v1.Bench in a table of `routes` routes, the paths of
+// bench/call.zig's filler_path: `Filler<j>` of the echo method's service, then `Call<j>` of the
+// services `bench.v1.Filler<i>`.
+func echoMux[T any](name string, routes int) (string, http.Handler) {
+	side := int(math.Sqrt(float64(routes)))
+	if side*side != routes {
+		panic("a route table is a square of services and methods")
+	}
+	procedure, handler := echoHandler[T](name)
+	mux := http.NewServeMux()
+	mux.Handle(procedure, handler)
+	for index := 1; index < routes; index++ {
+		filler := fmt.Sprintf("/bench.v1.Filler%02d/Call%02d", index/side, index%side)
+		if index < side {
+			filler = fmt.Sprintf("/bench.v1.Bench/Filler%02d", index)
+		}
+		mux.Handle(filler, connect.NewUnaryHandler(filler, func(_ context.Context, request *connect.Request[T]) (*connect.Response[T], error) {
+			return connect.NewResponse(request.Msg), nil
+		}, connect.WithCodec(deterministicCodec{})))
+	}
+	return procedure, mux
 }
 
 // A routed call of one message in one protocol.
@@ -131,37 +164,56 @@ func (c *routedCall) write(directory, name string) error {
 }
 
 // runCalls times the routed calls of the small and the medium message, each after its reply is
-// checked, and writes each reply into `directory` when it is set.
+// checked, and writes each reply into `directory` when it is set. The small message's calls run
+// in each table of callRouteCounts too, in bench/call_main.zig's order.
 func runCalls(current settings, directory string, small, medium *message) error {
-	smallProcedure, smallHandler := echoHandler[benchv1.Small]("Small")
-	mediumProcedure, mediumHandler := echoHandler[benchv1.Medium]("Medium")
-	targets := []struct {
+	smallProcedure, smallHandler := echoMux[benchv1.Small]("Small", 1)
+	mediumProcedure, mediumHandler := echoMux[benchv1.Medium]("Medium", 1)
+	type target struct {
 		message   *message
 		procedure string
 		handler   http.Handler
-	}{
-		{small, smallProcedure, smallHandler},
-		{medium, mediumProcedure, mediumHandler},
+		routes    int
 	}
-	for _, target := range targets {
+	targets := []target{
+		{small, smallProcedure, smallHandler, 1},
+		{medium, mediumProcedure, mediumHandler, 1},
+	}
+	for _, routes := range callRouteCounts[1:] {
+		procedure, handler := echoMux[benchv1.Small]("Small", routes)
+		targets = append(targets, target{small, procedure, handler, routes})
+	}
+	for _, t := range targets {
 		for _, protocol := range callProtocols {
-			c := newRoutedCall(protocol, target.procedure, target.handler, target.message.binary)
-			if _, err := c.reply(); err != nil {
-				return fmt.Errorf("%s: %w", target.message.name, err)
+			if err := runCall(current, directory, t.message, t.procedure, t.handler, t.routes, protocol); err != nil {
+				return err
 			}
-			if directory != "" {
-				if err := c.write(directory, target.message.name); err != nil {
-					return err
-				}
-			}
-			ns, err := medianNs(current, c.runner())
-			if err != nil {
-				return fmt.Errorf("%s, %s: %w", target.message.name, protocol.label, err)
-			}
-			size := len(c.body)
-			megabytesPerSecond := float64(size) / ns * 1e9 / bytesPerMegabyte
-			fmt.Printf("| %s | %s | %d | %.1f | %.1f |\n", target.message.name, protocol.label, size, ns, megabytesPerSecond)
 		}
 	}
+	return nil
+}
+
+// runCall checks, writes and times one routed call. A call in a table of more than one route
+// names the count after its own name, as "Connect unary call, 16 routes", and writes no reply.
+func runCall(current settings, directory string, m *message, procedure string, handler http.Handler, routes int, protocol callProtocol) error {
+	c := newRoutedCall(protocol, procedure, handler, m.binary)
+	if _, err := c.reply(); err != nil {
+		return fmt.Errorf("%s: %w", m.name, err)
+	}
+	label := protocol.label
+	if routes > 1 {
+		label = fmt.Sprintf("%s, %d routes", protocol.label, routes)
+	} else if directory != "" {
+		if err := c.write(directory, m.name); err != nil {
+			return err
+		}
+	}
+	ns, err := medianNs(current, c.runner())
+	if err != nil {
+		return fmt.Errorf("%s, %s: %w", m.name, label, err)
+	}
+	size := len(c.body)
+	megabytesPerSecond := float64(size) / ns * 1e9 / bytesPerMegabyte
+	fmt.Printf("| %s | %s | %d | %.1f | %.1f |\n", m.name, label, size, ns, megabytesPerSecond)
 	return nil
 }

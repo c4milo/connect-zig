@@ -107,6 +107,11 @@ expected_rows() {
         echo "| ${message} | Connect unary call |"
         echo "| ${message} | gRPC unary call |"
     done
+    # The small message's call in each larger route table (bench/constants.zig, call_route_counts).
+    for routes in 16 225; do
+        echo "| small | Connect unary call, ${routes} routes |"
+        echo "| small | gRPC unary call, ${routes} routes |"
+    done
 }
 missing="$(expected_rows | while IFS= read -r row; do
     grep -qF "${row}" "${scratch}/zig.md" || echo "${row}"

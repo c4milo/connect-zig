@@ -52,6 +52,12 @@ pub const call_body_bytes = 16 * 1024;
 pub const call_body_len = 2048;
 /// The HTTP version the routed calls name: h2 (RFC 9113).
 pub const h2_major = 2;
+/// The sizes of the route tables the small message's calls run on: the echo method's route
+/// alone, then among more methods, as 4 services of 4 methods and as 16 services of 16
+/// (bench/call.zig). bench/go and bench/rust build the same tables.
+pub const call_route_counts = [_]usize{ 1, 16, 225 };
+/// The comptime branches that the build of the largest route table takes.
+pub const call_routes_quota = 1_000_000;
 
 /// The limits of the costs table, bench/costs.zig.
 pub const costs = struct {

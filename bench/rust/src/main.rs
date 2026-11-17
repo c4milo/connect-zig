@@ -101,8 +101,19 @@ fn run(current: &Settings, directory: Option<&str>) -> Result<(), String> {
         inputs::tree(inputs::TREE_LEVELS_COUNT),
     )?;
     bench(current, directory, "packed", inputs::packed())?;
-    call::run_calls(current, directory, "small", "Small", &inputs::small())?;
-    call::run_calls(current, directory, "medium", "Medium", &inputs::medium())
+    call::run_calls(current, directory, "small", "Small", &inputs::small(), 1)?;
+    call::run_calls(current, directory, "medium", "Medium", &inputs::medium(), 1)?;
+    for routes in &call::CALL_ROUTE_COUNTS[1..] {
+        call::run_calls(
+            current,
+            directory,
+            "small",
+            "Small",
+            &inputs::small(),
+            *routes,
+        )?;
+    }
+    Ok(())
 }
 
 fn bench<T: Benched>(
