@@ -358,7 +358,8 @@ first. Cite an entry by number in code and commits ("decision 6").
     socket bookkeeping of colibri's `client_tcp.zig` for one connection at a time.
     Amended on 2026-11-16: the runner is v1.0.7, where it was v1.0.4 (design §8 step 25). It
     sends 16 calls at once in server mode, as many as the server's router holds. The server
-    keeps an idle connection 120 s, past the 90 s that Go's client keeps one.
+    keeps an idle connection 30 s, colibri's default, and holds 512 sockets for the grpc-go
+    client, which leaves a connection open for each case.
 
 27. **A method Connect does not serve gets 405.** colibri's router answers 501 for a method no
     route of the table names, and 405 with an Allow header for one that a route names on another

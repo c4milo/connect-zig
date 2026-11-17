@@ -1147,8 +1147,9 @@ ran on Linux x86-64 with Zig 0.16.0.
   - On this Mac the client half passed all 10711 cases. The server half passed every case in 39
     runs of 40, and failed one h11 case in one run with "unexpected EOF". The cause was the
     conformance server's idle wait of 1 s, against Go's 90 s: with 50 ms, about 200 cases a run
-    failed the same way. With 120 s, and 512 sockets for the grpc-go client's connections, 3
-    runs of 3 passed every case.
+    failed the same way. The wait is now 30 s, colibri's default, with 512 sockets for the
+    grpc-go client's connections: 8 runs of 8 passed every case. At 30 s with 128 sockets, the
+    grpc-go client's cases failed to connect.
   - `tools/conformance_report.awk` reads both runners' names for the grpc-go peer: v1.0.4's
     "(grpc)" and v1.0.7's "grpc-reference-".
 
