@@ -347,8 +347,8 @@ with `zig build test`, and serves its service with `zig build serve` for curl an
 unary call. `tools/bench_check.sh` runs the same inputs through Go's `google.golang.org/protobuf`
 v1.36.12, connect-go's codec, and Buffa, connect-rust's codec. It checks that each writes the
 same bytes as connect-zig. The numbers below come from CI's two `bench-compare` jobs of
-commit `493b3e0` ([run 129](https://github.com/c4milo/connect-zig/actions/runs/43657281850)). One
-ran on an AMD EPYC 9V45 core (x86-64) and one on an Arm Neoverse-N2 core (arm64), each with the
+commit `b96f830` ([run 160](https://github.com/c4milo/connect-zig/actions/runs/44007655863)). One
+ran on an AMD EPYC 7763 core (x86-64) and one on an Arm Neoverse-N2 core (arm64), each with the
 three programs in one job. The run's summary holds every table.
 
 Each chart draws the speed of connect-zig and of Buffa in multiples of Go's. A longer bar is
@@ -356,16 +356,26 @@ faster, and Go is the line at 1. The charts time the codecs alone, with no code 
 connect-rust. A binary decode with every field read takes `decode_into`, which reads each
 repeated field once (decision 37).
 
-On x86-64, Buffa is faster than connect-zig in 1 of 16 cells, binary encode of the deep message:
+On x86-64, Buffa is faster than connect-zig in 1 of 16 cells, JSON encode of the small message, by
+4%:
 
-![Bars of the speed of connect-zig and of Buffa, connect-rust's codec, in multiples of Go's protobuf runtime, connect-go's codec, on x86-64: connect-zig is 3.2 to 19.6 times faster than Go's protobuf runtime, and Buffa is faster than connect-zig in 1 of 16 cells](docs/images/speed-vs-go.svg)
+![Bars of the speed of connect-zig and of Buffa, connect-rust's codec, in multiples of Go's protobuf runtime, connect-go's codec, on x86-64: connect-zig is 3.3 to 17.9 times faster than Go's protobuf runtime, and Buffa is faster than connect-zig in 1 of 16 cells](docs/images/speed-vs-go.svg)
 
 On arm64, Buffa is faster in none:
 
-![Bars of the speed of connect-zig and of Buffa, connect-rust's codec, in multiples of Go's protobuf runtime, connect-go's codec, on arm64: connect-zig is 3.0 to 21.7 times faster than Go's protobuf runtime, and Buffa is faster than connect-zig in no cell](docs/images/speed-vs-go-arm64.svg)
+![Bars of the speed of connect-zig and of Buffa, connect-rust's codec, in multiples of Go's protobuf runtime, connect-go's codec, on arm64: connect-zig is 2.9 to 18.1 times faster than Go's protobuf runtime, and 1.1 to 1.9 times faster than Buffa](docs/images/speed-vs-go-arm64.svg)
 
 The routed calls (`bench/call.zig`) run the same unary call in memory through connect-zig,
-connect-go and connect-rust. CI's `bench-compare` job prints them beside each other.
+connect-go and connect-rust: the router, the route, the protocol and the codec, with no socket,
+no TLS and no HTTP/2 framing. The same two jobs timed them. Each chart draws a speed in multiples
+of connect-go's, and connect-zig's bar also gives its time for one call.
+
+![Bars of the speed of a routed unary call through connect-zig and connect-rust, in multiples of connect-go's, on x86-64: connect-zig is 11.0 to 12.8 times as fast as connect-go, and 3.2 to 4.8 times as fast as connect-rust](docs/images/call-vs-go.svg)
+
+![Bars of the speed of a routed unary call through connect-zig and connect-rust, in multiples of connect-go's, on arm64: connect-zig is 13.2 to 17.7 times as fast as connect-go, and 3.6 to 6.9 times as fast as connect-rust](docs/images/call-vs-go-arm64.svg)
+
+Whole servers over real sockets and TLS are not compared yet
+([issue 7](https://github.com/c4milo/connect-zig/issues/7)).
 
 ## How it is checked
 

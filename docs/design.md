@@ -1161,9 +1161,6 @@ ran on Linux x86-64 with Zig 0.16.0.
 
 ### What a later step owes
 
-- A chart of the routed calls, beside the codec charts: connect-zig, connect-go and connect-rust
-  on one unary call, from CI's `bench-compare` job of one named run, once the calls' new
-  baseline is in (step 24).
 - A stream that waits for an event of the program once its request ended (colibri issue 130).
   colibri v0.16.0 left it out, as ruled on 2026-11-10. No release up to v0.17.0 holds it, and
   the issue is still open.
