@@ -30,20 +30,51 @@ server_log="$(mktemp)"
 client_log="$(mktemp)"
 trap 'rm -f "${server_log}" "${client_log}"' EXIT
 status=0
-"${runner}" --mode server --conf conformance/config.yaml \
+# -v names each configuration with its count of cases, which the report's table reads.
+"${runner}" --mode server --conf conformance/config.yaml -v \
     --known-failing @conformance/known_failing.txt --known-flaky @conformance/known_flaky.txt \
     -- zig-out/bin/conformance-server >"${server_log}" 2>&1 || status=$?
 cat "${server_log}"
-"${runner}" --mode client --conf conformance/client_config.yaml \
+"${runner}" --mode client --conf conformance/client_config.yaml -v \
     --known-failing @conformance/client_known_failing.txt --known-flaky @conformance/client_known_flaky.txt \
     -- zig-out/bin/conformance-client >"${client_log}" 2>&1 || status=$?
 cat "${client_log}"
-# Writes a half's totals and each of its failures to the report.
+# The runner the report names: the release this script pins, or the one CONNECTCONFORMANCE names.
+if [ -n "${CONNECTCONFORMANCE:-}" ]; then
+    runner_text="the runner that \`CONNECTCONFORMANCE\` names, \`${CONNECTCONFORMANCE}\`"
+else
+    runner_text="connectconformance v${version} for Linux-x86_64, SHA-256 \`${sha256}\`"
+fi
+# The features a half's config file declares, one line for each list or flag. The runner tests
+# these alone.
+features_of() {
+    awk '
+        /^ *#/ || /^features:/ { next }
+        /^  [a-z_0-9]+:$/ { if (list != "") print "- " list ": " items; list = $1; sub(/:$/, "", list); items = ""; next }
+        /^    - / {
+            item = $2
+            sub(/^(HTTP_VERSION|PROTOCOL|CODEC|COMPRESSION|STREAM_TYPE)_/, "", item)
+            items = items == "" ? item : items ", " item
+            next
+        }
+        /^  [a-z_0-9]+: / { if (list != "") print "- " list ": " items; list = ""; flags = flags == "" ? $1 " " $2 : flags ", " $1 " " $2 }
+        END { if (list != "") print "- " list ": " items; print "- " flags }
+    ' "$1"
+}
+# Writes a half's report: the runner, the features its config declares, a table of its cases by
+# configuration (tools/conformance_report.awk), the runner's totals, and each failure by name.
 report() {
     echo "## Conformance: connectrpc's runner v${version} against the $1"
     echo
+    echo "Runner: ${runner_text}. Features of \`$3\`:"
+    echo
+    features_of "$3"
+    echo
+    awk -f tools/conformance_report.awk "$2"
+    echo
     grep -e '^Total cases' -e 'passed,' -e '^(Another' "$2" | sed 's/^/- /'
     grep '^FAILED: ' "$2" | sed 's/^/- /' || true
+    grep '^INFO: .* failed (as expected)' "$2" | sed 's/^/- /' || true
     echo
 }
 # Writes each failure of a half as a GitHub error annotation: the case's name and its message's
@@ -75,8 +106,8 @@ fi
 # With CONFORMANCE_REPORT naming a file, the runner's totals and each failure go there too.
 if [ -n "${CONFORMANCE_REPORT:-}" ]; then
     {
-        report server "${server_log}"
-        report client "${client_log}"
+        report server "${server_log}" conformance/config.yaml
+        report client "${client_log}" conformance/client_config.yaml
     } >>"${CONFORMANCE_REPORT}"
 fi
 exit "${status}"
