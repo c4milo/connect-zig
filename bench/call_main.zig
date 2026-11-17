@@ -55,7 +55,7 @@ pub fn main(init: std.process.Init) !void {
     const state = try init.arena.allocator().create(State);
     const options = try parse(init.minimal.args);
     state.messages.build();
-    var stdout = std.Io.File.stdout().writer(init.io, &state.output);
+    var stdout = std.Io.File.stdout().writerStreaming(init.io, &state.output);
     const writer = &stdout.interface;
     const context: Context = .{ .io = init.io, .writer = writer, .options = options };
     try writer.print("| message | operation | bytes | ns/op | MB/s |\n| --- | --- | ---: | ---: | ---: |\n", .{});

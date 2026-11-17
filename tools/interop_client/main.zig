@@ -132,7 +132,7 @@ pub fn main(init: std.process.Init) !void {
     // Over TLS the client trusts the CA alone; in cleartext it names none.
     const trust: ?tls.Client = if (origin.secure) try trust_of(state, io, ca_path) else null;
     state.transport.init(io);
-    var stdout = std.Io.File.stdout().writer(io, &state.output);
+    var stdout = std.Io.File.stdout().writerStreaming(io, &state.output);
     var reporter: Reporter = .{ .writer = &stdout.interface, .server = left.server, .left_out = left.left_out, .verdict = &state.room.verdict };
     for (0..known.len + 1) |_| {
         const name = args.next() orelse break;

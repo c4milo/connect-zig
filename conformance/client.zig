@@ -78,7 +78,7 @@ pub fn main(init: std.process.Init) !void {
         .decoders = .{ .gzip = &state.gzip_decoder, .zstd = &state.zstd_decoder, .brotli = &state.brotli_decoder },
     };
     var stdin = std.Io.File.stdin().reader(init.io, &state.stdin_buffer);
-    var stdout = std.Io.File.stdout().writer(init.io, &state.stdout_buffer);
+    var stdout = std.Io.File.stdout().writerStreaming(init.io, &state.stdout_buffer);
     for (0..constants.client_cases_max) |_| {
         const bytes = try read_request(state, &stdin.interface) orelse return;
         const request = try proto.decode(Request, bytes);

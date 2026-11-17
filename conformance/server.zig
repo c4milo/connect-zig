@@ -99,7 +99,7 @@ fn read_request(io: std.Io, state: *State) ![]const u8 {
 fn write_response(io: std.Io, state: *State, port: u16) !void {
     const response: server_compat.ServerCompatResponse = .{ .host = host, .port = port };
     const encoded = try proto.encode(server_compat.ServerCompatResponse, &response, &state.compat_response_bytes);
-    var stdout = std.Io.File.stdout().writer(io, &state.stdout_buffer);
+    var stdout = std.Io.File.stdout().writerStreaming(io, &state.stdout_buffer);
     try stdout.interface.writeInt(u32, @intCast(encoded.len), .big);
     try stdout.interface.writeAll(encoded);
     try stdout.interface.flush();

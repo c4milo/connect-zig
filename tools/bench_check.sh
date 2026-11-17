@@ -93,6 +93,29 @@ for baseline in ${baselines}; do
         fi
     done
 done
+# Each row the Zig table must hold: every operation of every message, and each routed call. A
+# program that wrote over another's output would leave rows out, as bench/call_main.zig did from
+# CI's run 141 to run 159: Zig 0.16's `File.writer` writes a file from its start.
+expected_rows() {
+    for message in small medium large deep varints strings tree packed; do
+        for operation in "binary encode" "binary decode" "binary decode+walk" \
+            "JSON encode" "JSON decode" "JSON decode+walk"; do
+            echo "| ${message} | ${operation} |"
+        done
+    done
+    for message in small medium; do
+        echo "| ${message} | Connect unary call |"
+        echo "| ${message} | gRPC unary call |"
+    done
+}
+missing="$(expected_rows | while IFS= read -r row; do
+    grep -qF "${row}" "${scratch}/zig.md" || echo "${row}"
+done)"
+if [ -n "${missing}" ]; then
+    echo "the Zig table lacks these rows:" >&2
+    echo "${missing}" >&2
+    status=1
+fi
 echo
 echo "Machine: $(uname -m), $(cpu_model), $(getconf _NPROCESSORS_ONLN 2>/dev/null || echo "?") CPUs, features ${cpu_features}"
 echo

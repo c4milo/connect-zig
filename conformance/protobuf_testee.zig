@@ -57,7 +57,7 @@ const JsonReadError = proto.JsonDecodeError || error{IgnoreUnknownAsked};
 pub fn main(init: std.process.Init) !void {
     const state = try init.arena.allocator().create(State);
     var stdin = std.Io.File.stdin().reader(init.io, &state.in_buffer);
-    var stdout = std.Io.File.stdout().writer(init.io, &state.out_buffer);
+    var stdout = std.Io.File.stdout().writerStreaming(init.io, &state.out_buffer);
     for (0..constants.testee_requests_max) |_| {
         const bytes = try read_request(state, &stdin.interface) orelse return;
         const response: pb.ConformanceResponse = .{ .result = respond(state, bytes) };

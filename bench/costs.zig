@@ -77,7 +77,7 @@ pub fn main(init: std.process.Init) !void {
     link_lines(buffers.memory, random.random());
     fill_bits(buffers.random_bits, buffers.sorted_bits, random.random());
     @memset(buffers.copy_from, 1);
-    var stdout = std.Io.File.stdout().writer(init.io, &state.output);
+    var stdout = std.Io.File.stdout().writerStreaming(init.io, &state.output);
     const writer = &stdout.interface;
     try writer.print("## The costs, timed on this machine ({s}, {t})\n\n", .{ builtin.cpu.model.name, builtin.mode });
     try writer.print("| Cost | Median | Spread | Unit |\n| --- | ---: | ---: | --- |\n", .{});

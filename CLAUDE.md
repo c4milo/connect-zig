@@ -53,7 +53,9 @@ confirm a test fails. Report `CAUGHT` or `NOT CAUGHT` per mutation in the commit
 ## Conventions
 
 - Zig 0.16. `pub fn main(init: std.process.Init) !void`; stdio through `std.Io.File.stdin()`
-  and `stdout()` with `init.io`; `std.ArrayList` is unmanaged.
+  and `stdout()` with `init.io`; `std.ArrayList` is unmanaged. A program writes standard output
+  with `writerStreaming`: `writer` writes a file from its start, over what another program wrote
+  there.
 - Names spell words out. One-letter names only for loop indices. `_len` counts bytes.
 - Functions stay at cognitive complexity 15 or less, `test` blocks included. Split the function;
   never raise the threshold.

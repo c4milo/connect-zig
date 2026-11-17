@@ -53,7 +53,7 @@ pub fn main(init: std.process.Init) !void {
         .editions => try convert(editions.Everything, state, direction, input),
         .legacy => try convert(legacy.Everything, state, direction, input),
     };
-    var stdout = std.Io.File.stdout().writer(init.io, &state.io_buffer);
+    var stdout = std.Io.File.stdout().writerStreaming(init.io, &state.io_buffer);
     try stdout.interface.writeAll(written);
     try stdout.interface.flush();
 }
