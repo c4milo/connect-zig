@@ -786,6 +786,11 @@ first. Cite an entry by number in code and commits ("decision 6").
       holds is known within 1/16 of it. Before, a ratio of two servers' rates could be off by
       half: Vector held 71,200 spans a second and failed 106,800. A step after a failure waits
       5 s for the server's queue to empty.
+    - Amended on 2026-11-17: the `fullstack` and `bench-compare` checks draw the README's charts
+      from their own output, and CI keeps them with the run for 90 days, as `charts-<check>-<arch>`.
+      A person copies a chosen run's charts to `docs/images`, so the README still names one run.
+      Beaten: CI that commits the charts, which needs write access, and moves the README's numbers
+      with each runner's CPU model.
     - Slack, whose fleet the model takes its size from, publishes no rate of spans. So the model
       states each core's rate, and the fleet's rate divided by it gives the cores a tier needs.
       The 516 connections, the mix and the 100 ms limit were chosen on 2026-11-17.

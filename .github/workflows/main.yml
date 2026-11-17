@@ -132,3 +132,12 @@ jobs:
       - name: Publish the report
         if: always()
         run: '[ -f ci-report.md ] && cat ci-report.md >>"${GITHUB_STEP_SUMMARY}" || true'
+      # The README's charts that a check drew from its own output, with that output (tools/ci.sh,
+      # draw_charts). A person copies a chosen run's charts to docs/images (decision 44).
+      - name: Keep the charts
+        if: always() && hashFiles('ci-charts/*.svg') != ''
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: charts-${{ matrix.check }}-${{ runner.arch }}
+          path: ci-charts/
+          retention-days: 90

@@ -30,6 +30,9 @@ paid for.
   1/16 of it. It fails only when a server
   answered an export wrongly or did not take every span. CI's `fullstack` job runs it on x86-64
   and on arm64, and adds its tables to each job's summary.
+- **Each run draws its charts.** The `fullstack` and `bench-compare` jobs draw the README's
+  charts from their own output. CI keeps them with the run as `charts-<check>-<arch>`. To update
+  the README, copy a chosen run's charts to `docs/images` and take its numbers into the text.
 - **The smoke run.** `zig build bench -- --quick` runs every operation on every message in a few
   short batches. CI's `bench` job runs it, so a broken operation fails before anyone times it.
 - **A profile shows where the cost goes, and is never a measurement.** Run callgrind on

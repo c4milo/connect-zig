@@ -47,6 +47,36 @@ report_only() {
     return 0
 }
 
+# Draws the README's charts of a check from its output (the first argument), into `charts`. Each
+# chart names its run: GitHub's run number in CI, or "local". An arm64 runner's charts take the
+# README's "-arm64" names. CI uploads `charts` with the run, and a person copies a chosen run's
+# charts to docs/images (decision 44). A chart that does not draw is a warning: the check measured
+# what it must.
+charts="ci-charts"
+draw_charts() {
+    mkdir -p "${charts}"
+    log="${charts}/$2.log"
+    printf '%s\n' "$1" >"${log}"
+    run_name="${GITHUB_RUN_NUMBER:-local}"
+    commit="$(git rev-parse --short HEAD)"
+    suffix=""
+    [ "$(uname -m)" = aarch64 ] && suffix="-arm64"
+    case "$2" in
+        bench-compare) drawings="speed_chart:speed-vs-go call_chart:call-vs-go routes_chart:call-routes" ;;
+        fullstack) drawings="fullstack_chart:fullstack:tls fullstack_chart:fullstack-cleartext:cleartext" ;;
+    esac
+    for drawing in ${drawings}; do
+        script="${drawing%%:*}" rest="${drawing#*:}"
+        name="${rest%%:*}" transport=""
+        [ "${rest}" = "${name}" ] || transport="${rest#*:}"
+        out="${charts}/${name}${suffix}.svg"
+        if ! python3 "tools/${script}.py" "${log}" "${run_name}" "${commit}" ${transport} "${out}" >&2; then
+            echo "ci: tools/${script}.py drew no ${name}${suffix}.svg" >&2
+            [ -z "${GITHUB_ACTIONS:-}" ] || echo "::warning title=$2::tools/${script}.py drew no ${name}${suffix}.svg"
+        fi
+    done
+}
+
 # Runs one check by name.
 check() {
     case "$1" in
@@ -69,11 +99,13 @@ check() {
         # runtime must match.
         bench-compare) compare="$(tools/bench_check.sh 2>&1)" && compare_status=0 || compare_status=$?
             report_only bench-compare "${compare}"
+            draw_charts "${compare}" bench-compare
             return "${compare_status}" ;;
         # Whole servers over TLS and h2, connect-zig's OTLP sink beside OpenTelemetry's Collector
         # (decision 44). The times report and never gate; every span must arrive.
         fullstack) full="$(tools/fullstack_check.sh)" && full_status=0 || full_status=$?
             report_only fullstack "${full}"
+            draw_charts "${full}" fullstack
             return "${full_status}" ;;
         perf) tools/perf_check.sh ;;
         generated) tools/generate_check.sh ;;

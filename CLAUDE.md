@@ -190,3 +190,6 @@ confirm a test fails. Report `CAUGHT` or `NOT CAUGHT` per mutation in the commit
   push and pull request. A new check joins `tools/ci.sh`, never the workflow file. `test`,
   `bench-compare` and `fullstack` run a second time on an arm64 runner: `test` because an aarch64
   Linux link can fail where x86-64's passes, and the other two for the README's arm64 charts.
+  `fullstack` and `bench-compare` draw the README's charts into `ci-charts/`, which CI keeps with
+  the run as `charts-<check>-<arch>`. To update the README, copy a chosen run's charts to
+  `docs/images` (decision 44).
