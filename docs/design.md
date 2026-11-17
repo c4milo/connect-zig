@@ -1179,6 +1179,9 @@ ran on Linux x86-64 with Zig 0.16.0.
     failed the same way. The wait is now 30 s, colibri's default, with 512 sockets for the
     grpc-go client's connections: 8 runs of 8 passed every case. At 30 s with 128 sockets, the
     grpc-go client's cases failed to connect.
+  - CI's run 173 failed one h11 client-stream case with "unexpected EOF". The server closed a
+    connection that Go's client opened and kept, at the first-request wait of 5 s. At 50 ms,
+    24 h11 cases failed in one run. Both waits are now 120 s, past Go's 90 s.
   - `tools/conformance_report.awk` reads both runners' names for the grpc-go peer: v1.0.4's
     "(grpc)" and v1.0.7's "grpc-reference-".
 

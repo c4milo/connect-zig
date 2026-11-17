@@ -360,6 +360,11 @@ first. Cite an entry by number in code and commits ("decision 6").
     sends 16 calls at once in server mode, as many as the server's router holds. The server
     keeps an idle connection 30 s, colibri's default, and holds 512 sockets for the grpc-go
     client, which leaves a connection open for each case.
+    Amended on 2026-11-17: the server waits 120 s for a connection's first request and between
+    requests, past the 90 s that Go's client keeps a connection. Go's client opens connections
+    it may not use at once. At a first-request wait of 5 s, CI's run 173 failed one h11 case
+    with "unexpected EOF". Beaten: colibri's defaults, which close a connection the client may
+    still send on.
 
 27. **A method Connect does not serve gets 405.** colibri's router answers 501 for a method no
     route of the table names, and 405 with an Allow header for one that a route names on another
