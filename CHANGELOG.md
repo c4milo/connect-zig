@@ -18,6 +18,8 @@ change the public API, and the entry marks each change that does.
 
 ### Changed
 
+- CI runs connectrpc's conformance suite v1.0.7, where it ran v1.0.4: the server passes its 3714
+  cases, and the client its 10711.
 - JSON encode writes a message with no member, `{}`, in one stdx call: tree's JSON encode takes
   27% fewer instructions.
 - **Changes the API.** `compression.compress` and `compression.choose` take the encoders as

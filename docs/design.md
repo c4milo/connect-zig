@@ -1137,23 +1137,23 @@ ran on Linux x86-64 with Zig 0.16.0.
   - Mutations, 4 of 4 CAUGHT: pad bits refused, the standard alphabet alone, padding required,
     and a refused text passed as an empty field.
 
+- **Runner v1.0.7** (step 25, decision 26 as amended on 2026-11-16). On colibri v0.17.3.
+  - `tools/conformance_check.sh` downloads runner v1.0.7 for Linux-x86_64, pinned by SHA-256.
+    In server mode it passes `--parallel 16`: the runner's default follows the CPU count, and
+    the server's router holds 16 calls.
+  - With br declared, the server half runs 3714 cases, and the client half 10711.
+    `client_known_flaky.txt` lists none: v1.0.5 removed the "Client Message Size" suite whose
+    case it held, and runner v1.0.7 refuses a pattern that matches no case.
+  - On this Mac the client half passed all 10711 cases. The server half passed every case in 39
+    runs of 40, and failed one h11 case in one run with "unexpected EOF". The cause was the
+    conformance server's idle wait of 1 s, against Go's 90 s: with 50 ms, about 200 cases a run
+    failed the same way. With 120 s, and 512 sockets for the grpc-go client's connections, 3
+    runs of 3 passed every case.
+  - `tools/conformance_report.awk` reads both runners' names for the grpc-go peer: v1.0.4's
+    "(grpc)" and v1.0.7's "grpc-reference-".
+
 ### What a later step owes
 
-- The pin of the conformance runner at v1.0.7 (step 25). It waits for two changes in colibri.
-  - Over h11, colibri v0.17.0 and v0.17.1 close a connection with no `Connection: close` after
-    an early answer whose request body they do not drain. The server half then fails 1 or 2 of
-    2852 cases a run. colibri v0.17.2 says the close in each head that goes out while a chunked
-    request body is open, and no h11 case failed in 19 runs. But a stream that answers before
-    its request ends then costs its h11 connection, and a call that waits behind it on the
-    client's pool ends refused: the `streaming` example's third chat over h11 does. So
-    connect-zig stays on v0.17.1.
-  - Over h2, colibri's router cancels an answer that has no entry when the connection has no
-    room for its head (`answer` in its `router_pool.zig`). A call to a path with no route then
-    reads a reset with CANCEL in place of `unimplemented`. Runner v1.0.7 failed 1 or 2 such
-    cases in 4 runs of 19. Runner v1.0.4, which sends its calls about 6 times slower, failed
-    none in 12.
-  - The "Client Message Size" entry of `client_known_flaky.txt` goes with the pin: v1.0.5
-    removed that suite.
 - A chart of the routed calls, beside the codec charts: connect-zig, connect-go and connect-rust
   on one unary call, from CI's `bench-compare` job of one named run, once the calls' new
   baseline is in (step 24).

@@ -137,7 +137,7 @@ confirm a test fails. Report `CAUGHT` or `NOT CAUGHT` per mutation in the commit
   `buf convert`, over the JSON cases in `tools/testdata/`, and the binary cases with upb's,
   Python's protobuf pinned in `tools/upb_requirements.txt`, for closed enums and unchecked
   strings. It needs buf, jq and python3 with venv.
-- Conformance: `tools/conformance_check.sh` runs connectrpc's conformance runner v1.0.4 against
+- Conformance: `tools/conformance_check.sh` runs connectrpc's conformance runner v1.0.7 against
   `zig build conformance-server`, with the features of `conformance/config.yaml`, then in client
   mode against `zig build conformance-client`, with those of `conformance/client_config.yaml`.
   It downloads the runner pinned by SHA-256, unless `CONNECTCONFORMANCE` names one. A case that

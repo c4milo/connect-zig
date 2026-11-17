@@ -343,7 +343,7 @@ first. Cite an entry by number in code and commits ("decision 6").
 26. **The conformance suite runs against a server of its own.** `conformance/` holds a program
     that serves connectrpc's ConformanceService on a socket the kernel picks, as the runner's
     server mode asks. It runs on `colibri.Server` in cleartext, as the example socket server
-    runs on it over TLS (decision 31). `tools/conformance_check.sh` downloads runner v1.0.4, pinned by
+    runs on it over TLS (decision 31). `tools/conformance_check.sh` downloads runner v1.0.7, pinned by
     SHA-256, and `conformance/known_failing.txt` names each case that fails on purpose, with the
     reason; the runner fails when a listed case passes. The client half waits on colibri's
     client (decision 11). Beaten: the runner's reference server against our client alone, which
@@ -356,6 +356,9 @@ first. Cite an entry by number in code and commits ("decision 6").
     on purpose is in `conformance/client_known_failing.txt` with its reason, and each it may fail
     in `client_known_flaky.txt`. Beaten: a Rotor loop of the program's own, which needs the
     socket bookkeeping of colibri's `client_tcp.zig` for one connection at a time.
+    Amended on 2026-11-16: the runner is v1.0.7, where it was v1.0.4 (design §8 step 25). It
+    sends 16 calls at once in server mode, as many as the server's router holds. The server
+    keeps an idle connection 120 s, past the 90 s that Go's client keeps one.
 
 27. **A method Connect does not serve gets 405.** colibri's router answers 501 for a method no
     route of the table names, and 405 with an Allow header for one that a route names on another

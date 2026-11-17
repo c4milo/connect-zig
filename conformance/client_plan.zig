@@ -96,7 +96,7 @@ pub fn plan_of(request: *const Request, codings: *const Codings, memory: *Memory
 
 /// The server's certificate, in PEM, which the client trusts as a root (docs/testing_clients.md:
 /// "treat this certificate as a trusted certificate authority"), or null for cleartext. The
-/// runner's certificate names "localhost" (connectconformance v1.0.4, internal/tls.go), which
+/// runner's certificate names "localhost" (connectconformance v1.0.7, internal/tls.go), which
 /// the client sends as server_name and checks the certificate against (RFC 6125 §6).
 fn tls_of(certificate: []const u8, memory: *Memory) Refusal!?tls.Client {
     if (certificate.len == 0) return null;

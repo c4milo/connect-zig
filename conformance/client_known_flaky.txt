@@ -1,10 +1,6 @@
 # The conformance cases the client may fail or pass, each group with its reason (decision 26).
 # `*` stands for one part of a case's name.
 #
-# Over HTTP/1.1 the reference gRPC server answers a half-duplex stream's head once it read the
-# first message, and Go's net/http then drops the rest of the request body: a handler cannot
-# read the body after it wrote the head over HTTP/1.x (net/http, ResponseWriter.Write). The
-# second message, when it arrives later, fails "http: invalid Read on closed Body". The client
-# sends each message as a piece of its own (decision 18), so a busy machine can open that gap:
-# the whole suite failed it in one run here, and under `taskset -c 0` it fails one run in four.
-Client Message Size/HTTPVersion:1/Protocol:PROTOCOL_GRPC_WEB/*/*/(grpc server impl)/bidi-stream/half-duplex/all-requests-equal-to-client-limit
+# None now. connectconformance v1.0.5 removed the "Client Message Size" suite, whose half-duplex
+# case over HTTP/1.1 was listed here: the reference gRPC server dropped the rest of a request
+# body once it wrote its head (net/http, ResponseWriter.Write).

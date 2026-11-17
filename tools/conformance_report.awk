@@ -4,7 +4,8 @@
 # a failure, and each "INFO: <case> failed (as expected)" line a known failing or flaky case that
 # failed. A case's name carries its HTTP version and TLS, and its protocol but in a few suites,
 # whose own name gives it. The peer is connectrpc's reference implementation, on connect-go, or
-# its grpc-go one, which the runner marks "(grpc)" and a case's name "(grpc ... impl)".
+# its grpc-go one, which the runner marks "(grpc)" or "grpc-reference-", and a case's name
+# "(grpc ... impl)".
 
 # The table's key of the configuration a failed case ran in.
 function key_of(line,    name, version, protocol, tls, peer) {
@@ -32,7 +33,8 @@ function key_of(line,    name, version, protocol, tls, peer) {
 
 # The key of a "Running" line's configuration and peer.
 function key_of_running(line,    config, peer) {
-    peer = line ~ /\(grpc\) for server config/ ? "grpc-go" : "connect-go"
+    # Runner v1.0.4 writes "reference client (grpc)", and v1.0.7 "grpc-reference-client".
+    peer = line ~ /(\(grpc\)|grpc-reference-(client|server)) for server config/ ? "grpc-go" : "connect-go"
     config = line
     sub(/.*\{/, "", config)
     sub(/\}.*/, "", config)

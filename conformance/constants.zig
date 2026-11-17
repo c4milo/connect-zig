@@ -1,7 +1,7 @@
 //! The conformance server's named sizes (design §8 step 7), the client's, and the protobuf
 //! testee's (decision 38).
 
-/// The runner's message receive limit is 200 KiB (connectconformance v1.0.4,
+/// The runner's message receive limit is 200 KiB (connectconformance v1.0.7,
 /// `serverReceiveLimit`). A message holds at most this many octets, so the limit always fits.
 pub const message_bytes = 512 * 1024;
 /// The longest JSON token of a request. The JSON cases carry short strings.
@@ -49,7 +49,7 @@ pub const nanos_per_milli = 1_000_000;
 
 // The conformance client's named sizes (design §8 step 7, the client half).
 
-/// The runner's client receive limit is 1 MiB (connectconformance v1.0.4,
+/// The runner's client receive limit is 1 MiB (connectconformance v1.0.7,
 /// `clientReceiveLimit`), and a request at the limit grows by its echo. A message the client
 /// writes or reads holds at most this many octets.
 pub const client_message_bytes = 2 * 1024 * 1024;

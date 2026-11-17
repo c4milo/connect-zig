@@ -9,8 +9,8 @@
 # It downloads the runner, pinned by SHA-256, into a cache, unless CONNECTCONFORMANCE names one.
 set -eu
 cd "$(dirname "$0")/.."
-version="1.0.4"
-sha256="b0b69570a6fc0e0dc94820f209ba47ef26a2dd3e98ed3350ce7fadd00bb51053"
+version="1.0.7"
+sha256="cf2d7c671c8cfbdfba5e48dc58cbe0b2db01fa7b1c160ecf060f20d27479d63c"
 runner="${CONNECTCONFORMANCE:-}"
 if [ -z "${runner}" ]; then
     cache="${XDG_CACHE_HOME:-${HOME}/.cache}/connect-zig/conformance-${version}"
@@ -30,8 +30,10 @@ server_log="$(mktemp)"
 client_log="$(mktemp)"
 trap 'rm -f "${server_log}" "${client_log}"' EXIT
 status=0
-# -v names each configuration with its count of cases, which the report's table reads.
-"${runner}" --mode server --conf conformance/config.yaml -v \
+# -v names each configuration with its count of cases, which the report's table reads. The
+# runner sends as many calls at once as the machine has CPUs, and the server's router holds
+# `constants.requests_at_once` calls, 16, so the runner sends 16 at most.
+"${runner}" --mode server --conf conformance/config.yaml -v --parallel 16 \
     --known-failing @conformance/known_failing.txt --known-flaky @conformance/known_flaky.txt \
     -- zig-out/bin/conformance-server >"${server_log}" 2>&1 || status=$?
 cat "${server_log}"
