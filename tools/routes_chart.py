@@ -52,6 +52,11 @@ for _, operation in protocols:
             sys.exit(f"{table_path}: no row for {operation} in a table of {routes} routes")
 
 
+def percent(change):
+    """A ratio's change in whole percent, with its sign; a change that rounds to 0 reads +0%."""
+    return f"{round(change * 100 - 100):+d}%"
+
+
 def ratio(operation, routes, name):
     """A call's time in a table of `routes` routes over its time in a table of one."""
     base, now = times[(operation, 1)][name], times[(operation, routes)][name]
@@ -64,7 +69,7 @@ for name, _, _ in time_columns:
     values = [ratio(operation, largest, name) for _, operation in protocols]
     values = [v for v in values if v is not None]
     if values:
-        changes.append(f"{name} {max(values) * 100 - 100:+.0f}%")
+        changes.append(f"{name} {percent(max(values))}")
 title = f"1 to {largest} routes, a call's time at most: " + ", ".join(changes)
 
 W, H = 840, 320
@@ -147,7 +152,7 @@ for k, (protocol, operation) in enumerate(protocols):
             a(f'<circle cx="{x:.1f}" cy="{y:.1f}" r="4" fill="var({fill})" stroke="var(--surface)" stroke-width="2"/>')
         last = ratio(operation, counts[-1], name)
         if last is not None and points[-1][0] == xs[counts[-1]]:
-            labels.append([points[-1][1] + 4, points[-1][0] + 9, f"{name} {last * 100 - 100:+.0f}%"])
+            labels.append([points[-1][1] + 4, points[-1][0] + 9, f"{name} {percent(last)}"])
     # The end labels keep a line's height apart, so two lines that end close stay readable.
     labels.sort()
     label_gap = 13

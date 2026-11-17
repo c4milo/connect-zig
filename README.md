@@ -367,12 +367,35 @@ On arm64, Buffa is faster in none:
 
 The routed calls (`bench/call.zig`) run the same unary call in memory through connect-zig,
 connect-go and connect-rust: the router, the route, the protocol and the codec, with no socket,
-no TLS and no HTTP/2 framing. The same two jobs timed them. Each chart draws a speed in multiples
-of connect-go's, and connect-zig's bar also gives its time for one call.
+no TLS and no HTTP/2 framing. connect-go's router is an `http.ServeMux`, as a server's is. CI's
+two `bench-compare` jobs of commit `cc20a73`
+([run 164](https://github.com/c4milo/connect-zig/actions/runs/44014548420)) timed them, on an AMD
+EPYC 9V74 core and on an Arm Neoverse-N2 core. Each chart draws a speed in multiples of
+connect-go's, and connect-zig's bar also gives its time for one call. In a table of one route:
 
-![Bars of the speed of a routed unary call through connect-zig and connect-rust, in multiples of connect-go's, on x86-64: connect-zig is 11.0 to 12.8 times as fast as connect-go, and 3.2 to 4.8 times as fast as connect-rust](docs/images/call-vs-go.svg)
+![Bars of the speed of a routed unary call through connect-zig and connect-rust, in multiples of connect-go's, on x86-64: connect-zig is 11.6 to 17.8 times as fast as connect-go, and 3.3 to 5.8 times as fast as connect-rust](docs/images/call-vs-go.svg)
 
-![Bars of the speed of a routed unary call through connect-zig and connect-rust, in multiples of connect-go's, on arm64: connect-zig is 13.2 to 17.7 times as fast as connect-go, and 3.6 to 6.9 times as fast as connect-rust](docs/images/call-vs-go-arm64.svg)
+![Bars of the speed of a routed unary call through connect-zig and connect-rust, in multiples of connect-go's, on arm64: connect-zig is 15.3 to 22.8 times as fast as connect-go, and 3.7 to 6.9 times as fast as connect-rust](docs/images/call-vs-go-arm64.svg)
+
+The small message's call also runs in tables of 16 and 225 routes: 4 and 15 services of as many
+methods, with the call's route among them. colibri finds a route by a binary search over each path
+segment, connect-rust by a hash map of the path, and Go's `ServeMux` by a tree of maps. So
+connect-zig's call grows with the table, by up to 14%, where the other two stay within 3%. On
+CI's judge it takes 4,224 instructions with one route and 4,432 with 225. The time of the small
+Connect call, in nanoseconds:
+
+| Router | 1 route | 16 routes | 225 routes |
+| --- | ---: | ---: | ---: |
+| connect-zig, x86-64 | 307 | 314 | 351 |
+| connect-rust, x86-64 | 1,688 | 1,661 | 1,737 |
+| connect-go, x86-64 | 5,372 | 5,378 | 5,330 |
+| connect-zig, arm64 | 342 | 367 | 369 |
+| connect-rust, arm64 | 2,119 | 2,068 | 2,056 |
+| connect-go, arm64 | 7,635 | 7,595 | 7,630 |
+
+![Lines of the time of a routed call over its time with one route, as the route table grows from 1 to 16 and 225 routes, on x86-64: connect-zig takes up to 14% more time, connect-rust up to 3% and connect-go up to 1%](docs/images/call-routes.svg)
+
+![Lines of the time of a routed call over its time with one route, as the route table grows from 1 to 16 and 225 routes, on arm64: connect-zig takes up to 8% more time, connect-rust up to 0% and connect-go up to 2%](docs/images/call-routes-arm64.svg)
 
 Whole servers over real sockets and TLS are not compared yet
 ([issue 7](https://github.com/c4milo/connect-zig/issues/7)).

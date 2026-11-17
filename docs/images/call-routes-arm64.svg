@@ -1,0 +1,90 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 840 320" width="840" height="320" role="img" aria-labelledby="t d">
+<title id="t">The time of a routed call as its route table grows, for connect-zig, connect-rust and connect-go</title>
+<desc id="d">1 to 225 routes, a call's time at most: connect-zig +8%, connect-rust +0%, connect-go +2%. Each line is one implementation's time a call over its time with one route. Connect, connect-zig: 1 routes 341.5 ns, 16 routes 366.8 ns, 225 routes 369.2 ns; Connect, connect-rust: 1 routes 2118.8 ns, 16 routes 2068.2 ns, 225 routes 2056.0 ns; Connect, connect-go: 1 routes 7634.5 ns, 16 routes 7594.5 ns, 225 routes 7630.4 ns; gRPC, connect-zig: 1 routes 362.8 ns, 16 routes 381.3 ns, 225 routes 384.4 ns; gRPC, connect-rust: 1 routes 2509.8 ns, 16 routes 2476.6 ns, 225 routes 2504.0 ns; gRPC, connect-go: 1 routes 8267.9 ns, 16 routes 8359.4 ns, 225 routes 8418.0 ns.</desc>
+<style>
+svg { --surface:#fcfcfb; --ink:#0b0b0b; --ink2:#52514e; --muted:#8a8984; --grid:#e4e3df; --zig:#2a78d6; --rust:#eb6834; --go:#6f6e69; }
+@media (prefers-color-scheme: dark) {
+  svg { --surface:#1a1a19; --ink:#f0efec; --ink2:#c3c2b7; --muted:#8f8e86; --grid:#33332f; --zig:#3987e5; --rust:#d95926; --go:#a8a79f; }
+}
+text { font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; fill: var(--ink); }
+.title { font-size: 16px; font-weight: 600; }
+.sub { font-size: 12.5px; fill: var(--ink2); }
+.panel { font-size: 14px; font-weight: 600; }
+.val { font-size: 11px; font-weight: 600; paint-order: stroke; stroke: var(--surface); stroke-width: 3px; stroke-linejoin: round; }
+.tick { font-size: 11px; fill: var(--muted); }
+.legend { font-size: 12.5px; fill: var(--ink2); }
+</style>
+<rect width="840" height="320" rx="8" fill="var(--surface)"/>
+<text class="title" x="24" y="34">1 to 225 routes, a call's time at most: connect-zig +8%, connect-rust +0%, connect-go +2%</text>
+<text class="sub" x="24" y="56">The small message's routed call in memory, its route among more methods and services. Each line is one</text>
+<text class="sub" x="24" y="74">implementation's time a call over its own time with one route: a flat line costs the same at any size.</text>
+<text class="sub" x="24" y="92">One CI job ran all three: run 164, commit cc20a73, aarch64, Neoverse-N2.</text>
+<line x1="24" y1="106" x2="40" y2="106" stroke="var(--zig)" stroke-width="2.5"/>
+<text class="legend" x="46" y="110">connect-zig</text>
+<line x1="147" y1="106" x2="163" y2="106" stroke="var(--rust)" stroke-width="2.5"/>
+<text class="legend" x="169" y="110">connect-rust</text>
+<line x1="277" y1="106" x2="293" y2="106" stroke="var(--go)" stroke-width="2.5"/>
+<text class="legend" x="299" y="110">connect-go</text>
+<text class="panel" x="24" y="148">Connect</text>
+<line x1="76" y1="282.0" x2="312" y2="282.0" stroke="var(--grid)" stroke-width="1"/>
+<text class="tick" x="70" y="286.0" text-anchor="end">0.90×</text>
+<line x1="76" y1="258.0" x2="312" y2="258.0" stroke="var(--grid)" stroke-width="1"/>
+<text class="tick" x="70" y="262.0" text-anchor="end">0.95×</text>
+<line x1="76" y1="234.0" x2="312" y2="234.0" stroke="var(--grid)" stroke-width="1"/>
+<text class="tick" x="70" y="238.0" text-anchor="end">1.00×</text>
+<line x1="76" y1="210.0" x2="312" y2="210.0" stroke="var(--grid)" stroke-width="1"/>
+<text class="tick" x="70" y="214.0" text-anchor="end">1.05×</text>
+<line x1="76" y1="186.0" x2="312" y2="186.0" stroke="var(--grid)" stroke-width="1"/>
+<text class="tick" x="70" y="190.0" text-anchor="end">1.10×</text>
+<line x1="76" y1="162.0" x2="312" y2="162.0" stroke="var(--grid)" stroke-width="1"/>
+<text class="tick" x="70" y="166.0" text-anchor="end">1.15×</text>
+<text class="tick" x="76.0" y="300" text-anchor="middle">1 route</text>
+<text class="tick" x="194.0" y="300" text-anchor="middle">16 routes</text>
+<text class="tick" x="312.0" y="300" text-anchor="middle">225 routes</text>
+<polyline points="76.0,234.0 194.0,198.4 312.0,195.1" fill="none" stroke="var(--zig)" stroke-width="2.5"/>
+<circle cx="76.0" cy="234.0" r="4" fill="var(--zig)" stroke="var(--surface)" stroke-width="2"/>
+<circle cx="194.0" cy="198.4" r="4" fill="var(--zig)" stroke="var(--surface)" stroke-width="2"/>
+<circle cx="312.0" cy="195.1" r="4" fill="var(--zig)" stroke="var(--surface)" stroke-width="2"/>
+<polyline points="76.0,234.0 194.0,245.5 312.0,248.2" fill="none" stroke="var(--rust)" stroke-width="2.5"/>
+<circle cx="76.0" cy="234.0" r="4" fill="var(--rust)" stroke="var(--surface)" stroke-width="2"/>
+<circle cx="194.0" cy="245.5" r="4" fill="var(--rust)" stroke="var(--surface)" stroke-width="2"/>
+<circle cx="312.0" cy="248.2" r="4" fill="var(--rust)" stroke="var(--surface)" stroke-width="2"/>
+<polyline points="76.0,234.0 194.0,236.5 312.0,234.3" fill="none" stroke="var(--go)" stroke-width="2.5"/>
+<circle cx="76.0" cy="234.0" r="4" fill="var(--go)" stroke="var(--surface)" stroke-width="2"/>
+<circle cx="194.0" cy="236.5" r="4" fill="var(--go)" stroke="var(--surface)" stroke-width="2"/>
+<circle cx="312.0" cy="234.3" r="4" fill="var(--go)" stroke="var(--surface)" stroke-width="2"/>
+<text class="val" x="321.0" y="199.1">connect-zig +8%</text>
+<text class="val" x="321.0" y="238.3">connect-go +0%</text>
+<text class="val" x="321.0" y="252.2">connect-rust -3%</text>
+<text class="panel" x="432" y="148">gRPC</text>
+<line x1="484" y1="282.0" x2="720" y2="282.0" stroke="var(--grid)" stroke-width="1"/>
+<text class="tick" x="478" y="286.0" text-anchor="end">0.90×</text>
+<line x1="484" y1="258.0" x2="720" y2="258.0" stroke="var(--grid)" stroke-width="1"/>
+<text class="tick" x="478" y="262.0" text-anchor="end">0.95×</text>
+<line x1="484" y1="234.0" x2="720" y2="234.0" stroke="var(--grid)" stroke-width="1"/>
+<text class="tick" x="478" y="238.0" text-anchor="end">1.00×</text>
+<line x1="484" y1="210.0" x2="720" y2="210.0" stroke="var(--grid)" stroke-width="1"/>
+<text class="tick" x="478" y="214.0" text-anchor="end">1.05×</text>
+<line x1="484" y1="186.0" x2="720" y2="186.0" stroke="var(--grid)" stroke-width="1"/>
+<text class="tick" x="478" y="190.0" text-anchor="end">1.10×</text>
+<line x1="484" y1="162.0" x2="720" y2="162.0" stroke="var(--grid)" stroke-width="1"/>
+<text class="tick" x="478" y="166.0" text-anchor="end">1.15×</text>
+<text class="tick" x="484.0" y="300" text-anchor="middle">1 route</text>
+<text class="tick" x="602.0" y="300" text-anchor="middle">16 routes</text>
+<text class="tick" x="720.0" y="300" text-anchor="middle">225 routes</text>
+<polyline points="484.0,234.0 602.0,209.5 720.0,205.4" fill="none" stroke="var(--zig)" stroke-width="2.5"/>
+<circle cx="484.0" cy="234.0" r="4" fill="var(--zig)" stroke="var(--surface)" stroke-width="2"/>
+<circle cx="602.0" cy="209.5" r="4" fill="var(--zig)" stroke="var(--surface)" stroke-width="2"/>
+<circle cx="720.0" cy="205.4" r="4" fill="var(--zig)" stroke="var(--surface)" stroke-width="2"/>
+<polyline points="484.0,234.0 602.0,240.3 720.0,235.1" fill="none" stroke="var(--rust)" stroke-width="2.5"/>
+<circle cx="484.0" cy="234.0" r="4" fill="var(--rust)" stroke="var(--surface)" stroke-width="2"/>
+<circle cx="602.0" cy="240.3" r="4" fill="var(--rust)" stroke="var(--surface)" stroke-width="2"/>
+<circle cx="720.0" cy="235.1" r="4" fill="var(--rust)" stroke="var(--surface)" stroke-width="2"/>
+<polyline points="484.0,234.0 602.0,228.7 720.0,225.3" fill="none" stroke="var(--go)" stroke-width="2.5"/>
+<circle cx="484.0" cy="234.0" r="4" fill="var(--go)" stroke="var(--surface)" stroke-width="2"/>
+<circle cx="602.0" cy="228.7" r="4" fill="var(--go)" stroke="var(--surface)" stroke-width="2"/>
+<circle cx="720.0" cy="225.3" r="4" fill="var(--go)" stroke="var(--surface)" stroke-width="2"/>
+<text class="val" x="729.0" y="209.4">connect-zig +6%</text>
+<text class="val" x="729.0" y="229.3">connect-go +2%</text>
+<text class="val" x="729.0" y="242.3">connect-rust +0%</text>
+</svg>

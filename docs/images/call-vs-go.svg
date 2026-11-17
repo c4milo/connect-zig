@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 840 272" width="840" height="272" role="img" aria-labelledby="t d">
 <title id="t">A routed unary call through connect-zig and connect-rust, against connect-go</title>
-<desc id="d">connect-zig is 11.0 to 12.8 times as fast as connect-go, 3.2 to 4.8 times connect-rust. Each bar is an implementation's speed in multiples of connect-go v1.18.1's, which is connect-go's time a call over the implementation's, for a small and a medium message in Connect and gRPC. connect-zig: Connect: Small, 40 B 12.8x, Medium, 1 KB 11.0x; gRPC: Small, 40 B 12.7x, Medium, 1 KB 11.1x. connect-rust 0.9.1: Connect: Small, 40 B 2.8x, Medium, 1 KB 3.5x; gRPC: Small, 40 B 2.7x, Medium, 1 KB 3.2x.</desc>
+<desc id="d">connect-zig is 11.6 to 17.8 times as fast as connect-go, 3.3 to 5.8 times connect-rust. Each bar is an implementation's speed in multiples of connect-go v1.18.1's, which is connect-go's time a call over the implementation's, for a small and a medium message in Connect and gRPC. connect-zig: Connect: Small, 40 B 17.5x, Medium, 1 KB 11.6x; gRPC: Small, 40 B 17.8x, Medium, 1 KB 12.0x. connect-rust 0.9.1: Connect: Small, 40 B 3.2x, Medium, 1 KB 3.5x; gRPC: Small, 40 B 3.1x, Medium, 1 KB 3.5x.</desc>
 <style>
 svg { --surface:#fcfcfb; --ink:#0b0b0b; --ink2:#52514e; --muted:#8a8984; --grid:#e4e3df; --zig:#2a78d6; --rust:#eb6834; --unit:#52514e; }
 @media (prefers-color-scheme: dark) {
@@ -17,10 +17,10 @@ text { font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; fil
 .legend { font-size: 12.5px; fill: var(--ink2); }
 </style>
 <rect width="840" height="272" rx="8" fill="var(--surface)"/>
-<text class="title" x="24" y="34">connect-zig is 11.0 to 12.8 times as fast as connect-go, 3.2 to 4.8 times connect-rust</text>
+<text class="title" x="24" y="34">connect-zig is 11.6 to 17.8 times as fast as connect-go, 3.3 to 5.8 times connect-rust</text>
 <text class="sub" x="24" y="56">One unary call in memory: router, route, protocol and codec, with no socket, no TLS and no HTTP/2 framing.</text>
 <text class="sub" x="24" y="74">Each bar is a speed in multiples of connect-go's: its time over the bar's time. A longer bar is faster.</text>
-<text class="sub" x="24" y="92">One CI job ran all three, and each answered the same octets: run 160, commit b96f830, x86_64, AMD EPYC 7763 64-Core Processor.</text>
+<text class="sub" x="24" y="92">One CI job ran all three, and each answered the same octets: run 164, commit cc20a73, x86_64, AMD EPYC 9V74 80-Core Processor.</text>
 <rect x="24" y="100" width="12" height="12" rx="2" fill="var(--zig)"/>
 <text class="legend" x="42" y="110">connect-zig</text>
 <rect x="143" y="100" width="12" height="12" rx="2" fill="var(--rust)"/>
@@ -30,54 +30,66 @@ text { font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; fil
 <text class="panel" x="24" y="148">Connect</text>
 <line x1="136.0" y1="160" x2="136.0" y2="234" stroke="var(--grid)" stroke-width="1"/>
 <text class="tick" x="136.0" y="248" text-anchor="middle">0×</text>
-<line x1="171.1" y1="160" x2="171.1" y2="234" stroke="var(--grid)" stroke-width="1"/>
-<text class="tick" x="171.1" y="248" text-anchor="middle">2×</text>
-<line x1="206.2" y1="160" x2="206.2" y2="234" stroke="var(--grid)" stroke-width="1"/>
-<text class="tick" x="206.2" y="248" text-anchor="middle">4×</text>
-<line x1="241.2" y1="160" x2="241.2" y2="234" stroke="var(--grid)" stroke-width="1"/>
-<text class="tick" x="241.2" y="248" text-anchor="middle">6×</text>
-<line x1="276.3" y1="160" x2="276.3" y2="234" stroke="var(--grid)" stroke-width="1"/>
-<text class="tick" x="276.3" y="248" text-anchor="middle">8×</text>
-<line x1="311.4" y1="160" x2="311.4" y2="234" stroke="var(--grid)" stroke-width="1"/>
-<text class="tick" x="311.4" y="248" text-anchor="middle">10×</text>
-<line x1="346.5" y1="160" x2="346.5" y2="234" stroke="var(--grid)" stroke-width="1"/>
-<text class="tick" x="346.5" y="248" text-anchor="middle">12×</text>
+<line x1="161.3" y1="160" x2="161.3" y2="234" stroke="var(--grid)" stroke-width="1"/>
+<text class="tick" x="161.3" y="248" text-anchor="middle">2×</text>
+<line x1="186.7" y1="160" x2="186.7" y2="234" stroke="var(--grid)" stroke-width="1"/>
+<text class="tick" x="186.7" y="248" text-anchor="middle">4×</text>
+<line x1="212.0" y1="160" x2="212.0" y2="234" stroke="var(--grid)" stroke-width="1"/>
+<text class="tick" x="212.0" y="248" text-anchor="middle">6×</text>
+<line x1="237.3" y1="160" x2="237.3" y2="234" stroke="var(--grid)" stroke-width="1"/>
+<text class="tick" x="237.3" y="248" text-anchor="middle">8×</text>
+<line x1="262.7" y1="160" x2="262.7" y2="234" stroke="var(--grid)" stroke-width="1"/>
+<text class="tick" x="262.7" y="248" text-anchor="middle">10×</text>
+<line x1="288.0" y1="160" x2="288.0" y2="234" stroke="var(--grid)" stroke-width="1"/>
+<text class="tick" x="288.0" y="248" text-anchor="middle">12×</text>
+<line x1="313.3" y1="160" x2="313.3" y2="234" stroke="var(--grid)" stroke-width="1"/>
+<text class="tick" x="313.3" y="248" text-anchor="middle">14×</text>
+<line x1="338.7" y1="160" x2="338.7" y2="234" stroke="var(--grid)" stroke-width="1"/>
+<text class="tick" x="338.7" y="248" text-anchor="middle">16×</text>
+<line x1="364.0" y1="160" x2="364.0" y2="234" stroke="var(--grid)" stroke-width="1"/>
+<text class="tick" x="364.0" y="248" text-anchor="middle">18×</text>
 <text class="row" x="126" y="182.0" text-anchor="end">Small, 40 B</text>
-<path d="M136.0,164 h221.0 a4.0,4.0 0 0 1 4.0,4.0 v5.0 a4.0,4.0 0 0 1 -4.0,4.0 h-221.0 z" fill="var(--zig)"/>
-<text class="val" x="366.0" y="174">12.8×, 0.43 µs</text>
-<path d="M136.0,179 h45.5 a4.0,4.0 0 0 1 4.0,4.0 v5.0 a4.0,4.0 0 0 1 -4.0,4.0 h-45.5 z" fill="var(--rust)"/>
-<text class="val" x="190.5" y="189">2.8×</text>
+<path d="M136.0,164 h217.4 a4.0,4.0 0 0 1 4.0,4.0 v5.0 a4.0,4.0 0 0 1 -4.0,4.0 h-217.4 z" fill="var(--zig)"/>
+<text class="val" x="362.4" y="174">17.5×, 0.31 µs</text>
+<path d="M136.0,179 h36.3 a4.0,4.0 0 0 1 4.0,4.0 v5.0 a4.0,4.0 0 0 1 -4.0,4.0 h-36.3 z" fill="var(--rust)"/>
+<text class="val" x="181.3" y="189">3.2×</text>
 <text class="row" x="126" y="220.0" text-anchor="end">Medium, 1 KB</text>
-<path d="M136.0,202 h189.3 a4.0,4.0 0 0 1 4.0,4.0 v5.0 a4.0,4.0 0 0 1 -4.0,4.0 h-189.3 z" fill="var(--zig)"/>
-<text class="val" x="334.3" y="212">11.0×, 2.23 µs</text>
-<path d="M136.0,217 h56.7 a4.0,4.0 0 0 1 4.0,4.0 v5.0 a4.0,4.0 0 0 1 -4.0,4.0 h-56.7 z" fill="var(--rust)"/>
-<text class="val" x="201.7" y="227">3.5×</text>
-<line x1="153.5" y1="156" x2="153.5" y2="234" stroke="var(--unit)" stroke-width="1.5" stroke-dasharray="4 3"/>
-<text class="note" x="157.5" y="154">1× = as fast as connect-go</text>
+<path d="M136.0,202 h143.4 a4.0,4.0 0 0 1 4.0,4.0 v5.0 a4.0,4.0 0 0 1 -4.0,4.0 h-143.4 z" fill="var(--zig)"/>
+<text class="val" x="288.4" y="212">11.6×, 1.73 µs</text>
+<path d="M136.0,217 h40.8 a4.0,4.0 0 0 1 4.0,4.0 v5.0 a4.0,4.0 0 0 1 -4.0,4.0 h-40.8 z" fill="var(--rust)"/>
+<text class="val" x="185.8" y="227">3.5×</text>
+<line x1="148.7" y1="156" x2="148.7" y2="234" stroke="var(--unit)" stroke-width="1.5" stroke-dasharray="4 3"/>
+<text class="note" x="152.7" y="154">1× = as fast as connect-go</text>
 <text class="panel" x="432" y="148">gRPC</text>
 <line x1="544.0" y1="160" x2="544.0" y2="234" stroke="var(--grid)" stroke-width="1"/>
 <text class="tick" x="544.0" y="248" text-anchor="middle">0×</text>
-<line x1="579.1" y1="160" x2="579.1" y2="234" stroke="var(--grid)" stroke-width="1"/>
-<text class="tick" x="579.1" y="248" text-anchor="middle">2×</text>
-<line x1="614.2" y1="160" x2="614.2" y2="234" stroke="var(--grid)" stroke-width="1"/>
-<text class="tick" x="614.2" y="248" text-anchor="middle">4×</text>
-<line x1="649.2" y1="160" x2="649.2" y2="234" stroke="var(--grid)" stroke-width="1"/>
-<text class="tick" x="649.2" y="248" text-anchor="middle">6×</text>
-<line x1="684.3" y1="160" x2="684.3" y2="234" stroke="var(--grid)" stroke-width="1"/>
-<text class="tick" x="684.3" y="248" text-anchor="middle">8×</text>
-<line x1="719.4" y1="160" x2="719.4" y2="234" stroke="var(--grid)" stroke-width="1"/>
-<text class="tick" x="719.4" y="248" text-anchor="middle">10×</text>
-<line x1="754.5" y1="160" x2="754.5" y2="234" stroke="var(--grid)" stroke-width="1"/>
-<text class="tick" x="754.5" y="248" text-anchor="middle">12×</text>
+<line x1="569.3" y1="160" x2="569.3" y2="234" stroke="var(--grid)" stroke-width="1"/>
+<text class="tick" x="569.3" y="248" text-anchor="middle">2×</text>
+<line x1="594.7" y1="160" x2="594.7" y2="234" stroke="var(--grid)" stroke-width="1"/>
+<text class="tick" x="594.7" y="248" text-anchor="middle">4×</text>
+<line x1="620.0" y1="160" x2="620.0" y2="234" stroke="var(--grid)" stroke-width="1"/>
+<text class="tick" x="620.0" y="248" text-anchor="middle">6×</text>
+<line x1="645.3" y1="160" x2="645.3" y2="234" stroke="var(--grid)" stroke-width="1"/>
+<text class="tick" x="645.3" y="248" text-anchor="middle">8×</text>
+<line x1="670.7" y1="160" x2="670.7" y2="234" stroke="var(--grid)" stroke-width="1"/>
+<text class="tick" x="670.7" y="248" text-anchor="middle">10×</text>
+<line x1="696.0" y1="160" x2="696.0" y2="234" stroke="var(--grid)" stroke-width="1"/>
+<text class="tick" x="696.0" y="248" text-anchor="middle">12×</text>
+<line x1="721.3" y1="160" x2="721.3" y2="234" stroke="var(--grid)" stroke-width="1"/>
+<text class="tick" x="721.3" y="248" text-anchor="middle">14×</text>
+<line x1="746.7" y1="160" x2="746.7" y2="234" stroke="var(--grid)" stroke-width="1"/>
+<text class="tick" x="746.7" y="248" text-anchor="middle">16×</text>
+<line x1="772.0" y1="160" x2="772.0" y2="234" stroke="var(--grid)" stroke-width="1"/>
+<text class="tick" x="772.0" y="248" text-anchor="middle">18×</text>
 <text class="row" x="534" y="182.0" text-anchor="end">Small, 40 B</text>
-<path d="M544.0,164 h218.6 a4.0,4.0 0 0 1 4.0,4.0 v5.0 a4.0,4.0 0 0 1 -4.0,4.0 h-218.6 z" fill="var(--zig)"/>
-<text class="val" x="771.6" y="174">12.7×, 0.50 µs</text>
-<path d="M544.0,179 h42.6 a4.0,4.0 0 0 1 4.0,4.0 v5.0 a4.0,4.0 0 0 1 -4.0,4.0 h-42.6 z" fill="var(--rust)"/>
-<text class="val" x="595.6" y="189">2.7×</text>
+<path d="M544.0,164 h221.1 a4.0,4.0 0 0 1 4.0,4.0 v5.0 a4.0,4.0 0 0 1 -4.0,4.0 h-221.1 z" fill="var(--zig)"/>
+<text class="val" x="774.1" y="174">17.8×, 0.34 µs</text>
+<path d="M544.0,179 h35.1 a4.0,4.0 0 0 1 4.0,4.0 v5.0 a4.0,4.0 0 0 1 -4.0,4.0 h-35.1 z" fill="var(--rust)"/>
+<text class="val" x="588.1" y="189">3.1×</text>
 <text class="row" x="534" y="220.0" text-anchor="end">Medium, 1 KB</text>
-<path d="M544.0,202 h190.9 a4.0,4.0 0 0 1 4.0,4.0 v5.0 a4.0,4.0 0 0 1 -4.0,4.0 h-190.9 z" fill="var(--zig)"/>
-<text class="val" x="743.9" y="212">11.1×, 2.29 µs</text>
-<path d="M544.0,217 h52.3 a4.0,4.0 0 0 1 4.0,4.0 v5.0 a4.0,4.0 0 0 1 -4.0,4.0 h-52.3 z" fill="var(--rust)"/>
-<text class="val" x="605.3" y="227">3.2×</text>
-<line x1="561.5" y1="156" x2="561.5" y2="234" stroke="var(--unit)" stroke-width="1.5" stroke-dasharray="4 3"/>
+<path d="M544.0,202 h147.9 a4.0,4.0 0 0 1 4.0,4.0 v5.0 a4.0,4.0 0 0 1 -4.0,4.0 h-147.9 z" fill="var(--zig)"/>
+<text class="val" x="700.9" y="212">12.0×, 1.74 µs</text>
+<path d="M544.0,217 h39.9 a4.0,4.0 0 0 1 4.0,4.0 v5.0 a4.0,4.0 0 0 1 -4.0,4.0 h-39.9 z" fill="var(--rust)"/>
+<text class="val" x="592.9" y="227">3.5×</text>
+<line x1="556.7" y1="156" x2="556.7" y2="234" stroke="var(--unit)" stroke-width="1.5" stroke-dasharray="4 3"/>
 </svg>
