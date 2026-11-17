@@ -1237,6 +1237,13 @@ ran on Linux x86-64 with Zig 0.16.0.
   - Vector spent 8.99 µs of CPU a span on x86-64 and 13.54 µs on arm64, and grew to 1,471 MiB
     and 709 MiB. Rotel spent 3.02 µs and 4.51 µs. Rotel's p99 stayed near 41 ms from 53,400
     spans a second up, on both machines, and Vector's passed 40 ms at about the same rate.
+  - The steps grow by up to half, so run 172's ratios could be off by half. Now three halvings
+    follow the first failure (decision 44). CI's
+    [run 177](https://github.com/c4milo/connect-zig/actions/runs/44148697298) on `ca4bea6`, on
+    an AMD EPYC 7763 and a Neoverse-N2: over TLS, connect-zig held 551,704 and 694,200 spans a
+    second, the Collector 186,896 and 204,700, and Vector 57,834 and 66,748. In cleartext,
+    connect-zig held 640,800 and 783,184, the Collector 169,116 and 195,800, and Rotel 222,488
+    and 222,478.
 - **colibri v0.18.1** (steps 27 to 29, decision 10). colibri v0.18.1 (`0942b20a`) pins the
   stdx, chapulin and Rotor that v0.17.3 pins, so only colibri moves.
   - v0.18.0's router compiles a table of 256 routes, so the largest route table moves from 225

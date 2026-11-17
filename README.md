@@ -20,10 +20,10 @@ and serve the same handlers to Connect, gRPC and gRPC-Web clients, in binary pro
 - **Fast.** Binary and JSON encoding and decoding run 2.6 to 33.6 times faster than Go's protobuf
   runtime on x86-64, and 2.2 to 39.6 times on arm64, in CI's
   [run 160](https://github.com/c4milo/connect-zig/actions/runs/44007655863). In a gateway that
-  takes OpenTelemetry traces, one core holds 4.0 times the OpenTelemetry Collector's spans a
-  second on x86-64 and 5.0 times on arm64, 12.0 and 13.3 times Vector's over TLS, and 3.0 and
-  3.3 times Rotel's in cleartext, in
-  [run 172](https://github.com/c4milo/connect-zig/actions/runs/44093381647) (see
+  takes OpenTelemetry traces, one core holds 3.0 times the OpenTelemetry Collector's spans a
+  second on x86-64 and 3.4 times on arm64, and 9.5 and 10.4 times Vector's, over TLS. In
+  cleartext it holds 2.9 and 3.5 times Rotel's, in
+  [run 177](https://github.com/c4milo/connect-zig/actions/runs/44148697298) (see
   [Performance](#performance)).
 - **HTTP from [colibri](https://github.com/c4milo/colibri).** Servers and clients run over h11,
   h2 and h3, in cleartext or over TLS.
@@ -430,46 +430,47 @@ Each run checks every span.
 The production model stands for one core of a 64-core gateway that 33,000 servers send their
 traces to. Each server holds 516 connections. 70%, 25% and 5% of them send gzip exports of 16, 128
 and 512 spans. [oha](https://github.com/hatoo/oha) sends at fixed rates, and its latency holds the
-time a call waits in a queue. The rate climbs until p99 passes 100 ms or a call is refused. CI's
-two `fullstack` jobs of commit `c2c75dd`
-([run 172](https://github.com/c4milo/connect-zig/actions/runs/44093381647)) ran it on colibri
-v0.18.1, on an Intel Xeon 6975P-C core and on an Arm Neoverse-N2 core. Over TLS 1.3, against the
+time a call waits in a queue. The rate climbs until p99 passes 100 ms or a call is refused.
+Then three more steps halve the gap to the last step that passed, so each rate is known within
+1/16 of it. CI's two `fullstack` jobs of commit `ca4bea6`
+([run 177](https://github.com/c4milo/connect-zig/actions/runs/44148697298)) ran it on colibri
+v0.18.1, on an AMD EPYC 7763 core and on an Arm Neoverse-N2 core. Over TLS 1.3, against the
 Collector and Vector:
 
-![Bars of the spans a second one core holds with p99 under 100 ms over TLS, and lines of p99 as the rate climbs, on x86-64: connect-zig holds 854,352 spans a second, 4.0 times the OpenTelemetry Collector's 213,600 and 12.0 times Vector's 71,200](docs/images/fullstack.svg)
+![Bars of the spans a second one core holds with p99 under 100 ms over TLS, and lines of p99 as the rate climbs, on x86-64: connect-zig holds 551,704 spans a second, 3.0 times the OpenTelemetry Collector's 186,896 and 9.5 times Vector's 57,834](docs/images/fullstack.svg)
 
-![Bars of the spans a second one core holds with p99 under 100 ms over TLS, and lines of p99 as the rate climbs, on arm64: connect-zig holds 712,000 spans a second, 5.0 times the OpenTelemetry Collector's 142,400 and 13.3 times Vector's 53,400](docs/images/fullstack-arm64.svg)
+![Bars of the spans a second one core holds with p99 under 100 ms over TLS, and lines of p99 as the rate climbs, on arm64: connect-zig holds 694,200 spans a second, 3.4 times the OpenTelemetry Collector's 204,700 and 10.4 times Vector's 66,748](docs/images/fullstack-arm64.svg)
 
 In cleartext, against the Collector and Rotel:
 
-![Bars of the spans a second one core holds with p99 under 100 ms in cleartext, and lines of p99 as the rate climbs, on x86-64: connect-zig holds 854,352 spans a second, 4.0 times the OpenTelemetry Collector's 213,600 and 3.0 times Rotel's 284,800](docs/images/fullstack-cleartext.svg)
+![Bars of the spans a second one core holds with p99 under 100 ms in cleartext, and lines of p99 as the rate climbs, on x86-64: connect-zig holds 640,800 spans a second, 3.8 times the OpenTelemetry Collector's 169,116 and 2.9 times Rotel's 222,488](docs/images/fullstack-cleartext.svg)
 
-![Bars of the spans a second one core holds with p99 under 100 ms in cleartext, and lines of p99 as the rate climbs, on arm64: connect-zig holds 712,032 spans a second, 5.0 times the OpenTelemetry Collector's 142,404 and 3.3 times Rotel's 213,604](docs/images/fullstack-cleartext-arm64.svg)
+![Bars of the spans a second one core holds with p99 under 100 ms in cleartext, and lines of p99 as the rate climbs, on arm64: connect-zig holds 783,184 spans a second, 4.0 times the OpenTelemetry Collector's 195,800 and 3.5 times Rotel's 222,478](docs/images/fullstack-cleartext-arm64.svg)
 
 The CPU time a span, at each server's highest step, in µs:
 
 | Server | x86-64, TLS | arm64, TLS | x86-64, cleartext | arm64, cleartext |
 | --- | ---: | ---: | ---: | ---: |
-| connect-zig | 1.17 | 1.40 | 1.17 | 1.41 |
-| Collector | 3.73 | 5.39 | 4.10 | 5.93 |
-| Vector | 8.99 | 13.54 | | |
-| Rotel | | | 3.02 | 4.51 |
+| connect-zig | 1.80 | 1.44 | 1.57 | 1.28 |
+| Collector | 5.07 | 4.67 | 5.86 | 5.12 |
+| Vector | 14.27 | 13.33 | | |
+| Rotel | | | 4.49 | 4.51 |
 
 connect-zig takes all its memory when it starts: 483 MiB, for 528 connections and 64 calls at
-once. Over TLS, the Collector grew to 712 MiB on x86-64 and to 630 MiB on arm64, and Vector to
-1,471 MiB and 709 MiB. In cleartext, the Collector grew to 186 MiB and 187 MiB, and Rotel to 355
-MiB and 323 MiB. connect-zig's climb ends when a burst fills its 64 calls and a call is refused.
-The other servers' climbs end when a call waits past 100 ms. The rate climbs in coarse steps, so
-each server's true limit lies between the step it held and the next one.
+once. Over TLS, the Collector grew to 699 MiB on x86-64 and to 702 MiB on arm64, and Vector to
+1,450 MiB and 782 MiB. In cleartext, the Collector grew to 192 MiB and 181 MiB, and Rotel to 353
+MiB and 315 MiB. connect-zig's climb ends when a burst fills its 64 calls and a call is refused.
+The other servers' climbs end when a call waits past 100 ms. A runner's CPU model changes from
+run to run: run 172 had an Intel Xeon 6975P-C, so its x86-64 rates were higher.
 
 The same jobs also load each server over TLS as fast as it answers, with exports of 16 and of 512
 spans, not compressed, on 16 connections of 4 streams. The calls a second:
 
 | Server | 16 spans, x86-64 | 512 spans, x86-64 | 16 spans, arm64 | 512 spans, arm64 |
 | --- | ---: | ---: | ---: | ---: |
-| connect-zig | 54,916 | 1,847 | 40,932 | 1,491 |
-| Collector | 20,520 | 1,093 | 13,076 | 745 |
-| Vector | 8,715 | 301 | 4,199 | 244 |
+| connect-zig | 37,763 | 1,384 | 41,273 | 1,555 |
+| Collector | 13,998 | 796 | 13,824 | 849 |
+| Vector | 5,682 | 258 | 4,460 | 257 |
 
 ## How it is checked
 

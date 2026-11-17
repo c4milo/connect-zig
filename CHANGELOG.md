@@ -8,6 +8,18 @@ are in [docs/decisions.md](docs/decisions.md), and the steps and their measureme
 connect-zig follows [Semantic Versioning](https://semver.org/). Before 1.0, a minor version may
 change the public API, and the entry marks each change that does.
 
+## Unreleased
+
+### Checked
+
+- The full-stack climb halves the gap after its first failure three times, so each rate is
+  known within 1/16 of it. Run 172's ratios came from coarse steps, and could be off by half. In
+  CI's run 177, one core of connect-zig held 3.0 times the Collector's spans a second on x86-64
+  and 3.4 times on arm64, and 9.5 and 10.4 times Vector's, over TLS. In cleartext it held 2.9
+  and 3.5 times Rotel's.
+- The conformance server waits 120 s for a connection's first request, past the 90 s that Go's
+  client keeps a connection, so a case never reads "unexpected EOF".
+
 ## v0.2.0 (2026-11-17)
 
 It builds on colibri v0.18.1 and on stdx v0.1.2, with Zig 0.16.0. Two changes to the API are
