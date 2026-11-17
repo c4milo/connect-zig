@@ -22,7 +22,7 @@ change the public API, and the entry marks each change that does.
   27% fewer instructions.
 - **Changes the API.** `compression.compress` and `compression.choose` take the encoders as
   `*const Encoders`, since `Encoders` holds three pointers now. A call passes `&encoders`.
-- connect-zig builds on colibri v0.17.1 and on stdx v0.1.1, the tag colibri pins. A program that
+- connect-zig builds on colibri v0.17.3 and on stdx v0.1.2, the tag colibri pins. A program that
   names stdx itself pins that tag too, so it links one stdx.
 - **Changes the API.** `rpc.failure_of` takes the pool's response, `*const client.Response`, in
   place of its `client.Result`, so it reads the code of a reset stream.
@@ -32,6 +32,11 @@ change the public API, and the entry marks each change that does.
 
 ### Fixed
 
+- Over HTTP/1.1, a stream that answers before its request ends keeps its connection, and a
+  response that ends its connection says `Connection: close`, so a client never sends its next
+  request into a closed connection (colibri v0.17.3).
+- A request to a path with no route gets its 404, 405, 501 or 503 when the connection is busy,
+  where over HTTP/2 it could read a reset with CANCEL (colibri v0.17.3).
 - A Connect GET writes its query in the protocol's order: `connect`, `base64`, `compression`,
   `encoding`, then `message`. connectrpc's conformance suite v1.0.7 checks it.
 

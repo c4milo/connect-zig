@@ -1108,6 +1108,19 @@ ran on Linux x86-64 with Zig 0.16.0.
     kinds of field left out of the test. The one NOT CAUGHT never calls `empty_object`, and
     writes the same text: the judge catches it once the baseline holds the new counts.
 
+- **colibri v0.17.3 and stdx v0.1.2** (decision 10). colibri v0.17.3 (`2c2144db`) holds the
+  two changes that the runner's pin at v1.0.7 waited for, and pins stdx v0.1.2 (`f45a045e`).
+  - Over h11, a head says `Connection: close` only when its route ended the response as the
+    head goes out, so a stream that answers early keeps its connection. colibri's router sets
+    the new `server.ResponseHeader.request_body` for this; no program here calls the engine's
+    `respond` itself. The `streaming` example's streamed round over h11 passes again.
+  - colibri's router waits for room to write an answer that has no entry, where it cancelled
+    the request.
+  - Runner v1.0.7's server half, with br declared, runs 3714 cases: 39 runs of 40 passed each
+    one. One run failed one h11 case, a Connect server stream that ends at once with an error:
+    Go's client read "unexpected EOF", the fault of v0.17.0, now rare. 60 runs with traces did
+    not show it again. colibri's session has the report.
+
 ### What a later step owes
 
 - The base64 change of stdx v0.1.1, and 8 instructions a bytes field on the judge. CI's
