@@ -19,7 +19,10 @@ and serve the same handlers to Connect, gRPC and gRPC-Web clients, in binary pro
   reads no clock, so every test is deterministic.
 - **Fast.** Binary and JSON encoding and decoding run 2.6 to 33.6 times faster than Go's protobuf
   runtime on x86-64, and 2.2 to 39.6 times on arm64, in CI's
-  [run 160](https://github.com/c4milo/connect-zig/actions/runs/44007655863) (see
+  [run 160](https://github.com/c4milo/connect-zig/actions/runs/44007655863). In a gateway that
+  takes OpenTelemetry traces over TLS, one core holds 2.7 times the OpenTelemetry Collector's
+  spans a second on x86-64, and 5.0 times on arm64, in
+  [run 170](https://github.com/c4milo/connect-zig/actions/runs/44077206597) (see
   [Performance](#performance)).
 - **HTTP from [colibri](https://github.com/c4milo/colibri).** Servers and clients run over h11,
   h2 and h3, in cleartext or over TLS.
@@ -374,37 +377,71 @@ times on x86-64. The other wins are by 1.15 times or less.
 The routed calls (`bench/call.zig`) run the same unary call in memory through connect-zig,
 connect-go and connect-rust: the router, the route, the protocol and the codec, with no socket,
 no TLS and no HTTP/2 framing. connect-go's router is an `http.ServeMux`, as a server's is. CI's
-two `bench-compare` jobs of commit `cc20a73`
-([run 164](https://github.com/c4milo/connect-zig/actions/runs/44014548420)) timed them, on an AMD
-EPYC 9V74 core and on an Arm Neoverse-N2 core. Each chart draws a speed in multiples of
-connect-go's, and connect-zig's bar also gives its time for one call. In a table of one route:
+two `bench-compare` jobs of commit `253404b`
+([run 170](https://github.com/c4milo/connect-zig/actions/runs/44077206597)) timed them on colibri
+v0.18.1, on an Intel Xeon 6975P-C core and on an Arm Neoverse-N2 core. Each chart draws a speed
+in multiples of connect-go's, and connect-zig's bar also gives its time for one call. In a table
+of one route:
 
-![Bars of the speed of a routed unary call through connect-zig and connect-rust, in multiples of connect-go's, on x86-64: connect-zig is 11.6 to 17.8 times as fast as connect-go, and 3.3 to 5.8 times as fast as connect-rust](docs/images/call-vs-go.svg)
+![Bars of the speed of a routed unary call through connect-zig and connect-rust, in multiples of connect-go's, on x86-64: connect-zig is 14.1 to 23.8 times as fast as connect-go, and 3.3 to 6.0 times as fast as connect-rust](docs/images/call-vs-go.svg)
 
-![Bars of the speed of a routed unary call through connect-zig and connect-rust, in multiples of connect-go's, on arm64: connect-zig is 15.3 to 22.8 times as fast as connect-go, and 3.7 to 6.9 times as fast as connect-rust](docs/images/call-vs-go-arm64.svg)
+![Bars of the speed of a routed unary call through connect-zig and connect-rust, in multiples of connect-go's, on arm64: connect-zig is 15.9 to 23.6 times as fast as connect-go, and 3.6 to 6.9 times as fast as connect-rust](docs/images/call-vs-go-arm64.svg)
 
-The small message's call also runs in tables of 16 and 225 routes: 4 and 15 services of as many
+The small message's call also runs in tables of 16 and 256 routes: 4 and 16 services of as many
 methods, with the call's route among them. colibri finds a route by a binary search over each path
 segment, connect-rust by a hash map of the path, and Go's `ServeMux` by a tree of maps. So
-connect-zig's call grows with the table, by up to 14%, where the other two stay within 3%. On
-CI's judge it takes 4,224 instructions with one route and 4,432 with 225. The time of the small
+connect-zig's call grows with the table, by up to 8%, where the other two stay within 3%. On
+CI's judge it takes 4,237 instructions with one route and 4,460 with 256. The time of the small
 Connect call, in nanoseconds:
 
-| Router | 1 route | 16 routes | 225 routes |
+| Router | 1 route | 16 routes | 256 routes |
 | --- | ---: | ---: | ---: |
-| connect-zig, x86-64 | 307 | 314 | 351 |
-| connect-rust, x86-64 | 1,688 | 1,661 | 1,737 |
-| connect-go, x86-64 | 5,372 | 5,378 | 5,330 |
-| connect-zig, arm64 | 342 | 367 | 369 |
-| connect-rust, arm64 | 2,119 | 2,068 | 2,056 |
-| connect-go, arm64 | 7,635 | 7,595 | 7,630 |
+| connect-zig, x86-64 | 241 | 241 | 259 |
+| connect-rust, x86-64 | 1,342 | 1,308 | 1,289 |
+| connect-go, x86-64 | 5,717 | 5,673 | 5,597 |
+| connect-zig, arm64 | 345 | 363 | 368 |
+| connect-rust, arm64 | 2,114 | 2,073 | 2,063 |
+| connect-go, arm64 | 7,858 | 7,921 | 7,824 |
 
-![Lines of the time of a routed call over its time with one route, as the route table grows from 1 to 16 and 225 routes, on x86-64: connect-zig takes up to 14% more time, connect-rust up to 3% and connect-go up to 1%](docs/images/call-routes.svg)
+![Lines of the time of a routed call over its time with one route, as the route table grows from 1 to 16 and 256 routes, on x86-64: connect-zig takes up to 7% more time, connect-rust up to 3% less and connect-go up to 1% more](docs/images/call-routes.svg)
 
-![Lines of the time of a routed call over its time with one route, as the route table grows from 1 to 16 and 225 routes, on arm64: connect-zig takes up to 8% more time, connect-rust up to 0% and connect-go up to 2%](docs/images/call-routes-arm64.svg)
+![Lines of the time of a routed call over its time with one route, as the route table grows from 1 to 16 and 256 routes, on arm64: connect-zig takes up to 8% more time, connect-rust up to 2% less and connect-go up to 1% more](docs/images/call-routes-arm64.svg)
 
-Whole servers over real sockets and TLS are not compared yet
-([issue 7](https://github.com/c4milo/connect-zig/issues/7)).
+### Whole servers over TLS
+
+`tools/fullstack_check.sh` loads whole servers on real sockets, over TLS 1.3 and HTTP/2. One is
+connect-zig's OTLP receiver, `tools/otlp_sink`. The other is the
+[OpenTelemetry Collector](https://opentelemetry.io/docs/collector/) v0.165.0, the server most
+companies run to take OpenTelemetry's traces, with its OTLP receiver and its `nop` exporter. Each
+server decodes and checks every span, counts it and drops it. Each runs on one core, the Collector
+with `GOMAXPROCS=1`, and the load runs on two other cores. Each run checks every span.
+
+The production model stands for one core of a 64-core gateway that 33,000 servers send their
+traces to. Each server holds 516 TLS connections. 70%, 25% and 5% of them send gzip exports of 16,
+128 and 512 spans. [oha](https://github.com/hatoo/oha) sends at fixed rates, and its latency holds
+the time a call waits in a queue. The rate climbs until p99 passes 100 ms or a call is refused.
+CI's two `fullstack` jobs of commit `253404b`
+([run 170](https://github.com/c4milo/connect-zig/actions/runs/44077206597)) ran it on colibri
+v0.18.1, on an AMD EPYC 9V74 core and on an Arm Neoverse-N2 core:
+
+![Bars of the spans a second one core holds with p99 under 100 ms, and lines of p99 as the rate climbs, on x86-64: connect-zig holds 569,536 spans a second at p99 1.46 ms, 2.7 times the OpenTelemetry Collector's 213,580 at p99 20.71 ms](docs/images/fullstack.svg)
+
+![Bars of the spans a second one core holds with p99 under 100 ms, and lines of p99 as the rate climbs, on arm64: connect-zig holds 712,014 spans a second at p99 18.65 ms, 5.0 times the OpenTelemetry Collector's 142,400 at p99 14.31 ms](docs/images/fullstack-arm64.svg)
+
+connect-zig spends 1.42 µs of CPU a span on x86-64 and 1.40 µs on arm64, and the Collector 4.03
+µs and 5.41 µs. connect-zig takes all its memory when it starts: 483 MiB, for 528 connections and
+64 calls at once. The Collector grew to 729 MiB on x86-64 and to 684 MiB on arm64. connect-zig's
+climb ends when a burst fills its 64 calls and a call is refused. The Collector's ends when its
+queue holds a call past 100 ms. The rate climbs in coarse steps, so each server's true limit lies
+between the step it held and the next one.
+
+The same jobs also load each server as fast as it answers, with exports of 16 and of 512 spans,
+not compressed, on 16 connections of 4 streams. The calls a second:
+
+| Export | connect-zig, x86-64 | Collector, x86-64 | connect-zig, arm64 | Collector, arm64 |
+| --- | ---: | ---: | ---: | ---: |
+| 16 spans, 6,271 B | 48,495 | 18,800 | 40,949 | 13,478 |
+| 512 spans, 192,397 B | 1,744 | 1,006 | 1,519 | 798 |
 
 ## How it is checked
 

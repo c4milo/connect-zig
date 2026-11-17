@@ -1215,6 +1215,11 @@ ran on Linux x86-64 with Zig 0.16.0.
     from 38% busy at 213,600 spans a second to 79% at 284,800, where calls were refused.
   - The sink holds about 480 MiB from its start: about 0.5 MiB for each of 528 connections, and
     about 3 MiB for each of the 64 calls that it holds at once.
+  - CI's [run 170](https://github.com/c4milo/connect-zig/actions/runs/44077206597) on `253404b`,
+    on colibri v0.18.1. On an EPYC 9V74, connect-zig held 569,536 spans a second at p99 1.46 ms,
+    and the Collector 213,580 at p99 20.71 ms. On a Neoverse-N2, connect-zig held 712,014 at
+    p99 18.65 ms, and the Collector 142,400 at p99 14.31 ms. `tools/fullstack_chart.py` draws
+    the README's charts from the job's output.
 - **colibri v0.18.1** (steps 27 to 29, decision 10). colibri v0.18.1 (`0942b20a`) pins the
   stdx, chapulin and Rotor that v0.17.3 pins, so only colibri moves.
   - v0.18.0's router compiles a table of 256 routes, so the largest route table moves from 225
