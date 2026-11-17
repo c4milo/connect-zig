@@ -1,9 +1,10 @@
 //! The server of the full-stack benchmark (design §8 step 28, decision 44): OTLP's
 //! `TraceService/Export` on `colibri.Server`, h11 and h2 over TLS on a TCP socket, and h3 on the
 //! UDP socket of the same port, under the test identity (decision 25). `tools/fullstack_check.sh`
-//! loads it beside OpenTelemetry's Collector. Run it with `zig build run-otlp-sink -- [port]`.
-//! Port 0 lets the kernel choose. It prints `listening on port <port>`, and serves until it is
-//! killed.
+//! loads it beside OpenTelemetry's Collector. Run it with `zig build run-otlp-sink -- [port]
+//! [cleartext]`. Port 0 lets the kernel choose. With `cleartext` it serves h11 and h2 with no TLS,
+//! and no h3, for the benchmark's cleartext climb. It prints `listening on port <port>`, and
+//! serves until it is killed.
 const std = @import("std");
 const builtin = @import("builtin");
 const connect = @import("connect");
@@ -43,16 +44,18 @@ const State = struct {
 };
 
 pub fn main(init: std.process.Init) !void {
-    const port = try port_of(init);
+    const command = try command_of(init);
     const state = try init.arena.allocator().create(State);
     state.router = .{};
     state.app = .{ .codings = .{ .decoders = .{ .gzip = &state.gzip_decoder } } };
     const cpu = probe();
     // The Unix time when the server starts, which its TLS session tickets carry.
     const unix_seconds: u64 = @intCast(@max(std.Io.Clock.real.now(init.io).toSeconds(), 0));
+    // colibri serves h11 and h2 in cleartext, and no h3, when the server has no identity.
+    const served: ?colibri.Identity = if (command.cleartext) null else .{ .chain = identity.chain_pem, .key = identity.key_pem };
     try state.http_server.init(&.{
-        .port = port,
-        .identity = .{ .chain = identity.chain_pem, .key = identity.key_pem },
+        .port = command.port,
+        .identity = served,
         .cpu = cpu,
         .unix_seconds = unix_seconds,
     }, &state.router, &state.app);
@@ -82,10 +85,16 @@ fn probe() tls.Cpu {
     return .{ .probe = found, .timing = timing };
 }
 
-/// The port the command line names, or `port_default`.
-fn port_of(init: std.process.Init) !u16 {
+/// What the command line names: the port, or `port_default`, and whether the server runs with no
+/// TLS.
+const Command = struct { port: u16, cleartext: bool };
+
+fn command_of(init: std.process.Init) !Command {
     var args = try init.minimal.args.iterateAllocator(init.arena.allocator());
     _ = args.skip();
-    const text = args.next() orelse return constants.port_default;
-    return std.fmt.parseInt(u16, text, constants.decimal);
+    const port_text = args.next() orelse return .{ .port = constants.port_default, .cleartext = false };
+    const port = try std.fmt.parseInt(u16, port_text, constants.decimal);
+    const mode = args.next() orelse return .{ .port = port, .cleartext = false };
+    if (!std.mem.eql(u8, mode, "cleartext")) return error.ModeUnknown;
+    return .{ .port = port, .cleartext = true };
 }

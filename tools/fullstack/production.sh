@@ -1,6 +1,8 @@
 # shellcheck shell=sh
-# The production part of tools/fullstack_check.sh (design §8 step 29, decision 44), which sources
-# this file: the traffic of one gateway core for a fleet of 33,000 servers.
+# The production part of tools/fullstack_check.sh (design §8 steps 29 and 30, decision 44), which
+# sources this file: the traffic of one gateway core for a fleet of 33,000 servers. It climbs
+# over TLS for connect-zig, the Collector and Vector, then in cleartext h2 for connect-zig, the
+# Collector and Rotel, whose receiver has no TLS.
 #
 # Each server of the fleet runs a Collector agent, which exports its spans over OTLP/gRPC with
 # gzip, the default of the Collector's otlp exporter. Each agent holds one TLS connection, through
@@ -38,11 +40,13 @@ production_load() {
     for class in ${production_classes}; do
         spans="${class%%:*}" connections="${class##*:}"
         calls="$(awk "BEGIN { print $2 * ${connections} }")"
-        url="https://127.0.0.1:$(port_of "$1")${export_path}"
+        trust=""
+        [ "${transport}" = tls ] && trust="--cacert ${ca}"
         ${load_pin} "${oha}" --no-tui --http2 -c "${connections}" -p "${connection_streams}" \
-            -q "${calls}" -z "${step_seconds}s" -w --latency-correction --cacert "${ca}" -m POST \
+            -q "${calls}" -z "${step_seconds}s" -w --latency-correction ${trust} -m POST \
             -D "${work}/production-${spans}.grpc" -H 'content-type: application/grpc' \
-            -H 'te: trailers' -H 'grpc-encoding: gzip' --output-format csv "${url}" \
+            -H 'te: trailers' -H 'grpc-encoding: gzip' --output-format csv \
+            "$(url_of "$1" "${export_path}")" \
             >"${work}/step-${spans}.csv" 2>"${work}/step-${spans}.log" &
         loads="${loads} $!"
     done
@@ -60,26 +64,34 @@ production_climb() {
         sent=$((sent + ${class%%:*}))
     done
     for rate in ${production_steps}; do
-        echo "fullstack: production, ${server}, ${rate} exports a connection a second" >&2
+        echo "fullstack: production, ${transport}, ${server}, ${rate} a connection a second" >&2
         before="$(cpu_ticks "${server_pid}")"
         production_load "${server}" "${rate}"
         after="$(cpu_ticks "${server_pid}")"
         set -- $(python3 tools/fullstack/production_step.py "${work}" "${warm_seconds}" \
             "${step_seconds}" "${p99_limit_ms}" "${rate}" ${production_classes})
         sent=$((sent + $1))
-        echo "step ${server} ${rate} $* $((after - before))"
+        echo "step ${transport} ${server} ${rate} $* $((after - before))"
         [ "$7" = pass ] || break
     done
-    echo "memory ${server} $(peak_kb "${server_pid}")"
+    echo "memory ${transport} ${server} $(peak_kb "${server_pid}")"
     check_count "${server}" "${sent}" || { stop; return 1; }
     stop
 }
 
 : >"${work}/production-results"
-for server in connect-zig collector; do
-    production_climb "${server}" >>"${work}/production-results" || status=1
+for transport in tls cleartext; do
+    case "${transport}" in
+        tls) servers="connect-zig collector vector" ;;
+        *) servers="connect-zig collector rotel" ;;
+    esac
+    for server in ${servers}; do
+        production_climb "${server}" >>"${work}/production-results" || status=1
+    done
+    python3 tools/fullstack/production_report.py "${work}/production-results" "${transport}" \
+        "$(getconf CLK_TCK)" "$("${oha}" --version | head -1)" "${collector}" "${vector_text}" \
+        "${rotel_text}" "${commit}" "${placement}" "${step_seconds}" "${warm_seconds}" \
+        "${p99_limit_ms}" "${tls_suite}" ${production_classes}
+    echo
 done
-python3 tools/fullstack/production_report.py "${work}/production-results" "$(getconf CLK_TCK)" \
-    "$("${oha}" --version | head -1)" "${collector}" "${commit}" "${placement}" "${step_seconds}" \
-    "${warm_seconds}" "${p99_limit_ms}" "${tls_suite}" ${production_classes}
-echo
+transport=tls

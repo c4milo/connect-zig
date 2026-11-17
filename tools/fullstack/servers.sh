@@ -1,17 +1,21 @@
 # shellcheck shell=sh
 # The servers of tools/fullstack_check.sh (decision 44), which sources this file: how each one
 # starts on its core, answers the probe, and counts the spans it took. It reads what the script
-# sets: work, sink, otelcol, buf, ca, export_path, server_pin and the ports.
+# sets: work, the programs, buf, ca, export_path, the pins and the ports. `transport` says how
+# the next server serves: `tls`, TLS 1.3 with ALPN h2, or `cleartext`, h2 with prior knowledge.
+transport=tls
+# The seconds a count may take to show the last calls: Vector scrapes its own metrics each
+# second, and Rotel sends its internal metrics every 10 seconds.
+count_tries=15
 
-cat >"${work}/otelcol.yaml" <<YAML
-receivers:
-  otlp:
-    protocols:
-      grpc:
-        endpoint: 127.0.0.1:${collector_port}
-        tls:
-          cert_file: $(pwd)/examples/harness/tls/chain.pem
-          key_file: $(pwd)/examples/harness/tls/key.pem
+for mode in tls cleartext; do
+    {
+        printf 'receivers:\n  otlp:\n    protocols:\n      grpc:\n'
+        printf '        endpoint: 127.0.0.1:%s\n' "${collector_port}"
+        [ "${mode}" = cleartext ] ||
+            printf '        tls:\n          cert_file: %s\n          key_file: %s\n' \
+                "$(pwd)/examples/harness/tls/chain.pem" "$(pwd)/examples/harness/tls/key.pem"
+        cat <<YAML
 exporters:
   nop:
 service:
@@ -30,19 +34,108 @@ service:
                 host: 127.0.0.1
                 port: ${metrics_port}
 YAML
+    } >"${work}/otelcol-${mode}.yaml"
+done
 
-port_of() { case "$1" in connect-zig) echo "${sink_port}" ;; *) echo "${collector_port}" ;; esac; }
+# Rotel's internal metrics reach a second Collector, which shows them to Prometheus: Rotel's
+# release build has no metrics endpoint of its own.
+cat >"${work}/counter.yaml" <<YAML
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 127.0.0.1:${counter_port}
+exporters:
+  prometheus:
+    endpoint: 127.0.0.1:${counter_metrics_port}
+service:
+  pipelines:
+    metrics:
+      receivers: [otlp]
+      exporters: [prometheus]
+  telemetry:
+    logs:
+      level: warn
+    metrics:
+      level: none
+YAML
 
-# Starts a server on its core, and waits until it answers over TLS.
+# Vector's gRPC listener offers no ALPN protocol unless its TLS names one, and a client then
+# speaks HTTP/1.1 (RFC 7301 §3.2).
+mkdir -p "${work}/vector-data"
+cat >"${work}/vector.yaml" <<YAML
+data_dir: ${work}/vector-data
+sources:
+  otlp:
+    type: opentelemetry
+    grpc:
+      address: 127.0.0.1:${vector_port}
+      tls:
+        enabled: true
+        crt_file: $(pwd)/examples/harness/tls/chain.pem
+        key_file: $(pwd)/examples/harness/tls/key.pem
+        alpn_protocols: [h2]
+    http:
+      address: 127.0.0.1:${vector_http_port}
+  vector_metrics:
+    type: internal_metrics
+sinks:
+  drop:
+    type: blackhole
+    inputs: [otlp.traces]
+    print_interval_secs: 0
+  metrics:
+    type: prometheus_exporter
+    inputs: [vector_metrics]
+    address: 127.0.0.1:${vector_metrics_port}
+YAML
+
+port_of() {
+    case "$1" in
+        connect-zig) echo "${sink_port}" ;;
+        collector) echo "${collector_port}" ;;
+        vector) echo "${vector_port}" ;;
+        rotel) echo "${rotel_port}" ;;
+    esac
+}
+
+# A server's URL for a path, over the transport.
+url_of() {
+    scheme=https
+    [ "${transport}" = tls ] || scheme=http
+    echo "${scheme}://127.0.0.1:$(port_of "$1")$2"
+}
+
+# curl's and buf curl's options for the transport: the test CA, or HTTP/2 with prior knowledge.
+reach() {
+    if [ "${transport}" = tls ]; then echo "--cacert ${ca}"; else echo "--http2-prior-knowledge"; fi
+}
+
+# Starts a server on its core, and waits until it answers.
 start() {
     case "$1" in
-        connect-zig) ${server_pin} "${sink}" "${sink_port}" >"${work}/server.log" 2>&1 & ;;
-        collector) GOMAXPROCS=1 ${server_pin} "${otelcol}" --config "${work}/otelcol.yaml" \
+        connect-zig)
+            mode=""
+            [ "${transport}" = tls ] || mode=cleartext
+            ${server_pin} "${sink}" "${sink_port}" ${mode} >"${work}/server.log" 2>&1 & ;;
+        collector) GOMAXPROCS=1 ${server_pin} "${otelcol}" \
+            --config "${work}/otelcol-${transport}.yaml" >"${work}/server.log" 2>&1 & ;;
+        vector) ${server_pin} "${vector}" --threads 1 --quiet --config "${work}/vector.yaml" \
             >"${work}/server.log" 2>&1 & ;;
+        rotel)
+            ${load_pin} "${otelcol}" --config "${work}/counter.yaml" >"${work}/counter.log" 2>&1 &
+            counter_pid=$!
+            # Rotel sends its internal metrics only while a metrics exporter is named.
+            ROTEL_EXPORTER_STATS_ENDPOINT="http://127.0.0.1:${counter_port}" \
+                ${server_pin} "${rotel}" start --otlp-grpc-endpoint "127.0.0.1:${rotel_port}" \
+                --otlp-http-endpoint "127.0.0.1:${rotel_http_port}" \
+                --exporters traces:blackhole,stats:otlp --exporters-traces traces \
+                --exporters-metrics stats --exporters-internal-metrics stats \
+                --enable-internal-telemetry >"${work}/server.log" 2>&1 & ;;
     esac
     server_pid=$!
     for _ in $(seq 1 100); do
-        curl -s -o /dev/null --cacert "${ca}" "https://127.0.0.1:$(port_of "$1")/" && return 0
+        curl -s -o /dev/null $(reach) "$(url_of "$1" /)" && return 0
         sleep 0.1
     done
     echo "fullstack: the $1 server did not start" >&2
@@ -51,11 +144,12 @@ start() {
 }
 
 stop() {
-    if [ -n "${server_pid}" ]; then
-        kill "${server_pid}" 2>/dev/null || true
-        wait "${server_pid}" 2>/dev/null || true
-    fi
+    for pid in ${server_pid} ${counter_pid:-}; do
+        kill "${pid}" 2>/dev/null || true
+        wait "${pid}" 2>/dev/null || true
+    done
     server_pid=""
+    counter_pid=""
 }
 
 # One export, the proto3 JSON that the second argument names, through buf curl. It must answer
@@ -64,8 +158,8 @@ stop() {
 # states a call's status in its trailers, which the load generators do not read, so this call
 # checks what they cannot.
 probe() {
-    answer="$("${buf}" curl --schema examples/otlp/proto --protocol grpc --cacert "${ca}" \
-        -d @"$2" "https://127.0.0.1:$(port_of "$1")${export_path}" 2>"${work}/probe.log")" || true
+    answer="$("${buf}" curl --schema examples/otlp/proto --protocol grpc $(reach) -d @"$2" \
+        "$(url_of "$1" "${export_path}")" 2>"${work}/probe.log")" || true
     case "$(printf '%s' "${answer}" | tr -d ' \n')" in
         '{}' | '{"partialSuccess":{}}') return 0 ;;
     esac
@@ -74,22 +168,40 @@ probe() {
     return 1
 }
 
-# The spans a server says it took and refused.
+# The spans a server says it took and refused. Vector counts one event for each span.
 counted() {
     case "$1" in
-        connect-zig) curl -sS --cacert "${ca}" "https://127.0.0.1:${sink_port}/sink/count" |
+        connect-zig) curl -sS $(reach) "$(url_of connect-zig /sink/count)" |
             awk '{ print $4, 0 }' ;;
-        collector) curl -sS "http://127.0.0.1:${metrics_port}/metrics" | awk '
-            /^otelcol_receiver_accepted_spans/ { taken += $NF }
-            /^otelcol_receiver_refused_spans/ { refused += $NF }
-            END { printf "%d %d\n", taken, refused }' ;;
+        collector) metric_sum "http://127.0.0.1:${metrics_port}/metrics" \
+            otelcol_receiver_accepted_spans otelcol_receiver_refused_spans ;;
+        vector) metric_sum "http://127.0.0.1:${vector_metrics_port}/metrics" \
+            'vector_component_received_events_total{component_id="otlp"' \
+            'vector_component_discarded_events_total{component_id="otlp"' ;;
+        rotel) metric_sum "http://127.0.0.1:${counter_metrics_port}/metrics" \
+            rotel_receiver_accepted_spans rotel_receiver_refused_spans ;;
     esac
 }
 
-# Fails when a server's count differs from the spans it was sent, or it refused one.
+# The sums of the Prometheus samples whose lines start with the second and the third argument. A
+# sample's value follows its name and labels, and a time may follow the value.
+metric_sum() {
+    curl -sS "$1" | awk -v taken="$2" -v refused="$3" '
+        index($0, taken) == 1 { took += $2 }
+        index($0, refused) == 1 { lost += $2 }
+        END { printf "%d %d\n", took, lost }'
+}
+
+# Fails when a server's count differs from the spans it was sent, or it refused one. A count that
+# lags reads again each second, `count_tries` times at most.
 check_count() {
-    set -- "$1" "$2" $(counted "$1")
-    [ "$3" -eq "$2" ] && [ "$4" -eq 0 ] && return 0
+    for _ in $(seq 1 "${count_tries}"); do
+        set -- "$1" "$2" $(counted "$1")
+        [ "$4" -eq 0 ] || break
+        [ "$3" -eq "$2" ] && return 0
+        [ "$3" -lt "$2" ] || break
+        sleep 1
+    done
     echo "fullstack: $1 took $3 spans and refused $4, of $2 sent" >&2
     return 1
 }

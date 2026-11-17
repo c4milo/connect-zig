@@ -247,6 +247,11 @@ Each step names the check that proves it. A step is done when its check passes i
     spans from 70%, 25% and 5% of them, under oha at rates that climb until p99 passes 100 ms
     or a call is refused (decision 44). The sink reads gzip and holds 528 connections. New public
     names: none. Check: the probes and the counts of step 28, over the whole climb.
+30. **Servers in Rust.** Vector joins the peak part and the climb over TLS. A second climb, in
+    cleartext h2, loads connect-zig, the Collector and Rotel, whose receiver has no TLS. The sink
+    takes a second argument, `cleartext`, and then serves with no identity (decision 44). New
+    public names: none. Check: the probes and the counts of step 28, with Vector's events and
+    Rotel's internal metrics.
 
 ### Step records
 

@@ -782,3 +782,13 @@ first. Cite an entry by number in code and commits ("decision 6").
     - oha v1.16.0 is pinned by SHA-256, the digest GitHub states for each release asset.
     - CI runs the check on x86-64 and on GitHub's arm64 runner, as it runs `bench-compare`, so the
       README can chart both machines. Each job's numbers belong to its machine alone.
+    - Two servers in Rust join, chosen on 2026-11-17. Vector v0.62.0 takes OTLP over TLS with its
+      `opentelemetry` source into its blackhole sink, on one thread, and counts one event for each
+      span. Its gRPC listener offers no ALPN protocol unless its TLS names `h2`, so the check
+      names it (RFC 7301 §3.2). Vector joins the peak part and the climb over TLS.
+    - Rotel v0.2.7, the Rust OpenTelemetry collector, has no TLS on its OTLP receiver. So a second
+      climb runs in cleartext h2, for connect-zig, the Collector and Rotel. Rotel counts its spans
+      in its internal metrics, which it sends by OTLP every 10 seconds; its release build has no
+      metrics endpoint. A second Collector takes them and shows them to Prometheus. Beaten: a TLS
+      proxy before Rotel, which the climb would measure too, and Rotel's log of each call, which
+      costs it CPU that the other servers do not pay.

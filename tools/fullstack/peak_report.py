@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Writes the peak report of tools/fullstack/peak.sh (design §8 step 28) on standard output.
 
-    tools/fullstack/peak_report.py <work> <ticks> <h2load> <otelcol> <commit> <placement> <rounds>
-                                   <connections> <streams> <suite>
+    tools/fullstack/peak_report.py <work> <ticks> <h2load> <otelcol> <vector> <commit> <placement>
+                                   <rounds> <connections> <streams> <suite>
 
 <work>/peak-results holds a line for each round of a server and an export: the spans, the server, the
 calls a second, the latency at p50 and p99 in microseconds, the server's CPU ticks over the
@@ -16,9 +16,9 @@ import sys
 
 from machine import machine
 
-work, ticks, h2load, otelcol, commit, placement, rounds, connections, streams, suite = sys.argv[1:11]
+work, ticks, h2load, otelcol, vector, commit, placement, rounds, connections, streams, suite = sys.argv[1:12]
 ticks = int(ticks)
-servers = [("connect-zig", "connect-zig"), ("collector", "Collector")]
+servers = [("connect-zig", "connect-zig"), ("collector", "Collector"), ("vector", "Vector")]
 microseconds = 1_000_000
 kib = 1024
 # The octets of gRPC's prefix before each message (gRPC over HTTP/2, "Requests").
@@ -60,14 +60,16 @@ for spans in spans_list:
               f"{median(spans, server, 'cpu'):.1f} | {median(spans, server, 'peak'):.1f} |")
 print()
 for spans in spans_list:
-    zig_rate, collector_rate = median(spans, "connect-zig", "rate"), median(spans, "collector", "rate")
-    zig_cpu, collector_cpu = median(spans, "connect-zig", "cpu"), median(spans, "collector", "cpu")
-    if None in (zig_rate, collector_rate, zig_cpu, collector_cpu):
-        continue
-    print(f"- {spans} spans: connect-zig answers {zig_rate / collector_rate:.2f} times the Collector's calls a "
-          f"second, and spends {zig_cpu / collector_cpu:.2f} times its CPU time a call.")
+    zig_rate, zig_cpu = median(spans, "connect-zig", "rate"), median(spans, "connect-zig", "cpu")
+    for server, name in servers[1:]:
+        rate, cpu = median(spans, server, "rate"), median(spans, server, "cpu")
+        if None in (zig_rate, zig_cpu, rate, cpu):
+            continue
+        print(f"- {spans} spans: connect-zig answers {zig_rate / rate:.2f} times {name}'s calls a second, and "
+              f"spends {zig_cpu / cpu:.2f} times its CPU time a call.")
 print()
 print(f"Machine: {machine()}.")
 print(f"Load: {h2load}, {connections} connections of {streams} streams each, {suite}; {placement}.")
-print(f"Servers: connect-zig {commit} in ReleaseSafe, `tools/otlp_sink`; {otelcol}, GOMAXPROCS=1, the OTLP")
-print(f"receiver into the nop exporter, no processor. Rounds: {rounds}.")
+print(f"Servers: connect-zig {commit} in ReleaseSafe, `tools/otlp_sink`; {otelcol}, GOMAXPROCS=1, its OTLP")
+print(f"receiver into its nop exporter; {vector}, one thread, its opentelemetry source into its blackhole sink.")
+print(f"Rounds: {rounds}.")

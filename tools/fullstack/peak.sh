@@ -1,10 +1,12 @@
 # shellcheck shell=sh
 # The peak part of tools/fullstack_check.sh (design §8 step 28, decision 44), which sources this
-# file: h2load sends one export, again and again, on 16 connections of 4 streams, as fast as each
-# server answers. The exports hold 16 spans and 512, from tools/fullstack/otlp_request.py. Each
-# round starts each server again, in turns, and the report gives the median of the rounds.
+# file: over TLS, h2load sends one export, again and again, on 16 connections of 4 streams, as
+# fast as each server answers: connect-zig, the Collector and Vector. The exports hold 16 spans
+# and 512, from tools/fullstack/otlp_request.py. Each round starts each server again, in turns,
+# and the report gives the median of the rounds.
 
 peak_spans="16 512"
+peak_servers="connect-zig collector vector"
 peak_rounds=3
 # The requests of each round for each export, after warm requests that are never counted.
 peak_requests_of() { case "$1" in 16) echo 40000 ;; *) echo 4000 ;; esac; }
@@ -23,7 +25,7 @@ peak_load() {
         -t "${load_threads}" \
         --tls13-ciphers="${tls_suite}" -d "${work}/export-$2.grpc" \
         -H 'content-type: application/grpc' -H 'te: trailers' ${4:+"--log-file=$4"} \
-        "https://127.0.0.1:$(port_of "$1")${export_path}"
+        "$(url_of "$1" "${export_path}")"
 }
 
 # One round of a server and an export: a line of the results, or a failure. The caller tests its
@@ -62,17 +64,18 @@ peak_measure() {
     echo "${spans} ${server} ${rate} ${latency} $((after - before)) ${requests} ${peak}"
 }
 
+transport=tls
 : >"${work}/peak-results"
 for round in $(seq 1 "${peak_rounds}"); do
     for spans in ${peak_spans}; do
-        for server in connect-zig collector; do
+        for server in ${peak_servers}; do
             echo "fullstack: peak, round ${round}, ${server}, ${spans} spans" >&2
             peak_measure "${server}" "${spans}" >>"${work}/peak-results" || status=1
         done
     done
 done
 loader="$("${h2load}" --version | head -1)"
-python3 tools/fullstack/peak_report.py "${work}" "$(getconf CLK_TCK)" "${loader}" "${collector}" \
-    "${commit}" "${placement}" "${peak_rounds}" "${peak_connections}" "${peak_streams}" \
-    "${tls_suite}"
+python3 tools/fullstack/peak_report.py "${work}" "$(getconf CLK_TCK)" "${loader}" \
+    "${collector}" "${vector_text}" "${commit}" "${placement}" "${peak_rounds}" \
+    "${peak_connections}" "${peak_streams}" "${tls_suite}"
 echo
