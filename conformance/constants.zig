@@ -26,14 +26,16 @@ pub const response_bytes = 640 * 1024;
 /// Octets of each call's request body memory: a whole unary body at the runner's limit, or the
 /// part of an envelope a stream has not read yet, up to `message_bytes`.
 pub const body_bytes = message_bytes + 1024;
-/// The TCP connections the server holds at once. The runner's client opens a connection for each
-/// test case and leaves it open once the case ends.
-pub const sockets_max = 128;
+/// The TCP connections the server holds at once. The runner's grpc-go client opens a connection
+/// for each of its test cases, about 180 in a run, and leaves it open once the case ends.
+pub const sockets_max = 512;
 /// How long a connection waits for its first request, and then between requests, before the
-/// server closes it. The runner's client leaves each test case's connection open, so the server
-/// closes them soon to keep sockets free for the cases that follow.
+/// server closes it. The idle wait is longer than Go's client keeps a connection, 90 s
+/// (net/http's DefaultTransport, IdleConnTimeout). Shorter, the client could send a request into
+/// a connection in the instant the server closed it, and read "unexpected EOF": at 1 s, 1 case
+/// in 40 runs did, and at 50 ms about 200 cases in each run. A run lasts under a minute.
 pub const first_request_timeout_ns = 5 * 1_000_000_000;
-pub const idle_timeout_ns = 1_000_000_000;
+pub const idle_timeout_ns = 120 * 1_000_000_000;
 /// The longest ServerCompatRequest the server reads from stdin: a TLS key and certificates at
 /// most, which the server refuses.
 pub const compat_request_bytes_max = 64 * 1024;
