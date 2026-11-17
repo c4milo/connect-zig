@@ -780,3 +780,5 @@ first. Cite an entry by number in code and commits ("decision 6").
       states each core's rate, and the fleet's rate divided by it gives the cores a tier needs.
       The 516 connections, the mix and the 100 ms limit were chosen on 2026-11-17.
     - oha v1.16.0 is pinned by SHA-256, the digest GitHub states for each release asset.
+    - CI runs the check on x86-64 and on GitHub's arm64 runner, as it runs `bench-compare`, so the
+      README can chart both machines. Each job's numbers belong to its machine alone.

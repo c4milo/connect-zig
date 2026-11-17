@@ -26,7 +26,7 @@ paid for.
   a call and peak memory under h2load. Its production part gives the span rate one gateway core
   holds for 33,000 servers, under oha at climbing rates, with p99 at most 100 ms. It fails only
   when a server answered an export wrongly or did not take every span. CI's `fullstack` job
-  runs it and adds both tables to the job's summary.
+  runs it on x86-64 and on arm64, and adds both tables to each job's summary.
 - **The smoke run.** `zig build bench -- --quick` runs every operation on every message in a few
   short batches. CI's `bench` job runs it, so a broken operation fails before anyone times it.
 - **A profile shows where the cost goes, and is never a measurement.** Run callgrind on
