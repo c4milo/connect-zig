@@ -1120,6 +1120,8 @@ ran on Linux x86-64 with Zig 0.16.0.
     one. One run failed one h11 case, a Connect server stream that ends at once with an error:
     Go's client read "unexpected EOF", the fault of v0.17.0, now rare. 60 runs with traces did
     not show it again. colibri's session has the report.
+  - CI's judge in run 160: a small routed call takes 8 instructions more, +0.19%, and a medium
+    one 2 fewer. No codec count but base64's moved past 0.03%.
 
 - **base64's pad bits in stdx's decoder** (decision 10 as amended on 2026-11-10). On stdx
   v0.1.2. proto3 JSON reads a last base64 letter whose pad bits are set, as protobuf's parsers
@@ -1133,7 +1135,11 @@ ran on Linux x86-64 with Zig 0.16.0.
     each of its 1000 bytes fields than on stdx `22f5139`; the baseline holds that count.
   - Local judges, with stdx v0.1.2's decoder: large JSON decode takes 26 instructions a field
     fewer than the fallback's code on x86-64-v2, and 8 more on aarch64; 5 of those 8 come from
-    the function's shape once the fallback's call goes. CI's judge counts x86-64-v3.
+    the function's shape once the fallback's call goes.
+  - CI's judge on x86-64-v3, in
+    [run 160](https://github.com/c4milo/connect-zig/actions/runs/44007655863), with the pin of
+    colibri v0.17.3: large JSON decode 4,969,617 to 4,952,616 instructions, 17 fewer a field,
+    and 9 fewer than on stdx `22f5139`. The run holds the pin and this change together.
   - Mutations, 4 of 4 CAUGHT: pad bits refused, the standard alphabet alone, padding required,
     and a refused text passed as an empty field.
 

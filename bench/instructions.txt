@@ -5,34 +5,34 @@ deep JSON encode|23876
 deep binary decode|14819
 deep binary decode+walk|17194
 deep binary encode|10593
-large JSON decode|4969617
-large JSON decode+walk|6163640
+large JSON decode|4952616
+large JSON decode+walk|6146639
 large JSON encode|3171391
 large binary decode|789457
 large binary decode+walk|1117453
 large binary encode|706570
-medium Connect unary call|28068
-medium JSON decode|49142
-medium JSON decode+walk|64303
+medium Connect unary call|28066
+medium JSON decode|49137
+medium JSON decode+walk|64298
 medium JSON encode|33709
-medium binary decode|16547
-medium binary decode+walk|15314
+medium binary decode|16542
+medium binary decode+walk|15309
 medium binary encode|9194
-medium gRPC unary call|28543
+medium gRPC unary call|28541
 packed JSON decode|68202
 packed JSON decode+walk|77578
 packed JSON encode|57598
 packed binary decode|6819
 packed binary decode+walk|8198
 packed binary encode|8186
-small Connect unary call|4194
+small Connect unary call|4202
 small JSON decode|2694
 small JSON decode+walk|2698
 small JSON encode|1320
 small binary decode|525
 small binary decode+walk|530
 small binary encode|218
-small gRPC unary call|4699
+small gRPC unary call|4707
 strings JSON decode|7019
 strings JSON decode+walk|7027
 strings JSON encode|3432
