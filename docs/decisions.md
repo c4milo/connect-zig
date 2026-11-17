@@ -791,6 +791,12 @@ first. Cite an entry by number in code and commits ("decision 6").
       A person copies a chosen run's charts to `docs/images`, so the README still names one run.
       Beaten: CI that commits the charts, which needs write access, and moves the README's numbers
       with each runner's CPU model.
+    - Vector and Rotel run as they ship, with Nagle's algorithm on. Each passes its accepted
+      sockets to tonic itself, and neither sets TCP_NODELAY, so their p99 stays near 40 ms, Linux's
+      delayed ACK, from a low rate. colibri and Go set TCP_NODELAY. Beaten on 2026-11-17: a
+      preloaded library that sets it on each accepted socket. In an arm64 container it cut their
+      p99 at 1.5 exports a connection a second from 42 ms to 5 ms, but did not raise the rate
+      either held: Rotel 9.5 and 7.75 exports a connection a second, Vector 3 and 2.875.
     - Slack, whose fleet the model takes its size from, publishes no rate of spans. So the model
       states each core's rate, and the fleet's rate divided by it gives the cores a tier needs.
       The 516 connections, the mix and the 100 ms limit were chosen on 2026-11-17.

@@ -463,6 +463,11 @@ MiB and 315 MiB. connect-zig's climb ends when a burst fills its 64 calls and a 
 The other servers' climbs end when a call waits past 100 ms. A runner's CPU model changes from
 run to run: run 172 had an Intel Xeon 6975P-C, so its x86-64 rates were higher.
 
+Vector's and Rotel's p99 stays near 40 ms from a low rate. Neither sets `TCP_NODELAY` on the
+sockets it accepts, so Nagle's algorithm waits for Linux's delayed ACK. With `TCP_NODELAY` set
+from outside, their p99 fell to about 5 ms, but neither held a higher rate. So the climb runs them
+as they ship.
+
 The same jobs also load each server over TLS as fast as it answers, with exports of 16 and of 512
 spans, not compressed, on 16 connections of 4 streams. The calls a second:
 
