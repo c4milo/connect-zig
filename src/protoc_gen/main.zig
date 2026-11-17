@@ -23,7 +23,7 @@ pub fn main(init: std.process.Init) !void {
     const len = try proto.encoded_len(pb.CodeGeneratorResponse, &response);
     const encoded = try proto.encode(pb.CodeGeneratorResponse, &response, try arena.alloc(u8, len));
     const output_buffer = try arena.alloc(u8, io_buffer_len);
-    var stdout = std.Io.File.stdout().writer(init.io, output_buffer);
+    var stdout = std.Io.File.stdout().writerStreaming(init.io, output_buffer);
     try stdout.interface.writeAll(encoded);
     try stdout.interface.flush();
 }
