@@ -18,7 +18,8 @@ and serve the same handlers to Connect, gRPC and gRPC-Web clients, in binary pro
 - **No hidden I/O.** The protocol core reads bytes you give it and writes bytes you send. It
   reads no clock, so every test is deterministic.
 - **Fast.** Binary and JSON encoding and decoding run 2.6 to 33.6 times faster than Go's protobuf
-  runtime on x86-64, and 2.2 to 39.6 times on arm64, in CI's run 160 (see
+  runtime on x86-64, and 2.2 to 39.6 times on arm64, in CI's
+  [run 160](https://github.com/c4milo/connect-zig/actions/runs/44007655863) (see
   [Performance](#performance)).
 - **HTTP from [colibri](https://github.com/c4milo/colibri).** Servers and clients run over h11,
   h2 and h3, in cleartext or over TLS.
