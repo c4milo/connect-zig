@@ -14,6 +14,7 @@ const bench = @import("build/bench.zig");
 const conformance = @import("build/conformance.zig");
 const chapulin = @import("build/chapulin.zig");
 const line_coverage = @import("build/line_coverage.zig");
+const fullstack = @import("build/fullstack.zig");
 
 const Graph = @import("build/graph.zig").Graph;
 
@@ -69,6 +70,7 @@ pub fn build(b: *std.Build) void {
     if (lint.add(b)) |lint_step| test_step.dependOn(lint_step);
     line_coverage.add(b, graph, plugin);
     bench.add(b, graph.public_names, target);
+    fullstack.add(b, graph);
 }
 
 fn modules(b: *std.Build, stdx: *std.Build.Dependency, colibri: *std.Build.Dependency, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode) Graph {
@@ -125,6 +127,7 @@ fn modules(b: *std.Build, stdx: *std.Build.Dependency, colibri: *std.Build.Depen
         .oidc = oidc_module(b, stdx, connect, public_names, target, optimize),
         .public_names = public_names,
         .colibri = colibri,
+        .platform = stdx.module("platform"),
         .target = target,
         .optimize = optimize,
     };

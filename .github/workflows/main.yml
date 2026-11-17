@@ -90,6 +90,10 @@ jobs:
       - name: Install valgrind
         if: matrix.check == 'perf'
         run: sudo apt-get update -q && sudo apt-get install -y -q valgrind
+      # The full-stack check's load generator, as colibri's judge installs it (decision 44).
+      - name: Install h2load
+        if: matrix.check == 'fullstack'
+        run: sudo apt-get update -q && sudo apt-get install -y -q nghttp2-client
       - name: Put the tools on the path
         run: |
           echo "${HOME}/zig" >>"${GITHUB_PATH}"

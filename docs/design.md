@@ -235,6 +235,12 @@ Each step names the check that proves it. A step is done when its check passes i
     connect-go server's does. New public names: none. Check: `tools/bench_check.sh`, which fails
     when a table size lacks its row, and `tools/routes_chart.py`, which draws each call's time
     against its time with one route.
+28. **The full stack.** `tools/fullstack_check.sh` loads connect-zig's OTLP sink,
+    `tools/otlp_sink`, and OpenTelemetry's Collector with the same OTLP exports, over gRPC, TLS
+    1.3 and h2, under h2load. It reports calls a second, latency at p50 and p99, CPU time a call
+    and peak memory (decision 44). New public names: none. Check: one export through `buf curl`
+    answers with OTLP's full success, and each server's count of the spans it took equals the
+    spans it was sent, with none refused.
 
 ### Step records
 

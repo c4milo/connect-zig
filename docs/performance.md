@@ -20,6 +20,11 @@ paid for.
   on the same machine. CI's `bench-compare` job runs it and adds the table to the job's summary;
   it fails only when the octets differ, never on a time. The README's table comes from one named
   run of that job.
+- **The full stack is a time too.** `tools/fullstack_check.sh` loads whole servers over TLS and
+  h2 on a socket: connect-zig's OTLP sink and OpenTelemetry's Collector, each on one core, under
+  h2load on two others (decision 44). It reports calls a second, latency, CPU time a call and
+  peak memory, and fails only when a server answered an export wrongly or did not take every
+  span. CI's `fullstack` job runs it and adds the table to the job's summary.
 - **The smoke run.** `zig build bench -- --quick` runs every operation on every message in a few
   short batches. CI's `bench` job runs it, so a broken operation fails before anyone times it.
 - **A profile shows where the cost goes, and is never a measurement.** Run callgrind on
@@ -173,6 +178,7 @@ zig build bench                  # time every operation, ReleaseFast
 zig build bench -- --quick       # the smoke run CI runs
 zig build costs                  # time the costs table on this machine
 tools/bench_check.sh             # time connect-zig beside Go's and Rust's runtimes, compare octets
+tools/fullstack_check.sh         # load the OTLP sink and the Collector over TLS and h2, on Linux
 zig build install-bench -Dcpu=x86_64_v3
 valgrind --tool=callgrind --collect-atstart=no zig-out/bin/bench --instructions
 callgrind_annotate callgrind.out.<pid>   # the profile, by function and by line

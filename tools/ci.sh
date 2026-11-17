@@ -7,12 +7,12 @@
 #   tools/ci.sh --list                      the checks' names, as a JSON array
 #
 # The report gets a line for each check, and the tables of the checks that write one: interop
-# across languages in both directions, the costs, the instruction counts and the conformance
-# totals. CI publishes it as the job's summary, and the workflow runs each check of `--list` as a
-# job of its own, so each shows apart in GitHub.
+# across languages in both directions, the costs, the full stack, the instruction counts and the
+# conformance totals. CI publishes it as the job's summary, and the workflow runs each check of
+# `--list` as a job of its own, so each shows apart in GitHub.
 set -eu
 cd "$(dirname "$0")/.."
-checks="format commits test release package bench costs bench-compare perf generated interop interop-languages interop-servers coverage line-coverage conformance protobuf-conformance"
+checks="format commits test release package bench costs bench-compare fullstack perf generated interop interop-languages interop-servers coverage line-coverage conformance protobuf-conformance"
 only=""
 case "${1:-}" in
     --list)
@@ -70,6 +70,11 @@ check() {
         bench-compare) compare="$(tools/bench_check.sh 2>&1)" && compare_status=0 || compare_status=$?
             report_only bench-compare "${compare}"
             return "${compare_status}" ;;
+        # Whole servers over TLS and h2, connect-zig's OTLP sink beside OpenTelemetry's Collector
+        # (decision 44). The times report and never gate; every span must arrive.
+        fullstack) full="$(tools/fullstack_check.sh)" && full_status=0 || full_status=$?
+            report_only fullstack "${full}"
+            return "${full_status}" ;;
         perf) tools/perf_check.sh ;;
         generated) tools/generate_check.sh ;;
         interop) tools/interop_check.sh ;;

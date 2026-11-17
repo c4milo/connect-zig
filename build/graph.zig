@@ -9,6 +9,8 @@ pub const Graph = struct {
     oidc: ?*std.Build.Module,
     public_names: *std.Build.Module,
     colibri: *std.Build.Dependency,
+    /// stdx's CPU probe, which a program's TLS values take (colibri decision 97).
+    platform: *std.Build.Module,
     target: std.Build.ResolvedTarget,
     optimize: std.builtin.OptimizeMode,
 };

@@ -736,3 +736,32 @@ first. Cite an entry by number in code and commits ("decision 6").
     - The README's badge is a static shields.io badge. A commit takes its number from a named CI
       run of the check, as the README's charts take theirs. Beaten: Codecov, which needs an
       account and a token in the repository's secrets.
+44. **A full-stack benchmark loads whole servers over TLS and h2, beside OpenTelemetry's
+    Collector.**
+    - The routed call (design §8 step 23) leaves out the socket, TLS and HTTP/2.
+      `tools/fullstack_check.sh` measures them. h2load sends OTLP's `TraceService/Export` over
+      gRPC, TLS 1.3 and h2 to connect-zig's OTLP sink and to OpenTelemetry's Collector v0.165.0,
+      which the script downloads pinned by SHA-256.
+    - The Collector runs its OTLP receiver into its `nop` exporter, with no processor. The sink,
+      `tools/otlp_sink`, decodes each export, counts its spans and drops it. So each server reads
+      and checks every octet, and keeps nothing. Beaten: a full Collector in Zig, which is a
+      product of its own and not an example of a library.
+    - colibri's `.private` server runs one loop on one thread. So each server runs alone on one
+      core, the Collector with GOMAXPROCS=1, and h2load runs on two other cores (colibri decision
+      33). The report gives each server's CPU time a call, which holds on any count of cores.
+    - Go's runtime encodes the exports, through `tools/fullstack/otlp_request.py` and `buf
+      convert`, so connect-zig encodes none of the octets it reads. One export holds 16 spans.
+      The other holds 512, the largest batch an OpenTelemetry SDK exports by default.
+    - Each round first sends one export through `buf curl`, which must answer with OTLP's full
+      success, no span refused and no message: gRPC states a call's status in its trailers,
+      which h2load does not read. After
+      each round, each server's own count of spans must equal what it was sent, with none
+      refused. Either failure fails the check. The times report and never gate, as
+      `bench-compare`'s do.
+    - TLS runs TLS_AES_128_GCM_SHA256, which every TLS 1.3 implementation has (RFC 8446 §9.1).
+      The sink states its thread's timing mode, as colibri's test programs do, so it runs AES-GCM,
+      as Go does.
+    - h2load is the load generator, as in colibri's judge: a gRPC call is an HTTP/2 POST, so its
+      body is fixed ahead of time. Beaten: ghz, which speaks gRPC alone, so it cannot send the
+      Connect calls of issue 7. CI installs h2load from Ubuntu's `nghttp2-client` for this check
+      alone, as it installs valgrind for `perf`.
