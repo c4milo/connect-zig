@@ -1225,6 +1225,15 @@ ran on Linux x86-64 with Zig 0.16.0.
     and the Collector 213,580 at p99 20.71 ms. On a Neoverse-N2, connect-zig held 712,014 at
     p99 18.65 ms, and the Collector 142,400 at p99 14.31 ms. `tools/fullstack_chart.py` draws
     the README's charts from the job's output.
+- **Servers in Rust** (step 30). CI's
+  [run 172](https://github.com/c4milo/connect-zig/actions/runs/44093381647) on `c2c75dd`.
+  - Over TLS, on a Xeon 6975P-C: connect-zig held 854,352 spans a second, the Collector 213,600
+    and Vector 71,200. On a Neoverse-N2: 712,000, 142,400 and 53,400.
+  - In cleartext: connect-zig held 854,352 and 712,032, the Collector 213,600 and 142,404, and
+    Rotel 284,800 and 213,604.
+  - Vector spent 8.99 µs of CPU a span on x86-64 and 13.54 µs on arm64, and grew to 1,471 MiB
+    and 709 MiB. Rotel spent 3.02 µs and 4.51 µs. Rotel's p99 stayed near 41 ms from 53,400
+    spans a second up, on both machines, and Vector's passed 40 ms at about the same rate.
 - **colibri v0.18.1** (steps 27 to 29, decision 10). colibri v0.18.1 (`0942b20a`) pins the
   stdx, chapulin and Rotor that v0.17.3 pins, so only colibri moves.
   - v0.18.0's router compiles a table of 256 routes, so the largest route table moves from 225

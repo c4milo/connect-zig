@@ -20,9 +20,10 @@ and serve the same handlers to Connect, gRPC and gRPC-Web clients, in binary pro
 - **Fast.** Binary and JSON encoding and decoding run 2.6 to 33.6 times faster than Go's protobuf
   runtime on x86-64, and 2.2 to 39.6 times on arm64, in CI's
   [run 160](https://github.com/c4milo/connect-zig/actions/runs/44007655863). In a gateway that
-  takes OpenTelemetry traces over TLS, one core holds 2.7 times the OpenTelemetry Collector's
-  spans a second on x86-64, and 5.0 times on arm64, in
-  [run 170](https://github.com/c4milo/connect-zig/actions/runs/44077206597) (see
+  takes OpenTelemetry traces, one core holds 4.0 times the OpenTelemetry Collector's spans a
+  second on x86-64 and 5.0 times on arm64, 12.0 and 13.3 times Vector's over TLS, and 3.0 and
+  3.3 times Rotel's in cleartext, in
+  [run 172](https://github.com/c4milo/connect-zig/actions/runs/44093381647) (see
   [Performance](#performance)).
 - **HTTP from [colibri](https://github.com/c4milo/colibri).** Servers and clients run over h11,
   h2 and h3, in cleartext or over TLS.
@@ -407,41 +408,67 @@ Connect call, in nanoseconds:
 
 ![Lines of the time of a routed call over its time with one route, as the route table grows from 1 to 16 and 256 routes, on arm64: connect-zig takes up to 8% more time, connect-rust up to 2% less and connect-go up to 1% more](docs/images/call-routes-arm64.svg)
 
-### Whole servers over TLS
+### Whole servers on a socket
 
-`tools/fullstack_check.sh` loads whole servers on real sockets, over TLS 1.3 and HTTP/2. One is
-connect-zig's OTLP receiver, `tools/otlp_sink`. The other is the
-[OpenTelemetry Collector](https://opentelemetry.io/docs/collector/) v0.165.0, the server most
-companies run to take OpenTelemetry's traces, with its OTLP receiver and its `nop` exporter. Each
-server decodes and checks every span, counts it and drops it. Each runs on one core, the Collector
-with `GOMAXPROCS=1`, and the load runs on two other cores. Each run checks every span.
+`tools/fullstack_check.sh` loads whole servers on real sockets over HTTP/2, each with the same
+OTLP exports. The servers:
+
+- connect-zig's OTLP receiver, `tools/otlp_sink`.
+- The [OpenTelemetry Collector](https://opentelemetry.io/docs/collector/) v0.165.0, the server
+  most companies run to take OpenTelemetry's traces, with its OTLP receiver and its `nop`
+  exporter.
+- [Vector](https://vector.dev/) v0.62.0, in Rust, with its `opentelemetry` source and its
+  `blackhole` sink.
+- [Rotel](https://github.com/streamfold/rotel) v0.2.7, the OpenTelemetry collector in Rust, with
+  its OTLP receiver and its `blackhole` exporter. Its receiver has no TLS.
+
+Each server decodes and checks every span, counts it and drops it. Each runs on one core, the
+Collector with `GOMAXPROCS=1` and Vector with one thread, and the load runs on two other cores.
+Each run checks every span.
 
 The production model stands for one core of a 64-core gateway that 33,000 servers send their
-traces to. Each server holds 516 TLS connections. 70%, 25% and 5% of them send gzip exports of 16,
-128 and 512 spans. [oha](https://github.com/hatoo/oha) sends at fixed rates, and its latency holds
-the time a call waits in a queue. The rate climbs until p99 passes 100 ms or a call is refused.
-CI's two `fullstack` jobs of commit `253404b`
-([run 170](https://github.com/c4milo/connect-zig/actions/runs/44077206597)) ran it on colibri
-v0.18.1, on an AMD EPYC 9V74 core and on an Arm Neoverse-N2 core:
+traces to. Each server holds 516 connections. 70%, 25% and 5% of them send gzip exports of 16, 128
+and 512 spans. [oha](https://github.com/hatoo/oha) sends at fixed rates, and its latency holds the
+time a call waits in a queue. The rate climbs until p99 passes 100 ms or a call is refused. CI's
+two `fullstack` jobs of commit `c2c75dd`
+([run 172](https://github.com/c4milo/connect-zig/actions/runs/44093381647)) ran it on colibri
+v0.18.1, on an Intel Xeon 6975P-C core and on an Arm Neoverse-N2 core. Over TLS 1.3, against the
+Collector and Vector:
 
-![Bars of the spans a second one core holds with p99 under 100 ms, and lines of p99 as the rate climbs, on x86-64: connect-zig holds 569,536 spans a second at p99 1.46 ms, 2.7 times the OpenTelemetry Collector's 213,580 at p99 20.71 ms](docs/images/fullstack.svg)
+![Bars of the spans a second one core holds with p99 under 100 ms over TLS, and lines of p99 as the rate climbs, on x86-64: connect-zig holds 854,352 spans a second, 4.0 times the OpenTelemetry Collector's 213,600 and 12.0 times Vector's 71,200](docs/images/fullstack.svg)
 
-![Bars of the spans a second one core holds with p99 under 100 ms, and lines of p99 as the rate climbs, on arm64: connect-zig holds 712,014 spans a second at p99 18.65 ms, 5.0 times the OpenTelemetry Collector's 142,400 at p99 14.31 ms](docs/images/fullstack-arm64.svg)
+![Bars of the spans a second one core holds with p99 under 100 ms over TLS, and lines of p99 as the rate climbs, on arm64: connect-zig holds 712,000 spans a second, 5.0 times the OpenTelemetry Collector's 142,400 and 13.3 times Vector's 53,400](docs/images/fullstack-arm64.svg)
 
-connect-zig spends 1.42 µs of CPU a span on x86-64 and 1.40 µs on arm64, and the Collector 4.03
-µs and 5.41 µs. connect-zig takes all its memory when it starts: 483 MiB, for 528 connections and
-64 calls at once. The Collector grew to 729 MiB on x86-64 and to 684 MiB on arm64. connect-zig's
-climb ends when a burst fills its 64 calls and a call is refused. The Collector's ends when its
-queue holds a call past 100 ms. The rate climbs in coarse steps, so each server's true limit lies
-between the step it held and the next one.
+In cleartext, against the Collector and Rotel:
 
-The same jobs also load each server as fast as it answers, with exports of 16 and of 512 spans,
-not compressed, on 16 connections of 4 streams. The calls a second:
+![Bars of the spans a second one core holds with p99 under 100 ms in cleartext, and lines of p99 as the rate climbs, on x86-64: connect-zig holds 854,352 spans a second, 4.0 times the OpenTelemetry Collector's 213,600 and 3.0 times Rotel's 284,800](docs/images/fullstack-cleartext.svg)
 
-| Export | connect-zig, x86-64 | Collector, x86-64 | connect-zig, arm64 | Collector, arm64 |
+![Bars of the spans a second one core holds with p99 under 100 ms in cleartext, and lines of p99 as the rate climbs, on arm64: connect-zig holds 712,032 spans a second, 5.0 times the OpenTelemetry Collector's 142,404 and 3.3 times Rotel's 213,604](docs/images/fullstack-cleartext-arm64.svg)
+
+The CPU time a span, at each server's highest step, in µs:
+
+| Server | x86-64, TLS | arm64, TLS | x86-64, cleartext | arm64, cleartext |
 | --- | ---: | ---: | ---: | ---: |
-| 16 spans, 6,271 B | 48,495 | 18,800 | 40,949 | 13,478 |
-| 512 spans, 192,397 B | 1,744 | 1,006 | 1,519 | 798 |
+| connect-zig | 1.17 | 1.40 | 1.17 | 1.41 |
+| Collector | 3.73 | 5.39 | 4.10 | 5.93 |
+| Vector | 8.99 | 13.54 | | |
+| Rotel | | | 3.02 | 4.51 |
+
+connect-zig takes all its memory when it starts: 483 MiB, for 528 connections and 64 calls at
+once. Over TLS, the Collector grew to 712 MiB on x86-64 and to 630 MiB on arm64, and Vector to
+1,471 MiB and 709 MiB. In cleartext, the Collector grew to 186 MiB and 187 MiB, and Rotel to 355
+MiB and 323 MiB. connect-zig's climb ends when a burst fills its 64 calls and a call is refused.
+The other servers' climbs end when a call waits past 100 ms. The rate climbs in coarse steps, so
+each server's true limit lies between the step it held and the next one.
+
+The same jobs also load each server over TLS as fast as it answers, with exports of 16 and of 512
+spans, not compressed, on 16 connections of 4 streams. The calls a second:
+
+| Server | 16 spans, x86-64 | 512 spans, x86-64 | 16 spans, arm64 | 512 spans, arm64 |
+| --- | ---: | ---: | ---: | ---: |
+| connect-zig | 54,916 | 1,847 | 40,932 | 1,491 |
+| Collector | 20,520 | 1,093 | 13,076 | 745 |
+| Vector | 8,715 | 301 | 4,199 | 244 |
 
 ## How it is checked
 

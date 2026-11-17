@@ -152,6 +152,7 @@ tick = 200_000 if x_high <= 1_000_000 else 400_000
 for value in range(0, int(x_high) + 1, tick):
     a(f'<text class="tick" x="{sx(value):.1f}" y="{top + plot_h + 16}" text-anchor="middle">{thousands(value)}</text>')
 a(f'<text class="tick" x="{line_right}" y="{top + plot_h + 32}" text-anchor="end">spans a second sent</text>')
+labels = []
 for name in servers:
     fill = looks[name][1]
     points = [(sx(step["sent"]), sy(step[name][0]), step[name]) for step in steps if name in step]
@@ -161,7 +162,23 @@ for name in servers:
         a(f'<circle cx="{x:.1f}" cy="{y:.1f}" r="4" fill="{inside}" stroke="var({fill})" stroke-width="2"/>')
     x, y, (last, failed) = points[-1]
     if failed:
-        label = "refused" if failed == "refused" else ("short of the rate" if failed == "rate" else f"p99 {last:,.0f} ms")
-        a(f'<text class="val" x="{x - 8:.1f}" y="{y - 8:.1f}" text-anchor="end">{label}</text>')
+        text = "refused" if failed == "refused" else ("short of the rate" if failed == "rate" else f"p99 {last:,.0f} ms")
+        labels.append([max(y + 4, top + 8), x, text])
+# Each label of a failed step sits beside its point, to the right, or above it and to the left at
+# the right edge. A label that would cover the one above it moves down a line.
+char_w, line_h = 6.2, 13
+placed = []
+for label in sorted(labels):
+    y, x, text = label
+    width = len(text) * char_w
+    at_edge = x + 8 + width > line_right
+    left = x - 8 - width if at_edge else x + 8
+    if at_edge:
+        y = max(y - 12, top + 8)
+    for other_y, other_left, other_width in placed:
+        if abs(y - other_y) < line_h and left < other_left + other_width and other_left < left + width:
+            y = other_y + line_h
+    placed.append((y, left, width))
+    a(f'<text class="val" x="{left:.1f}" y="{y:.1f}">{text}</text>')
 a('</svg>')
 open(out, "w").write("\n".join(parts) + "\n")
