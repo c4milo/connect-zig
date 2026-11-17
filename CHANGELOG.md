@@ -8,7 +8,10 @@ are in [docs/decisions.md](docs/decisions.md), and the steps and their measureme
 connect-zig follows [Semantic Versioning](https://semver.org/). Before 1.0, a minor version may
 change the public API, and the entry marks each change that does.
 
-## Unreleased
+## v0.2.0 (2026-11-17)
+
+It builds on colibri v0.18.1 and on stdx v0.1.2, with Zig 0.16.0. Two changes to the API are
+marked below.
 
 ### Added
 
@@ -43,6 +46,15 @@ change the public API, and the entry marks each change that does.
   where over HTTP/2 it could read a reset with CANCEL (colibri v0.17.3).
 - A Connect GET writes its query in the protocol's order: `connect`, `base64`, `compression`,
   `encoding`, then `message`. connectrpc's conformance suite v1.0.7 checks it.
+
+### Checked
+
+- The routed call runs in tables of 16 and 256 routes, and the performance gate counts its
+  instructions there too.
+- A full-stack check loads connect-zig's OTLP sink beside OpenTelemetry's Collector, Vector and
+  Rotel, each on one core. In CI's run 172, connect-zig held 4.0 times the Collector's spans a
+  second on x86-64 and 5.0 times on arm64, with p99 under 100 ms. It held 12.0 and 13.3 times
+  Vector's over TLS, and 3.0 and 3.3 times Rotel's in cleartext.
 
 ## v0.1.0 (2026-11-15)
 
