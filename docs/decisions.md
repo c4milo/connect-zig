@@ -786,6 +786,11 @@ first. Cite an entry by number in code and commits ("decision 6").
       `opentelemetry` source into its blackhole sink, on one thread, and counts one event for each
       span. Its gRPC listener offers no ALPN protocol unless its TLS names `h2`, so the check
       names it (RFC 7301 §3.2). Vector joins the peak part and the climb over TLS.
+    - Vector runs its default decoding, which converts each span into an event of its own model.
+      Beaten on 2026-11-17: the source's `otlp` codec, which keeps OTLP's form. Its gRPC handler
+      decodes each export, encodes it again, and decodes it into a tree. On one core of an
+      arm64 container, it answered 4,400 calls a second of 16 spans where the default answered
+      9,400, and 120 of 512 spans where the default answered 390.
     - Rotel v0.2.7, the Rust OpenTelemetry collector, has no TLS on its OTLP receiver. So a second
       climb runs in cleartext h2, for connect-zig, the Collector and Rotel. Rotel counts its spans
       in its internal metrics, which it sends by OTLP every 10 seconds; its release build has no

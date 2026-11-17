@@ -418,7 +418,8 @@ OTLP exports. The servers:
   most companies run to take OpenTelemetry's traces, with its OTLP receiver and its `nop`
   exporter.
 - [Vector](https://vector.dev/) v0.62.0, in Rust, with its `opentelemetry` source and its
-  `blackhole` sink.
+  `blackhole` sink. The source converts each span into Vector's own event, its default. Its
+  `otlp` codec keeps OTLP's form, but answered fewer than half the calls a second.
 - [Rotel](https://github.com/streamfold/rotel) v0.2.7, the OpenTelemetry collector in Rust, with
   its OTLP receiver and its `blackhole` exporter. Its receiver has no TLS.
 
