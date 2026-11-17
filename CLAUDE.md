@@ -74,7 +74,7 @@ confirm a test fails. Report `CAUGHT` or `NOT CAUGHT` per mutation in the commit
   `refactor`, `perf`, `build`, `ci`, `chore`. Scopes: `protobuf`, `connect`, `connect-colibri`,
   `oidc`, `plugin`, `examples`, `build`, `ci`, `docs`.
 - The description is imperative, lowercase, with no final period, and the subject stays at or
-  under 72 columns. The body says why, in at most 3 paragraphs and 100 words, lines at or under
+  under 72 columns. The body says why, in at most 4 paragraphs and 150 words, lines at or under
   100 columns.
 - Stage by explicit path. Never `git add -A` or `git add .`.
 

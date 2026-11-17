@@ -68,7 +68,7 @@ Commits are [Conventional Commits](https://www.conventionalcommits.org/):
   `ci` or `docs`.
 - The description is imperative and lowercase, with no period, and the subject line fits in 72
   columns.
-- The body says why, in at most 3 paragraphs and 100 words, with lines of at most 100 columns.
+- The body says why, in at most 4 paragraphs and 150 words, with lines of at most 100 columns.
 
 `zig build lint-commits` checks every commit since `origin/main`. Stage files by path, never with
 `git add -A`.
