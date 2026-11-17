@@ -3,7 +3,7 @@
 // httptest builds, with a recorder for the response. No socket, no framing and no TLS, as on the
 // Zig side.
 //
-// The mux holds 1, 16 or 225 routes, as bench/call.zig's tables do: the echo method's, then more
+// The mux holds 1, 16 or 256 routes, as bench/call.zig's tables do: the echo method's, then more
 // methods of its service, then more services of as many methods. The calls never reach the other
 // routes.
 //
@@ -49,7 +49,7 @@ const prefixLen = 5
 
 // The sizes of the route tables the small message's calls run on, as bench/constants.zig's
 // call_route_counts: each a square of services and methods.
-var callRouteCounts = []int{1, 16, 225}
+var callRouteCounts = []int{1, 16, 256}
 
 // deterministicCodec is connect-go's proto codec with deterministic marshaling.
 type deterministicCodec struct{}

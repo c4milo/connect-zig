@@ -7,7 +7,7 @@
 //! The handler answers the message with itself. A map field is a BTreeMap, so each reply's
 //! octets equal its request's, as Zig's do.
 //!
-//! The router holds 1, 16 or 225 routes, as bench/call.zig's tables do: the echo method's, then
+//! The router holds 1, 16 or 256 routes, as bench/call.zig's tables do: the echo method's, then
 //! more methods of its service, then more services of as many methods. The calls never reach the
 //! other routes.
 
@@ -52,7 +52,7 @@ const PREFIX_LEN: usize = 5;
 
 /// The sizes of the route tables the small message's calls run on, as bench/constants.zig's
 /// call_route_counts: each a square of services and methods.
-pub const CALL_ROUTE_COUNTS: [usize; 3] = [1, 16, 225];
+pub const CALL_ROUTE_COUNTS: [usize; 3] = [1, 16, 256];
 
 /// A routed call of one message in one protocol.
 struct RoutedCall {

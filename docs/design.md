@@ -230,9 +230,10 @@ Each step names the check that proves it. A step is done when its check passes i
     `zig build test-connect`, the conformance suite with `COMPRESSION_BR` in both halves'
     features, and `tools/interop_check.sh`, where curl reads a br answer.
 27. **Route tables in the routed call.** The small message's routed call runs in tables of 1,
-    16 and 225 routes, in connect-zig, connect-go and connect-rust, each a square of services
-    and methods with the same paths. connect-go's call goes through an `http.ServeMux`, as a
-    connect-go server's does. New public names: none. Check: `tools/bench_check.sh`, which fails
+    16 and 256 routes (225 before colibri v0.18.0, whose router compiles a table of 256), in
+    connect-zig, connect-go and connect-rust, each a square of services and methods with the
+    same paths. connect-go's call goes through an `http.ServeMux`, as a connect-go server's
+    does. New public names: none. Check: `tools/bench_check.sh`, which fails
     when a table size lacks its row, and `tools/routes_chart.py`, which draws each call's time
     against its time with one route.
 28. **The full stack.** `tools/fullstack_check.sh` loads connect-zig's OTLP sink,
@@ -1199,6 +1200,33 @@ ran on Linux x86-64 with Zig 0.16.0.
     with 16 and 4,432 with 225 (+4.9%); gRPC 4,730, 4,770 and 4,937 (+4.4%). The baseline holds
     the new rows. Times, from 1 to 225 routes: connect-zig's call took up to 14% more on the
     EPYC 9V74 and 8% more on the Neoverse-N2, connect-rust's up to 3%, and connect-go's up to 2%.
+- **The full stack** (step 28). On colibri v0.17.3.
+  - CI's [run 168](https://github.com/c4milo/connect-zig/actions/runs/44024752259) on `8cf269e`,
+    an EPYC 9V45. At 16 spans, connect-zig answered 52,806 calls a second at 19.0 µs of CPU a
+    call, and the Collector 23,695 at 42.0 µs. At 512 spans, connect-zig answered 1,607 at
+    620.0 µs, and the Collector 1,275 at 785.0 µs.
+  - The check found a copy in colibri's body path whose cost grew with the square of a body's
+    pieces (colibri v0.18.1, below).
+- **The production model** (step 29). The 516 connections, the 70/25/5 mix and the 100 ms
+  limit were chosen on 2026-11-17.
+  - A local run on an M1 Pro, in a Linux VM, on colibri's fix `ed40807`: connect-zig held
+    712,098 spans a second, at p99 33 ms with its core 99% busy, and the Collector 213,620, at
+    p99 27 ms with its core 85% busy. On v0.17.3, connect-zig's CPU grew faster than its load,
+    from 38% busy at 213,600 spans a second to 79% at 284,800, where calls were refused.
+  - The sink holds about 480 MiB from its start: about 0.5 MiB for each of 528 connections, and
+    about 3 MiB for each of the 64 calls that it holds at once.
+- **colibri v0.18.1** (steps 27 to 29, decision 10). colibri v0.18.1 (`0942b20a`) pins the
+  stdx, chapulin and Rotor that v0.17.3 pins, so only colibri moves.
+  - v0.18.0's router compiles a table of 256 routes, so the largest route table moves from 225
+    routes to 256: 16 services of 16 methods.
+  - v0.18.1 fixes the copy that step 28 found. The router copied a body's held octets onto
+    themselves after each piece, and a unary call holds its body until its end. The TLS
+    connection shifted its buffers in a byte loop. v0.18.1 copies nothing in place, and shifts
+    with `@memmove`.
+  - Measured in turns on the M1 Pro, the sink under h2load, five rounds each. These numbers
+    order the builds, and the published ones come from CI (docs/performance.md). At 16 spans:
+    36,152 calls a second on v0.18.0's tree and 62,102 on the fix, at 27 and 16 µs of CPU a
+    call. At 512 spans: 819 and 1,997 calls a second, at 1,220 and 495 µs.
 
 ### What a later step owes
 

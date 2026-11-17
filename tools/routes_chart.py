@@ -6,7 +6,7 @@
 <table.md> holds the job's table, or the job's whole output, as for tools/speed_chart.py. The
 chart draws how the small message's routed unary call (bench/call.zig) changes as its route table
 grows: for connect-zig, connect-rust and connect-go, the time of a call in a table of 16 and of
-225 routes over the time of the same call in a table of one route. Each implementation is its own
+256 routes over the time of the same call in a table of one route. Each implementation is its own
 unit, so a flat line means the router's match costs the same at any size. A row whose cell reads
 "absent" draws no point. <run> and <commit> name the run in the subtitle, as docs/performance.md
 asks of a published number.

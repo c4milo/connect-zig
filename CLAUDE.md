@@ -127,7 +127,7 @@ confirm a test fails. Report `CAUGHT` or `NOT CAUGHT` per mutation in the commit
   test CA, and checks that Chat answers full-duplex. It needs buf, curl, python3 and go.
 - Benchmark: `zig build bench` times binary and JSON encode and decode, then, in a program of
   its own (`bench/call_main.zig`), a routed unary call of the small and the medium message in
-  Connect and in gRPC, the small one also in tables of 16 and 225 routes, ReleaseFast;
+  Connect and in gRPC, the small one also in tables of 16 and 256 routes, ReleaseFast;
   `tools/bench_check.sh` runs the Go benchmark in `bench/go` and, when cargo is on the path, the
   Rust one on Buffa in `bench/rust` beside it, with their calls through connect-go and
   connect-rust, and checks each writes the same bytes as Zig. The

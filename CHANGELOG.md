@@ -24,8 +24,10 @@ change the public API, and the entry marks each change that does.
   27% fewer instructions.
 - **Changes the API.** `compression.compress` and `compression.choose` take the encoders as
   `*const Encoders`, since `Encoders` holds three pointers now. A call passes `&encoders`.
-- connect-zig builds on colibri v0.17.3 and on stdx v0.1.2, the tag colibri pins. A program that
+- connect-zig builds on colibri v0.18.1 and on stdx v0.1.2, the tag colibri pins. A program that
   names stdx itself pins that tag too, so it links one stdx.
+- A server reads a large request body in a time that grows with its length. On colibri v0.17.3
+  the time grew with the square of the pieces the body arrived in.
 - **Changes the API.** `rpc.failure_of` takes the pool's response, `*const client.Response`, in
   place of its `client.Result`, so it reads the code of a reset stream.
 - A call whose stream the server reset ends with the code gRPC's table gives the reset, over h2

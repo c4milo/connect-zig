@@ -55,7 +55,7 @@ pub const h2_major = 2;
 /// The sizes of the route tables the small message's calls run on: the echo method's route
 /// alone, then among more methods, as 4 services of 4 methods and as 16 services of 16
 /// (bench/call.zig). bench/go and bench/rust build the same tables.
-pub const call_route_counts = [_]usize{ 1, 16, 225 };
+pub const call_route_counts = [_]usize{ 1, 16, 256 };
 /// The comptime branches that the build of the largest route table takes.
 pub const call_routes_quota = 1_000_000;
 

@@ -108,7 +108,7 @@ expected_rows() {
         echo "| ${message} | gRPC unary call |"
     done
     # The small message's call in each larger route table (bench/constants.zig, call_route_counts).
-    for routes in 16 225; do
+    for routes in 16 256; do
         echo "| small | Connect unary call, ${routes} routes |"
         echo "| small | gRPC unary call, ${routes} routes |"
     done
