@@ -25,14 +25,18 @@ packed JSON encode|57598
 packed binary decode|6819
 packed binary decode+walk|8198
 packed binary encode|8186
-small Connect unary call|4202
+small Connect unary call|4224
+small Connect unary call, 16 routes|4264
+small Connect unary call, 225 routes|4432
 small JSON decode|2694
 small JSON decode+walk|2698
 small JSON encode|1320
 small binary decode|525
 small binary decode+walk|530
 small binary encode|218
-small gRPC unary call|4707
+small gRPC unary call|4730
+small gRPC unary call, 16 routes|4770
+small gRPC unary call, 225 routes|4937
 strings JSON decode|7019
 strings JSON decode+walk|7027
 strings JSON encode|3432

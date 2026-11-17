@@ -1183,6 +1183,11 @@ ran on Linux x86-64 with Zig 0.16.0.
     at 225 routes, about 110 are the binary search's steps, about 13 instructions each, about
     40 a copy that the one-route build left out, and about 30 calls that the compiler no longer
     inlines into the larger router.
+  - CI's [run 164](https://github.com/c4milo/connect-zig/actions/runs/44014548420) on `cc20a73`.
+    The judge, x86-64-v3: the small Connect call takes 4,224 instructions with 1 route, 4,264
+    with 16 and 4,432 with 225 (+4.9%); gRPC 4,730, 4,770 and 4,937 (+4.4%). The baseline holds
+    the new rows. Times, from 1 to 225 routes: connect-zig's call took up to 14% more on the
+    EPYC 9V74 and 8% more on the Neoverse-N2, connect-rust's up to 3%, and connect-go's up to 2%.
 
 ### What a later step owes
 
