@@ -4,7 +4,7 @@
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 [![Zig 0.16](https://img.shields.io/badge/zig-0.16.0-f7a41d.svg)](https://ziglang.org/download/#release-0.16.0)
 [![Connect conformance: 3714 of 3714 server cases, 10711 of 10711 client cases](https://img.shields.io/badge/connect_conformance-passing-brightgreen.svg)](https://github.com/c4milo/connect-zig/actions/runs/44007655863)
-[![Line coverage: 97.6%](https://img.shields.io/badge/line_coverage-97.6%25-brightgreen.svg)](https://github.com/c4milo/connect-zig/actions/runs/43680656658)
+[![Line coverage: 97.7%](https://img.shields.io/badge/line_coverage-97.7%25-brightgreen.svg)](https://github.com/c4milo/connect-zig/actions/runs/44007655863)
 
 **[Connect RPC](https://connectrpc.com/) for Zig.** Write a `.proto` file, run `buf generate`,
 and serve the same handlers to Connect, gRPC and gRPC-Web clients, in binary protobuf or JSON.
@@ -17,8 +17,9 @@ and serve the same handlers to Connect, gRPC and gRPC-Web clients, in binary pro
   each message is encoded straight into the HTTP body it goes out in.
 - **No hidden I/O.** The protocol core reads bytes you give it and writes bytes you send. It
   reads no clock, so every test is deterministic.
-- **Fast.** Binary and JSON encoding and decoding run 2.4 to 24 times faster than Go's protobuf
-  runtime on x86-64, and 2.3 to 32 times on arm64 (see [Performance](#performance)).
+- **Fast.** Binary and JSON encoding and decoding run 2.6 to 33.6 times faster than Go's protobuf
+  runtime on x86-64, and 2.2 to 39.6 times on arm64, in CI's run 160 (see
+  [Performance](#performance)).
 - **HTTP from [colibri](https://github.com/c4milo/colibri).** Servers and clients run over h11,
   h2 and h3, in cleartext or over TLS.
 
@@ -356,14 +357,18 @@ faster, and Go is the line at 1. The charts time the codecs alone, with no code 
 connect-rust. A binary decode with every field read takes `decode_into`, which reads each
 repeated field once (decision 37).
 
-On x86-64, Buffa is faster than connect-zig in 1 of 16 cells, JSON encode of the small message, by
-4%:
+The charts draw 16 of the table's 48 cells. On x86-64, Buffa is faster than connect-zig in 1 of
+them, JSON encode of the small message, by 4%:
 
 ![Bars of the speed of connect-zig and of Buffa, connect-rust's codec, in multiples of Go's protobuf runtime, connect-go's codec, on x86-64: connect-zig is 3.3 to 17.9 times faster than Go's protobuf runtime, and Buffa is faster than connect-zig in 1 of 16 cells](docs/images/speed-vs-go.svg)
 
-On arm64, Buffa is faster in none:
+On arm64, Buffa is faster in none of them:
 
 ![Bars of the speed of connect-zig and of Buffa, connect-rust's codec, in multiples of Go's protobuf runtime, connect-go's codec, on arm64: connect-zig is 2.9 to 18.1 times faster than Go's protobuf runtime, and 1.1 to 1.9 times faster than Buffa](docs/images/speed-vs-go-arm64.svg)
+
+Across all 48 cells, Buffa is faster in 7 on x86-64 and in 5 on arm64. The gap is widest in JSON:
+tree JSON encode, by 1.27 times on x86-64 and 1.49 times on arm64, and packed JSON decode, by 1.30
+times on x86-64. The other wins are by 1.15 times or less.
 
 The routed calls (`bench/call.zig`) run the same unary call in memory through connect-zig,
 connect-go and connect-rust: the router, the route, the protocol and the codec, with no socket,
@@ -406,8 +411,8 @@ Whole servers over real sockets and TLS are not compared yet
   library was broken on purpose to prove a test catches it. The examples run a client against
   the server in memory over h11, h2 and h3.
 - `tools/line_coverage_check.sh` runs each module's tests under kcov (decision 43). On CI's
-  [run 136](https://github.com/c4milo/connect-zig/actions/runs/43680656658) they ran 97.6% of
-  the library's 8489 lines.
+  [run 160](https://github.com/c4milo/connect-zig/actions/runs/44007655863) they ran 97.7% of
+  the library's 8604 lines.
 - `tools/conformance_check.sh` runs the [connectrpc conformance
   suite](https://github.com/connectrpc/conformance) v1.0.7, as CI's
   [run 160](https://github.com/c4milo/connect-zig/actions/runs/44007655863) did on colibri v0.17.3.
