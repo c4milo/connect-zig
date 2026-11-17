@@ -13,7 +13,8 @@
 # oha sends the exports at fixed rates, one process for each size, with its latency correction,
 # so the latency holds the time a call waited in a queue. The rate climbs one step at a time. A
 # step fails when its p99 passes 100 ms, when a call is refused, or when the core takes less than
-# 95% of the step's spans. Each step opens its connections again, so the report leaves out its
+# 95% of the step's spans. Then three more steps halve the gap between the last step that passed
+# and the step that failed. Each step opens its connections again, so the report leaves out its
 # first 2 seconds, where the TLS handshakes fall. The server runs once for the whole climb, and
 # its count of spans must equal what it was sent.
 
@@ -22,6 +23,10 @@ production_classes="16:361 128:129 512:26"
 # The exports each connection sends a second, at each step. At 1, the core takes 35,600 spans a
 # second.
 production_steps="0.25 0.5 0.75 1 1.5 2 3 4 6 8 10 12 16 20 24 32"
+# Halvings of the gap between the last step that passed and the step that failed. The steps grow
+# by up to half, so three halvings place the rate a core holds within 1/16 of it.
+refine_rounds=3
+rest_seconds=5
 step_seconds=10
 warm_seconds=2
 # Calls in flight on one connection at most, as the otlp exporter's queue sends them.
@@ -53,8 +58,24 @@ production_load() {
     for load in ${loads}; do wait "${load}" || true; done
 }
 
-# The climb of one server: a line of the results for each step, until a step fails, then the
-# server's peak memory. It fails when the server answers a probe wrongly or miscounts.
+# One step of the server at a rate: a line of its results. It adds the spans the server took to
+# `sent`, and sets `verdict`.
+production_step() {
+    step_rate="$2"
+    echo "fullstack: production, ${transport}, $1, ${step_rate} a connection a second" >&2
+    before="$(cpu_ticks "${server_pid}")"
+    production_load "$1" "${step_rate}"
+    after="$(cpu_ticks "${server_pid}")"
+    set -- $(python3 tools/fullstack/production_step.py "${work}" "${warm_seconds}" \
+        "${step_seconds}" "${p99_limit_ms}" "${step_rate}" ${production_classes})
+    sent=$((sent + $1))
+    echo "step ${transport} ${server} ${step_rate} $* $((after - before))"
+    verdict="$7"
+}
+
+# The climb of one server: a line of the results for each step, until a step fails. Then the
+# rate between the last step that passed and the step that failed, halved `refine_rounds` times,
+# and the server's peak memory. It fails when the server answers a probe wrongly or miscounts.
 production_climb() {
     server="$1"
     start "${server}" || { stop; return 1; }
@@ -63,17 +84,21 @@ production_climb() {
         probe "${server}" "${work}/production-${class%%:*}.grpc.json" || { stop; return 1; }
         sent=$((sent + ${class%%:*}))
     done
+    passed="" failed=""
     for rate in ${production_steps}; do
-        echo "fullstack: production, ${transport}, ${server}, ${rate} a connection a second" >&2
-        before="$(cpu_ticks "${server_pid}")"
-        production_load "${server}" "${rate}"
-        after="$(cpu_ticks "${server_pid}")"
-        set -- $(python3 tools/fullstack/production_step.py "${work}" "${warm_seconds}" \
-            "${step_seconds}" "${p99_limit_ms}" "${rate}" ${production_classes})
-        sent=$((sent + $1))
-        echo "step ${transport} ${server} ${rate} $* $((after - before))"
-        [ "$7" = pass ] || break
+        production_step "${server}" "${rate}"
+        [ "${verdict}" = pass ] || { failed="${rate}"; break; }
+        passed="${rate}"
     done
+    if [ -n "${passed}" ] && [ -n "${failed}" ]; then
+        for _ in $(seq 1 "${refine_rounds}"); do
+            # A step that failed leaves calls in the server's queue.
+            sleep "${rest_seconds}"
+            rate="$(awk "BEGIN { print (${passed} + ${failed}) / 2 }")"
+            production_step "${server}" "${rate}"
+            if [ "${verdict}" = pass ]; then passed="${rate}"; else failed="${rate}"; fi
+        done
+    fi
     echo "memory ${transport} ${server} $(peak_kb "${server_pid}")"
     check_count "${server}" "${sent}" || { stop; return 1; }
     stop

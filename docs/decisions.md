@@ -781,6 +781,11 @@ first. Cite an entry by number in code and commits ("decision 6").
       fails when p99 passes 100 ms, a call is refused, or the server takes less than 95% of the
       step's spans. The report gives the highest step each server holds. Beaten: a peak rate
       alone, which hides the queue, and h2load's `--rps`, which corrects no latency.
+    - Amended on 2026-11-17: after the first step that fails, three more steps halve the gap
+      between it and the last step that passed. The steps grow by up to half, so the rate a core
+      holds is known within 1/16 of it. Before, a ratio of two servers' rates could be off by
+      half: Vector held 71,200 spans a second and failed 106,800. A step after a failure waits
+      5 s for the server's queue to empty.
     - Slack, whose fleet the model takes its size from, publishes no rate of spans. So the model
       states each core's rate, and the fleet's rate divided by it gives the cores a tier needs.
       The 516 connections, the mix and the 100 ms limit were chosen on 2026-11-17.

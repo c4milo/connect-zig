@@ -56,10 +56,16 @@ spans_per_rate = sum(spans * count for spans, count in classes)
 
 
 def held(server):
-    """The highest step the server passed, and the verdict of the step after it."""
+    """The highest step the server passed, and the verdict of the lowest step above it that
+    failed. After its first failure, the climb tries rates between, so its steps are not in
+    order."""
     passed = [step for step in steps.get(server, []) if step["verdict"] == "pass"]
-    failed = [step for step in steps.get(server, []) if step["verdict"] != "pass"]
-    return (passed[-1] if passed else None), (failed[0]["verdict"] if failed else "none: the last step passed")
+    best = max(passed, key=lambda step: step["rate"]) if passed else None
+    floor = best["rate"] if best else 0
+    failed = [step for step in steps.get(server, []) if step["verdict"] != "pass" and step["rate"] > floor]
+    if not failed:
+        return best, "none: the last step passed"
+    return best, min(failed, key=lambda step: step["rate"])["verdict"]
 
 
 over = "over TLS" if transport == "tls" else "over cleartext h2"

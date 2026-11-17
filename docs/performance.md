@@ -25,7 +25,9 @@ paid for.
   core, with the load on two others (decision 44). Its peak part reports calls a second,
   latency, CPU time a call and peak memory under h2load, over TLS. Its production part gives the
   span rate one gateway core holds for 33,000 servers, under oha at climbing rates, with p99 at
-  most 100 ms: over TLS beside Vector, and in cleartext beside Rotel. It fails only when a server
+  most 100 ms: over TLS beside Vector, and in cleartext beside Rotel. After the first step that
+  fails, it halves the gap to the last step that passed three times, so a rate is known within
+  1/16 of it. It fails only when a server
   answered an export wrongly or did not take every span. CI's `fullstack` job runs it on x86-64
   and on arm64, and adds its tables to each job's summary.
 - **The smoke run.** `zig build bench -- --quick` runs every operation on every message in a few
