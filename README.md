@@ -3,14 +3,14 @@
 [![CI](https://github.com/c4milo/connect-zig/actions/workflows/main.yml/badge.svg)](https://github.com/c4milo/connect-zig/actions/workflows/main.yml)
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 [![Zig 0.16](https://img.shields.io/badge/zig-0.16.0-f7a41d.svg)](https://ziglang.org/download/#release-0.16.0)
-[![Connect conformance: 3536 of 3536 server cases, 10758 of 10758 client cases](https://img.shields.io/badge/connect_conformance-passing-brightgreen.svg)](https://github.com/c4milo/connect-zig/actions/runs/43956832740)
+[![Connect conformance: 3714 of 3714 server cases, 10711 of 10711 client cases](https://img.shields.io/badge/connect_conformance-passing-brightgreen.svg)](https://github.com/c4milo/connect-zig/actions/runs/44007655863)
 [![Line coverage: 97.6%](https://img.shields.io/badge/line_coverage-97.6%25-brightgreen.svg)](https://github.com/c4milo/connect-zig/actions/runs/43680656658)
 
 **[Connect RPC](https://connectrpc.com/) for Zig.** Write a `.proto` file, run `buf generate`,
 and serve the same handlers to Connect, gRPC and gRPC-Web clients, in binary protobuf or JSON.
 
 - **Conformant.** It passes [connectrpc's conformance suite](https://github.com/connectrpc/conformance)
-  v1.0.4 in Connect, gRPC and gRPC-Web: all 3536 server cases, and all 10758 client cases.
+  v1.0.7 in Connect, gRPC and gRPC-Web: all 3714 server cases, and all 10711 client cases.
 - **No allocator in the library.** Every buffer is yours, and every size is a constant you can
   read.
 - **No copies.** Decoding leaves strings, bytes and repeated fields pointing into the input, and
@@ -376,11 +376,11 @@ connect-go and connect-rust. CI's `bench-compare` job prints them beside each ot
   [run 136](https://github.com/c4milo/connect-zig/actions/runs/43680656658) they ran 97.6% of
   the library's 8489 lines.
 - `tools/conformance_check.sh` runs the [connectrpc conformance
-  suite](https://github.com/connectrpc/conformance) v1.0.4, as CI's
-  [run 156](https://github.com/c4milo/connect-zig/actions/runs/43956832740) did on colibri v0.17.1.
-  The server passes all 3536 cases, over h11 and h2. The client passes all 10758, over h11, h2
-  and h3, in cleartext and over TLS. One client case, a timing case of the reference server,
-  may fail and is listed in `conformance/client_known_flaky.txt`.
+  suite](https://github.com/connectrpc/conformance) v1.0.7, as CI's
+  [run 160](https://github.com/c4milo/connect-zig/actions/runs/44007655863) did on colibri v0.17.3.
+  The server passes all 3714 cases, over h11 and h2. The client passes all 10711, over h11, h2
+  and h3, in cleartext and over TLS. No case is listed as known to fail or as flaky. Each half's
+  job summary holds a table of its cases by HTTP version, protocol, TLS and reference peer.
 - `tools/protobuf_conformance_check.sh` runs [Google's protobuf conformance
   suite](https://github.com/protocolbuffers/protobuf/tree/main/conformance) in binary and JSON,
   for proto3, proto2 and edition 2023. 5635 cases pass, and
