@@ -1099,6 +1099,11 @@ ran on Linux x86-64 with Zig 0.16.0.
     x86-64-v2 (26.65% fewer), and 57,175 to 42,177 on aarch64 (26.23% fewer). Small, strings
     and varints JSON encode take 2 more for each message, +0.05% to +0.16%, and large on
     aarch64 2 more for each of its 1000 records, +0.07%. No other count moved.
+  - CI's judge on `22b3767`, on x86-64-v3, in
+    [run 43982316500](https://github.com/c4milo/connect-zig/actions/runs/43982316500): tree
+    JSON encode 64,670 to 47,880 instructions, 25.96% fewer. Small, strings,
+    varints and deep JSON encode took 2 more, large 2,002 more, medium 14 more. The baseline
+    now holds these counts, and with them the cost of stdx v0.1.1 below.
   - Mutations, 8 of 9 CAUGHT: the test always true, the test inverted, and each of the five
     kinds of field left out of the test. The one NOT CAUGHT never calls `empty_object`, and
     writes the same text: the judge catches it once the baseline holds the new counts.
@@ -1120,7 +1125,8 @@ ran on Linux x86-64 with Zig 0.16.0.
     than today's code on x86-64-v2, and 7 to 8 more on aarch64. On stdx v0.1.1 that change
     takes 6.4 more and 17.0 more, so it did not land.
   - The change lands, and the judge counts again, at the colibri tag that pins a stdx with
-    that commit.
+    that commit: stdx v0.1.2, which colibri v0.17.3 pins. The baseline holds 4,969,617 since
+    run 43982316500, so a return of the 8 instructions reads as 0.16% fewer.
 
 - The pin of the conformance runner at v1.0.7 (step 25). It waits for two changes in colibri.
   - Over h11, colibri v0.17.0 and v0.17.1 close a connection with no `Connection: close` after
