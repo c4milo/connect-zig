@@ -765,3 +765,18 @@ first. Cite an entry by number in code and commits ("decision 6").
       body is fixed ahead of time. Beaten: ghz, which speaks gRPC alone, so it cannot send the
       Connect calls of issue 7. CI installs h2load from Ubuntu's `nghttp2-client` for this check
       alone, as it installs valgrind for `perf`.
+    - A second part models production traffic: one gateway core for a fleet of 33,000 servers.
+      Each server runs a Collector agent, which exports over OTLP/gRPC with gzip, the default of
+      the Collector's otlp exporter, on one TLS connection. A gateway tier of 64 cores shares the
+      connections, so one core holds 516 of them. 70% send exports of 16 spans, 25% exports of
+      128, and 5% exports of 512. The spans carry the attributes of OpenTelemetry's semantic
+      conventions for Kubernetes, HTTP, gRPC, databases and Kafka, and 2% are errors.
+    - The production part climbs: oha sends at fixed rates with its latency correction, as
+      colibri's judge measures latency, so a call's latency holds its time in a queue. A step
+      fails when p99 passes 100 ms, a call is refused, or the server takes less than 95% of the
+      step's spans. The report gives the highest step each server holds. Beaten: a peak rate
+      alone, which hides the queue, and h2load's `--rps`, which corrects no latency.
+    - Slack, whose fleet the model takes its size from, publishes no rate of spans. So the model
+      states each core's rate, and the fleet's rate divided by it gives the cores a tier needs.
+      The 516 connections, the mix and the 100 ms limit were chosen on 2026-11-17.
+    - oha v1.16.0 is pinned by SHA-256, the digest GitHub states for each release asset.

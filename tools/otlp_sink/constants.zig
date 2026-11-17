@@ -5,9 +5,10 @@
 pub const port_default = 4317;
 /// The base of the port number on the command line.
 pub const decimal = 10;
-/// TCP connections at once: twice the benchmark's. A connection past them is accepted and closed,
-/// so its client learns it at once.
-pub const tcp_connections = 32;
+/// TCP connections at once: the production model's 516, one for each of 33,000 servers over a
+/// gateway tier of 64 cores, and room for the probe. A connection past them is accepted and
+/// closed, so its client learns it at once.
+pub const tcp_connections = 528;
 /// QUIC connections at once. The benchmark sends none, but the server binds UDP too.
 pub const quic_connections = 1;
 /// Calls the router answers at once: as many as the benchmark has in flight, at most. Each call

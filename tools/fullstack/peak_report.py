@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Writes the report of tools/fullstack_check.sh (design §8 step 28) on standard output.
+"""Writes the peak report of tools/fullstack/peak.sh (design §8 step 28) on standard output.
 
-    tools/fullstack/report.py <work> <ticks> <h2load> <otelcol> <commit> <placement> <rounds>
-                              <connections> <streams> <suite>
+    tools/fullstack/peak_report.py <work> <ticks> <h2load> <otelcol> <commit> <placement> <rounds>
+                                   <connections> <streams> <suite>
 
-<work>/results holds a line for each round of a server and an export: the spans, the server, the
+<work>/peak-results holds a line for each round of a server and an export: the spans, the server, the
 calls a second, the latency at p50 and p99 in microseconds, the server's CPU ticks over the
 measured calls, the measured calls, and the server's peak memory in KiB. <ticks> is the ticks of a
 second of CPU time. Each cell of the table is the median of the rounds, taken for each measure
@@ -12,8 +12,9 @@ alone.
 """
 import os
 import statistics
-import subprocess
 import sys
+
+from machine import machine
 
 work, ticks, h2load, otelcol, commit, placement, rounds, connections, streams, suite = sys.argv[1:11]
 ticks = int(ticks)
@@ -24,7 +25,7 @@ kib = 1024
 prefix_len = 5
 
 rows = {}
-for line in open(os.path.join(work, "results")):
+for line in open(os.path.join(work, "peak-results")):
     spans, server, rate, p50, p99, cpu_ticks, calls, peak = line.split()
     rows.setdefault((int(spans), server), []).append({
         "rate": float(rate),
@@ -40,15 +41,8 @@ def median(spans, server, key):
     return statistics.median(values) if values else None
 
 
-def machine():
-    """The CPU's model and the cores, as lscpu names them."""
-    found = subprocess.run(["lscpu"], capture_output=True, text=True).stdout
-    model = next((line.split(":", 1)[1].strip() for line in found.splitlines() if line.startswith("Model name:")), "unknown")
-    return f"{model}, {os.cpu_count()} cores, Linux {os.uname().release}"
-
-
 spans_list = sorted({spans for spans, _ in rows})
-print("## Full stack: OTLP's trace export over TLS and h2")
+print("## Full stack, peak: OTLP's trace export over TLS and h2")
 print()
 print("Each server answers OTLP's `TraceService/Export` over gRPC on a socket, and h2load sends each")
 print("the same export. Each cell is the median of the rounds, and each round checked every span.")

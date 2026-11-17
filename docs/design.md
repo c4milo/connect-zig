@@ -241,6 +241,11 @@ Each step names the check that proves it. A step is done when its check passes i
     and peak memory (decision 44). New public names: none. Check: one export through `buf curl`
     answers with OTLP's full success, and each server's count of the spans it took equals the
     spans it was sent, with none refused.
+29. **The production model.** `tools/fullstack/production.sh` loads each server as one gateway
+    core of a fleet of 33,000 servers: 516 TLS connections, gzip exports of 16, 128 and 512
+    spans from 70%, 25% and 5% of them, under oha at rates that climb until p99 passes 100 ms
+    or a call is refused (decision 44). The sink reads gzip and holds 528 connections. New public
+    names: none. Check: the probes and the counts of step 28, over the whole climb.
 
 ### Step records
 

@@ -173,12 +173,13 @@ confirm a test fails. Report `CAUGHT` or `NOT CAUGHT` per mutation in the commit
   openssl.
 - Guide: `zig build guide` installs pepegrillo's performance method and API guide to
   `zig-out/docs`, at the commit `build.zig.zon` pins.
-- Full stack: `tools/fullstack_check.sh` loads connect-zig's OTLP sink, `zig build otlp-sink`,
-  and OpenTelemetry's Collector v0.165.0, pinned by SHA-256, with the same OTLP exports over
-  gRPC, TLS 1.3 and h2, under h2load, each server on one core (decision 44). It prints a table of
-  calls a second, latency, CPU time a call and peak memory, and fails when a server answered an
-  export wrongly or did not take every span. It runs on Linux and needs h2load, buf, python3 and
-  curl.
+- Full stack: `tools/fullstack_check.sh [peak] [production]` loads connect-zig's OTLP sink, `zig
+  build otlp-sink`, and OpenTelemetry's Collector v0.165.0 with the same OTLP exports over gRPC,
+  TLS 1.3 and h2, each server on one core (decision 44). `peak` runs h2load as fast as each server
+  answers. `production` runs oha, pinned by SHA-256 as the Collector is, as one gateway core of
+  33,000 servers takes traffic: 516 connections and a mix of gzip exports, at rates that climb
+  until p99 passes 100 ms. It fails when a server answered an export wrongly or did not take
+  every span. It runs on Linux and needs h2load, buf, python3 and curl.
 - Performance: `tools/perf_check.sh` counts each benchmark operation's instructions under
   callgrind against `bench/instructions.txt` and fails past 2%; `--write` records a new baseline,
   which the commit that pays for it explains. It needs valgrind.

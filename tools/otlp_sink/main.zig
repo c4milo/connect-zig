@@ -6,6 +6,7 @@
 //! killed.
 const std = @import("std");
 const builtin = @import("builtin");
+const connect = @import("connect");
 const server = @import("server");
 const colibri = @import("colibri");
 const tls = @import("tls");
@@ -31,18 +32,21 @@ const Router = server.Router(App, .{
 
 const Server = colibri.Server(.{ .tcp_connections = constants.tcp_connections, .quic_connections = constants.quic_connections }, .private);
 
-/// All the program holds, which `main` allocates once before the first call (decision 42).
+/// All the program holds, which `main` allocates once before the first call (decision 42). The
+/// production model sends gzip, as the Collector's otlp exporter does by default, so the sink
+/// reads it.
 const State = struct {
     http_server: Server,
     router: Router,
     app: App,
+    gzip_decoder: connect.GzipDecoder,
 };
 
 pub fn main(init: std.process.Init) !void {
     const port = try port_of(init);
     const state = try init.arena.allocator().create(State);
     state.router = .{};
-    state.app = .{};
+    state.app = .{ .codings = .{ .decoders = .{ .gzip = &state.gzip_decoder } } };
     const cpu = probe();
     // The Unix time when the server starts, which its TLS session tickets carry.
     const unix_seconds: u64 = @intCast(@max(std.Io.Clock.real.now(init.io).toSeconds(), 0));
