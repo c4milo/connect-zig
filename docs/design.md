@@ -1121,25 +1121,23 @@ ran on Linux x86-64 with Zig 0.16.0.
     Go's client read "unexpected EOF", the fault of v0.17.0, now rare. 60 runs with traces did
     not show it again. colibri's session has the report.
 
-### What a later step owes
+- **base64's pad bits in stdx's decoder** (decision 10 as amended on 2026-11-10). On stdx
+  v0.1.2. proto3 JSON reads a last base64 letter whose pad bits are set, as protobuf's parsers
+  do. connect-zig read such a text in a fallback of its own, after stdx's decoder refused it.
+  stdx's `pad_bits = .drop` now drops the bits, and the fallback's four functions go.
+  - stdx v0.1.1 made the decoder's `init` inline, but kept its options, and whether the CPU has
+    AVX2, in fields of one or two bits. Zig 0.16 stores such a field at its width and loads it
+    as an octet, and LLVM carries no such store to the load. So a decode knew its options at
+    compile time only when each was zero. stdx v0.1.2 keeps each as a whole octet.
+  - CI's judge counted large JSON decode at 4,969,617 instructions on stdx v0.1.1, 8 more for
+    each of its 1000 bytes fields than on stdx `22f5139`; the baseline holds that count.
+  - Local judges, with stdx v0.1.2's decoder: large JSON decode takes 26 instructions a field
+    fewer than the fallback's code on x86-64-v2, and 8 more on aarch64; 5 of those 8 come from
+    the function's shape once the fallback's call goes. CI's judge counts x86-64-v3.
+  - Mutations, 4 of 4 CAUGHT: pad bits refused, the standard alphabet alone, padding required,
+    and a refused text passed as an empty field.
 
-- The base64 change of stdx v0.1.1, and 8 instructions a bytes field on the judge. CI's
-  [run 156](https://github.com/c4milo/connect-zig/actions/runs/43956832740) counted large JSON
-  decode at 4,969,617 instructions on stdx v0.1.1, where the baseline on stdx `22f5139` is
-  4,961,617: 8 more for each of its 1000 bytes fields, +0.16%. The local judge counts
-  x86-64-v2, and saw no count move.
-  - stdx v0.1.1 made the base64 decoder's `init` inline. The decoder keeps its options, and
-    whether the CPU has AVX2, in fields of one or two bits. Zig 0.16 stores such a field at its
-    width and loads it as an octet, and LLVM carries no such store to the load. So a decode
-    knows its options at compile time only when each of them is zero, and on x86-64-v3 the AVX2
-    field is not.
-  - stdx `847345cb`, on a branch, keeps each of those fields as a whole octet. With it,
-    `pad_bits = .drop` and no fallback of connect-zig's own takes 26 instructions a field fewer
-    than today's code on x86-64-v2, and 7 to 8 more on aarch64. On stdx v0.1.1 that change
-    takes 6.4 more and 17.0 more, so it did not land.
-  - The change lands, and the judge counts again, at the colibri tag that pins a stdx with
-    that commit: stdx v0.1.2, which colibri v0.17.3 pins. The baseline holds 4,969,617 since
-    run 43982316500, so a return of the 8 instructions reads as 0.16% fewer.
+### What a later step owes
 
 - The pin of the conformance runner at v1.0.7 (step 25). It waits for two changes in colibri.
   - Over h11, colibri v0.17.0 and v0.17.1 close a connection with no `Connection: close` after
