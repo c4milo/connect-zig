@@ -1227,6 +1227,16 @@ ran on Linux x86-64 with Zig 0.16.0.
     order the builds, and the published ones come from CI (docs/performance.md). At 16 spans:
     36,152 calls a second on v0.18.0's tree and 62,102 on the fix, at 27 and 16 µs of CPU a
     call. At 512 spans: 819 and 1,997 calls a second, at 1,220 and 495 µs.
+  - CI's [run 169](https://github.com/c4milo/connect-zig/actions/runs/44076765191) on `87b91d5`,
+    a Xeon Platinum 8370C. The judge, x86-64-v3: each routed call takes 13 instructions more
+    (+0.3%), the medium call 23 more, and no codec count moved. The small call takes 4,460
+    instructions in a table of 256 routes, +5.3% on one route, and 4,965 in gRPC, +4.7%. The
+    baseline holds them.
+  - The full stack in run 169: at 16 spans connect-zig answered 3.12 times the Collector's
+    calls a second, and at 512 spans 1.80 times; in run 168, on v0.17.3 and an EPYC 9V45, 2.23
+    and 1.26 times. In the production model connect-zig held 427,128 spans a second on one core,
+    at p99 2.55 ms, and the Collector 142,402, at p99 25.21 ms. A burst filled the sink's 64
+    calls at 569,600 spans a second, with its core 94% busy, and a call was refused.
 
 ### What a later step owes
 
