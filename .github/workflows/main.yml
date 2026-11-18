@@ -122,7 +122,7 @@ jobs:
             ~/go/pkg/mod
             ~/.cargo/registry
             interop/typescript/node_modules
-          key: deps-${{ matrix.check }}-${{ runner.arch }}-${{ hashFiles('interop/*/go.sum', 'interop/*/package-lock.json', 'interop/*/Cargo.lock', 'interop/*/requirements.txt', 'tools/*.txt', 'bench/go/go.sum', 'bench/rust/Cargo.lock') }}
+          key: deps-${{ matrix.check }}-${{ runner.arch }}-${{ hashFiles('interop/*/go.sum', 'interop/*/package-lock.json', 'interop/*/Cargo.lock', 'interop/*/requirements.txt', 'tools/*.txt', 'bench/go/go.sum', 'bench/rust/Cargo.lock', 'tools/fullstack/*/go.sum', 'tools/fullstack/*/Cargo.lock') }}
           restore-keys: |
             deps-${{ matrix.check }}-${{ runner.arch }}-
       - name: Run the check

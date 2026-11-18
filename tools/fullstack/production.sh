@@ -107,7 +107,7 @@ production_climb() {
 : >"${work}/production-results"
 for transport in tls cleartext; do
     case "${transport}" in
-        tls) servers="connect-zig collector vector" ;;
+        tls) servers="connect-zig collector vector connect-go connect-rust" ;;
         *) servers="connect-zig collector rotel" ;;
     esac
     for server in ${servers}; do
@@ -115,7 +115,8 @@ for transport in tls cleartext; do
     done
     python3 tools/fullstack/production_report.py "${work}/production-results" "${transport}" \
         "$(getconf CLK_TCK)" "$("${oha}" --version | head -1)" "${collector}" "${vector_text}" \
-        "${rotel_text}" "${commit}" "${placement}" "${step_seconds}" "${warm_seconds}" \
+        "${rotel_text}" "${connect_go_text}" "${connect_rust_text}" "${commit}" "${placement}" \
+        "${step_seconds}" "${warm_seconds}" \
         "${p99_limit_ms}" "${tls_suite}" ${production_classes}
     echo
 done

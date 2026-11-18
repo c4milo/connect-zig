@@ -1,0 +1,19 @@
+# The Go code of OpenTelemetry's trace export, which tools/fullstack_check.sh generates into gen/
+# before it builds the receiver, with the plugins it builds at the versions go.mod pins.
+version: v2
+managed:
+  enabled: true
+  override:
+    - file_option: go_package_prefix
+      value: github.com/c4milo/connect-zig/tools/fullstack/connect-go/gen
+inputs:
+  - directory: ../../../examples/otlp/proto
+    paths:
+      - ../../../examples/otlp/proto/opentelemetry
+plugins:
+  - local: protoc-gen-go
+    out: gen
+    opt: paths=source_relative
+  - local: protoc-gen-connect-go
+    out: gen
+    opt: paths=source_relative

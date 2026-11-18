@@ -179,9 +179,11 @@ confirm a test fails. Report `CAUGHT` or `NOT CAUGHT` per mutation in the commit
   answers. `production` runs oha, pinned by SHA-256 as the Collector is, as one gateway core of
   33,000 servers takes traffic: 516 connections and a mix of gzip exports, at rates that climb
   until p99 passes 100 ms. Vector v0.62.0, in Rust, joins both over TLS, and Rotel v0.2.7, in
-  Rust with no receiver TLS, joins a second climb in cleartext. It fails when a server answered
-  an export wrongly or did not take every span. It runs on Linux and needs h2load, buf, python3
-  and curl.
+  Rust with no receiver TLS, joins a second climb in cleartext. Receivers on connect-go and
+  connect-rust, `tools/fullstack/connect-go` and `tools/fullstack/connect-rust`, join both over
+  TLS (decision 46); the check builds them into the cache, unless `CONNECT_GO` and
+  `CONNECT_RUST` name built ones. It fails when a server answered an export wrongly or did not
+  take every span. It runs on Linux and needs h2load, buf, python3, curl, go and cargo.
 - Performance: `tools/perf_check.sh` counts each benchmark operation's instructions under
   callgrind against `bench/instructions.txt` and fails past 2%; `--write` records a new baseline,
   which the commit that pays for it explains. It needs valgrind.

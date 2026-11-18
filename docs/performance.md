@@ -21,8 +21,9 @@ paid for.
   it fails only when the octets differ, never on a time. The README's table comes from one named
   run of that job.
 - **The full stack is a time too.** `tools/fullstack_check.sh` loads whole servers on a socket:
-  connect-zig's OTLP sink, OpenTelemetry's Collector, and Vector and Rotel in Rust, each on one
-  core, with the load on two others (decision 44). Its peak part reports calls a second,
+  connect-zig's OTLP sink, OpenTelemetry's Collector, Vector and Rotel in Rust, and receivers on
+  connect-go and connect-rust, each on one core, with the load on two others (decisions 44 and
+  46). Its peak part reports calls a second,
   latency, CPU time a call and peak memory under h2load, over TLS. Its production part gives the
   span rate one gateway core holds for 33,000 servers, under oha at climbing rates, with p99 at
   most 100 ms: over TLS beside Vector, and in cleartext beside Rotel. After the first step that

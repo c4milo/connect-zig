@@ -3,8 +3,8 @@
 standard output.
 
     tools/fullstack/production_report.py <results> <transport> <ticks> <oha> <otelcol> <vector>
-                                         <rotel> <commit> <placement> <seconds> <warm> <limit_ms>
-                                         <suite> <spans:connections>...
+                                         <rotel> <connect-go> <connect-rust> <commit> <placement>
+                                         <seconds> <warm> <limit_ms> <suite> <spans:connections>...
 
 <results> holds a line for each step of each server's climb: "step", the transport, the server,
 the exports a connection a second, the spans of the calls answered 200, the measured calls a
@@ -17,14 +17,17 @@ import sys
 
 from machine import machine
 
-results, transport, ticks, oha, otelcol, vector, rotel, commit, placement, seconds, warm, limit_ms, suite = sys.argv[1:14]
+results, transport, ticks, oha, otelcol, vector, rotel, connect_go, connect_rust, commit, placement, seconds, warm, limit_ms, suite = sys.argv[1:16]
 ticks, seconds, warm, limit_ms = int(ticks), float(seconds), float(warm), float(limit_ms)
-classes = [tuple(int(part) for part in item.split(":")) for item in sys.argv[14:]]
-names = {"connect-zig": "connect-zig", "collector": "Collector", "vector": "Vector", "rotel": "Rotel"}
+classes = [tuple(int(part) for part in item.split(":")) for item in sys.argv[16:]]
+names = {"connect-zig": "connect-zig", "collector": "Collector", "vector": "Vector", "rotel": "Rotel",
+         "connect-go": "connect-go", "connect-rust": "connect-rust"}
 setups = {
     "collector": f"{otelcol}, GOMAXPROCS=1, its OTLP receiver into its nop exporter",
     "vector": f"{vector}, one thread, its opentelemetry source into its blackhole sink",
     "rotel": f"{rotel}, its OTLP receiver into its blackhole exporter",
+    "connect-go": f"{connect_go}, GOMAXPROCS=1, a receiver that counts spans (`tools/fullstack/connect-go`)",
+    "connect-rust": f"{connect_rust}, one tokio worker, a receiver that counts spans (`tools/fullstack/connect-rust`)",
 }
 # The fleet the model stands for, and the gateway cores that share its connections.
 fleet_servers = 33_000

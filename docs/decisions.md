@@ -831,3 +831,28 @@ first. Cite an entry by number in code and commits ("decision 6").
       metrics endpoint. A second Collector takes them and shows them to Prometheus. Beaten: a TLS
       proxy before Rotel, which the climb would measure too, and Rotel's log of each call, which
       costs it CPU that the other servers do not pay.
+
+46. **The full-stack benchmark loads receivers on connect-go and connect-rust beside the sink.**
+    Ruled by the owner on 2026-11-18, for issue 7.
+    - The routed call (design §8 step 23) compares connect-zig with connect-go and connect-rust in
+      memory, with no socket, TLS or HTTP/2. The full stack (decision 44) puts sockets, TLS and
+      HTTP/2 in, beside OTLP products with pipelines of their own. Neither shows how much of the
+      library's lead survives the transport.
+    - So two receivers join the full-stack check: `tools/fullstack/connect-go`, on connect-go
+      and `net/http`, and `tools/fullstack/connect-rust`, on connect-rust's `connectrpc` server,
+      hyper and rustls. Each serves TraceService/Export over TLS with the test identity, counts
+      each export's spans and drops it, as `tools/otlp_sink` does. connect-go decodes each export
+      into Go's structs; connect-rust into Buffa's view of the request's octets.
+    - Each runs alone on one core: connect-go with GOMAXPROCS=1, and connect-rust with
+      TOKIO_WORKER_THREADS=1. Both join the peak part and the climb over TLS, under the probes and
+      the counts of step 28. connect-go answers `GET /sink/count` as the sink does. connect-rust's
+      server has no plain route, so a thread on a second port answers the counts; it waits in
+      `accept` while the load runs.
+    - The check builds both into the cache: connect-go with the modules its go.sum pins, and
+      connect-rust in release with the crates its Cargo.lock pins. connect-rust's server sets
+      TCP_NODELAY, so it has no 40 ms floor.
+    - Beaten: a second harness that loads the interop servers with `Echo` of
+      `coverage.v1.Everything`. It measured the same libraries over the same transport, and adds
+      only the Connect protocol and a large reply. It needed a second check, a second chart, and
+      a CPU probe in the interop server, which runs ChaCha20 alone. Beaten too: one cipher suite,
+      ChaCha20, for every server, which Go and rustls choose only on a CPU with no AES hardware.

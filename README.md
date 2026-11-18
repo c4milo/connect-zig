@@ -422,6 +422,11 @@ OTLP exports. The servers:
   `otlp` codec keeps OTLP's form, but answered fewer than half the calls a second.
 - [Rotel](https://github.com/streamfold/rotel) v0.2.7, the OpenTelemetry collector in Rust, with
   its OTLP receiver and its `blackhole` exporter. Its receiver has no TLS.
+- Receivers on the other Connect libraries:
+  [connect-go](https://github.com/connectrpc/connect-go) v1.18.1 on `net/http`, and
+  [connect-rust](https://github.com/connectrpc/connect-rust) v0.9.1 on hyper and rustls
+  (`tools/fullstack/connect-go` and `tools/fullstack/connect-rust`). Each counts the spans of
+  each export and drops it, as connect-zig's receiver does.
 
 Each server decodes and checks every span, counts it and drops it. Each runs on one core, the
 Collector with `GOMAXPROCS=1` and Vector with one thread, and the load runs on two other cores.

@@ -1,11 +1,13 @@
 #!/bin/sh
-# The full-stack benchmark (design §8 steps 28 to 30, decision 44): whole servers on real sockets,
-# over h2. Each server answers OTLP's TraceService/Export over gRPC and drops what it reads:
-# connect-zig's OTLP sink (tools/otlp_sink); OpenTelemetry's Collector, with its OTLP receiver and
-# its nop exporter; and two servers in Rust, Vector with its blackhole sink, and Rotel with its
-# blackhole exporter. Each server runs alone on one core, the Collector with GOMAXPROCS=1 and
-# Vector with one thread, and the load runs on two other cores, as colibri's judge places them
-# (colibri decision 33).
+# The full-stack benchmark (design §8 steps 28 to 31, decisions 44 and 46): whole servers on real
+# sockets, over h2. Each server answers OTLP's TraceService/Export over gRPC and drops what it
+# reads: connect-zig's OTLP sink (tools/otlp_sink); OpenTelemetry's Collector, with its OTLP
+# receiver and its nop exporter; two servers in Rust, Vector with its blackhole sink, and Rotel
+# with its blackhole exporter; and receivers on two other Connect libraries, connect-go and
+# connect-rust (tools/fullstack/connect-go and tools/fullstack/connect-rust), which count spans
+# as the sink does. Each server runs alone on one core, the Collector and connect-go with
+# GOMAXPROCS=1, Vector with one thread, and connect-rust with one tokio worker. The load runs on
+# two other cores, as colibri's judge places them (colibri decision 33).
 #
 #   tools/fullstack_check.sh [peak] [production] > report.md
 #
@@ -15,17 +17,19 @@
 #   on 16 connections of 4 streams, as fast as each server answers.
 # - production (tools/fullstack/production.sh): the traffic of one gateway core for a fleet of
 #   33,000 servers. oha sends a mix of gzip exports on 516 connections, at rates that climb until
-#   p99 passes 100 ms or a call is refused: over TLS to connect-zig, the Collector and Vector,
-#   then in cleartext to connect-zig, the Collector and Rotel, whose receiver has no TLS.
+#   p99 passes 100 ms or a call is refused: over TLS to connect-zig, the Collector, Vector,
+#   connect-go and connect-rust, then in cleartext to connect-zig, the Collector and Rotel, whose
+#   receiver has no TLS.
 #
 # Each part checks every answer. One export through buf curl must answer with OTLP's full success,
 # and each server's own count of spans must equal the spans it was sent, with none refused. The
 # times report and never gate.
 #
 # It runs on Linux, where /proc gives a process's CPU time and peak memory. It needs h2load
-# (nghttp2-client), buf, python3 and curl; H2LOAD and BUF name them. It downloads the Collector,
-# Vector, Rotel and oha, each pinned by SHA-256, into a cache, unless OTELCOL, VECTOR, ROTEL and
-# OHA name them. It builds the sink with -Drelease, unless OTLP_SINK names one.
+# (nghttp2-client), buf, python3, curl, go and cargo; H2LOAD and BUF name the first two. It
+# downloads the Collector, Vector, Rotel and oha, each pinned by SHA-256, into a cache, unless
+# OTELCOL, VECTOR, ROTEL and OHA name them. It builds the sink with -Drelease, unless OTLP_SINK
+# names one, and the two receivers, unless CONNECT_GO and CONNECT_RUST name them.
 set -eu
 cd "$(dirname "$0")/.."
 # The reports import tools/fullstack/machine.py, and Python leaves no cache of it in the tree.
@@ -71,6 +75,9 @@ rotel_http_port=14320
 vector_port=14321
 vector_http_port=14322
 vector_metrics_port=18891
+connect_go_port=14323
+connect_rust_port=14324
+connect_rust_count_port=18892
 counter_port=14390
 counter_metrics_port=18890
 # The server on core 1 and the load on cores 2 and 3, where the machine has 4.
@@ -117,6 +124,36 @@ vector="${VECTOR:-$(fetch "vector-${vector_version}-${arch}" \
 rotel="${ROTEL:-$(fetch "rotel-${rotel_version}-${arch}" \
     "https://github.com/streamfold/rotel/releases/download/${rotel_version}/rotel_${rotel_version}_${triple}.tar.gz" \
     "${rotel_sha256}" rotel)}"
+# The receivers on Connect libraries (decision 46): connect-go, built with the plugins and the
+# modules its go.sum pins, and connect-rust, in release, with the crates its Cargo.lock pins. Each
+# build lives in the cache, outside the repository, unless CONNECT_GO and CONNECT_RUST name one.
+cache="${XDG_CACHE_HOME:-${HOME}/.cache}/connect-zig"
+connect_go="${CONNECT_GO:-}"
+if [ -z "${connect_go}" ]; then
+    bin="${cache}/fullstack-connect-go-$(sha256sum tools/fullstack/connect-go/go.sum | cut -c1-12)"
+    mkdir -p "${bin}"
+    (
+        cd tools/fullstack/connect-go
+        export GOFLAGS=-mod=readonly
+        go build -o "${bin}/protoc-gen-go" google.golang.org/protobuf/cmd/protoc-gen-go
+        go build -o "${bin}/protoc-gen-connect-go" connectrpc.com/connect/cmd/protoc-gen-connect-go
+        PATH="${bin}:${PATH}" "${buf}" generate
+        go build -o "${bin}/connect-go" .
+    ) >&2
+    connect_go="${bin}/connect-go"
+fi
+connect_rust="${CONNECT_RUST:-}"
+if [ -z "${connect_rust}" ]; then
+    target="${cache}/fullstack-connect-rust-target"
+    mkdir -p "${target}"
+    # The descriptors move only when the schema does, so Cargo builds the crate again only then.
+    "${buf}" build examples/otlp/proto --as-file-descriptor-set -o "${target}/otlp.new.binpb"
+    cmp -s "${target}/otlp.new.binpb" "${target}/otlp.binpb" ||
+        mv "${target}/otlp.new.binpb" "${target}/otlp.binpb"
+    OTLP_DESCRIPTORS="${target}/otlp.binpb" CARGO_TARGET_DIR="${target}" cargo build --quiet \
+        --locked --release --manifest-path tools/fullstack/connect-rust/Cargo.toml >&2
+    connect_rust="${target}/release/fullstack-connect-rust"
+fi
 sink="${OTLP_SINK:-}"
 if [ -z "${sink}" ]; then
     zig build otlp-sink -Drelease >&2
@@ -126,6 +163,8 @@ commit="$(git rev-parse --short HEAD 2>/dev/null || echo unknown)"
 collector="$("${otelcol}" --version)"
 vector_text="$("${vector}" --version | cut -d' ' -f1-2)"
 rotel_text="$("${rotel}" --version)"
+connect_go_text="connect-go $(awk '$1 == "connectrpc.com/connect" { print $2 }' tools/fullstack/connect-go/go.mod)"
+connect_rust_text="connect-rust $(awk '$0 == "name = \"connectrpc\"" { getline; gsub(/"/, "", $3); print "v" $3 }' tools/fullstack/connect-rust/Cargo.lock)"
 
 work="$(mktemp -d)"
 server_pid=""

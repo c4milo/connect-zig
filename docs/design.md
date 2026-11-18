@@ -254,6 +254,10 @@ Each step names the check that proves it. A step is done when its check passes i
     takes a second argument, `cleartext`, and then serves with no identity (decision 44). New
     public names: none. Check: the probes and the counts of step 28, with Vector's events and
     Rotel's internal metrics.
+31. **Other Connect libraries.** Receivers on connect-go and connect-rust join the peak part and
+    the climb over TLS, each on one core (decision 46, issue 7). Each counts the spans it took and
+    answers the counts, connect-rust on a port of its own. New public names: none. Check: the
+    probes and the counts of step 28.
 
 ### Step records
 

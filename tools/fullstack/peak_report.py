@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Writes the peak report of tools/fullstack/peak.sh (design §8 step 28) on standard output.
 
-    tools/fullstack/peak_report.py <work> <ticks> <h2load> <otelcol> <vector> <commit> <placement>
-                                   <rounds> <connections> <streams> <suite>
+    tools/fullstack/peak_report.py <work> <ticks> <h2load> <otelcol> <vector> <connect-go>
+                                   <connect-rust> <commit> <placement> <rounds> <connections>
+                                   <streams> <suite>
 
 <work>/peak-results holds a line for each round of a server and an export: the spans, the server, the
 calls a second, the latency at p50 and p99 in microseconds, the server's CPU ticks over the
@@ -16,9 +17,10 @@ import sys
 
 from machine import machine
 
-work, ticks, h2load, otelcol, vector, commit, placement, rounds, connections, streams, suite = sys.argv[1:12]
+work, ticks, h2load, otelcol, vector, connect_go, connect_rust, commit, placement, rounds, connections, streams, suite = sys.argv[1:14]
 ticks = int(ticks)
-servers = [("connect-zig", "connect-zig"), ("collector", "Collector"), ("vector", "Vector")]
+servers = [("connect-zig", "connect-zig"), ("collector", "Collector"), ("vector", "Vector"),
+           ("connect-go", "connect-go"), ("connect-rust", "connect-rust")]
 microseconds = 1_000_000
 kib = 1024
 # The octets of gRPC's prefix before each message (gRPC over HTTP/2, "Requests").
@@ -71,5 +73,7 @@ print()
 print(f"Machine: {machine()}.")
 print(f"Load: {h2load}, {connections} connections of {streams} streams each, {suite}; {placement}.")
 print(f"Servers: connect-zig {commit} in ReleaseSafe, `tools/otlp_sink`; {otelcol}, GOMAXPROCS=1, its OTLP")
-print(f"receiver into its nop exporter; {vector}, one thread, its opentelemetry source into its blackhole sink.")
+print(f"receiver into its nop exporter; {vector}, one thread, its opentelemetry source into its blackhole sink;")
+print(f"{connect_go}, GOMAXPROCS=1, and {connect_rust}, one tokio worker, each a receiver that counts spans")
+print("(`tools/fullstack/connect-go`, `tools/fullstack/connect-rust`).")
 print(f"Rounds: {rounds}.")

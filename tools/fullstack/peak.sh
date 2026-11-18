@@ -1,12 +1,13 @@
 # shellcheck shell=sh
 # The peak part of tools/fullstack_check.sh (design §8 step 28, decision 44), which sources this
 # file: over TLS, h2load sends one export, again and again, on 16 connections of 4 streams, as
-# fast as each server answers: connect-zig, the Collector and Vector. The exports hold 16 spans
+# fast as each server answers: connect-zig, the Collector, Vector, and the receivers on connect-go
+# and connect-rust. The exports hold 16 spans
 # and 512, from tools/fullstack/otlp_request.py. Each round starts each server again, in turns,
 # and the report gives the median of the rounds.
 
 peak_spans="16 512"
-peak_servers="connect-zig collector vector"
+peak_servers="connect-zig collector vector connect-go connect-rust"
 peak_rounds=3
 # The requests of each round for each export, after warm requests that are never counted.
 peak_requests_of() { case "$1" in 16) echo 40000 ;; *) echo 4000 ;; esac; }
@@ -76,6 +77,6 @@ for round in $(seq 1 "${peak_rounds}"); do
 done
 loader="$("${h2load}" --version | head -1)"
 python3 tools/fullstack/peak_report.py "${work}" "$(getconf CLK_TCK)" "${loader}" \
-    "${collector}" "${vector_text}" "${commit}" "${placement}" "${peak_rounds}" \
-    "${peak_connections}" "${peak_streams}" "${tls_suite}"
+    "${collector}" "${vector_text}" "${connect_go_text}" "${connect_rust_text}" "${commit}" \
+    "${placement}" "${peak_rounds}" "${peak_connections}" "${peak_streams}" "${tls_suite}"
 echo

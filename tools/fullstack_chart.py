@@ -25,7 +25,11 @@ looks = {
     "Collector": ("OpenTelemetry Collector", "--otel"),
     "Vector": ("Vector", "--vector"),
     "Rotel": ("Rotel", "--rotel"),
+    "connect-go": ("connect-go", "--go"),
+    "connect-rust": ("connect-rust", "--rust"),
 }
+# The Connect libraries, which the title names when the table holds them (decision 46).
+libraries = ("connect-go", "connect-rust")
 limit_ms = 100
 
 
@@ -62,14 +66,24 @@ if "connect-zig" not in held or len(servers) < 2 or not steps:
     sys.exit(f"{log_path}: no production table {over} with connect-zig and another server")
 
 others = [name for name in servers if name != "connect-zig"]
+# Four ratios do not fit one title, so a table with the Connect libraries names them alone, and
+# each bar gives its own ratio.
+titled = [name for name in others if name in libraries] or others
 ratios = [f"{held['connect-zig']['spans'] / held[name]['spans']:.1f} times {'the ' if name == 'Collector' else ''}{name}'s"
-          for name in others]
+          for name in titled]
+# The longest title the chart's width holds at its font: a longer one leaves out the limit, which
+# the subtitle states.
+title_len_max = 90
 title = f"One core holds {' and '.join(ratios)} spans a second, with p99 under {limit_ms} ms"
+if len(title) > title_len_max:
+    title = f"One core holds {' and '.join(ratios)} spans a second"
 
-W, H = 840, 340
 pad_l = 24
 legend_y = 112
 top = 168
+bar_h, bar_gap = 20, 22
+# The chart grows when its bars pass its foot.
+W, H = 840, max(340, top + 12 + len(servers) * (bar_h + bar_gap) + 8)
 plot_h = 128
 bar_left, bar_w = pad_l + 104, 210
 line_left, line_right = 448, 800
@@ -101,9 +115,9 @@ climb = "; ".join(
 spans = ", ".join(f"{name} {held[name]['spans']:,.0f} spans a second at p99 {held[name]['p99']:g} ms" for name in servers)
 a(f'<desc id="d">{title}. {spans}. p99 at each step: {climb}.</desc>')
 a('''<style>
-svg { --surface:#fcfcfb; --ink:#0b0b0b; --ink2:#52514e; --muted:#8a8984; --grid:#e4e3df; --zig:#2a78d6; --otel:#b07d00; --vector:#b8407f; --rotel:#722626; }
+svg { --surface:#fcfcfb; --ink:#0b0b0b; --ink2:#52514e; --muted:#8a8984; --grid:#e4e3df; --zig:#2a78d6; --otel:#b07d00; --vector:#b8407f; --rotel:#722626; --go:#1a8a82; --rust:#b5562b; }
 @media (prefers-color-scheme: dark) {
-  svg { --surface:#1a1a19; --ink:#f0efec; --ink2:#c3c2b7; --muted:#8f8e86; --grid:#33332f; --zig:#3987e5; --otel:#c99512; --vector:#d0599a; --rotel:#b84545; }
+  svg { --surface:#1a1a19; --ink:#f0efec; --ink2:#c3c2b7; --muted:#8f8e86; --grid:#33332f; --zig:#3987e5; --otel:#c99512; --vector:#d0599a; --rotel:#b84545; --go:#2fa59c; --rust:#d06d3f; }
 }
 text { font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; fill: var(--ink); }
 .title { font-size: 16px; font-weight: 600; }
@@ -128,7 +142,6 @@ for name in servers:
     legend_x += 18 + 7 * len(label) + 24
 
 a(f'<text class="panel" x="{pad_l}" y="{top - 14}">Spans a second one core holds</text>')
-bar_h, bar_gap = 20, 22
 spans_high = max(item["spans"] for item in held.values())
 for index, name in enumerate(servers):
     fill = looks[name][1]
@@ -138,7 +151,8 @@ for index, name in enumerate(servers):
     a(f'<text class="row" x="{bar_left - 10}" y="{y + bar_h / 2 + 4:.1f}" text-anchor="end">{name}</text>')
     a(f'<path d="M{bar_left},{y} h{width - radius:.1f} a{radius},{radius} 0 0 1 {radius},{radius} v{bar_h - 2 * radius} '
       f'a{radius},{radius} 0 0 1 {-radius},{radius} h{-(width - radius):.1f} z" fill="var({fill})"/>')
-    a(f'<text class="val" x="{bar_left + 4:.1f}" y="{y + bar_h + 13}">{held[name]["spans"]:,.0f} spans/s, p99 {held[name]["p99"]:g} ms</text>')
+    ratio = "" if name == "connect-zig" else f", connect-zig {held['connect-zig']['spans'] / held[name]['spans']:.1f}×"
+    a(f'<text class="val" x="{bar_left + 4:.1f}" y="{y + bar_h + 13}">{held[name]["spans"]:,.0f} spans/s, p99 {held[name]["p99"]:g} ms{ratio}</text>')
 
 a(f'<text class="panel" x="{line_left - 40}" y="{top - 14}">p99 as the rate climbs</text>')
 for ms in (1, 10, 100, 1000):
