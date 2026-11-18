@@ -67,6 +67,11 @@ pub const limits = struct {
     /// The length a nested message's prefix takes when the JSON transcoder writes it before it
     /// knows the length: 5 bytes hold any length below 2^35, padded with continuation bits.
     pub const padded_length_len = 5;
+    /// The most entries of one map that JSON encode checks for a key that a later entry holds
+    /// again. A JSON object holds each name once, and a map's last entry of a key wins ("Maps",
+    /// language guide), so JSON encode leaves out each earlier one. The check compares each pair
+    /// of entries, at most 32,640 here, so a larger map is written as it was received.
+    pub const json_map_entries_checked_max = 256;
     /// The deepest nesting of JSON values the transcoder follows.
     pub const json_depth_max = depth_max;
     /// The most decimal digits the JSON integer fast path reads. Any 19 digits fit in a u64, as

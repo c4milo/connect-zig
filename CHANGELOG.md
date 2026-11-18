@@ -10,6 +10,13 @@ change the public API, and the entry marks each change that does.
 
 ## Unreleased
 
+### Fixed
+
+- JSON encode writes a map key once, with its last entry's value, as protobuf's map rule says.
+  Before, a map read from binary with a key twice wrote the key twice, which Go's protojson
+  refuses. A map of more than 256 entries is written as received. Google's protobuf suite now
+  passes 5707 cases, and lists 35 that fail on purpose.
+
 ### Checked
 
 - The full-stack climb halves the gap after its first failure three times, so each rate is

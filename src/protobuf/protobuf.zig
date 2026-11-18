@@ -171,6 +171,7 @@ test {
     std.testing.refAllDecls(files);
     _ = @import("protobuf_test.zig");
     _ = @import("protobuf_json_test.zig");
+    _ = @import("protobuf_json_map_test.zig");
     _ = @import("protobuf_json_wkt_test.zig");
     _ = @import("protobuf_group_test.zig");
     _ = @import("protobuf_unknown_test.zig");

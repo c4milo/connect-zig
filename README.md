@@ -493,8 +493,8 @@ spans, not compressed, on 16 connections of 4 streams. The calls a second:
   job summary holds a table of its cases by HTTP version, protocol, TLS and reference peer.
 - `tools/protobuf_conformance_check.sh` runs [Google's protobuf conformance
   suite](https://github.com/protocolbuffers/protobuf/tree/main/conformance) in binary and JSON,
-  for proto3, proto2 and edition 2023. 5635 cases pass, and
-  `conformance/protobuf_known_failing.txt` lists each of the 107 that fail, with its reason.
+  for proto3, proto2 and edition 2023. 5707 cases pass, and
+  `conformance/protobuf_known_failing.txt` lists each of the 35 that fail, with its reason.
 - `tools/coverage_check.sh` converts every protobuf type with connect-zig and with Go's runtime,
   between binary and JSON both ways, and requires the same message.
 - `tools/interop_languages_check.sh` calls the server from [clients in Go, TypeScript, Python

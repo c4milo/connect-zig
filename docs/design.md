@@ -184,7 +184,9 @@ Each step names the check that proves it. A step is done when its check passes i
     names: none. `zig build plugin` builds the plugin alone. Check: the runner passes with the
     cases of `conformance/protobuf_known_failing.txt` as its expected failures. At its first
     run 5629 cases pass, 48 are skipped and 113 are listed. The fixes it led to leave 5635
-    passing and 107 listed.
+    passing and 107 listed. On 2026-11-17, JSON encode wrote a map key once (decision 38), and
+    5707 pass with 35 listed. Runner 37.0.0-rc1 is the npm package's newest; protobuf's rc2 and
+    rc3 change no file under `conformance/`.
 18. **Checks out of the examples.** The coverage converter, the interop client and the test of
     the generated code move to `tools/`, with the schemas that only they read (decision 41).
     New public names: none. Check: `tools/coverage_check.sh`, `tools/interop_servers_check.sh`

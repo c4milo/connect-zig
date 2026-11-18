@@ -19,6 +19,7 @@ const time_text = @import("time_text.zig");
 const decode = @import("decode.zig");
 const any = @import("any.zig");
 const constants = @import("constants.zig");
+const json_map = @import("json_map.zig");
 const Field = descriptor.Field;
 
 pub const Error = json_scalar.EncodeError;
@@ -302,22 +303,42 @@ fn write_map(comptime F: type, item: *const F, text: *json.TextWriter, comptime 
     const key_field = Entry.protobuf.fields[0];
     const value_field = Entry.protobuf.fields[1];
     comptime assert(key_field.number == 1 and value_field.number == 2);
+    // An entry whose key a later entry holds again is left out: the last one wins ("Maps",
+    // language guide), and a JSON object names each key once (RFC 8259 §4).
+    const skip = try json_map.skipped(F, item);
     try @call(.always_inline, json.TextWriter.begin_object, .{text});
     if (item.items.len != 0) {
-        for (item.items) |*entry| try write_entry(Entry, key_field, value_field, entry, text, registry);
+        try write_map_items(F, item, skip, text, registry);
     } else {
-        try write_map_encoded(F, item, text, registry);
+        try write_map_encoded(F, item, skip, text, registry);
     }
     try @call(.always_inline, json.TextWriter.end_object, .{text});
 }
 
+/// The entries of a program's map. A map with no entry left out keeps one loop with no check.
+fn write_map_items(comptime F: type, item: *const F, skip: ?json_map.Skipped, text: *json.TextWriter, comptime registry: []const type) Error!void {
+    const Entry = F.Element;
+    const key_field = Entry.protobuf.fields[0];
+    const value_field = Entry.protobuf.fields[1];
+    const left_out = skip orelse {
+        for (item.items) |*entry| try write_entry(Entry, key_field, value_field, entry, text, registry);
+        return;
+    };
+    for (item.items, 0..) |*entry, index| {
+        if (left_out.isSet(index)) continue;
+        try write_entry(Entry, key_field, value_field, entry, text, registry);
+    }
+}
+
 /// The entries of a decoded message's map, which an iterator reads from its octets, out of line
 /// as `write_array_encoded` is.
-noinline fn write_map_encoded(comptime F: type, item: *const F, text: *json.TextWriter, comptime registry: []const type) Error!void {
+noinline fn write_map_encoded(comptime F: type, item: *const F, skip: ?json_map.Skipped, text: *json.TextWriter, comptime registry: []const type) Error!void {
     const Entry = F.Element;
     var entries = item.iterator();
-    for (0..constants.limits.elements_max) |_| {
+    for (0..constants.limits.elements_max) |index| {
         const entry = try entries.next() orelse return;
+        // A map with entries left out holds at most `json_map_entries_checked_max` of them.
+        if (skip) |left_out| if (left_out.isSet(index)) continue;
         try write_entry(Entry, Entry.protobuf.fields[0], Entry.protobuf.fields[1], entry, text, registry);
     }
 }

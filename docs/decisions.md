@@ -702,6 +702,19 @@ first. Cite an entry by number in code and commits ("decision 6").
       Go's runtime on this repository's own cases. Neither holds the encoding's corner cases.
       This suite's first run found a generated name that did not compile, a JSON decoder that
       did not compile for a message of 150 fields, and 113 failing cases.
+    - Amended on 2026-11-17, ruled by the owner: JSON encode writes a map key once. A map read
+      from binary may hold a key twice, and its last entry wins ("Maps", language guide). A JSON
+      object holds each name once (RFC 8259 §4), and Go's protojson refuses a key twice. So
+      `json_map.skipped` leaves out each entry whose key a later entry holds. A first pass sets
+      a bit of a 1,024-bit filter for each key's fingerprint; only two keys on one bit start a
+      second pass, which compares the keys. The check runs on a map of at most
+      `json_map_entries_checked_max` entries, 256, and a larger map is written as received, so
+      hostile input costs at most 32,640 comparisons a map. The 72 `DuplicateKey.JsonOutput`
+      cases now pass. Medium's JSON encode, whose map holds 16 keys, took 1.89% more
+      instructions under callgrind on arm64.
+    - Beaten: a scratch buffer from the caller, which adds a public name and still needs a rule
+      without one; and a comparison of every pair with no bound, which a map of 2 GiB makes
+      take hours.
 
 40. **The examples serve OpenTelemetry's trace export, and OpenTelemetry's Go SDK calls it.**
     Ruled by the owner on 2026-11-14.
