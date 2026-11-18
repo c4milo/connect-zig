@@ -20,10 +20,10 @@ and serve the same handlers to Connect, gRPC and gRPC-Web clients, in binary pro
 - **Fast.** Binary and JSON encoding and decoding run 2.6 to 33.6 times faster than Go's protobuf
   runtime on x86-64, and 2.2 to 39.6 times on arm64, in CI's
   [run 160](https://github.com/c4milo/connect-zig/actions/runs/44007655863). In a gateway that
-  takes OpenTelemetry traces, one core holds 3.0 times the OpenTelemetry Collector's spans a
-  second on x86-64 and 3.4 times on arm64, and 9.5 and 10.4 times Vector's, over TLS. In
-  cleartext it holds 2.9 and 3.5 times Rotel's, in
-  [run 177](https://github.com/c4milo/connect-zig/actions/runs/44148697298) (see
+  takes OpenTelemetry traces over TLS, one core holds 8.2 times connect-go's spans a second and
+  2.8 times connect-rust's on arm64, and 5.0 and 1.9 times on x86-64. It holds 3.7 times the
+  OpenTelemetry Collector's on arm64, in
+  [run 182](https://github.com/c4milo/connect-zig/actions/runs/44322389021) (see
   [Performance](#performance)).
 - **HTTP from [colibri](https://github.com/c4milo/colibri).** Servers and clients run over h11,
   h2 and h3, in cleartext or over TLS.
@@ -362,14 +362,16 @@ faster, and Go is the line at 1. The charts time the codecs alone, with no code 
 connect-rust. A binary decode with every field read takes `decode_into`, which reads each
 repeated field once (decision 37).
 
-The charts draw 16 of the table's 48 cells. On x86-64, Buffa is faster than connect-zig in 1 of
-them, JSON encode of the small message, by 4%:
+The charts draw 16 of the table's 48 cells. On arm64, Buffa is faster in none of them:
+
+![Bars of the speed of connect-zig and of Buffa, connect-rust's codec, in multiples of Go's protobuf runtime, connect-go's codec, on arm64: connect-zig is 2.9 to 18.1 times faster than Go's protobuf runtime, and 1.1 to 1.9 times faster than Buffa](docs/images/speed-vs-go-arm64.svg)
+
+<details>
+<summary>On x86-64, Buffa is faster in 1 of them, JSON encode of the small message, by 4%.</summary>
 
 ![Bars of the speed of connect-zig and of Buffa, connect-rust's codec, in multiples of Go's protobuf runtime, connect-go's codec, on x86-64: connect-zig is 3.3 to 17.9 times faster than Go's protobuf runtime, and Buffa is faster than connect-zig in 1 of 16 cells](docs/images/speed-vs-go.svg)
 
-On arm64, Buffa is faster in none of them:
-
-![Bars of the speed of connect-zig and of Buffa, connect-rust's codec, in multiples of Go's protobuf runtime, connect-go's codec, on arm64: connect-zig is 2.9 to 18.1 times faster than Go's protobuf runtime, and 1.1 to 1.9 times faster than Buffa](docs/images/speed-vs-go-arm64.svg)
+</details>
 
 Across all 48 cells, Buffa is faster in 7 on x86-64 and in 5 on arm64. The gap is widest in JSON:
 tree JSON encode, by 1.27 times on x86-64 and 1.49 times on arm64, and packed JSON decode, by 1.30
@@ -382,11 +384,16 @@ two `bench-compare` jobs of commit `253404b`
 ([run 170](https://github.com/c4milo/connect-zig/actions/runs/44077206597)) timed them on colibri
 v0.18.1, on an Intel Xeon 6975P-C core and on an Arm Neoverse-N2 core. Each chart draws a speed
 in multiples of connect-go's, and connect-zig's bar also gives its time for one call. In a table
-of one route:
+of one route, on arm64:
+
+![Bars of the speed of a routed unary call through connect-zig and connect-rust, in multiples of connect-go's, on arm64: connect-zig is 15.9 to 23.6 times as fast as connect-go, and 3.6 to 6.9 times as fast as connect-rust](docs/images/call-vs-go-arm64.svg)
+
+<details>
+<summary>On x86-64, connect-zig is 14.1 to 23.8 times as fast as connect-go, and 3.3 to 6.0 times as fast as connect-rust.</summary>
 
 ![Bars of the speed of a routed unary call through connect-zig and connect-rust, in multiples of connect-go's, on x86-64: connect-zig is 14.1 to 23.8 times as fast as connect-go, and 3.3 to 6.0 times as fast as connect-rust](docs/images/call-vs-go.svg)
 
-![Bars of the speed of a routed unary call through connect-zig and connect-rust, in multiples of connect-go's, on arm64: connect-zig is 15.9 to 23.6 times as fast as connect-go, and 3.6 to 6.9 times as fast as connect-rust](docs/images/call-vs-go-arm64.svg)
+</details>
 
 The small message's call also runs in tables of 16 and 256 routes: 4 and 16 services of as many
 methods, with the call's route among them. colibri finds a route by a binary search over each path
@@ -403,10 +410,6 @@ Connect call, in nanoseconds:
 | connect-zig, arm64 | 345 | 363 | 368 |
 | connect-rust, arm64 | 2,114 | 2,073 | 2,063 |
 | connect-go, arm64 | 7,858 | 7,921 | 7,824 |
-
-![Lines of the time of a routed call over its time with one route, as the route table grows from 1 to 16 and 256 routes, on x86-64: connect-zig takes up to 7% more time, connect-rust up to 3% less and connect-go up to 1% more](docs/images/call-routes.svg)
-
-![Lines of the time of a routed call over its time with one route, as the route table grows from 1 to 16 and 256 routes, on arm64: connect-zig takes up to 8% more time, connect-rust up to 2% less and connect-go up to 1% more](docs/images/call-routes-arm64.svg)
 
 ### Whole servers on a socket
 
@@ -429,58 +432,64 @@ OTLP exports. The servers:
   each export and drops it, as connect-zig's receiver does.
 
 Each server decodes and checks every span, counts it and drops it. Each runs on one core, the
-Collector with `GOMAXPROCS=1` and Vector with one thread, and the load runs on two other cores.
-Each run checks every span.
+Collector and connect-go with `GOMAXPROCS=1`, Vector with one thread, and connect-rust with one
+tokio worker. The load runs on two other cores. Each run checks every span.
 
 The production model stands for one core of a 64-core gateway that 33,000 servers send their
 traces to. Each server holds 516 connections. 70%, 25% and 5% of them send gzip exports of 16, 128
 and 512 spans. [oha](https://github.com/hatoo/oha) sends at fixed rates, and its latency holds the
 time a call waits in a queue. The rate climbs until p99 passes 100 ms or a call is refused.
 Then three more steps halve the gap to the last step that passed, so each rate is known within
-1/16 of it. CI's two `fullstack` jobs of commit `ca4bea6`
-([run 177](https://github.com/c4milo/connect-zig/actions/runs/44148697298)) ran it on colibri
-v0.18.1, on an AMD EPYC 7763 core and on an Arm Neoverse-N2 core. Over TLS 1.3, against the
-Collector and Vector:
+1/16 of it. CI's two `fullstack` jobs of commit `15e6986`
+([run 182](https://github.com/c4milo/connect-zig/actions/runs/44322389021)) ran it on colibri
+v0.18.1, on an Arm Neoverse-N2 core and on an AMD EPYC 9V74 core. Over TLS 1.3, on arm64:
 
-![Bars of the spans a second one core holds with p99 under 100 ms over TLS, and lines of p99 as the rate climbs, on x86-64: connect-zig holds 551,704 spans a second, 3.0 times the OpenTelemetry Collector's 186,896 and 9.5 times Vector's 57,834](docs/images/fullstack.svg)
+![Bars of the spans a second one core holds with p99 under 100 ms over TLS, and lines of p99 as the rate climbs, on arm64: connect-zig holds 729,750 spans a second, 8.2 times connect-go's 89,000, 2.8 times connect-rust's 258,090, 3.7 times the OpenTelemetry Collector's 195,800 and 11.7 times Vector's 62,302](docs/images/fullstack-arm64.svg)
 
-![Bars of the spans a second one core holds with p99 under 100 ms over TLS, and lines of p99 as the rate climbs, on arm64: connect-zig holds 694,200 spans a second, 3.4 times the OpenTelemetry Collector's 204,700 and 10.4 times Vector's 66,748](docs/images/fullstack-arm64.svg)
+<details>
+<summary>On x86-64, connect-zig holds 5.0 times connect-go's spans a second, 1.9 times connect-rust's, 2.5 times the Collector's and 8.2 times Vector's.</summary>
 
-In cleartext, against the Collector and Rotel:
+![Bars of the spans a second one core holds with p99 under 100 ms over TLS, and lines of p99 as the rate climbs, on x86-64: connect-zig holds 622,968 spans a second, 5.0 times connect-go's 124,600, 1.9 times connect-rust's 329,300, 2.5 times the OpenTelemetry Collector's 249,200 and 8.2 times Vector's 75,666](docs/images/fullstack.svg)
 
-![Bars of the spans a second one core holds with p99 under 100 ms in cleartext, and lines of p99 as the rate climbs, on x86-64: connect-zig holds 640,800 spans a second, 3.8 times the OpenTelemetry Collector's 169,116 and 2.9 times Rotel's 222,488](docs/images/fullstack-cleartext.svg)
+</details>
 
-![Bars of the spans a second one core holds with p99 under 100 ms in cleartext, and lines of p99 as the rate climbs, on arm64: connect-zig holds 783,184 spans a second, 4.0 times the OpenTelemetry Collector's 195,800 and 3.5 times Rotel's 222,478](docs/images/fullstack-cleartext-arm64.svg)
+Rotel has no TLS on its receiver, so a second climb runs in cleartext h2 for connect-zig, the
+Collector and Rotel. There one core of connect-zig holds 3.8 times Rotel's spans a second on
+arm64 and 3.3 times on x86-64, and 4.2 and 3.5 times the Collector's.
 
 The CPU time a span, at each server's highest step, in µs:
 
-| Server | x86-64, TLS | arm64, TLS | x86-64, cleartext | arm64, cleartext |
+| Server | arm64, TLS | x86-64, TLS | arm64, cleartext | x86-64, cleartext |
 | --- | ---: | ---: | ---: | ---: |
-| connect-zig | 1.80 | 1.44 | 1.57 | 1.28 |
-| Collector | 5.07 | 4.67 | 5.86 | 5.12 |
-| Vector | 14.27 | 13.33 | | |
-| Rotel | | | 4.49 | 4.51 |
+| connect-zig | 1.37 | 1.43 | 1.28 | 1.25 |
+| connect-rust | 3.76 | 3.03 | | |
+| connect-go | 10.30 | 7.21 | | |
+| Collector | 4.87 | 3.80 | 5.36 | 4.34 |
+| Vector | 13.80 | 9.86 | | |
+| Rotel | | | 4.56 | 3.72 |
 
 connect-zig takes all its memory when it starts: 483 MiB, for 528 connections and 64 calls at
-once. Over TLS, the Collector grew to 699 MiB on x86-64 and to 702 MiB on arm64, and Vector to
-1,450 MiB and 782 MiB. In cleartext, the Collector grew to 192 MiB and 181 MiB, and Rotel to 353
-MiB and 315 MiB. connect-zig's climb ends when a burst fills its 64 calls and a call is refused.
-The other servers' climbs end when a call waits past 100 ms. A runner's CPU model changes from
-run to run: run 172 had an Intel Xeon 6975P-C, so its x86-64 rates were higher.
+once. Over TLS on arm64, connect-rust grew to 53 MiB, connect-go to 144 MiB, the Collector to 697
+MiB and Vector to 872 MiB; in cleartext, Rotel grew to 82 MiB. connect-zig's climb ends when a
+burst fills its 64 calls and a call is refused. The other servers' climbs end when a call waits
+past 100 ms. A runner's CPU model changes from run to run on x86-64, so its rates move between
+runs; the arm64 runner has been a Neoverse-N2 in each run.
 
 Vector's and Rotel's p99 stays near 40 ms from a low rate. Neither sets `TCP_NODELAY` on the
 sockets it accepts, so Nagle's algorithm waits for Linux's delayed ACK. With `TCP_NODELAY` set
 from outside, their p99 fell to about 5 ms, but neither held a higher rate. So the climb runs them
-as they ship.
+as they ship. connect-rust's server sets it.
 
 The same jobs also load each server over TLS as fast as it answers, with exports of 16 and of 512
 spans, not compressed, on 16 connections of 4 streams. The calls a second:
 
-| Server | 16 spans, x86-64 | 512 spans, x86-64 | 16 spans, arm64 | 512 spans, arm64 |
+| Server | 16 spans, arm64 | 512 spans, arm64 | 16 spans, x86-64 | 512 spans, x86-64 |
 | --- | ---: | ---: | ---: | ---: |
-| connect-zig | 37,763 | 1,384 | 41,273 | 1,555 |
-| Collector | 13,998 | 796 | 13,824 | 849 |
-| Vector | 5,682 | 258 | 4,460 | 257 |
+| connect-zig | 40,784 | 1,510 | 49,039 | 1,762 |
+| connect-rust | 15,529 | 1,043 | 20,276 | 1,071 |
+| connect-go | 5,373 | 379 | 7,134 | 513 |
+| Collector | 13,180 | 770 | 17,999 | 994 |
+| Vector | 4,344 | 248 | 7,901 | 308 |
 
 ## How it is checked
 

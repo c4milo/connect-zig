@@ -19,6 +19,9 @@ change the public API, and the entry marks each change that does.
 
 ### Checked
 
+- Receivers on connect-go and connect-rust join the full-stack check, each on one core. In CI's
+  run 182, one core of connect-zig held 8.2 times connect-go's spans a second over TLS on arm64
+  and 5.0 times on x86-64, and 2.8 and 1.9 times connect-rust's.
 - The full-stack climb halves the gap after its first failure three times, so each rate is
   known within 1/16 of it. Run 172's ratios came from coarse steps, and could be off by half. In
   CI's run 177, one core of connect-zig held 3.0 times the Collector's spans a second on x86-64

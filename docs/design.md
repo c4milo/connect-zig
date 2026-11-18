@@ -1250,6 +1250,15 @@ ran on Linux x86-64 with Zig 0.16.0.
     second, the Collector 186,896 and 204,700, and Vector 57,834 and 66,748. In cleartext,
     connect-zig held 640,800 and 783,184, the Collector 169,116 and 195,800, and Rotel 222,488
     and 222,478.
+- **Other Connect libraries** (step 31). CI's
+  [run 182](https://github.com/c4milo/connect-zig/actions/runs/44322389021) on `15e6986`.
+  - Over TLS, on a Neoverse-N2: connect-zig held 729,750 spans a second, connect-rust 258,090
+    and connect-go 89,000. On an EPYC 9V74: 622,968, 329,300 and 124,600.
+  - connect-rust spent 3.76 µs of CPU a span on arm64 and 3.03 µs on x86-64, and connect-go
+    10.30 µs and 7.21 µs, where connect-zig spent 1.37 µs and 1.43 µs. connect-rust grew to 53
+    MiB and 55 MiB, and connect-go to 144 MiB and 131 MiB.
+  - A local run in an arm64 container before it gave 4.5 times connect-go's rate and 1.8 times
+    connect-rust's, with every span counted.
 - **colibri v0.18.1** (steps 27 to 29, decision 10). colibri v0.18.1 (`0942b20a`) pins the
   stdx, chapulin and Rotor that v0.17.3 pins, so only colibri moves.
   - v0.18.0's router compiles a table of 256 routes, so the largest route table moves from 225
