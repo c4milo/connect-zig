@@ -7,6 +7,7 @@
 //! that file: `curl --cacert examples/harness/tls/ca.pem https://127.0.0.1:8443/...`.
 const std = @import("std");
 const colibri = @import("colibri");
+const server = @import("server");
 const identity = @import("test_identity");
 const constants = @import("constants.zig");
 const server_side = @import("server_side.zig");
@@ -21,16 +22,18 @@ pub fn Served(comptime App: type, comptime Router: type) type {
 
         http_server: Server,
         router: Router,
+        /// The TLS session of each TCP connection (colibri decision 167).
+        tls_buffer: [server.Config.tls_buffer_len(constants.serve_tcp_connections)]u8,
 
         /// Serves `app` on the port the command line names, until the program is killed.
         pub fn run(self: *Self, init: std.process.Init, app: *App) !void {
             self.router = .{};
-            try serve(&self.http_server, &self.router, app, init);
+            try serve(&self.http_server, &self.router, app, &self.tls_buffer, init);
         }
     };
 }
 
-fn serve(http_server: *Server, router: anytype, app: anytype, init: std.process.Init) !void {
+fn serve(http_server: *Server, router: anytype, app: anytype, tls_buffer: []u8, init: std.process.Init) !void {
     const port = try port_of(init);
     // The Unix time when the server starts, which its TLS session tickets carry.
     const unix_seconds: u64 = @intCast(@max(std.Io.Clock.real.now(init.io).toSeconds(), 0));
@@ -39,6 +42,7 @@ fn serve(http_server: *Server, router: anytype, app: anytype, init: std.process.
         .identity = .{ .chain = identity.chain_pem, .key = identity.key_pem },
         .cpu = server_side.cpu,
         .unix_seconds = unix_seconds,
+        .engine = .{ .tls_buffer = tls_buffer },
     }, router, app);
     defer http_server.deinit();
     // A script that asked for port 0 reads the port from this line.

@@ -6,8 +6,8 @@
     .dependencies = .{
         // The HTTP transport of `connect_colibri`, and through its `tls` module, chapulin.
         .colibri = .{
-            .url = "git+https://github.com/c4milo/colibri?ref=v0.18.1#0942b20aaaa3b92475633c83113aa719d38d1c62",
-            .hash = "colibri-0.18.1-Wo-AvrI9swQfaOaU0iSdjDbauuqeWXD68XyckUF8pKgv",
+            .url = "git+https://github.com/c4milo/colibri?ref=v0.19.0#4c41e44a5da9f5844c96cc1627de417cc3fa5423",
+            .hash = "colibri-0.19.0-Wo-AvokatATsRO-zkw6tTSJZj_a9-KKeNdDUYDm6us8p",
         },
         // JSON for proto3 JSON and the Connect error bodies, and the compression codecs.
         .stdx = .{

@@ -10,6 +10,19 @@ change the public API, and the entry marks each change that does.
 
 ## Unreleased
 
+### Changed
+
+- connect-zig builds on colibri v0.19.0. **Changes a program's setup.** A program that serves TLS
+  on `colibri.Server` passes room for its TLS sessions: a field
+  `tls_buffer: [server.Config.tls_buffer_len(n)]u8`, where `n` is the TCP connections over TLS
+  it holds at once, and `.engine = .{ .tls_buffer = &state.tls_buffer }` in `init`'s
+  configuration (colibri decision 167). With an identity and no buffer, `init` asserts. A
+  cleartext server passes nothing. The README's server code shows the form.
+- On colibri v0.19.0, a TCP connection holds about 151 KB, where it held about 531 KB, and a TLS
+  session takes about 83 KB of the buffer while its connection lasts. The OTLP sink's idle
+  memory fell from 480 MiB to 376 MiB. A route search compares 8 octets at a time.
+- An h11 request head longer than 24,582 octets is refused (colibri's step 62).
+
 ### Fixed
 
 - JSON encode writes a map key once, with its last entry's value, as protobuf's map rule says.

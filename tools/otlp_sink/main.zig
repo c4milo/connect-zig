@@ -41,6 +41,9 @@ const State = struct {
     router: Router,
     app: App,
     gzip_decoder: connect.GzipDecoder,
+    /// The TLS session of each connection over TLS (colibri decision 167). A sink in cleartext
+    /// passes none, so this room stays untouched.
+    tls_buffer: [server.Config.tls_buffer_len(constants.tcp_connections)]u8,
 };
 
 pub fn main(init: std.process.Init) !void {
@@ -58,6 +61,7 @@ pub fn main(init: std.process.Init) !void {
         .identity = served,
         .cpu = cpu,
         .unix_seconds = unix_seconds,
+        .engine = if (command.cleartext) .{} else .{ .tls_buffer = &state.tls_buffer },
     }, &state.router, &state.app);
     defer state.http_server.deinit();
     // A script that asked for port 0 reads the port from this line, and the CPU line says which

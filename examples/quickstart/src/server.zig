@@ -69,6 +69,8 @@ const State = struct {
     app: App,
     chain_pem: [constants.pem_len_max]u8,
     key_pem: [constants.pem_len_max]u8,
+    /// The TLS session of each TCP connection: about 83 KB each (colibri decision 167).
+    tls_buffer: [server.Config.tls_buffer_len(constants.tcp_connections)]u8,
 };
 
 pub fn main(init: std.process.Init) !void {
@@ -92,6 +94,7 @@ pub fn main(init: std.process.Init) !void {
         .identity = .{ .chain = chain, .key = key },
         .cpu = cpu,
         .unix_seconds = unix_seconds,
+        .engine = .{ .tls_buffer = &state.tls_buffer },
     }, &state.router, &state.app);
     defer state.http_server.deinit();
     std.debug.print("listening on port {d}\n", .{state.http_server.port()});

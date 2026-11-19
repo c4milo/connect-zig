@@ -289,7 +289,12 @@ start:
 
 ```zig
 const Server = colibri.Server(.{ .tcp_connections = 64, .quic_connections = 8 }, .private);
-const State = struct { http_server: Server, router: Router, app: App };
+const State = struct {
+    http_server: Server,
+    router: Router,
+    app: App,
+    tls_buffer: [server.Config.tls_buffer_len(64)]u8,
+};
 
 const state = try init.arena.allocator().create(State);
 state.router = .{};
@@ -299,6 +304,7 @@ try state.http_server.init(&.{
     .identity = .{ .chain = chain_pem, .key = key_pem },
     .cpu = cpu,
     .unix_seconds = unix_seconds,
+    .engine = .{ .tls_buffer = &state.tls_buffer },
 }, &state.router, &state.app);
 defer state.http_server.deinit();
 try state.http_server.run();
@@ -306,7 +312,9 @@ try state.http_server.run();
 
 It serves h11 and h2 over TLS on a TCP socket, and h3 on the UDP socket of the same port.
 `chain_pem` and `key_pem` are your certificate chain and its key, as PEM text, and `cpu` is what
-your program probed of its CPU. With no `identity`, it serves h11 and h2 in cleartext, and no h3.
+your program probed of its CPU. `tls_buffer` holds the TLS session of each TCP connection over
+TLS, about 83 KB each, for as many connections as it serves at once. With no `identity`, it serves
+h11 and h2 in cleartext and no h3, and needs no `tls_buffer`.
 
 ### 5. Call it
 

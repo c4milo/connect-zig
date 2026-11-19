@@ -54,6 +54,8 @@ const State = struct {
     gzip_encoder: connect.GzipEncoder,
     zstd_decoder: connect.ZstdDecoder,
     zstd_encoder: connect.ZstdEncoder,
+    /// The TLS session of each TCP connection (colibri decision 167).
+    tls_buffer: [server.Config.tls_buffer_len(constants.tcp_connections)]u8,
 };
 
 pub fn main(init: std.process.Init) !void {
@@ -71,6 +73,7 @@ pub fn main(init: std.process.Init) !void {
         .identity = .{ .chain = identity.chain_pem, .key = identity.key_pem },
         .cpu = cpu,
         .unix_seconds = unix_seconds,
+        .engine = .{ .tls_buffer = &state.tls_buffer },
     }, &state.router, &state.app);
     defer state.http_server.deinit();
     // A script that asked for port 0 reads the port from this line.
