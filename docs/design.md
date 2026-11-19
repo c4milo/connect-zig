@@ -1259,6 +1259,13 @@ ran on Linux x86-64 with Zig 0.16.0.
     MiB and 55 MiB, and connect-go to 144 MiB and 131 MiB.
   - A local run in an arm64 container before it gave 4.5 times connect-go's rate and 1.8 times
     connect-rust's, with every span counted.
+- **colibri v0.19.0** (`af0b01e`). CI's
+  [run 185](https://github.com/c4milo/connect-zig/actions/runs/44627403358). colibri issue 137
+  halved each socket's buffers and decision 167 moved each TLS session into a buffer the program
+  passes, so the sink's peak fell from 483 MiB to 378 MiB on both machines. The small routed
+  Connect call took 4,177 instructions, 1.42% fewer, and 4,430 in 256 routes. Over TLS on arm64,
+  connect-zig held 694,200 spans a second, connect-rust 266,990 and connect-go 97,898: 2.6 and
+  7.1 times, where run 182 gave 2.8 and 8.2, within the climb's 1/16.
 - **colibri v0.18.1** (steps 27 to 29, decision 10). colibri v0.18.1 (`0942b20a`) pins the
   stdx, chapulin and Rotor that v0.17.3 pins, so only colibri moves.
   - v0.18.0's router compiles a table of 256 routes, so the largest route table moves from 225

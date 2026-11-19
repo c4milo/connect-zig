@@ -82,29 +82,32 @@ traces to. Each server holds 516 connections. 70%, 25% and 5% of them send gzip 
 and 512 spans. [oha](https://github.com/hatoo/oha) sends at fixed rates, and its latency holds the
 time a call waits in a queue. The rate climbs until p99 passes 100 ms or a call is refused.
 Then three more steps halve the gap to the last step that passed, so each rate is known within
-1/16 of it. CI's two `fullstack` jobs of commit `15e6986`
-([run 182](https://github.com/c4milo/connect-zig/actions/runs/44322389021)) ran it on colibri
-v0.18.1, on an Arm Neoverse-N2 core and on an AMD EPYC 9V74 core. The README charts the climb
-over TLS 1.3.
+1/16 of it. CI's two `fullstack` jobs of commit `af0b01e`
+([run 185](https://github.com/c4milo/connect-zig/actions/runs/44627403358)) ran it on colibri
+v0.19.0, on an Arm Neoverse-N2 core and on an AMD EPYC 7763 core. The README charts the climb
+over TLS 1.3: one core of connect-zig held 7.1 times connect-go's spans a second on arm64 and 6.8
+times on x86-64, 2.6 and 2.3 times connect-rust's, 3.4 and 3.4 times the Collector's, and 10.4
+and 10.5 times Vector's.
 
 Rotel has no TLS on its receiver, so a second climb runs in cleartext h2 for connect-zig, the
-Collector and Rotel. There one core of connect-zig holds 3.8 times Rotel's spans a second on
-arm64 and 3.3 times on x86-64, and 4.2 and 3.5 times the Collector's.
+Collector and Rotel. There one core of connect-zig holds 3.6 times Rotel's spans a second on
+arm64 and 2.6 times on x86-64, and 4.1 and 3.8 times the Collector's.
 
 The CPU time a span, at each server's highest step, in µs:
 
 | Server | arm64, TLS | x86-64, TLS | arm64, cleartext | x86-64, cleartext |
 | --- | ---: | ---: | ---: | ---: |
-| connect-zig | 1.37 | 1.43 | 1.28 | 1.25 |
-| connect-rust | 3.76 | 3.03 | | |
-| connect-go | 10.30 | 7.21 | | |
-| Collector | 4.87 | 3.80 | 5.36 | 4.34 |
-| Vector | 13.80 | 9.86 | | |
-| Rotel | | | 4.56 | 3.72 |
+| connect-zig | 1.44 | 1.64 | 1.31 | 1.56 |
+| connect-rust | 3.69 | 3.86 | | |
+| connect-go | 9.64 | 10.25 | | |
+| Collector | 4.70 | 5.16 | 5.37 | 5.80 |
+| Vector | 13.39 | 13.92 | | |
+| Rotel | | | 4.70 | 4.00 |
 
-connect-zig takes all its memory when it starts: 483 MiB, for 528 connections and 64 calls at
-once. Over TLS on arm64, connect-rust grew to 53 MiB, connect-go to 144 MiB, the Collector to 697
-MiB and Vector to 872 MiB; in cleartext, Rotel grew to 82 MiB. connect-zig's climb ends when a
+connect-zig takes all its memory when it starts: 378 MiB, for 528 connections and 64 calls at
+once, where colibri v0.18.1 took 483 MiB. Over TLS on arm64, connect-rust grew to 50 MiB,
+connect-go to 125 MiB, the Collector to 689 MiB and Vector to 825 MiB; in cleartext, Rotel grew
+to 324 MiB. connect-zig's climb ends when a
 burst fills its 64 calls and a call is refused. The other servers' climbs end when a call waits
 past 100 ms. A runner's CPU model changes from run to run on x86-64, so its rates move between
 runs; the arm64 runner has been a Neoverse-N2 in each run.
@@ -119,8 +122,8 @@ spans, not compressed, on 16 connections of 4 streams. The calls a second:
 
 | Server | 16 spans, arm64 | 512 spans, arm64 | 16 spans, x86-64 | 512 spans, x86-64 |
 | --- | ---: | ---: | ---: | ---: |
-| connect-zig | 40,784 | 1,510 | 49,039 | 1,762 |
-| connect-rust | 15,529 | 1,043 | 20,276 | 1,071 |
-| connect-go | 5,373 | 379 | 7,134 | 513 |
-| Collector | 13,180 | 770 | 17,999 | 994 |
-| Vector | 4,344 | 248 | 7,901 | 308 |
+| connect-zig | 41,947 | 1,497 | 37,630 | 1,403 |
+| connect-rust | 15,766 | 1,061 | 14,286 | 953 |
+| connect-go | 5,356 | 376 | 5,076 | 373 |
+| Collector | 13,309 | 760 | 13,815 | 791 |
+| Vector | 4,397 | 248 | 5,555 | 254 |

@@ -19,8 +19,9 @@ change the public API, and the entry marks each change that does.
   configuration (colibri decision 167). With an identity and no buffer, `init` asserts. A
   cleartext server passes nothing. The README's server code shows the form.
 - On colibri v0.19.0, a TCP connection holds about 151 KB, where it held about 531 KB, and a TLS
-  session takes about 83 KB of the buffer while its connection lasts. The OTLP sink's idle
-  memory fell from 480 MiB to 376 MiB. A route search compares 8 octets at a time.
+  session takes about 83 KB of the buffer while its connection lasts. In CI's run 185, the OTLP
+  sink's peak memory under the full-stack load fell from 483 MiB to 378 MiB. A route search
+  compares 8 octets at a time, and the small routed call takes 1.4% fewer instructions.
 - An h11 request head longer than 24,582 octets is refused (colibri's step 62).
 
 ### Fixed

@@ -20,10 +20,10 @@ and serve the same handlers to Connect, gRPC and gRPC-Web clients, in binary pro
 - **Fast.** Binary and JSON encoding and decoding run 2.6 to 33.6 times faster than Go's protobuf
   runtime on x86-64, and 2.2 to 39.6 times on arm64, in CI's
   [run 160](https://github.com/c4milo/connect-zig/actions/runs/44007655863). In a gateway that
-  takes OpenTelemetry traces over TLS, one core holds 8.2 times connect-go's spans a second and
-  2.8 times connect-rust's on arm64, and 5.0 and 1.9 times on x86-64. It holds 3.7 times the
-  OpenTelemetry Collector's on arm64, in
-  [run 182](https://github.com/c4milo/connect-zig/actions/runs/44322389021) (see
+  takes OpenTelemetry traces over TLS, one core holds 7.1 times connect-go's spans a second and
+  2.6 times connect-rust's on arm64, and 6.8 and 2.3 times on x86-64. It holds 3.4 times the
+  OpenTelemetry Collector's, in
+  [run 185](https://github.com/c4milo/connect-zig/actions/runs/44627403358) (see
   [Performance](#performance)).
 - **HTTP from [colibri](https://github.com/c4milo/colibri).** Servers and clients run over h11,
   h2 and h3, in cleartext or over TLS.
@@ -35,15 +35,16 @@ under each one. [docs/benchmarks.md](docs/benchmarks.md) says how each is measur
 table.
 
 **Whole servers.** An OTLP receiver on one core, over TLS and h2, takes the traffic of one gateway
-core for 33,000 servers. connect-zig holds 8.2 times connect-go's spans a second and 2.8 times
-connect-rust's ([run 182](https://github.com/c4milo/connect-zig/actions/runs/44322389021)).
+core for 33,000 servers. connect-zig holds 7.1 times connect-go's spans a second and 2.6 times
+connect-rust's, in 378 MiB that it takes at start
+([run 185](https://github.com/c4milo/connect-zig/actions/runs/44627403358)).
 
-![Bars of the spans a second one core holds with p99 under 100 ms over TLS, and lines of p99 as the rate climbs, on arm64: connect-zig holds 729,750 spans a second, 8.2 times connect-go's 89,000, 2.8 times connect-rust's 258,090, 3.7 times the OpenTelemetry Collector's 195,800 and 11.7 times Vector's 62,302](docs/images/fullstack-arm64.svg)
+![Bars of the spans a second one core holds with p99 under 100 ms over TLS, and lines of p99 as the rate climbs, on arm64: connect-zig holds 694,200 spans a second, 7.1 times connect-go's 97,898, 2.6 times connect-rust's 266,990, 3.4 times the OpenTelemetry Collector's 204,696 and 10.4 times Vector's 66,750](docs/images/fullstack-arm64.svg)
 
 <details>
-<summary>On x86-64, connect-zig holds 5.0 times connect-go's spans a second, 1.9 times connect-rust's, 2.5 times the Collector's and 8.2 times Vector's.</summary>
+<summary>On x86-64, connect-zig holds 6.8 times connect-go's spans a second, 2.3 times connect-rust's, 3.4 times the Collector's and 10.5 times Vector's.</summary>
 
-![Bars of the spans a second one core holds with p99 under 100 ms over TLS, and lines of p99 as the rate climbs, on x86-64: connect-zig holds 622,968 spans a second, 5.0 times connect-go's 124,600, 1.9 times connect-rust's 329,300, 2.5 times the OpenTelemetry Collector's 249,200 and 8.2 times Vector's 75,666](docs/images/fullstack.svg)
+![Bars of the spans a second one core holds with p99 under 100 ms over TLS, and lines of p99 as the rate climbs, on x86-64: connect-zig holds 605,232 spans a second, 6.8 times connect-go's 89,000, 2.3 times connect-rust's 258,094, 3.4 times the OpenTelemetry Collector's 178,000 and 10.5 times Vector's 57,850](docs/images/fullstack.svg)
 
 </details>
 
