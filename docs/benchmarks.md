@@ -23,12 +23,13 @@ The README's charts draw 16 of the table's 48 cells. On arm64, Buffa is faster i
 On x86-64 it is faster in 2: the medium message's binary decode with every field read, by 1.25
 times, and the deep message's binary encode, by 1%.
 
-Across all 48 cells, connect-zig is 2.2 to 41.4 times faster than Go on arm64, and 2.1 to 31.7
-times on x86-64. Buffa is faster in 8 cells on x86-64 and in 5 on arm64. The gap is widest in
-tree JSON encode on arm64, by 1.49 times, and on x86-64 in packed JSON decode with every field
-read, by 1.27 times, the medium message's binary decode with every field read, by 1.25 times,
-and tree JSON decode with every field read, by 1.23 times. The other wins are by 1.15 times or
-less.
+In the table's 48 cells, connect-zig is 2.2 to 41.4 times faster than Go on arm64, and 2.1 to
+31.7 times on x86-64. Against Buffa, connect-zig is faster in 43 of the 48 cells on arm64 and in
+40 on x86-64, by up to 4.05 and 3.44 times. Buffa is faster in the other 5 and 8. Its widest win
+is tree JSON encode on arm64, by 1.49 times. On x86-64 its widest are packed JSON decode with
+every field read, by 1.27 times, the medium message's binary decode with every field read, by
+1.25 times, and tree JSON decode with every field read, by 1.23 times. Its other wins are by 1.15
+times or less.
 
 ## The routed call
 
