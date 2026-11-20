@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 840 272" width="840" height="272" role="img" aria-labelledby="t d">
 <title id="t">A routed unary call through connect-zig and connect-rust, against connect-go</title>
-<desc id="d">connect-zig is 14.1 to 23.8 times as fast as connect-go, 3.3 to 6.0 times connect-rust. Each bar is an implementation's speed in multiples of connect-go v1.18.1's, which is connect-go's time a call over the implementation's, for a small and a medium message in Connect and gRPC. connect-zig: Connect: Small, 40 B 23.8x, Medium, 1 KB 14.1x; gRPC: Small, 40 B 23.5x, Medium, 1 KB 14.3x. connect-rust 0.9.1: Connect: Small, 40 B 4.3x, Medium, 1 KB 4.3x; gRPC: Small, 40 B 3.9x, Medium, 1 KB 4.1x.</desc>
+<desc id="d">connect-zig is 14.2 to 23.9 times as fast as connect-go, 3.4 to 6.2 times connect-rust. Each bar is an implementation's speed in multiples of connect-go v1.18.1's, which is connect-go's time a call over the implementation's, for a small and a medium message in Connect and gRPC. connect-zig: Connect: Small, 40 B 23.7x, Medium, 1 KB 14.2x; gRPC: Small, 40 B 23.9x, Medium, 1 KB 14.4x. connect-rust 0.9.1: Connect: Small, 40 B 4.3x, Medium, 1 KB 4.2x; gRPC: Small, 40 B 3.9x, Medium, 1 KB 4.1x.</desc>
 <style>
 svg { --surface:#fcfcfb; --ink:#0b0b0b; --ink2:#52514e; --muted:#8a8984; --grid:#e4e3df; --zig:#2a78d6; --rust:#eb6834; --unit:#52514e; }
 @media (prefers-color-scheme: dark) {
@@ -17,10 +17,10 @@ text { font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; fil
 .legend { font-size: 12.5px; fill: var(--ink2); }
 </style>
 <rect width="840" height="272" rx="8" fill="var(--surface)"/>
-<text class="title" x="24" y="34">connect-zig is 14.1 to 23.8 times as fast as connect-go, 3.3 to 6.0 times connect-rust</text>
+<text class="title" x="24" y="34">connect-zig is 14.2 to 23.9 times as fast as connect-go, 3.4 to 6.2 times connect-rust</text>
 <text class="sub" x="24" y="56">One unary call in memory: router, route, protocol and codec, with no socket, no TLS and no HTTP/2 framing.</text>
 <text class="sub" x="24" y="74">Each bar is a speed in multiples of connect-go's: its time over the bar's time. A longer bar is faster.</text>
-<text class="sub" x="24" y="92">One CI job ran all three, and each answered the same octets: run 170, commit 253404b, x86_64, Intel(R) Xeon(R) 6975P-C.</text>
+<text class="sub" x="24" y="92">One CI job ran all three, and each answered the same octets: run 185, commit af0b01e, x86_64, Intel(R) Xeon(R) 6975P-C.</text>
 <rect x="24" y="100" width="12" height="12" rx="2" fill="var(--zig)"/>
 <text class="legend" x="42" y="110">connect-zig</text>
 <rect x="143" y="100" width="12" height="12" rx="2" fill="var(--rust)"/>
@@ -55,15 +55,15 @@ text { font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; fil
 <line x1="364.0" y1="160" x2="364.0" y2="234" stroke="var(--grid)" stroke-width="1"/>
 <text class="tick" x="364.0" y="248" text-anchor="middle">24×</text>
 <text class="row" x="126" y="182.0" text-anchor="end">Small, 40 B</text>
-<path d="M136.0,164 h221.8 a4.0,4.0 0 0 1 4.0,4.0 v5.0 a4.0,4.0 0 0 1 -4.0,4.0 h-221.8 z" fill="var(--zig)"/>
-<text class="val" x="366.8" y="174">23.8×, 0.24 µs</text>
-<path d="M136.0,179 h36.5 a4.0,4.0 0 0 1 4.0,4.0 v5.0 a4.0,4.0 0 0 1 -4.0,4.0 h-36.5 z" fill="var(--rust)"/>
-<text class="val" x="181.5" y="189">4.3×</text>
+<path d="M136.0,164 h221.3 a4.0,4.0 0 0 1 4.0,4.0 v5.0 a4.0,4.0 0 0 1 -4.0,4.0 h-221.3 z" fill="var(--zig)"/>
+<text class="val" x="366.3" y="174">23.7×, 0.24 µs</text>
+<path d="M136.0,179 h36.9 a4.0,4.0 0 0 1 4.0,4.0 v5.0 a4.0,4.0 0 0 1 -4.0,4.0 h-36.9 z" fill="var(--rust)"/>
+<text class="val" x="181.9" y="189">4.3×</text>
 <text class="row" x="126" y="220.0" text-anchor="end">Medium, 1 KB</text>
-<path d="M136.0,202 h130.3 a4.0,4.0 0 0 1 4.0,4.0 v5.0 a4.0,4.0 0 0 1 -4.0,4.0 h-130.3 z" fill="var(--zig)"/>
-<text class="val" x="275.3" y="212">14.1×, 1.45 µs</text>
-<path d="M136.0,217 h36.4 a4.0,4.0 0 0 1 4.0,4.0 v5.0 a4.0,4.0 0 0 1 -4.0,4.0 h-36.4 z" fill="var(--rust)"/>
-<text class="val" x="181.4" y="227">4.3×</text>
+<path d="M136.0,202 h130.9 a4.0,4.0 0 0 1 4.0,4.0 v5.0 a4.0,4.0 0 0 1 -4.0,4.0 h-130.9 z" fill="var(--zig)"/>
+<text class="val" x="275.9" y="212">14.2×, 1.43 µs</text>
+<path d="M136.0,217 h35.8 a4.0,4.0 0 0 1 4.0,4.0 v5.0 a4.0,4.0 0 0 1 -4.0,4.0 h-35.8 z" fill="var(--rust)"/>
+<text class="val" x="180.8" y="227">4.2×</text>
 <line x1="145.5" y1="156" x2="145.5" y2="234" stroke="var(--unit)" stroke-width="1.5" stroke-dasharray="4 3"/>
 <text class="note" x="149.5" y="154">1× = as fast as connect-go</text>
 <text class="panel" x="432" y="148">gRPC</text>
@@ -94,14 +94,14 @@ text { font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; fil
 <line x1="772.0" y1="160" x2="772.0" y2="234" stroke="var(--grid)" stroke-width="1"/>
 <text class="tick" x="772.0" y="248" text-anchor="middle">24×</text>
 <text class="row" x="534" y="182.0" text-anchor="end">Small, 40 B</text>
-<path d="M544.0,164 h219.0 a4.0,4.0 0 0 1 4.0,4.0 v5.0 a4.0,4.0 0 0 1 -4.0,4.0 h-219.0 z" fill="var(--zig)"/>
-<text class="val" x="772.0" y="174">23.5×, 0.27 µs</text>
-<path d="M544.0,179 h33.3 a4.0,4.0 0 0 1 4.0,4.0 v5.0 a4.0,4.0 0 0 1 -4.0,4.0 h-33.3 z" fill="var(--rust)"/>
-<text class="val" x="586.3" y="189">3.9×</text>
+<path d="M544.0,164 h222.7 a4.0,4.0 0 0 1 4.0,4.0 v5.0 a4.0,4.0 0 0 1 -4.0,4.0 h-222.7 z" fill="var(--zig)"/>
+<text class="val" x="775.7" y="174">23.9×, 0.26 µs</text>
+<path d="M544.0,179 h32.8 a4.0,4.0 0 0 1 4.0,4.0 v5.0 a4.0,4.0 0 0 1 -4.0,4.0 h-32.8 z" fill="var(--rust)"/>
+<text class="val" x="585.8" y="189">3.9×</text>
 <text class="row" x="534" y="220.0" text-anchor="end">Medium, 1 KB</text>
-<path d="M544.0,202 h132.3 a4.0,4.0 0 0 1 4.0,4.0 v5.0 a4.0,4.0 0 0 1 -4.0,4.0 h-132.3 z" fill="var(--zig)"/>
-<text class="val" x="685.3" y="212">14.3×, 1.47 µs</text>
-<path d="M544.0,217 h34.5 a4.0,4.0 0 0 1 4.0,4.0 v5.0 a4.0,4.0 0 0 1 -4.0,4.0 h-34.5 z" fill="var(--rust)"/>
-<text class="val" x="587.5" y="227">4.1×</text>
+<path d="M544.0,202 h133.2 a4.0,4.0 0 0 1 4.0,4.0 v5.0 a4.0,4.0 0 0 1 -4.0,4.0 h-133.2 z" fill="var(--zig)"/>
+<text class="val" x="686.2" y="212">14.4×, 1.46 µs</text>
+<path d="M544.0,217 h34.6 a4.0,4.0 0 0 1 4.0,4.0 v5.0 a4.0,4.0 0 0 1 -4.0,4.0 h-34.6 z" fill="var(--rust)"/>
+<text class="val" x="587.6" y="227">4.1×</text>
 <line x1="553.5" y1="156" x2="553.5" y2="234" stroke="var(--unit)" stroke-width="1.5" stroke-dasharray="4 3"/>
 </svg>

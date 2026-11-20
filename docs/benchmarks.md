@@ -10,48 +10,53 @@ time compares only within one job on one machine.
 unary call. `tools/bench_check.sh` runs the same inputs through Go's `google.golang.org/protobuf`
 v1.36.12, connect-go's codec, and Buffa, connect-rust's codec. It checks that each writes the
 same bytes as connect-zig. The numbers below come from CI's two `bench-compare` jobs of
-commit `b96f830` ([run 160](https://github.com/c4milo/connect-zig/actions/runs/44007655863)). One
-ran on an AMD EPYC 7763 core (x86-64) and one on an Arm Neoverse-N2 core (arm64), each with the
-three programs in one job. The run's summary holds every table.
+commit `af0b01e` ([run 185](https://github.com/c4milo/connect-zig/actions/runs/44627403358)). One
+ran on an Intel Xeon 6975P-C core (x86-64) and one on an Arm Neoverse-N2 core (arm64), each with
+the three programs in one job. The run's summary holds every table.
 
 Each chart of the README draws the speed of connect-zig and of Buffa in multiples of Go's. A
 longer bar is faster, and Go is the line at 1. The charts time the codecs alone, with no code of
 connect-go or connect-rust. A binary decode with every field read takes `decode_into`, which
 reads each repeated field once (decision 37).
 
-The README's charts draw 16 of the table's 48 cells. On arm64, Buffa is faster in none of them;
-on x86-64, in 1 of them, JSON encode of the small message, by 4%.
+The README's charts draw 16 of the table's 48 cells. On arm64, Buffa is faster in none of them.
+On x86-64 it is faster in 2: the medium message's binary decode with every field read, by 1.25
+times, and the deep message's binary encode, by 1%.
 
-Across all 48 cells, Buffa is faster in 7 on x86-64 and in 5 on arm64. The gap is widest in JSON:
-tree JSON encode, by 1.27 times on x86-64 and 1.49 times on arm64, and packed JSON decode, by 1.30
-times on x86-64. The other wins are by 1.15 times or less.
+Across all 48 cells, connect-zig is 2.2 to 41.4 times faster than Go on arm64, and 2.1 to 31.7
+times on x86-64. Buffa is faster in 8 cells on x86-64 and in 5 on arm64. The gap is widest in
+tree JSON encode on arm64, by 1.49 times, and on x86-64 in packed JSON decode with every field
+read, by 1.27 times, the medium message's binary decode with every field read, by 1.25 times,
+and tree JSON decode with every field read, by 1.23 times. The other wins are by 1.15 times or
+less.
 
 ## The routed call
 
 The routed calls (`bench/call.zig`) run the same unary call in memory through connect-zig,
 connect-go and connect-rust: the router, the route, the protocol and the codec, with no socket,
 no TLS and no HTTP/2 framing. connect-go's router is an `http.ServeMux`, as a server's is. CI's
-two `bench-compare` jobs of commit `253404b`
-([run 170](https://github.com/c4milo/connect-zig/actions/runs/44077206597)) timed them on colibri
-v0.18.1, on an Intel Xeon 6975P-C core and on an Arm Neoverse-N2 core. The README's charts draw a
+two `bench-compare` jobs of commit `af0b01e`
+([run 185](https://github.com/c4milo/connect-zig/actions/runs/44627403358)) timed them on colibri
+v0.19.0, on an Intel Xeon 6975P-C core and on an Arm Neoverse-N2 core. The README's charts draw a
 speed in multiples of connect-go's, and connect-zig's bar also gives its time for one call, in a
 table of one route.
 
 The small message's call also runs in tables of 16 and 256 routes: 4 and 16 services of as many
 methods, with the call's route among them. colibri finds a route by a binary search over each path
-segment, connect-rust by a hash map of the path, and Go's `ServeMux` by a tree of maps. So
-connect-zig's call grows with the table, by up to 8%, where the other two stay within 3%. On
-CI's judge it takes 4,237 instructions with one route and 4,460 with 256. The time of the small
-Connect call, in nanoseconds:
+segment, 8 octets at a time since colibri v0.19.0, connect-rust by a hash map of the path, and
+Go's `ServeMux` by a tree of maps. So connect-zig's call grows with the table, where the other two
+stay within 3%. On CI's judge it takes 4,177 instructions with one route and 4,430 with 256, 6%
+more. In time it grew 9% on x86-64 and 13% on arm64 in this run. The time of the small Connect
+call, in nanoseconds:
 
 | Router | 1 route | 16 routes | 256 routes |
 | --- | ---: | ---: | ---: |
-| connect-zig, x86-64 | 241 | 241 | 259 |
-| connect-rust, x86-64 | 1,342 | 1,308 | 1,289 |
-| connect-go, x86-64 | 5,717 | 5,673 | 5,597 |
-| connect-zig, arm64 | 345 | 363 | 368 |
-| connect-rust, arm64 | 2,114 | 2,073 | 2,063 |
-| connect-go, arm64 | 7,858 | 7,921 | 7,824 |
+| connect-zig, arm64 | 333 | 365 | 378 |
+| connect-rust, arm64 | 2,138 | 2,083 | 2,085 |
+| connect-go, arm64 | 7,699 | 7,699 | 7,828 |
+| connect-zig, x86-64 | 241 | 239 | 264 |
+| connect-rust, x86-64 | 1,328 | 1,306 | 1,290 |
+| connect-go, x86-64 | 5,716 | 5,721 | 5,641 |
 
 ## Whole servers on a socket
 
