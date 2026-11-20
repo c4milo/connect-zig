@@ -1,0 +1,11 @@
+# actionlint's configuration, which it reads from this path on its own.
+# actionlint knows the labels of the runner images GitHub offered when its
+# release was cut. Two labels the workflow uses are newer than release
+# 1.7.12: ubuntu-26.04 and ubuntu-26.04-arm, which every job runs on.
+# self-hosted-runner is the one key actionlint offers for a label it does
+# not know, although GitHub hosts these runners. Drop each entry once actionlint's own list carries
+# the label.
+self-hosted-runner:
+  labels:
+    - ubuntu-26.04
+    - ubuntu-26.04-arm

@@ -1,12 +1,14 @@
 # The client's packages and their dependencies, pinned by hash. run.sh installs them with
-# --require-hashes --only-binary=:all:. The hashes cover the Linux x86-64 wheels for CPython 3.12
-# and 3.13.
+# --require-hashes --only-binary=:all:. The hashes cover the Linux x86-64 wheels for CPython 3.12,
+# 3.13 and 3.14, which Ubuntu 26.04 carries.
 grpcio==1.85.1 \
     --hash=sha256:a1a72d19c0ab84b4b73b6c47eeaade76d84b1973a51593ff1160a73df33d03d9 \
-    --hash=sha256:de520b1555ae445cdc4f8f1cc7ccba12a19992bfafa7c292ebe7fe1fe5da6c53
+    --hash=sha256:de520b1555ae445cdc4f8f1cc7ccba12a19992bfafa7c292ebe7fe1fe5da6c53 \
+    --hash=sha256:e0e6d5829b50a2ffcfcd2dbf08d02ac0d6919051a2e97c2ee27c99bc9916a245
 grpcio-tools==1.85.1 \
     --hash=sha256:207e2e65147a744d7cb43949b0c8b898a6f290984d10f025409311563804163f \
-    --hash=sha256:7fdc3b869ad79254cb570eb043b5a940a775f367fd43682ce51aa518f45fec8f
+    --hash=sha256:7fdc3b869ad79254cb570eb043b5a940a775f367fd43682ce51aa518f45fec8f \
+    --hash=sha256:a3d13e21ac9551cc8cd4baf49abefda3a6a30b1051c12367e7150dfe08c513e2
 protobuf==7.36.2 \
     --hash=sha256:89f23aa53c24553a2416fd4fd1ec06f74fa42b14b546d8883128813f775bbfd2 \
     --hash=sha256:bdb3a345d48db958e6ce1f18e508beb0cc981d64f24088427549c866cd039f1e

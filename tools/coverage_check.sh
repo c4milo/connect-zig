@@ -88,7 +88,10 @@ done
 # 8. Zig's JSON equals upb's, or, where Go refuses to write JSON, Zig refuses too.
 python="${UPB_PYTHON:-}"
 if [ -z "${python}" ]; then
-    venv="${XDG_CACHE_HOME:-${HOME}/.cache}/connect-zig/upb-$(sha256sum tools/upb_requirements.txt | cut -c1-12)"
+    # The cache is named after the requirements and the interpreter, as interop/python/run.sh
+    # names its own: a cache of another Python's packages, such as one an older runner image
+    # left, is not taken.
+    venv="${XDG_CACHE_HOME:-${HOME}/.cache}/connect-zig/upb-$({ cat tools/upb_requirements.txt; python3 --version; } | sha256sum | cut -c1-12)"
     if [ ! -x "${venv}/bin/python" ]; then
         python3 -m venv "${venv}"
         "${venv}/bin/pip" install --quiet --disable-pip-version-check --require-hashes -r tools/upb_requirements.txt

@@ -831,6 +831,17 @@ first. Cite an entry by number in code and commits ("decision 6").
       metrics endpoint. A second Collector takes them and shows them to Prometheus. Beaten: a TLS
       proxy before Rotel, which the climb would measure too, and Rotel's log of each call, which
       costs it CPU that the other servers do not pay.
+    - Amended on 2026-11-20, ruled by the owner: CI runs on GitHub's Ubuntu 26.04 images,
+      `ubuntu-26.04` and `ubuntu-26.04-arm`, as colibri, stdx and chapulin do. The image moves
+      the numbers of `bench-compare` and `fullstack`, so a lab branch ran one commit on both
+      arm64 images, each a Neoverse-N2 on kernel 7.0 (run 44664572054). connect-zig did not
+      move: its codec's median time was 1.001 times 24.04's, and it held 729,722 spans a second
+      over TLS against 729,752. The other servers gained on 26.04: connect-go 10%, the Collector
+      9%, Vector 7% and connect-rust 3.5% in the climb over TLS, and connect-rust's routed call
+      took 11% less time. So the charts' ratios to them shrink a little. Each chart after this
+      names a run on 26.04. Python 3.14 on 26.04 also needed the cp314 wheels of grpcio and
+      grpcio-tools in `interop/python/requirements.txt`, and the coverage check now names its
+      upb environment after the Python too, since the dependency cache is kept per architecture.
 
 46. **The full-stack benchmark loads receivers on connect-go and connect-rust beside the sink.**
     Ruled by the owner on 2026-11-18, for issue 7.

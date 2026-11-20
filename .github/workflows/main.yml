@@ -26,7 +26,7 @@ env:
   GOTOOLCHAIN: auto
 jobs:
   plan:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     outputs:
       checks: ${{ steps.list.outputs.checks }}
     steps:
@@ -35,26 +35,26 @@ jobs:
         run: echo "checks=$(tools/ci.sh --list)" >>"${GITHUB_OUTPUT}"
   check:
     needs: plan
-    name: ${{ matrix.check }}${{ matrix.runner == 'ubuntu-24.04-arm' && ' (arm64)' || '' }}
+    name: ${{ matrix.check }}${{ matrix.runner == 'ubuntu-26.04-arm' && ' (arm64)' || '' }}
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
         check: ${{ fromJSON(needs.plan.outputs.checks) }}
-        runner: [ubuntu-24.04]
+        runner: [ubuntu-26.04]
         # The comparison with Go and Buffa runs on arm64 too. Its times belong to that machine
         # alone, as each run's do (docs/performance.md).
         include:
           - check: bench-compare
-            runner: ubuntu-24.04-arm
+            runner: ubuntu-26.04-arm
           # aarch64 Linux reaches a test binary's thread-local data through local-exec
           # relocations, which reach 16 MiB, and x86-64's reach 2 GiB.
           - check: test
-            runner: ubuntu-24.04-arm
+            runner: ubuntu-26.04-arm
           # The full stack on arm64, for the README's arm64 chart (decision 44).
           - check: fullstack
-            runner: ubuntu-24.04-arm
+            runner: ubuntu-26.04-arm
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
