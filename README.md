@@ -17,58 +17,56 @@ and serve the same handlers to Connect, gRPC and gRPC-Web clients, in binary pro
   each message is encoded straight into the HTTP body it goes out in.
 - **No hidden I/O.** The protocol core reads bytes you give it and writes bytes you send. It
   reads no clock, so every test is deterministic.
-- **Fast.** Binary and JSON encoding and decoding run 2.2 to 41.4 times faster than Go's protobuf
-  runtime on arm64, and 2.1 to 31.7 times on x86-64. In a gateway that takes OpenTelemetry traces
-  over TLS, one core holds 7.1 times connect-go's spans a second and 2.6 times connect-rust's on
-  arm64, and 6.8 and 2.3 times on x86-64. It holds 3.4 times the OpenTelemetry Collector's. All
-  in CI's [run 185](https://github.com/c4milo/connect-zig/actions/runs/44627403358) (see
-  [Performance](#performance)).
+- **Fast.** Binary and JSON encoding and decoding run 2.3 to 38.5 times faster than Go's protobuf
+  runtime on arm64, and 1.4 to 32.5 times on x86-64. In a gateway that takes OpenTelemetry traces
+  over TLS, one core holds 8.0 times connect-go's spans a second and 2.7 times connect-rust's on
+  arm64, and 5.6 and 2.2 times on x86-64. It holds 3.5 times the OpenTelemetry Collector's. All
+  in CI's [run 191](https://github.com/c4milo/connect-zig/actions/runs/44673102412) on Ubuntu 26.04 (see [Performance](#performance)).
 - **HTTP from [colibri](https://github.com/c4milo/colibri).** Servers and clients run over h11,
   h2 and h3, in cleartext or over TLS.
 
 ## Performance
 
-Three measurements from CI's
-[run 185](https://github.com/c4milo/connect-zig/actions/runs/44627403358), on an Arm Neoverse-N2
-core. The x86-64 chart is under each one. [docs/benchmarks.md](docs/benchmarks.md) says how each is measured and holds every
-table.
+Three measurements from CI's [run 191](https://github.com/c4milo/connect-zig/actions/runs/44673102412) on Ubuntu 26.04, on an
+Arm Neoverse-N2 core. The x86-64 chart is under each one. [docs/benchmarks.md](docs/benchmarks.md)
+says how each is measured and holds every table.
 
 **Whole servers.** An OTLP receiver on one core, over TLS and h2, takes the traffic of one gateway
-core for 33,000 servers. connect-zig holds 7.1 times connect-go's spans a second and 2.6 times
+core for 33,000 servers. connect-zig holds 8.0 times connect-go's spans a second and 2.7 times
 connect-rust's, in 378 MiB that it takes at start.
 
-![Bars of the spans a second one core holds with p99 under 100 ms over TLS, and lines of p99 as the rate climbs, on arm64: connect-zig holds 694,200 spans a second, 7.1 times connect-go's 97,898, 2.6 times connect-rust's 266,990, 3.4 times the OpenTelemetry Collector's 204,696 and 10.4 times Vector's 66,750](docs/images/fullstack-arm64.svg)
+![Bars of the spans a second one core holds with p99 under 100 ms over TLS, and lines of p99 as the rate climbs, on arm64: connect-zig holds 712,016 spans a second, 8.0 times connect-go's 89,002, 2.7 times connect-rust's 267,000, 3.5 times the OpenTelemetry Collector's 204,696 and 10.7 times Vector's 66,748](docs/images/fullstack-arm64.svg)
 
 <details>
-<summary>On x86-64, connect-zig holds 6.8 times connect-go's spans a second, 2.3 times connect-rust's, 3.4 times the Collector's and 10.5 times Vector's.</summary>
+<summary>On x86-64, connect-zig holds 5.6 times connect-go's spans a second, 2.2 times connect-rust's, 2.7 times the Collector's and 10.4 times Vector's.</summary>
 
-![Bars of the spans a second one core holds with p99 under 100 ms over TLS, and lines of p99 as the rate climbs, on x86-64: connect-zig holds 605,232 spans a second, 6.8 times connect-go's 89,000, 2.3 times connect-rust's 258,094, 3.4 times the OpenTelemetry Collector's 178,000 and 10.5 times Vector's 57,850](docs/images/fullstack.svg)
+![Bars of the spans a second one core holds with p99 under 100 ms over TLS, and lines of p99 as the rate climbs, on x86-64: connect-zig holds 694,232 spans a second, 5.6 times connect-go's 124,602, 2.2 times connect-rust's 320,416, 2.7 times the OpenTelemetry Collector's 258,094 and 10.4 times Vector's 66,750](docs/images/fullstack.svg)
 
 </details>
 
 **The routed call.** One unary call in memory through each library's router, protocol and codec.
-connect-zig is 15.8 to 24.0 times as fast as connect-go, and 3.7 to 7.1 times as fast as
+connect-zig is 15.1 to 22.9 times as fast as connect-go, and 3.4 to 6.4 times as fast as
 connect-rust.
 
-![Bars of the speed of a routed unary call through connect-zig and connect-rust, in multiples of connect-go's, on arm64: connect-zig is 15.8 to 24.0 times as fast as connect-go, and 3.7 to 7.1 times as fast as connect-rust](docs/images/call-vs-go-arm64.svg)
+![Bars of the speed of a routed unary call through connect-zig and connect-rust, in multiples of connect-go's, on arm64: connect-zig is 15.1 to 22.9 times as fast as connect-go, and 3.4 to 6.4 times as fast as connect-rust](docs/images/call-vs-go-arm64.svg)
 
 <details>
-<summary>On x86-64, connect-zig is 14.2 to 23.9 times as fast as connect-go, and 3.4 to 6.2 times as fast as connect-rust.</summary>
+<summary>On x86-64, connect-zig is 12.3 to 18.7 times as fast as connect-go, and 3.1 to 5.7 times as fast as connect-rust.</summary>
 
-![Bars of the speed of a routed unary call through connect-zig and connect-rust, in multiples of connect-go's, on x86-64: connect-zig is 14.2 to 23.9 times as fast as connect-go, and 3.4 to 6.2 times as fast as connect-rust](docs/images/call-vs-go.svg)
+![Bars of the speed of a routed unary call through connect-zig and connect-rust, in multiples of connect-go's, on x86-64: connect-zig is 12.3 to 18.7 times as fast as connect-go, and 3.1 to 5.7 times as fast as connect-rust](docs/images/call-vs-go.svg)
 
 </details>
 
 **The codec.** Binary and JSON encoding and decoding of eight messages, against Go's protobuf
-runtime and Buffa, connect-rust's codec. connect-zig is 2.9 to 19.5 times faster than Go, and Buffa
+runtime and Buffa, connect-rust's codec. connect-zig is 3.2 to 19.2 times faster than Go, and Buffa
 is faster in none of the 16 cells charted.
 
-![Bars of the speed of connect-zig and of Buffa, connect-rust's codec, in multiples of Go's protobuf runtime, connect-go's codec, on arm64: connect-zig is 2.9 to 19.5 times faster than Go's protobuf runtime, and 1.1 to 1.9 times faster than Buffa](docs/images/speed-vs-go-arm64.svg)
+![Bars of the speed of connect-zig and of Buffa, connect-rust's codec, in multiples of Go's protobuf runtime, connect-go's codec, on arm64: connect-zig is 3.2 to 19.2 times faster than Go's protobuf runtime, and 1.0 to 2.2 times faster than Buffa](docs/images/speed-vs-go-arm64.svg)
 
 <details>
-<summary>On x86-64, connect-zig is 2.8 to 21.5 times faster than Go, and Buffa is faster in 2 of the 16 cells: the medium message's binary decode with every field read, by 1.25 times, and the deep message's binary encode, by 1%.</summary>
+<summary>On x86-64, connect-zig is 3.3 to 19.0 times faster than Go, and Buffa is faster in 1 of the 16 cells: the medium message's binary encode, by 1.45 times.</summary>
 
-![Bars of the speed of connect-zig and of Buffa, connect-rust's codec, in multiples of Go's protobuf runtime, connect-go's codec, on x86-64: connect-zig is 2.8 to 21.5 times faster than Go's protobuf runtime, and Buffa is faster than connect-zig in 2 of 16 cells](docs/images/speed-vs-go.svg)
+![Bars of the speed of connect-zig and of Buffa, connect-rust's codec, in multiples of Go's protobuf runtime, connect-go's codec, on x86-64: connect-zig is 3.3 to 19.0 times faster than Go's protobuf runtime, and Buffa is faster than connect-zig in 1 of 16 cells](docs/images/speed-vs-go.svg)
 
 </details>
 

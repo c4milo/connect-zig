@@ -1259,6 +1259,13 @@ ran on Linux x86-64 with Zig 0.16.0.
     MiB and 55 MiB, and connect-go to 144 MiB and 131 MiB.
   - A local run in an arm64 container before it gave 4.5 times connect-go's rate and 1.8 times
     connect-rust's, with every span counted.
+- **Ubuntu 26.04** (`fa83b86`, decision 44 as amended on 2026-11-20). CI's
+  [run 191](https://github.com/c4milo/connect-zig/actions/runs/44673102412), the first on
+  `ubuntu-26.04` and `ubuntu-26.04-arm`. Every job passed. Over TLS on arm64, connect-zig held
+  712,016 spans a second, connect-rust 267,000 and connect-go 89,002: 2.7 and 8.0 times. The
+  first attempt of `bench-compare` on arm64 timed some of connect-zig's cells at twice the lab's
+  time, with the same CPU and code; a second attempt matched the lab, and the README takes it.
+  valgrind 3.26 counted the routed call's instructions as 3.22 did: 4,177 and 4,430.
 - **colibri v0.19.0** (`af0b01e`). CI's
   [run 185](https://github.com/c4milo/connect-zig/actions/runs/44627403358). colibri issue 137
   halved each socket's buffers and decision 167 moved each TLS session into a buffer the program
