@@ -663,6 +663,67 @@ first. Cite an entry by number in code and commits ("decision 6").
     size it, which cost the same within 0.7% and added a public option; and a function route for
     each unary method, which holds no state for the call.
 
+## Validation
+
+47. **protovalidate's rules are checked in a module of their own, `protovalidate`, from tables
+    the plugin writes.** Ruled by the owner on 2026-11-21. A server that checks each request
+    against the rules of its schema is common, so the library holds the check:
+    [protovalidate](https://github.com/bufbuild/protovalidate) v1.2.2's
+    `(buf.validate.message)`, `(buf.validate.oneof)` and `(buf.validate.field)` options.
+    - It lives in this repository. The rules are read from the plugin's request, and the check
+      reads a generated message's fields, which no public contract describes. A second
+      repository needs a second plugin that copies this one's names, index and features.
+    - `protovalidate` imports `protobuf` and the generated code of `validate.proto`, and no
+      `connect` module. A program with no RPC validates a message. The owner expects `protobuf`
+      to move to stdx one day, and a module that names no `connect` can move with it.
+    - No rule is read at run time. The plugin writes a message's rules as a table,
+      `pub const protovalidate: validate.Rules`, beside its `protobuf` descriptor. `validate`
+      reads the table at comptime, as `encode` reads the descriptor, so a rule that a field
+      lacks costs no instruction. A CEL expression becomes a Zig function that the plugin
+      writes (design §8 step 34).
+    - The table holds the generated types of `validate.proto` itself, such as
+      `buf.validate.FieldRules`. The plugin writes each rule message as a Zig literal from its
+      descriptor in the request, so the plugin knows no rule by name. A violation's rule path
+      takes each rule's number, name and type from the generated descriptor.
+    - The package exports that generated code as the module `buf_validate_validate`, the name
+      the plugin gives `buf/validate/validate.proto`, and `google_protobuf_descriptor`, which
+      it imports. A program's generated code that names `buf.validate.Violations` imports the
+      same module, so one `Violation` type exists in a build.
+    - A rule fails closed. A rule that the library has no check for, or that does not fit its
+      field, stops the build with a message that names it. `rules_error` gives that message as
+      a value, for a program that must report it at run time, as the conformance executor
+      does.
+    - Each number above 1 of a rule is a constant of the message's `RuleNumber`, named for its
+      field and its rule, as decision 17 asks of every number in generated code.
+    - A message with no rule, in itself or in a message it holds, keeps the code it had. Its
+      file imports no `protovalidate`.
+    - `validate` writes each violation into a `Report` over storage the caller passes: the
+      field's path, the rule's path, the rule's id and a message, as `buf.validate.Violation`
+      holds them. A full report ends the walk and says so. A standard rule's message is a
+      comptime string.
+    - A rule that reads the time takes it from `Options.now` (decision 3). A message whose
+      rules need the time fails with `TimeMissing` when the caller passed none.
+    - A server checks each request message in an interceptor's `on_message` hook, which runs
+      once the message is decoded and before the handler (design §8 step 33, which amends
+      decisions 19 and 36). `protovalidate.Interceptor` refuses a message with
+      `invalid_argument` and a `buf.validate.Violations` detail. It takes the `connect` module
+      as a parameter, as a generated `Routes` takes its transport (decision 2).
+    - `pattern` and CEL's `matches` take RE2's syntax. They wait for a regular expression
+      module in stdx, which the owner chose on 2026-11-21 (design §8 step 35). Until then a
+      rule with a pattern stops the build.
+    - protovalidate's conformance harness v1.2.2 runs against `zig build
+      protovalidate-executor`. The harness sends each case as an Any beside a
+      `FileDescriptorSet`. The library has no dynamic message, so the executor holds the
+      suite's generated messages and finds a case's type by its URL, as decision 21 does.
+
+    Beaten: a repository of its own, for the reasons above; a CEL interpreter at run time, as
+    every other protovalidate library has, which needs an allocator and messages read through
+    reflection (decisions 4 and 6); rule tables written by hand in the library, a second copy
+    of `validate.proto`'s shape with each rule's number typed in; the rules as encoded octets
+    that `validate` decodes at comptime, which no reader can check against the schema; and a
+    check function that the plugin writes for each message, which passes cognitive complexity
+    15 at a message of many rules (decision 17).
+
 ## Tooling
 
 15. **pepegrillo is lazy.** `build.zig` requests it only when `b.pkg_hash.len == 0`, so a project

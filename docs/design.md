@@ -18,6 +18,10 @@ Each rule in the code cites the document that states it:
 - For `oidc`: RFC 7515 (JWS), RFC 7517 (JWK), RFC 7518 (JWA), RFC 7519 (JWT), RFC 8037
   (EdDSA in JOSE), RFC 8725 (JWT best practices), RFC 6750 (bearer tokens) and OpenID Connect
   Core 1.0: <https://openid.net/specs/openid-connect-core-1_0.html>.
+- For `protovalidate`: `buf/validate/validate.proto` of protovalidate v1.2.2,
+  <https://github.com/bufbuild/protovalidate>, whose comments state each rule and whose
+  `(buf.validate.predefined).cel` options define it. The code cites a rule by its message and
+  its field: "validate.proto, StringRules.min_len".
 
 ## 2. Rules
 
@@ -32,11 +36,17 @@ protobuf          <- stdx json, stdx codec
 connect           <- protobuf, stdx json, codec, gzip, zstd, brotli
 connect_colibri   <- connect, protobuf, colibri server, client, http
 oidc              <- connect, stdx json, codec, chapulin
+protovalidate     <- protobuf, buf_validate_validate, google_protobuf_descriptor
+buf_validate_validate (generated)      <- protobuf, google_protobuf_descriptor
+google_protobuf_descriptor (generated) <- protobuf
 protoc-gen-connect-zig (executable) <- protobuf
 ```
 
 `connect` imports no HTTP library (decision 2). Only `connect_colibri` imports colibri. `oidc`
-imports chapulin for its `jws` calls, and no colibri module (decision 34).
+imports chapulin for its `jws` calls, and no colibri module (decision 34). `protovalidate`
+imports no `connect` module (decision 47). Its two generated modules are the plugin's code for
+`buf/validate/validate.proto` and `google/protobuf/descriptor.proto`, in
+`src/protovalidate/gen`, from the copies in `src/protovalidate/proto`.
 
 ## 4. The protobuf runtime
 
@@ -258,6 +268,34 @@ Each step names the check that proves it. A step is done when its check passes i
     the climb over TLS, each on one core (decision 46, issue 7). Each counts the spans it took and
     answers the counts, connect-rust on a port of its own. New public names: none. Check: the
     probes and the counts of step 28.
+32. **protovalidate's standard rules.** The `protovalidate` module, and the tables the plugin
+    writes for it (decision 47). The plugin reads `(buf.validate.message)`,
+    `(buf.validate.oneof)` and `(buf.validate.field)` from each descriptor's options, and
+    writes `pub const protovalidate` and `RuleNumber` in each message that has a rule or holds
+    a message that has one. `validate` checks `required`, `ignore`, a oneof's `required`, a
+    message's `oneof` rules and each type's standard rules, and walks nested messages,
+    repeated fields and maps. New public names, all in `protovalidate`: `constants`, `Rules`,
+    `validate`, `Options`, `Report`, `Violation`, `Error` and `rules_error`. The package gains
+    the modules `protovalidate`, `buf_validate_validate` and `google_protobuf_descriptor`.
+    Check: `zig build test-protovalidate` and `zig build test-plugin`, with each check's
+    mutation caught; `tools/protovalidate_conformance_check.sh` runs protovalidate's
+    conformance harness v1.2.2 against `zig build protovalidate-executor`, with the cases that
+    wait for steps 34 and 35 in `conformance/protovalidate_known_failing.yaml`, each under its
+    reason.
+33. **A hook for each request message.** An interceptor may declare `on_message`, which a
+    route calls with each request message once it is decoded, before the handler takes it
+    (decision 47, which amends decisions 19 and 36). `protovalidate.Interceptor` validates the
+    message there and refuses it with `invalid_argument`. New public names:
+    `protovalidate.Interceptor` and `protovalidate.InterceptorOptions`. Check: `zig build
+    test-connect-colibri` runs the hook for a unary call and for each message of a stream, by
+    both kinds of handler; a new example project serves a method behind the interceptor.
+34. **CEL.** The plugin compiles `cel` and `cel_expression` rules, and the predefined rules of
+    an extension, into Zig functions that the tables name (decision 47). New public names: the
+    step names them. Check: the conformance cases of custom and predefined rules leave the
+    known-failing list.
+35. **Patterns.** `pattern` rules and CEL's `matches` run on stdx's regular expression module
+    (decision 47). New public names: none. Check: the conformance cases of patterns leave the
+    known-failing list.
 
 ### Step records
 
