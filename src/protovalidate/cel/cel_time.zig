@@ -1,5 +1,7 @@
-//! CEL's `duration(string)`: the text of a duration as Go's time.ParseDuration reads it, which
-//! cel-go follows (CEL language definition, "Timestamps and Durations").
+//! CEL's `duration(string)` (CEL language definition, "Types and Conversions"): "Duration
+//! strings may be zero (`"0"`), negative (`-1h`), fractional (`-23.4s`), and/or compound
+//! (`1h34us`)", with the suffixes h, m, s, ms, us and ns. The definition states no grammar of
+//! the text. cel-go reads it with Go's time.ParseDuration, and this file follows that.
 const std = @import("std");
 const proto = @import("protobuf");
 const constants = @import("../constants.zig");
@@ -83,11 +85,12 @@ fn unit_of(rest: []const u8) ?Unit {
     return null;
 }
 
-/// google/protobuf/duration.proto: "Seconds ... Must be from -315,576,000,000 to
-/// +315,576,000,000 inclusive", and `nanos` has the sign of `seconds`.
+/// "Duration values are limited to a single int64 value, or roughly +-290 years" (CEL language
+/// definition, "Overflow"): the nanoseconds of a duration's text fit an int64. `nanos` has the
+/// sign of `seconds` (google/protobuf/duration.proto).
 fn from_nanos(total: i128) ?Duration {
+    if (total < std.math.minInt(i64) or total > std.math.maxInt(i64)) return null;
     const seconds = @divTrunc(total, constants.nanos_per_second);
-    if (seconds < -constants.duration_seconds_max or seconds > constants.duration_seconds_max) return null;
     return .{ .seconds = @intCast(seconds), .nanos = @intCast(@rem(total, constants.nanos_per_second)) };
 }
 
@@ -135,7 +138,10 @@ test "a text that states no duration, or one past the type's range, gives none" 
     for ([_][]const u8{ "", "-", "10", "s", "1x", "1.s2", "1 s", "1s ", "--1s", ".s", "1h-1m" }) |text| {
         try testing.expect(parse_duration(text) == null);
     }
-    try testing.expect(parse_duration("87660000h") != null);
-    try testing.expect(parse_duration("87660001h") == null);
-    try testing.expect(parse_duration("-87660001h") == null);
+    // A duration's nanoseconds fit an int64: about 292 years either side of zero.
+    try testing.expect(parse_duration("2562047h47m16.854775807s") != null);
+    try testing.expect(parse_duration("2562047h47m16.854775808s") == null);
+    try testing.expect(parse_duration("-2562047h47m16.854775808s") != null);
+    try testing.expect(parse_duration("-2562047h47m16.854775809s") == null);
+    try testing.expect(parse_duration("87660000h") == null);
 }
