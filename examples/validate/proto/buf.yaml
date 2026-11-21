@@ -1,0 +1,6 @@
+# The validate example's schema, one buf module (decision 41). Its rules are options of
+# protovalidate's validate.proto, which buf fetches from the Buf Schema Registry at the release
+# that connect-zig's `protovalidate` module is generated from. buf.lock pins its commit.
+version: v2
+deps:
+  - buf.build/bufbuild/protovalidate:v1.2.2

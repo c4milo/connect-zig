@@ -1,0 +1,42 @@
+[
+  {
+    "command": "zig build run",
+    "output": [
+      "validate: register took Ada",
+      "validate: refused: invalid_argument: email: must be a valid email address",
+      "validate:   email: must be a valid email address [string.email]",
+      "validate: refused: invalid_argument: name: must be at least 1 characters (and 2 more)",
+      "…",
+      "validate: refused: invalid_argument: name: must be at least 1 characters (and 2 more)",
+      "validate:   name: must be at least 1 characters [string.min_len]",
+      "validate:   age: must be greater than or equal to 13 and less than 150 [int32.gte_lt]",
+      "validate:   tags: repeated value must contain unique items [repeated.unique]",
+      "validate: register of a stream took 2 accounts",
+      "validate: refused: invalid_argument: email: must be a valid email address",
+      "validate:   email: must be a valid email address [string.email]",
+      "validate: over h3, the handlers took 4 accounts, and no account that broke a rule",
+      "validate: every call answered as expected over h2, h11 and h3"
+    ]
+  },
+  {
+    "command": "zig build serve &",
+    "output": [
+      "listening on port 8443"
+    ]
+  },
+  {
+    "command": "curl --cacert ../harness/tls/ca.pem --json '{\"email\":\"ada@example.com\",\"name\":\"Ada\",\"age\":36}' https://127.0.0.1:8443/signup.v1.SignupService/Register",
+    "output": [
+      "{\"name\":\"Ada\"}"
+    ]
+  },
+  {
+    "command": "curl -i --cacert ../harness/tls/ca.pem --json '{\"email\":\"ada\",\"name\":\"Ada\",\"age\":7}' https://127.0.0.1:8443/signup.v1.SignupService/Register",
+    "output": [
+      "HTTP/2 400",
+      "content-type: application/json",
+      "content-length: 415",
+      "{\"code\":\"invalid_argument\",\"message\":\"email: must be a valid email address (and 1 more)\",\"details\":[{\"type\":\"buf.validate.Violations\",\"value\":\"ClkSDHN0cmluZy5lbWFpbBodbXVzdCBiZSBhIHZhbGlkIGVtYWlsIGFkZHJlc3MqDQoLCAESBWVtYWlsGAkyGwoMCA4SBnN0cmluZxgLCgsIDBIFZW1haWwYCApsEgxpbnQzMi5ndGVfbHQaNW11c3QgYmUgZ3JlYXRlciB0aGFuIG9yIGVxdWFsIHRvIDEzIGFuZCBsZXNzIHRoYW4gMTUwKgsKCQgDEgNhZ2UYBTIYCgsIAxIFaW50MzIYCwoJCAUSA2d0ZRgF\"}]}"
+    ]
+  }
+]

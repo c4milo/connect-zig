@@ -84,6 +84,12 @@ EXAMPLES = {
         ("serve", None),
         ("sh", "curl --cacert " + CA + " -H \"authorization: Bearer $TOKEN\" --json '{}' " + URL + "/account.v1.AccountService/Whoami"),
     ],
+    "validate": [
+        ("run", None),
+        ("serve", None),
+        ("sh", "curl --cacert " + CA + " --json '{\"email\":\"ada@example.com\",\"name\":\"Ada\",\"age\":36}' " + URL + "/signup.v1.SignupService/Register"),
+        ("sh", "curl -i --cacert " + CA + " --json '{\"email\":\"ada\",\"name\":\"Ada\",\"age\":7}' " + URL + "/signup.v1.SignupService/Register"),
+    ],
     "std_io": [
         ("run", None),
         ("serve", None),
