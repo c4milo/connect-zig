@@ -12,7 +12,7 @@
 # `--list` as a job of its own, so each shows apart in GitHub.
 set -eu
 cd "$(dirname "$0")/.."
-checks="format commits test release package bench costs bench-compare fullstack perf generated interop interop-languages interop-servers coverage line-coverage conformance protobuf-conformance protovalidate-conformance"
+checks="format commits test release package bench costs bench-compare fullstack perf generated interop interop-languages interop-servers coverage line-coverage conformance protobuf-conformance protovalidate-conformance lean"
 only=""
 case "${1:-}" in
     --list)
@@ -124,6 +124,9 @@ check() {
         protobuf-conformance) tools/protobuf_conformance_check.sh ;;
         # protovalidate's conformance harness, against the rules the library checks (decision 47).
         protovalidate-conformance) tools/protovalidate_conformance_check.sh ;;
+        # The Lean model of the CEL syntax, and the vectors a unit test replays against the Zig
+        # grammar (spec/lean/README.md).
+        lean) tools/lean_check.sh ;;
         *)
             echo "no check named $1" >&2
             return 2

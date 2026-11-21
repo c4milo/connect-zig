@@ -1,0 +1,16 @@
+name = "connect_zig"
+defaultTargets = ["Cel"]
+
+# The model of the CEL syntax that `protovalidate` reads (docs/design.md §8 step 34). Lean's core
+# alone: no package.
+[[lean_lib]]
+name = "Cel"
+# Every public declaration says what it is, and an unused name is an error.
+leanOptions = [
+  { name = "linter.missingDocs", value = true },
+  { name = "linter.unusedVariables", value = true },
+]
+
+[[lean_exe]]
+name = "vectors"
+root = "Vectors"

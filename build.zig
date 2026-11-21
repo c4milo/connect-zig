@@ -17,6 +17,7 @@ const bench = @import("build/bench.zig");
 const conformance = @import("build/conformance.zig");
 const chapulin = @import("build/chapulin.zig");
 const line_coverage = @import("build/line_coverage.zig");
+const lean = @import("build/lean.zig");
 const fullstack = @import("build/fullstack.zig");
 const protovalidate = @import("build/protovalidate.zig");
 
@@ -76,6 +77,7 @@ pub fn build(b: *std.Build) void {
     test_step.dependOn(protovalidate.add(b, graph));
     if (lint.add(b)) |lint_step| test_step.dependOn(lint_step);
     line_coverage.add(b, graph, plugin);
+    lean.add(b);
     bench.add(b, graph.public_names, target);
     fullstack.add(b, graph);
 }
