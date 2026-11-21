@@ -55,6 +55,22 @@ code, and another test requires the two trees to be equal on a corpus.
 Before it writes or checks the file, the program requires the model to read the text of each
 of its 600 trees back as the tree.
 
+The file is one fixed set. `tools/lean_check.sh [seed...]` also compares the two on a set that
+no run compared before. `lake exe vectors --random <seed> <count>` draws from the seed, `count`
+of each kind:
+
+- sequences of two to nine tokens with a space or nothing between two of them, from an
+  alphabet of 65 that holds texts that are no token;
+- sequences of four to nine tokens with spaces;
+- chains of two to seven operands with an operator between two of them and no brackets, so
+  the levels of the operators alone group them, and one chain in five is a conditional;
+- the texts of trees of one to four parts one inside another.
+
+`zig build cel-vectors-replay` builds the program that reads each text with the grammar the
+compiler runs, and requires the model's tree, or a refusal where the model has none. With no
+seed the script takes the time in seconds, and prints it, so a run that fails is run again
+with its seed. A count of 2,500 gives 10,000 expressions, which the two read in 4 seconds.
+
 ## What is proved
 
 Nothing yet. The model is a definition that Lean accepts as total: each function ends, by a

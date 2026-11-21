@@ -78,7 +78,7 @@ pub fn build(b: *std.Build) void {
     test_step.dependOn(protovalidate.add(b, graph));
     if (lint.add(b)) |lint_step| test_step.dependOn(lint_step);
     line_coverage.add(b, graph, plugin);
-    lean.add(b);
+    lean.add(b, graph);
     bench.add(b, graph.public_names, target);
     fullstack.add(b, graph);
     schema_programs.add(b, graph);

@@ -8,6 +8,13 @@ the tree the model reads of it, or "!" for a text that is no expression. A Zig u
 requires the Zig grammar to read each expression as the model does (spec/README.md).
 
     lake exe vectors (--write | --check) <src/protovalidate/cel directory>
+    lake exe vectors --random <seed> <count>
+
+With `--random` the program prints vectors of expressions that it draws from the seed, in the
+file's form: `count` sequences of tokens with a space or nothing between two of them, `count`
+sequences with spaces, `count` chains of operands and operators with no brackets, and `count`
+trees. `tools/lean_check.sh` gives them to the Zig grammar, so each run compares the two on
+expressions that no run compared before.
 
 The expressions are every sequence of up to three tokens of a small alphabet, each pair of
 those tokens with no space between them, sequences of more tokens that a fixed generator
@@ -99,6 +106,70 @@ def trees : Nat → Nat → List Expr
     let (built, state') := tree (1 + pick state 3) (next state)
     built :: trees count state'
 
+/-- The tokens of the sequences that a seed draws: `large`, and tokens that state more of the
+lexis, some of them no token at all. -/
+def wide : List String :=
+  large ++ [".5", "1e3", "2.5", "0", "5u", "r'\\d'", "\"q\"", "'''m'''", "b\"y\"", "'a\\'b'", "9223372036854775808",
+    "18446744073709551615u", "0x", "u", "#", "_x1", "exists", "--", "\\", "''", "e", "0X1", "1.", "..", "//c"]
+
+/-- `count` sequences of 2 to 9 tokens of `wide`, from `state`, with a space or nothing between
+two tokens: two tokens with nothing between them may read as one, or as no token. -/
+def joined : Nat → Nat → List Octets
+  | 0, _ => []
+  | count + 1, state =>
+    let length := 2 + pick state 8
+    let (text, state) := (List.range length).foldl
+      (fun (acc : String × Nat) _ =>
+        let state := next acc.2
+        let token := wide.getD (pick state wide.length) "a"
+        let state := next state
+        let gap := if acc.1.isEmpty || pick state 3 == 0 then "" else " "
+        (acc.1 ++ gap ++ token, state))
+      ("", next state)
+    octetsOf text :: joined count (next state)
+
+/-- `count` trees from `state`, of 1 to 4 parts one inside another. -/
+def deeper : Nat → Nat → List Expr
+  | 0, _ => []
+  | count + 1, state =>
+    let (built, state') := tree (1 + pick state 4) (next state)
+    built :: deeper count state'
+
+/-- The operands of the texts that `chains` draws: each is an expression by itself. -/
+def operands : List String :=
+  ["a", "this", "1", "2u", "1.5", "'s'", "true", "null", "(a)", "[1, 2]", "f(a)", "a.b", "a[0]", "-1", "!a", "-a", "--1.5",
+    "-2.5.f()", "!-1", "a.g(1)", "b'x'", ".5", "-(1)", "!!a", "x.y.z", "- 5", "---a", "[a,]", "a.all(x, x)"]
+
+/-- The operators of two operands, as an expression writes them. -/
+def operators : List String := ["||", "&&", "<", "<=", ">", ">=", "==", "!=", "in", "+", "-", "*", "/", "%"]
+
+/-- 2 to 7 operands from `state`, with an operator between two of them and no brackets, so the
+levels of the operators alone group them. A space, or nothing, stands around an operator. -/
+def chain (state : Nat) : String × Nat :=
+  (List.range (2 + pick state 6)).foldl
+    (fun (acc : String × Nat) index =>
+      let state := next acc.2
+      let operand := operands.getD (pick state operands.length) "a"
+      if index == 0 then (operand, state)
+      else
+        let state := next state
+        let operator := operators.getD (pick state operators.length) "+"
+        let state := next state
+        let gap := if operator == "in" || pick state 2 == 0 then " " else ""
+        (acc.1 ++ gap ++ operator ++ gap ++ operand, state))
+    ("", next state)
+
+/-- `count` texts from `state`: a chain, or three chains as a conditional. -/
+def chains : Nat → Nat → List Octets
+  | 0, _ => []
+  | count + 1, state =>
+    let (first, state1) := chain (next state)
+    if pick state 5 == 0 then
+      let (second, state2) := chain state1
+      let (third, state3) := chain state2
+      octetsOf (first ++ " ? " ++ second ++ " : " ++ third) :: chains count (next state3)
+    else octetsOf first :: chains count (next state1)
+
 /-- Expressions that state each rule of the lexis, and each part of the grammar that the
 sequences above do not reach. -/
 def chosen : List Octets :=
@@ -147,9 +218,28 @@ def lines : List String :=
 wrong. -/
 def unread : List Expr := (trees 600 34).filter fun built => parse (write built) != some built
 
-/-- Writes the file, or checks it against what the model gives; 1 when it differs. -/
+def usage : String := "usage: vectors (--write | --check) <src/protovalidate/cel directory> | vectors --random <seed> <count>"
+
+/-- Prints the vectors of the expressions that a seed draws; 1 when the model does not read a
+drawn tree's text back as the tree. -/
+def random (seed count : Nat) : IO UInt32 := do
+  let state := next (seed + 1)
+  let drawn := deeper count (next (next state))
+  if let built :: _ := drawn.filter fun built => parse (write built) != some built then
+    IO.eprintln s!"the model does not read its own text back: {fileText (write built)}"
+    return 1
+  IO.println s!"# vectors of the CEL model from the seed {seed}: expression, a tab, and the text of its tree or \"!\"."
+  let texts := joined count state ++ longer count (next state) ++ chains count (next (next (next state))) ++ drawn.map write
+  for expression in texts do
+    IO.println (line expression)
+  return 0
+
+/-- Writes the file, or checks it against what the model gives; 1 when it differs. With
+`--random`, prints the vectors a seed draws. -/
 def main (arguments : List String) : IO UInt32 := do
-  let usage := "usage: vectors (--write | --check) <src/protovalidate/cel directory>"
+  if let ["--random", seed, count] := arguments then
+    let (some seed, some count) := (seed.toNat?, count.toNat?) | IO.eprintln usage; return 2
+    return ← random seed count
   let [mode, directory] := arguments | IO.eprintln usage; return 2
   unless mode == "--write" || mode == "--check" do
     IO.eprintln usage

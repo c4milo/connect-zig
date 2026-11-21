@@ -58,6 +58,8 @@ change the public API, and the entry marks each change that does.
 - `docs/specs/cel/langdef.md`, the CEL language definition as cel-spec published it at
   v0.25.3, with its checksum. `tools/citations_check.sh`, the check `citations`, requires each
   citation of it in the code to name one of its sections.
+- `tools/lean_check.sh [seed...]` also compares the Lean model with the Zig grammar on
+  expressions that the model draws from a seed, a new seed on each run.
 - `tools/cel_differential_check.sh`, the check `cel-differential` of `tools/ci.sh`: random
   CEL rules over random messages, with this library's verdicts held to those of
   protovalidate-go v1.4.1, which runs cel-go.

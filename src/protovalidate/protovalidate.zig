@@ -78,6 +78,7 @@ test {
     _ = @import("cel/cel_rule_test.zig");
     _ = @import("cel/cel_collection_test.zig");
     _ = @import("cel/cel_cost_test.zig");
+    _ = @import("cel_reader.zig");
     _ = @import("cel/cel_library.zig");
     _ = @import("cel/cel_list.zig");
     _ = @import("cel/cel_predefined_test.zig");

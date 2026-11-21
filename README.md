@@ -566,7 +566,9 @@ with `zig build test`, and serves its service with `zig build serve` for curl an
 - `tools/lean_check.sh` builds a [Lean model](spec/README.md) of the CEL syntax, written
   from the CEL language definition, and requires the vector file beside the Zig grammar to be
   what the model gives. A unit test reads each of the 6,655 expressions with the grammar the
-  compiler runs, and requires the model's tree or its refusal. No theorem is proved yet.
+  compiler runs, and requires the model's tree or its refusal. No theorem is proved yet. The
+  script then draws 10,000 expressions from a new seed, gives each to the model and to the
+  Zig grammar, and requires the same tree: on five seeds, 50,000 expressions were read alike.
 - `tools/cel_differential_check.sh` writes random CEL rules and random messages from a seed,
   and requires this library and
   [protovalidate-go](https://github.com/bufbuild/protovalidate-go) v1.4.1, which runs cel-go,

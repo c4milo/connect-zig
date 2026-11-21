@@ -1584,6 +1584,12 @@ ran on Linux x86-64 with Zig 0.16.0.
   - Six places follow cel-go where the definition is silent or gives two readings, and
     `docs/specs/README.md` lists them.
   - Mutations of the duration's range: 3, each `CAUGHT`.
+  - The owner asked for random expressions given to the Lean model and to the Zig grammar.
+    `lake exe vectors --random <seed> <count>` draws four kinds of text from a seed, and
+    `zig build cel-vectors-replay` reads each with the grammar the compiler runs.
+    `tools/lean_check.sh 7 8 9 11 12` printed, for each seed, `10000 expressions: the Zig
+    grammar and the Lean model differ on 0`. With "%" given the level of "+" on purpose, the
+    replay of seed 7 printed `differ on 165`.
 
 ### What a later step owes
 

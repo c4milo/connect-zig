@@ -189,9 +189,13 @@ confirm a test fails. Report `CAUGHT` or `NOT CAUGHT` per mutation in the commit
   `lean` tool, and requires `src/protovalidate/cel/cel_vectors.txt` to be what the model gives;
   `zig build lean -- write` rewrites it. A unit test of `protovalidate` replays the file against
   the Zig grammar, with no Lean needed. `spec/lean/lean-toolchain` pins the release.
-  `tools/lean_check.sh` runs the step, and installs that release for x86-64 Linux, pinned by
-  SHA-256, when no lake is on the path and `LAKE` names none. `spec/README.md` says what
-  the model holds and what it proves.
+  `tools/lean_check.sh [seed...]` runs the step, and installs that release for x86-64 Linux,
+  pinned by SHA-256, when no lake is on the path and `LAKE` names none. It then compares the
+  model with the Zig grammar on random expressions: `lake exe vectors --random <seed> <count>`
+  writes them, for each seed, the time in seconds when none is given, and
+  `zig build cel-vectors-replay` builds the program that reads each with the grammar the
+  compiler runs, through `src/protovalidate/cel_reader.zig`, a module root no package exports.
+  `spec/README.md` says what the model holds and what it proves.
 - Citations: `tools/citations_check.sh` requires each file of `docs/specs` to have the checksum
   of `docs/specs/SHA256SUMS`, and each citation `CEL language definition, "<section>"` in the
   code to name a heading of `docs/specs/cel/langdef.md`. It is the check `citations` of
