@@ -166,11 +166,12 @@ message:
   each request, and which the chart draws;
 - one validation of the message decoded before, which the second table holds.
 
-The first is the one to compare. connect-zig's message reads a repeated field and a map from the
-octets as validation runs, where the other implementations' decode built a list and a map
-before it. So connect-zig's validation alone includes work that the others count in their
-decode. protovalidate-es reads the schema's descriptors from a FileDescriptorSet, as code that
-protoc-gen-es writes builds them from an embedded descriptor.
+The first is the one to compare. connect-zig decodes with `decode_into`, as `connect_colibri`'s
+route decodes a request: it reads each repeated field and map once, into storage that the
+program owns (decision 37). So validation reads each list and each map as a slice, as the other
+implementations read the lists their decode built. protovalidate-es reads the schema's
+descriptors from a FileDescriptorSet, as code that protoc-gen-es writes builds them from an
+embedded descriptor.
 
 Each verdict is "valid", or "invalid:" and the rule ids of the violations in order. The check
 fails when two implementations give one message different verdicts.

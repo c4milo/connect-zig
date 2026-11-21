@@ -487,7 +487,7 @@ const file_bench_validate_v1_validate_proto_rawDesc = "" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\x05R\x05value:\x028\x01:\xb7\x01\xbaH\xb3\x01\x1aL\n" +
 	"\x0emedium.confirm\x12\x1bconfirm must equal password\x1a\x1dthis.confirm == this.password\x1ac\n" +
-	"\x10medium.pro_quota\x12(a pro plan needs a quota of 1000 or more\x1a%this.plan != 2 || this.quota >= 1000u\"\xd0\x05\n" +
+	"\x10medium.pro_quota\x12(a pro plan needs a quota of 1000 or more\x1a%this.plan != 2 || this.quota >= 1000u\"\xd1\x06\n" +
 	"\x05Rules\x12_\n" +
 	"\x06values\x18\x01 \x03(\x03BG\xbaHD\xba\x01A\n" +
 	"\x0erules.positive\x12\x1beach value must be positive\x1a\x12this.all(v, v > 0)R\x06values\x12\x95\x01\n" +
@@ -499,9 +499,11 @@ const file_bench_validate_v1_validate_proto_rawDesc = "" +
 	"\x04high\x18\x05 \x01(\x03R\x04high\x1a:\n" +
 	"\fWeightsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\x03R\x05value:\x028\x01:\xb1\x01\xbaH\xad\x01\x1a>\n" +
+	"\x05value\x18\x02 \x01(\x03R\x05value:\x028\x01:\xb2\x02\xbaH\xae\x02\x1a>\n" +
 	"\vrules.range\x12\x18low must not exceed high\x1a\x15this.low <= this.high\x1ak\n" +
-	"\vrules.first\x12%the first value must not be under low\x1a5this.values.size() == 0 || this.values[0] >= this.low*9\n" +
+	"\vrules.first\x12%the first value must not be under low\x1a5this.values.size() == 0 || this.values[0] >= this.low\x1a\x7f\n" +
+	"\n" +
+	"rules.last\x12$the last value must not be over high\x1aKthis.values.size() == 0 || this.values[this.values.size() - 1] <= this.high*9\n" +
 	"\x04Plan\x12\x14\n" +
 	"\x10PLAN_UNSPECIFIED\x10\x00\x12\r\n" +
 	"\tPLAN_FREE\x10\x01\x12\f\n" +

@@ -221,7 +221,7 @@ pub const Rules = struct {
     };
 
     pub const protovalidate: validate.Rules = .{
-        .message = .{ .cel = .of(&.{ .{ .id = "rules.range", .message = "low must not exceed high", .expression = "this.low <= this.high" }, .{ .id = "rules.first", .message = "the first value must not be under low", .expression = "this.values.size() == 0 || this.values[0] >= this.low" } }) },
+        .message = .{ .cel = .of(&.{ .{ .id = "rules.range", .message = "low must not exceed high", .expression = "this.low <= this.high" }, .{ .id = "rules.first", .message = "the first value must not be under low", .expression = "this.values.size() == 0 || this.values[0] >= this.low" }, .{ .id = "rules.last", .message = "the last value must not be over high", .expression = "this.values.size() == 0 || this.values[this.values.size() - 1] <= this.high" } }) },
         .fields = &.{
             .{ .number = @intFromEnum(@This().FieldNumber.values), .rules = .{ .cel = .of(&.{.{ .id = "rules.positive", .message = "each value must be positive", .expression = "this.all(v, v > 0)" }}) } },
             .{ .number = @intFromEnum(@This().FieldNumber.names), .rules = .{ .cel = .of(&.{.{ .id = "rules.names", .message = "a name must start with a, and there are at most 10", .expression = "this.exists(n, n.startsWith('a')) && this.size() <= 10" }}) } },

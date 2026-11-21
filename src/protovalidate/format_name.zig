@@ -2,6 +2,7 @@
 //! identifiers validate.proto states as fixed patterns: UUID, trimmed UUID, ULID, a Protobuf
 //! name and an HTTP header's name and value (validate.proto, StringRules).
 const std = @import("std");
+const octet_class = @import("octet_class.zig");
 const constants = @import("constants.zig");
 const format_ip = @import("format_ip.zig");
 
@@ -58,7 +59,7 @@ pub fn is_email(value: []const u8) bool {
 
 /// The HTML standard's characters before the "@": RFC 5322's atext, and ".".
 fn is_email_local(octet: u8) bool {
-    return std.ascii.isAlphanumeric(octet) or std.mem.indexOfScalar(u8, ".!#$%&'*+/=?^_`{|}~-", octet) != null;
+    return octet_class.has(octet_class.alphanumeric ++ ".!#$%&'*+/=?^_`{|}~-", octet);
 }
 
 /// validate.proto, StringRules.host_and_port: a hostname, an IPv4 address or an IPv6 address
@@ -119,9 +120,8 @@ pub fn is_ulid(value: []const u8) bool {
     if (value.len != constants.ulid_text_len) return false;
     if (value[0] < '0' or value[0] > '7') return false;
     for (value[1..]) |octet| {
-        const upper = std.ascii.toUpper(octet);
         // Crockford's base 32 leaves out I, L, O and U.
-        if (!std.ascii.isAlphanumeric(octet) or std.mem.indexOfScalar(u8, "ILOU", upper) != null) return false;
+        if (!octet_class.has("0123456789ABCDEFGHJKMNPQRSTVWXYZabcdefghjkmnpqrstvwxyz", octet)) return false;
     }
     return true;
 }
@@ -151,7 +151,7 @@ pub fn is_header_name(value: []const u8, strict: bool) bool {
     const name = if (value.len != 0 and value[0] == ':') value[1..] else value;
     if (name.len == 0) return false;
     for (name) |octet| {
-        if (!std.ascii.isAlphanumeric(octet) and std.mem.indexOfScalar(u8, "!#$%&'*+,-.^_|~`", octet) == null) return false;
+        if (!octet_class.has(octet_class.alphanumeric ++ "!#$%&'*+,-.^_|~`", octet)) return false;
     }
     return true;
 }

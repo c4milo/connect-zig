@@ -1,16 +1,25 @@
 //! The validation benchmark's Zig program (tools/validate_compare_check.sh): connect-zig's
 //! protovalidate over the schema of bench/validate/proto.
 //!
-//!     bench-validate [--quick] <directory>
+//!     bench-validate [--quick] [--only <case>] <directory>
+//!     bench-validate --instructions
 //!
 //! The directory holds one encoded message for each case of bench/validate/cases, as
 //! `<case>.binpb`, which the check writes from the case's JSON with `buf convert`. For each case
 //! the program times two things, the median nanoseconds of one call of each: `validate` of the
 //! message decoded once, and the decode of its octets with `validate` of what it gives, which a
-//! server runs for each request. A repeated field and a map are views of the octets here, so
-//! `validate` reads them as it runs, where another implementation's decode built them. It prints
+//! server runs for each request. The decode is `decode_into`, as `connect_colibri` decodes a
+//! request into its route's storage (decision 37): each repeated field and each map is read once,
+//! into elements that `validate` then reads in place, as another implementation's decode builds
+//! its lists and maps. It prints
 //! a row for each case with the verdict, which each other implementation's program prints too:
-//! "valid", or "invalid:" and the rule ids of the violations in order.
+//! "valid", or "invalid:" and the rule ids of the violations in order. `--only` runs one case,
+//! as "rules valid", for a profile of it.
+//!
+//! `--instructions` times nothing and reads no file. It decodes each case's JSON, which the
+//! program holds, encodes it, and under callgrind collects `instruction_iterations` runs of
+//! each thing it times, dumped as "validate <case>" and "decode and validate <case>", which
+//! tools/perf_check.sh reads.
 //!
 //! This is a program, not the library: it reads the clock and files through `init.io`.
 const std = @import("std");
@@ -23,22 +32,29 @@ const constants = @import("constants.zig");
 const full: measure.Settings = .{ .runs = constants.full_runs, .batch_ns = constants.full_batch_ns };
 const quick: measure.Settings = .{ .runs = constants.quick_runs, .batch_ns = constants.quick_batch_ns };
 
-/// Each case: its name, the file of its message, and the message's type.
-const Case = struct { name: []const u8, file: []const u8, Message: type };
+/// Each case: its name, the stem of its files, and the message's type.
+const Case = struct { name: []const u8, stem: []const u8, Message: type };
 
 const cases = [_]Case{
-    .{ .name = "small valid", .file = "small_valid.binpb", .Message = schema.Small },
-    .{ .name = "small invalid", .file = "small_invalid.binpb", .Message = schema.Small },
-    .{ .name = "medium valid", .file = "medium_valid.binpb", .Message = schema.Medium },
-    .{ .name = "medium invalid", .file = "medium_invalid.binpb", .Message = schema.Medium },
-    .{ .name = "rules valid", .file = "rules_valid.binpb", .Message = schema.Rules },
-    .{ .name = "rules invalid", .file = "rules_invalid.binpb", .Message = schema.Rules },
+    .{ .name = "small valid", .stem = "small_valid", .Message = schema.Small },
+    .{ .name = "small invalid", .stem = "small_invalid", .Message = schema.Small },
+    .{ .name = "medium valid", .stem = "medium_valid", .Message = schema.Medium },
+    .{ .name = "medium invalid", .stem = "medium_invalid", .Message = schema.Medium },
+    .{ .name = "rules valid", .stem = "rules_valid", .Message = schema.Rules },
+    .{ .name = "rules invalid", .stem = "rules_invalid", .Message = schema.Rules },
 };
+
+/// The runs of each thing `--instructions` counts. tools/perf_check.sh divides by the same.
+pub const instruction_iterations = 16;
+/// The octets of one JSON token of a case, at most.
+const token_len = 1024;
 
 /// The octets of one case's encoded message, at most.
 const message_len_max = 4096;
 /// The octets of the violations of one message, at most.
 const report_len = 16_384;
+/// The octets `decode_into` reads one message's repeated fields and maps into, at most.
+const storage_len = 16_384;
 /// The violations of one message whose rule ids the verdict names, at most.
 const violations_max = 32;
 /// The octets of a verdict, at most.
@@ -48,45 +64,72 @@ const verdict_len_max = 1024;
 const State = struct {
     message: [message_len_max]u8,
     report_storage: [report_len]u8 align(@alignOf(protovalidate.Violation)),
+    storage: [storage_len]u8 align(@alignOf(u64)),
+    transcoded: [message_len_max]u8,
+    tokens: [token_len]u8,
     verdict: [verdict_len_max]u8,
     ids: [violations_max][]const u8,
     path: [constants.path_len]u8,
     output: [constants.output_len]u8 align(constants.buffer_align),
 };
 
+/// What the command line asks for.
+const Options = struct {
+    settings: measure.Settings = full,
+    directory: ?[]const u8 = null,
+    only: ?[]const u8 = null,
+    instructions: bool = false,
+};
+
 pub fn main(init: std.process.Init) !void {
     const state = try init.arena.allocator().create(State);
-    var settings = full;
-    var directory: ?[]const u8 = null;
-    var arguments = init.minimal.args.iterate();
-    _ = arguments.skip();
-    for (0..constants.arguments_max) |_| {
-        const argument = arguments.next() orelse break;
-        if (std.mem.eql(u8, argument, "--quick")) {
-            settings = quick;
-        } else directory = argument;
+    const options = try parse(init.minimal.args);
+    if (options.instructions) {
+        inline for (cases) |case| try count_case(state, case);
+        return;
     }
-    const folder = directory orelse {
-        std.debug.print("usage: bench-validate [--quick] <directory>\n", .{});
+    const folder = options.directory orelse {
+        std.debug.print("usage: bench-validate [--quick] [--only <case>] <directory> | --instructions\n", .{});
         return error.Usage;
     };
     var stdout = std.Io.File.stdout().writerStreaming(init.io, &state.output);
     const writer = &stdout.interface;
     try writer.writeAll("| case | verdict | validate ns/op | decode and validate ns/op |\n| --- | --- | ---: | ---: |\n");
-    inline for (cases) |case| try run_case(init.io, state, settings, folder, case, writer);
+    inline for (cases) |case| {
+        if (options.only == null or std.mem.eql(u8, options.only.?, case.name)) {
+            try run_case(init.io, state, options.settings, folder, case, writer);
+        }
+    }
     try writer.flush();
+}
+
+fn parse(args: std.process.Args) !Options {
+    var options: Options = .{};
+    var arguments = args.iterate();
+    _ = arguments.skip();
+    for (0..constants.arguments_max) |_| {
+        const argument = arguments.next() orelse break;
+        if (std.mem.eql(u8, argument, "--quick")) {
+            options.settings = quick;
+        } else if (std.mem.eql(u8, argument, "--instructions")) {
+            options.instructions = true;
+        } else if (std.mem.eql(u8, argument, "--only")) {
+            options.only = arguments.next() orelse return error.Usage;
+        } else options.directory = argument;
+    }
+    return options;
 }
 
 /// Decodes one case's message, writes its verdict, and times `validate` of it.
 fn run_case(io: std.Io, state: *State, settings: measure.Settings, folder: []const u8, comptime case: Case, writer: *std.Io.Writer) !void {
-    const path = try std.fmt.bufPrint(&state.path, "{s}/{s}", .{ folder, case.file });
+    const path = try std.fmt.bufPrint(&state.path, "{s}/{s}.binpb", .{ folder, case.stem });
     const bytes = try std.Io.Dir.cwd().readFile(io, path, &state.message);
     if (bytes.len == state.message.len) return error.MessageTooLarge;
-    const message = try proto.decode(case.Message, bytes);
+    const message = try proto.decode_into(case.Message, bytes, &state.storage);
     const verdict = try verdict_of(case.Message, state, &message);
     const runner: Runner(case.Message) = .{ .message = &message, .storage = &state.report_storage };
     const validate_ns = try measure.median_ns(io, settings, runner);
-    const both: BothRunner(case.Message) = .{ .bytes = bytes, .storage = &state.report_storage };
+    const both: BothRunner(case.Message) = .{ .bytes = bytes, .storage = &state.report_storage, .elements = &state.storage };
     const both_ns = try measure.median_ns(io, settings, both);
     try writer.print("| {s} | {s} | {d:.1} | {d:.1} |\n", .{ case.name, verdict, validate_ns, both_ns });
     try writer.flush();
@@ -97,12 +140,13 @@ fn BothRunner(comptime M: type) type {
     return struct {
         bytes: []const u8,
         storage: []align(@alignOf(protovalidate.Violation)) u8,
+        elements: []u8,
 
         pub fn run(runner: @This(), n: u64) !void {
             for (0..n) |_| {
                 var bytes = runner.bytes;
                 std.mem.doNotOptimizeAway(&bytes);
-                const message = try proto.decode(M, bytes);
+                const message = try proto.decode_into(M, bytes, runner.elements);
                 var report: protovalidate.Report = .init(runner.storage);
                 const result = protovalidate.validate(M, &message, .{}, &report);
                 std.mem.doNotOptimizeAway(&report);
@@ -153,4 +197,29 @@ fn verdict_of(comptime M: type, state: *State, message: *const M) ![]const u8 {
 
 fn less(_: void, left: []const u8, right: []const u8) bool {
     return std.mem.lessThan(u8, left, right);
+}
+
+/// Counts the instructions of one case under callgrind: `validate` of the message decoded once,
+/// and the decode of its octets with `validate` of what it gives, after one run of each that
+/// warms them. The case's octets are the encoding of its JSON, which the program holds.
+fn count_case(state: *State, comptime case: Case) !void {
+    const json = @embedFile("validate/cases/" ++ case.stem ++ ".json");
+    const decoded = try proto.decode_json(case.Message, json, &state.transcoded, &state.tokens);
+    const bytes = try proto.encode(case.Message, &decoded, &state.message);
+    const message = try proto.decode_into(case.Message, bytes, &state.storage);
+    const runner: Runner(case.Message) = .{ .message = &message, .storage = &state.report_storage };
+    try collect("validate " ++ case.name, runner);
+    // `message` is done with: the decodes write their elements where it stood.
+    const both: BothRunner(case.Message) = .{ .bytes = bytes, .storage = &state.report_storage, .elements = &state.storage };
+    try collect("decode and validate " ++ case.name, both);
+}
+
+fn collect(comptime label: []const u8, runner: anytype) !void {
+    try runner.run(1);
+    const callgrind = std.valgrind.callgrind;
+    callgrind.toggleCollect();
+    try runner.run(instruction_iterations);
+    callgrind.toggleCollect();
+    // callgrind reads the label up to its zero octet.
+    callgrind.dumpStatsAt(@ptrCast(label ++ "\x00"));
 }

@@ -18,14 +18,15 @@ report="${PERF_REPORT:-/dev/null}"
 # A change may cost this much more than the baseline before the check fails, in percent. Counts
 # repeat exactly on one build; the margin covers what another compiler build may reorder.
 tolerance_percent=2
-# The runs of each operation the programs count (bench/main.zig and bench/call_main.zig,
-# instruction_iterations).
+# The runs of each operation the programs count (bench/main.zig, bench/call_main.zig and
+# bench/validate_main.zig, instruction_iterations).
 iterations=16
 zig build install-bench -Dcpu=x86_64_v3
 work="$(mktemp -d)"
 trap 'rm -rf "${work}"' EXIT
-# The codec's operations, then the routed calls, each program alone (build/bench.zig says why).
-for program in bench bench-call; do
+# The codec's operations, the routed calls, then validation, each program alone (build/bench.zig
+# says why).
+for program in bench bench-call bench-validate; do
     valgrind --tool=callgrind --collect-atstart=no --callgrind-out-file="${work}/out.${program}.%p" \
         "zig-out/bin/${program}" --instructions >/dev/null 2>"${work}/valgrind.log" || {
         cat "${work}/valgrind.log" >&2
@@ -58,7 +59,8 @@ fi
 } >>"${report}"
 regressions=0
 while IFS='|' read -r label count; do
-    base="$(grep -F "${label}|" "${baseline}" | cut -d'|' -f2 || true)"
+    # The line whose label is this one whole: "validate x" is the end of "decode and validate x".
+    base="$(awk -F'|' -v label="${label}" '$1 == label { print $2 }' "${baseline}")"
     if [ -z "${base}" ]; then
         echo "| ${label} | none | ${count} | new |" >>"${report}"
         echo "new: ${label}: ${count}"

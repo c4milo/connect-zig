@@ -70,6 +70,12 @@ own, `bench-call` (`bench/call_main.zig`), which `zig build bench` runs after th
 `tools/perf_check.sh` counts beside it. The build makes `connect`, `connect_colibri` and colibri's
 modules in ReleaseFast for it.
 
+A third program, `bench-validate` (`bench/validate_main.zig`), counts `protovalidate` on the
+six messages of `bench/validate/cases`: "validate <case>" validates a message decoded before, and
+"decode and validate <case>" decodes its octets with `decode_into`, as `connect_colibri`'s route
+does, and validates what it gives. With `--instructions` it reads no file: it holds each case's
+JSON and encodes it itself, so the judge needs no buf.
+
 bench/go and bench/rust make the same calls in memory: connect-go's handler through `ServeHTTP`,
 and connect-rust's `ConnectRpcService`, which encodes with Buffa, as a tower service. Each
 handler answers the message with itself, and `tools/bench_check.sh` checks that each reply's
@@ -154,6 +160,9 @@ failed (the owner's ruling of 2026-11-09). A new fast path joins this list the s
 | A JSON array of a packed field written as one record | `json_decode.zig`, `read_packed_array` | packed JSON decode+walk +38.06%, packed JSON decode +21.31%, medium JSON decode+walk +12.15%, large +11.14%, local x86-64-v2 |
 | A `Lazy` child's object opened with its member's name | `json_encode.zig`, `write_lazy` | deep JSON encode +9.47%, local x86-64-v2 |
 | A message with no member written as `{}` in one call | `json_encode.zig`, `writes_none` | tree JSON encode +36.33%, local x86-64-v2 |
+| A stored list's size, with no element read | `cel_list.zig`, `count` | validate rules valid +69.92%, rules invalid +46.33%, decode and validate rules valid +32.30% |
+| A stored list's element read at its place | `cel_list.zig`, `at` | validate rules valid +18.16%, rules invalid +10.20%, decode and validate rules valid +8.39% |
+| A string's octet looked up in a table the compiler builds | `octet_class.zig`, `has` | validate medium valid +112.30%, small valid +100.88%, decode and validate medium valid +68.20% |
 
 ## The compiler's time
 

@@ -81,9 +81,8 @@ pub fn add(b: *std.Build, public_names: *std.Build.Module, target: std.Build.Res
     const install = b.step("install-bench", "Install the benchmark programs into zig-out/bin");
     install.dependOn(&b.addInstallArtifact(exe, .{}).step);
     install.dependOn(&b.addInstallArtifact(call_exe, .{}).step);
+    install.dependOn(add_validate(b, protobuf, public_names, target));
     b.step("bench", "Benchmark the protobuf runtime and a routed call, ReleaseFast: zig build bench -- [--quick] [--write <dir>]").dependOn(&call_run.step);
-
-    add_validate(b, protobuf, public_names, target);
 
     // `zig build costs`: the costs table of docs/performance.md, timed on the machine that runs it.
     const costs = b.addExecutable(.{
@@ -96,8 +95,9 @@ pub fn add(b: *std.Build, public_names: *std.Build.Module, target: std.Build.Res
 }
 
 /// `zig build bench-validate`: bench/validate_main.zig over `protovalidate` and the generated code
-/// of bench/validate, each in ReleaseFast, as the root build makes them.
-fn add_validate(b: *std.Build, protobuf: *std.Build.Module, public_names: *std.Build.Module, target: std.Build.ResolvedTarget) void {
+/// of bench/validate, each in ReleaseFast, as the root build makes them. Returns the step that
+/// installs it, which `install-bench` takes for tools/perf_check.sh.
+fn add_validate(b: *std.Build, protobuf: *std.Build.Module, public_names: *std.Build.Module, target: std.Build.ResolvedTarget) *std.Build.Step {
     const descriptor = b.createModule(.{
         .root_source_file = b.path("src/protovalidate/gen/google/protobuf/descriptor.pb.zig"),
         .target = target,
@@ -133,21 +133,28 @@ fn add_validate(b: *std.Build, protobuf: *std.Build.Module, public_names: *std.B
             .{ .name = "protovalidate", .module = protovalidate },
         },
     });
-    const exe = b.addExecutable(.{ .name = "bench-validate", .root_module = b.createModule(.{
-        .root_source_file = b.path("bench/validate_main.zig"),
-        .target = target,
-        .optimize = optimize,
-        .imports = &.{
-            .{ .name = "protobuf", .module = protobuf },
-            .{ .name = "protovalidate", .module = protovalidate },
-            .{ .name = "bench_validate_v1", .module = messages },
-        },
-    }) });
+    const exe = b.addExecutable(.{
+        .name = "bench-validate",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("bench/validate_main.zig"),
+            .target = target,
+            .optimize = optimize,
+            // `--instructions` talks to callgrind, as bench/main.zig does.
+            .valgrind = if (target.result.os.tag == .linux) true else null,
+            .imports = &.{
+                .{ .name = "protobuf", .module = protobuf },
+                .{ .name = "protovalidate", .module = protovalidate },
+                .{ .name = "bench_validate_v1", .module = messages },
+            },
+        }),
+    });
     const run = b.addRunArtifact(exe);
     if (b.args) |args| run.addArgs(args);
     run.has_side_effects = true;
     b.step("bench-validate", "Time connect-zig's protovalidate over bench/validate, ReleaseFast: zig build bench-validate -- [--quick] <dir>").dependOn(&run.step);
-    b.step("install-bench-validate", "Install the validation benchmark into zig-out/bin").dependOn(&b.addInstallArtifact(exe, .{}).step);
+    const install = b.addInstallArtifact(exe, .{});
+    b.step("install-bench-validate", "Install the validation benchmark into zig-out/bin").dependOn(&install.step);
+    return &install.step;
 }
 
 /// The modules a routed call runs (bench/call.zig), in ReleaseFast.

@@ -35,6 +35,18 @@ pub fn List(comptime F: type) type {
         pub fn iterator(list: Self) Iterator {
             return .{ .inner = list.field.iterator() };
         }
+
+        /// The elements a decode with storage read the field into, or null when they lie in
+        /// the field's view of the octets (decision 37). A list `of` elements is stored too.
+        pub fn stored(list: Self) ?[]const F.Element {
+            if (list.field.items.len != 0 or list.field.view.bytes.len == 0) return list.field.items;
+            return null;
+        }
+
+        /// The stored element at `place`, as an iterator gives it.
+        pub fn element_at(list: Self, place: usize) Element {
+            return type_file.from(F.kind, F.Element, &list.field.items[place]);
+        }
     };
 }
 
@@ -181,8 +193,14 @@ pub fn list_holds(list: anytype, value: anytype, env: *Env) Error!bool {
 }
 
 /// `size(list)` and `size(map)`'s count of entries. A map's entry whose key a later entry
-/// holds is not counted.
+/// holds is not counted. A list literal's length and a stored list's are known, so neither
+/// reads an element.
 pub fn count(collection: anytype, env: *Env) Error!i64 {
+    const C = @TypeOf(collection);
+    if (comptime @typeInfo(C) == .array) return @typeInfo(C).array.len;
+    if (comptime is_list(C)) {
+        if (collection.stored()) |items| return @intCast(items.len);
+    }
     var total: i64 = 0;
     var elements = if (comptime is_map(@TypeOf(collection))) collection.iterator() else iterate(collection);
     for (0..proto.constants.limits.elements_max) |_| {
@@ -208,6 +226,15 @@ pub fn key_again(comptime M: type, after: M.Iterator, key: M.Key, env: *Env) Err
 /// `list[index]`: the element at `index`, counted from 0. An index outside the list fails: no
 /// element stands at it, nor at an index under 0.
 pub fn at(list: anytype, index: i64, env: *Env) Error!Taken(ElementOf(@TypeOf(list))) {
+    const L = @TypeOf(list);
+    // A stored list is indexed in place: one element read.
+    if (comptime @typeInfo(L) != .array) {
+        if (list.stored()) |items| {
+            if (index < 0 or index >= items.len) return error.Unevaluable;
+            try env.spend();
+            return take(ElementOf(L), list.element_at(@intCast(index)));
+        }
+    }
     var elements = iterate(list);
     var place: i64 = 0;
     for (0..proto.constants.limits.elements_max) |_| {
@@ -240,14 +267,21 @@ test "each element read counts against the expression's limit" {
     // Two elements and the end are three reads, of a list and of a literal alike.
     const reads = 3;
     var env: Env = .{ .steps = reads };
-    try testing.expectEqual(@as(i64, reads - 1), try count(list, &env));
+    var elements = iterate(list);
+    for (0..reads) |_| _ = try elements.next(&env);
     try testing.expectEqual(@as(usize, 0), env.steps);
-    try testing.expectError(error.TooManyItems, count(list, &env));
-    try testing.expectError(error.TooManyItems, count(literal, &env));
+    try testing.expectError(error.TooManyItems, elements.next(&env));
+    var literal_elements = iterate(literal);
+    try testing.expectError(error.TooManyItems, literal_elements.next(&env));
     try testing.expectError(error.TooManyItems, map.get(@as(i64, 1), &env));
     try testing.expectError(error.TooManyItems, count(map, &env));
-    env.steps = reads;
+    // A stored list's length and a literal's are known: their size reads no element, and an
+    // index of a stored list reads one.
+    try testing.expectEqual(@as(i64, reads - 1), try count(list, &env));
     try testing.expectEqual(@as(i64, reads - 1), try count(literal, &env));
+    try testing.expectError(error.TooManyItems, at(list, 1, &env));
+    env.steps = 1;
+    try testing.expectEqual(@as(i64, 1), try at(list, 1, &env));
     try testing.expectEqual(@as(usize, 0), env.steps);
     // A map's one key, the search for it among the later entries and the end are three reads.
     env.steps = reads;

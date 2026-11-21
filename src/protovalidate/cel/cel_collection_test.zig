@@ -89,6 +89,22 @@ test "size counts a list's elements and a map's keys" {
     try expect_true("uint(this.numbers.size()) >= 3u", &sample);
 }
 
+/// Room for `sample` encoded.
+const encoded_len_max = 256;
+
+test "a list read from the message's octets has the size and the elements of a stored one" {
+    var octets: [encoded_len_max]u8 = undefined;
+    const encoded = try proto.encode(Message, &sample, &octets);
+    // `decode` leaves each repeated field a view of the octets, where `.of` stores its elements.
+    const viewed = try proto.decode(Message, encoded);
+    try testing.expect(viewed.numbers.items.len == 0 and viewed.numbers.view.bytes.len != 0);
+    try expect_true("this.numbers.size() == 3 && size(this.names) == 2 && this.items.size() == 2", &viewed);
+    try expect_true("this.numbers[0] == 2 && this.numbers[2] == 6 && this.names[1] == 'bob' && this.items[1].a == 2", &viewed);
+    try testing.expectError(error.Unevaluable, run("this.numbers[3] == 0", &viewed));
+    try testing.expectError(error.Unevaluable, run("this.numbers[0 - 1] == 0", &viewed));
+    try expect_true("this.counts.size() == 2 && this.counts['b'] == 2", &viewed);
+}
+
 test "in finds a value among a list's elements and a map's keys" {
     try expect_true("this.pick in this.numbers && 6 in this.numbers && 'bob' in this.names", &sample);
     try expect_false("5 in this.numbers || 'cy' in this.names || this.pick in [1, 2, 3]", &sample);

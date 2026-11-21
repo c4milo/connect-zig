@@ -4,6 +4,7 @@
 //! The text is split as RFC 3986 Appendix B splits it, at the first "#", then the first "?",
 //! and each part is then checked against the rule of §3 that names it.
 const std = @import("std");
+const octet_class = @import("octet_class.zig");
 const constants = @import("constants.zig");
 const format_ip = @import("format_ip.zig");
 
@@ -42,7 +43,7 @@ fn without_query_and_fragment(text: []const u8) ?[]const u8 {
 fn is_scheme(text: []const u8) bool {
     if (text.len == 0 or !std.ascii.isAlphabetic(text[0])) return false;
     for (text[1..]) |octet| {
-        if (!std.ascii.isAlphanumeric(octet) and std.mem.indexOfScalar(u8, "+-.", octet) == null) return false;
+        if (!octet_class.has(octet_class.alphanumeric ++ "+-.", octet)) return false;
     }
     return true;
 }
@@ -183,12 +184,12 @@ fn taken_len(text: []const u8, part: Part) ?usize {
 
 /// RFC 3986 §2.3: unreserved = ALPHA / DIGIT / "-" / "." / "_" / "~".
 fn is_unreserved(octet: u8) bool {
-    return std.ascii.isAlphanumeric(octet) or std.mem.indexOfScalar(u8, "-._~", octet) != null;
+    return octet_class.has(octet_class.alphanumeric ++ "-._~", octet);
 }
 
 /// RFC 3986 §2.2: sub-delims = "!" / "$" / "&" / "'" / "(" / ")" / "*" / "+" / "," / ";" / "=".
 fn is_sub_delim(octet: u8) bool {
-    return std.mem.indexOfScalar(u8, "!$&'()*+,;=", octet) != null;
+    return octet_class.has("!$&'()*+,;=", octet);
 }
 
 /// Whether `text`, whose pct-encoded octets are well formed, is UTF-8 once they are decoded.

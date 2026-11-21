@@ -106,6 +106,12 @@ change the public API, and the entry marks each change that does.
   field. A double past the greatest one is refused. `!-5` reads, since a number's sign is
   part of its literal.
 - A table with two entries for one field stops the build.
+- CEL's `size` of a repeated field that `decode_into` stored reads no element, and an index of
+  one reads only the element at its place. A string form check, such as `email`, `uri` or
+  `hostname`, looks each octet up in a table. On this tree's Xeon, validating the benchmark's
+  `Medium` message takes half the instructions it took.
+- `tools/perf_check.sh` also counts `protovalidate` on the six messages of the validation
+  benchmark, `bench-validate --instructions`, against `bench/instructions.txt`.
 
 ### Fixed
 

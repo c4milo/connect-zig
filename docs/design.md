@@ -1596,14 +1596,24 @@ ran on Linux x86-64 with Zig 0.16.0.
   - `tools/validate_compare_check.sh` runs five, docs/benchmarks.md, "Validation", says how,
     and each gave each of the six messages the same verdict on the first run.
   - On this tree's Xeon at 2.1 GHz, decode with validation: connect-zig took 59 to 932 ns, and
-    was 13 to 67 times as fast as protovalidate-go. It was the fastest in 5 of 6 cases.
-    protovalidate-buffa, whose plugin writes Rust code for each rule, was faster in one: the
-    valid message of CEL rules alone, 295 ns to connect-zig's 519.
-  - Validation alone, protovalidate-buffa was faster in three: the valid `Medium`, 348 ns to
-    850, and both `Rules` messages, 35 ns to 410 and 190 to 284. A repeated field and a map of
-    connect-zig are views of the octets, so validation decodes what Buffa decoded before. And a
-    CEL index of a map, `this[k]`, reads the entries from the last one until it finds the key,
-    so `all` over a map reads its entries once for each key. "What a later step owes" names it.
+    was 13 to 67 times as fast as protovalidate-go. protovalidate-buffa, whose plugin writes
+    Rust code for each rule, was faster in the valid message of CEL rules alone: 295 ns to 519.
+    The benchmark decoded into views, so CEL read each repeated field and map from the octets.
+  - The benchmark now decodes with `decode_into`, as `connect_colibri`'s route does. CEL's
+    `size` of a stored list reads no element, an index reads only the element at its place, and
+    a string form check looks each octet up in a table. `bench-validate --instructions` counts
+    the six messages, and `tools/perf_check.sh` holds them to `bench/instructions.txt`. The rule
+    `rules.last` indexes the last value, so the judge sees the index. Each of the three switched
+    off failed the judge: docs/performance.md's table holds the numbers.
+  - Mutations against `zig build test-protovalidate`: a stored list's size read through its
+    elements, its index walked through them, an index of the next element, an index of the
+    length admitted, a size that ignores a list of views, and a table without its last member.
+    Each was `CAUGHT`.
+  - Then decode with validation took 52 to 759 ns, 12 to 62 times as fast as protovalidate-go,
+    and connect-zig was the fastest in all six. Validation alone, protovalidate-buffa was faster
+    in two: the valid `Medium`, 349 ns to 509, and the valid `Rules`, 34 ns to 109. A CEL index
+    of a map, `this[k]`, reads the entries from the last one until it finds the key, so `all`
+    over a map reads its entries once for each key. "What a later step owes" names it.
   - The README's chart comes from a named CI run of the check.
 
 ### What a later step owes

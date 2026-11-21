@@ -86,6 +86,11 @@ message Rules {
     message: "the first value must not be under low"
     expression: "this.values.size() == 0 || this.values[0] >= this.low"
   };
+  option (buf.validate.message).cel = {
+    id: "rules.last"
+    message: "the last value must not be over high"
+    expression: "this.values.size() == 0 || this.values[this.values.size() - 1] <= this.high"
+  };
 
   repeated int64 values = 1 [(buf.validate.field).cel = {
     id: "rules.positive"
