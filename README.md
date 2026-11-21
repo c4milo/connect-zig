@@ -483,8 +483,31 @@ functions, and protovalidate's own functions, such as `isEmail` and `isIpPrefix`
 - An expression reads at most `constants.cel_steps_max` elements of lists and maps, so a macro
   inside a macro cannot make a small message cost much.
 
+A predefined rule is an extension of one of validate.proto's rule messages, which states its
+CEL rules once for every field that sets it:
+
+```proto
+extend buf.validate.Int32Rules {
+  bool even = 1161 [(buf.validate.predefined).cel = {
+    id: "int32.even"
+    message: "must be even"
+    expression: "!rule || this % 2 == 0"
+  }];
+}
+
+message Order {
+  int32 quantity = 1 [(buf.validate.field).int32.(even) = true];
+}
+```
+
+The plugin reads each extension from its request and writes its value and its rules into the
+table of the message that sets it. An expression reads the field as `this`, the extension's
+value as `rule` and the rule message as `rules`. A value is a scalar, a wrapper such as
+`google.protobuf.Int64Value`, or a list of them.
+
 A rule the module has no check for stops your build, with a message that names it. That holds
-today for the predefined rules of an extension, for `pattern`, and for CEL's `matches`.
+today for `pattern`, for CEL's `matches`, and for a predefined rule whose value is a message
+that is no wrapper.
 
 ### More examples
 
@@ -515,9 +538,9 @@ with `zig build test`, and serves its service with `zig build serve` for curl an
   `conformance/protobuf_known_failing.txt` lists each of the 35 that fail, with its reason.
 - `tools/protovalidate_conformance_check.sh` runs [protovalidate's conformance
   harness](https://github.com/bufbuild/protovalidate/blob/main/docs/conformance.md) v1.2.2, with
-  strict messages and strict errors. 2614 of its 2872 cases pass. Each of the other 258 is
-  listed in `conformance/protovalidate_known_failing.yaml` under its reason: a predefined rule
-  of an extension or a `pattern`, which the library does not check yet.
+  strict messages and strict errors. 2822 of its 2872 cases pass. Each of the other 50 is
+  listed in `conformance/protovalidate_known_failing.yaml` under its reason: a `pattern`, or
+  an expression that calls `matches`, which wait for stdx's regular expressions.
 - `tools/coverage_check.sh` converts every protobuf type with connect-zig and with Go's runtime,
   between binary and JSON both ways, and requires the same message.
 - `tools/interop_languages_check.sh` calls the server from [clients in Go, TypeScript, Python
@@ -548,8 +571,8 @@ missing required field (decision 23).
 Not yet done:
 
 - a stream that waits for an event of the program once its request ended (colibri issue 130);
-- in `protovalidate`: the predefined rules of an extension, and `pattern` with CEL's `matches`
-  (docs/design.md §8 steps 34 and 35).
+- in `protovalidate`: `pattern` and CEL's `matches`, which wait for stdx's regular expressions
+  (docs/design.md §8 step 35).
 
 ## Contributing
 

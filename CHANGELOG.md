@@ -43,8 +43,13 @@ change the public API, and the entry marks each change that does.
   own functions. A problem of an expression stops the build.
 - `protovalidate.Error` gains `Unevaluable`, for an expression that fails as it runs, such as
   by a division by zero.
-- Not yet: the predefined rules of an extension, `pattern`, and CEL's `matches`. A message with
-  such a rule stops the build, with a message that names the rule.
+- The plugin reads the predefined rules of an extension from its request: an extension of a
+  rule message whose declaration states CEL rules in `(buf.validate.predefined)`. It writes
+  each one's value and rules into the table of the message that sets it, and `protovalidate`
+  compiles them as it compiles a schema's own. A value is a scalar, a wrapper or a list of
+  them.
+- Not yet: `pattern` and CEL's `matches`. A message with such a rule stops the build, with a
+  message that names the rule.
 
 ### Changed
 
@@ -70,8 +75,8 @@ change the public API, and the entry marks each change that does.
 ### Checked
 
 - protovalidate's conformance harness v1.2.2 runs against the library, with strict messages
-  and strict errors. 2614 of 2872 cases pass, and `conformance/protovalidate_known_failing.yaml`
-  lists the other 258, each under its reason.
+  and strict errors. 2822 of 2872 cases pass, and `conformance/protovalidate_known_failing.yaml`
+  lists the other 50, each under its reason.
 - Receivers on connect-go and connect-rust join the full-stack check, each on one core. In CI's
   run 182, one core of connect-zig held 8.2 times connect-go's spans a second over TLS on arm64
   and 5.0 times on x86-64, and 2.8 and 1.9 times connect-rust's.
