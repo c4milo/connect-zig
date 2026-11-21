@@ -9,6 +9,7 @@ const names = @import("names.zig");
 const index_file = @import("index.zig");
 const generate_out = @import("generate_out.zig");
 const generate_enum = @import("generate_enum.zig");
+const generate_rules = @import("generate_rules.zig");
 const Out = generate_out.Out;
 const Error = generate_out.Error;
 
@@ -34,9 +35,19 @@ pub fn write(out: *Out, scope: []const u8, message: pb.DescriptorProto, depth: u
     try write_unknown_field(out, message, depth + 1);
     try write_field_numbers(out, fields, depth + 1);
     try write_descriptor(out, full, message, fields, depth + 1);
+    try generate_rules.write(out, full, message, try rule_entries(out, fields), depth + 1);
     try write_nested(out, full, message, depth + 1);
     try out.indent(depth);
     try out.print("}};\n", .{});
+}
+
+/// Each field with the name of its number in `FieldNumber`, for the table of its rules.
+fn rule_entries(out: *Out, fields: []const Member) Error![]const generate_rules.Entry {
+    const entries = try out.arena.alloc(generate_rules.Entry, fields.len);
+    for (fields, entries) |member, *entry| {
+        entry.* = .{ .field = member.field, .name = try names.member_identifier(out.arena, member.field.name orelse "") };
+    }
+    return entries;
 }
 
 fn write_nested(out: *Out, full: []const u8, message: pb.DescriptorProto, depth: usize) Error!void {

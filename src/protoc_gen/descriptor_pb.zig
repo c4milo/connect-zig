@@ -3,6 +3,7 @@
 //! Only the fields the generator reads are named; `decode` drops the rest (decision 5). Both files
 //! are proto2, so each singular field has explicit presence and is a `?T`.
 const proto = @import("protobuf");
+const validate = @import("buf_validate_validate");
 const Repeated = proto.Repeated;
 const Descriptor = proto.Descriptor;
 const field_of = proto.field_of;
@@ -80,9 +81,12 @@ pub const message_delimited = 2;
 pub const FieldOptions = struct {
     @"packed": ?bool = null,
     features: ?FeatureSet = null,
-    pub const FieldNumber = enum(u29) { @"packed" = 2, features = 21 };
+    /// `(buf.validate.field)`: protovalidate's extension of FieldOptions (validate.proto,
+    /// "extend google.protobuf.FieldOptions"; decision 47).
+    rules: ?validate.FieldRules = null,
+    pub const FieldNumber = enum(u29) { @"packed" = 2, features = 21, rules = 1159 };
     pub const protobuf: Descriptor = .{ .full_name = "google.protobuf.FieldOptions", .fields = &.{
-        field_of(FieldNumber.@"packed", .bool, .{}), field_of(FieldNumber.features, .message, .{}),
+        field_of(FieldNumber.@"packed", .bool, .{}), field_of(FieldNumber.features, .message, .{}), field_of(FieldNumber.rules, .message, .{}),
     } };
 };
 
@@ -104,18 +108,32 @@ pub const FieldDescriptorProto = struct {
     } };
 };
 
+pub const OneofOptions = struct {
+    /// `(buf.validate.oneof)`: protovalidate's extension of OneofOptions (validate.proto,
+    /// "extend google.protobuf.OneofOptions").
+    rules: ?validate.OneofRules = null,
+    pub const FieldNumber = enum(u29) { rules = 1159 };
+    pub const protobuf: Descriptor = .{ .full_name = "google.protobuf.OneofOptions", .fields = &.{field_of(FieldNumber.rules, .message, .{})} };
+};
+
 pub const OneofDescriptorProto = struct {
     name: ?[]const u8 = null,
-    pub const FieldNumber = enum(u29) { name = 1 };
-    pub const protobuf: Descriptor = .{ .full_name = "google.protobuf.OneofDescriptorProto", .fields = &.{field_of(FieldNumber.name, .string, .{})} };
+    options: ?OneofOptions = null,
+    pub const FieldNumber = enum(u29) { name = 1, options = 2 };
+    pub const protobuf: Descriptor = .{ .full_name = "google.protobuf.OneofDescriptorProto", .fields = &.{
+        field_of(FieldNumber.name, .string, .{}), field_of(FieldNumber.options, .message, .{}),
+    } };
 };
 
 pub const MessageOptions = struct {
     map_entry: ?bool = null,
     features: ?FeatureSet = null,
-    pub const FieldNumber = enum(u29) { map_entry = 7, features = 12 };
+    /// `(buf.validate.message)`: protovalidate's extension of MessageOptions (validate.proto,
+    /// "extend google.protobuf.MessageOptions").
+    rules: ?validate.MessageRules = null,
+    pub const FieldNumber = enum(u29) { map_entry = 7, features = 12, rules = 1159 };
     pub const protobuf: Descriptor = .{ .full_name = "google.protobuf.MessageOptions", .fields = &.{
-        field_of(FieldNumber.map_entry, .bool, .{}), field_of(FieldNumber.features, .message, .{}),
+        field_of(FieldNumber.map_entry, .bool, .{}), field_of(FieldNumber.features, .message, .{}), field_of(FieldNumber.rules, .message, .{}),
     } };
 };
 
