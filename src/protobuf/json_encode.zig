@@ -55,6 +55,7 @@ pub fn write_message(comptime T: type, message: *const T, text: *json.TextWriter
 /// Whether `write_fields` writes no member: each field holds its default or is absent ("JSON
 /// Mapping": "fields with default values are omitted").
 fn writes_none(comptime T: type, message: *const T) bool {
+    @setEvalBranchQuota(comptime descriptor.branches_of(T));
     inline for (T.protobuf.fields) |field| {
         if (writes_member(T, field, message)) return false;
     }
@@ -76,6 +77,7 @@ inline fn writes_member(comptime T: type, comptime field: Field, message: *const
 /// Writes a message's fields as members of an object already open. A repeated or lazy field is
 /// read in place, through a pointer, so a recursive message is not copied at each level.
 fn write_fields(comptime T: type, message: *const T, text: *json.TextWriter, comptime registry: []const type) Error!void {
+    @setEvalBranchQuota(comptime descriptor.branches_of(T));
     inline for (T.protobuf.fields) |field| {
         if (field.oneof) |oneof| {
             try write_member(T, field, oneof, message, text, registry);

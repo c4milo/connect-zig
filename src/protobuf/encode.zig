@@ -82,6 +82,7 @@ pub fn encode_into(comptime T: type, message: *const T, writer: *wire.Writer) Er
 fn encode_message(comptime T: type, message: *const T, sink: anytype) Error!void {
     comptime descriptor.check(T);
     if (comptime T.protobuf.map_entry) return encode_entry(T, message, sink);
+    @setEvalBranchQuota(comptime descriptor.branches_of(T));
     inline for (T.protobuf.fields) |field| {
         if (field.oneof) |oneof| {
             try encode_member(T, field, oneof, message, sink);
@@ -115,6 +116,7 @@ fn closed_value_unknown(comptime T: type, record: []const u8) Error!bool {
     var reader: wire.Reader = .{ .bytes = record };
     const tag = try reader.tag();
     if (tag.wire_type != .varint) return false;
+    @setEvalBranchQuota(comptime descriptor.branches_of(T));
     inline for (T.protobuf.fields) |field| {
         if (comptime field.kind != .@"enum") continue;
         const V = comptime singular_enum(T, field) orelse continue;

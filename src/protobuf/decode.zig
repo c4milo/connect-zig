@@ -81,6 +81,7 @@ const Read = enum { field, unknown_value, absent };
 /// `field_start` is where the field's tag starts in `bytes`, where a repeated field's view
 /// starts, so the view holds the field's records and not the whole message.
 fn read_known(comptime T: type, message: *T, field_start: usize, bytes: []const u8, tag: wire.Tag, reader: *wire.Reader, depth_left: u32, comptime mode: Mode, store: StoreOf(mode)) Error!Read {
+    @setEvalBranchQuota(comptime descriptor.branches_of(T));
     inline for (T.protobuf.fields) |field| {
         if (tag.number == field.number) return read_field(T, field, message, field_start, bytes, tag, reader, depth_left, mode, store);
     }

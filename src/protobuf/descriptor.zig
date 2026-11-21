@@ -168,8 +168,15 @@ pub fn keeps_unknown(comptime T: type) bool {
     return @hasField(T, unknown_field) and @FieldType(T, unknown_field) == Unknown;
 }
 
+/// The backward branches the compiler may take in a function that reads each field of `T` at
+/// compile time. Zig's default, 1000, stops such a function at a message of about 500 fields.
+pub fn branches_of(comptime T: type) u32 {
+    return T.protobuf.fields.len * constants.limits.eval_branches_per_field + constants.limits.eval_branches_base;
+}
+
 /// Whether `number` names a field of `T`.
 pub fn knows(comptime T: type, number: u32) bool {
+    @setEvalBranchQuota(comptime branches_of(T));
     inline for (T.protobuf.fields) |field| {
         if (field.number == number) return true;
     }
@@ -187,6 +194,7 @@ pub fn check(comptime T: type) void {
     comptime {
         const fields = T.protobuf.fields;
         if (fields.len > constants.limits.fields_max) @compileError(T.protobuf.full_name ++ " has too many fields");
+        @setEvalBranchQuota(branches_of(T));
         var previous: u32 = 0;
         for (fields) |field| {
             if (field.number <= previous) @compileError(T.protobuf.full_name ++ ": numbers must rise");
