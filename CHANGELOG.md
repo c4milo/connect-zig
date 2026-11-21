@@ -35,7 +35,15 @@ change the public API, and the entry marks each change that does.
   `.Values` holds a `protovalidate.InterceptorRoom(connect, options)` in a field
   `protovalidate`. The example project `validate` serves a service behind it.
 - `RequestStream(T).next` gives no message after its stream failed.
-- Not yet: CEL rules and the predefined rules of an extension, and `pattern`. A message with
+- `protovalidate` compiles a schema's CEL rules, `cel` and `cel_expression`, at comptime, from
+  the text the table holds (decision 47 as amended). An expression unfolds into plain code: no
+  interpreter runs, and the plugin writes no function. It reads CEL's operators, conditionals,
+  field selection, `has`, `dyn`, lists and maps with `in`, `size`, an index and the macros
+  `all`, `exists` and `exists_one`, the conversions, the string functions and protovalidate's
+  own functions. A problem of an expression stops the build.
+- `protovalidate.Error` gains `Unevaluable`, for an expression that fails as it runs, such as
+  by a division by zero.
+- Not yet: the predefined rules of an extension, `pattern`, and CEL's `matches`. A message with
   such a rule stops the build, with a message that names the rule.
 
 ### Changed
@@ -62,8 +70,8 @@ change the public API, and the entry marks each change that does.
 ### Checked
 
 - protovalidate's conformance harness v1.2.2 runs against the library, with strict messages
-  and strict errors. 1818 of 2872 cases pass, and `conformance/protovalidate_known_failing.yaml`
-  lists the other 1054, each under its reason.
+  and strict errors. 2614 of 2872 cases pass, and `conformance/protovalidate_known_failing.yaml`
+  lists the other 258, each under its reason.
 - Receivers on connect-go and connect-rust join the full-stack check, each on one core. In CI's
   run 182, one core of connect-zig held 8.2 times connect-go's spans a second over TLS on arm64
   and 5.0 times on x86-64, and 2.8 and 1.9 times connect-rust's.
