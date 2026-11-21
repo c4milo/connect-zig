@@ -2,9 +2,12 @@
 //! examples and the tooling. Helpers live in build/.
 //!
 //! A project that depends on connect-zig reaches the library modules by name:
-//! `dependency.module("protobuf")`, `"connect"`, `"connect_colibri"` and, on a host target,
-//! `"oidc"`. It reaches colibri's `"server"`, `"client"`, `"http"`, `"tls"` and `"colibri"` the
-//! same way, and `.rotor = true` builds colibri's `.private` kinds on Rotor (decision 39).
+//! `dependency.module("protobuf")`, `"connect"`, `"connect_colibri"`, `"protovalidate"` and, on
+//! a host target, `"oidc"`. It reaches colibri's `"server"`, `"client"`, `"http"`, `"tls"` and
+//! `"colibri"` the same way, and `.rotor = true` builds colibri's `.private` kinds on Rotor
+//! (decision 39). `"buf_validate_validate"` and `"google_protobuf_descriptor"` are the generated
+//! code of validate.proto and descriptor.proto, under the names the plugin gives them (decision
+//! 47).
 const std = @import("std");
 const assert = std.debug.assert;
 const lint = @import("build/lint.zig");
@@ -125,6 +128,7 @@ fn modules(b: *std.Build, stdx: *std.Build.Dependency, colibri: *std.Build.Depen
         .connect = connect,
         .connect_colibri = connect_colibri,
         .oidc = oidc_module(b, stdx, connect, public_names, target, optimize),
+        .protovalidate = protovalidate_module(b, protobuf, public_names, target, optimize),
         .public_names = public_names,
         .colibri = colibri,
         .platform = stdx.module("platform"),
@@ -152,12 +156,46 @@ fn oidc_module(b: *std.Build, stdx: *std.Build.Dependency, connect: *std.Build.M
     });
 }
 
+/// Decision 47: the `protovalidate` module, and the generated code of validate.proto and of
+/// descriptor.proto that it reads its rules and writes its violations with. Each generated file
+/// is a module under the name the plugin gives its .proto file, so a program's generated code
+/// that names a `buf.validate` type imports the same one.
+fn protovalidate_module(b: *std.Build, protobuf: *std.Build.Module, public_names: *std.Build.Module, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode) *std.Build.Module {
+    const descriptor = b.addModule("google_protobuf_descriptor", .{
+        .root_source_file = b.path("src/protovalidate/gen/google/protobuf/descriptor.pb.zig"),
+        .target = target,
+        .optimize = optimize,
+        .imports = &.{.{ .name = "protobuf", .module = protobuf }},
+    });
+    const rules = b.addModule("buf_validate_validate", .{
+        .root_source_file = b.path("src/protovalidate/gen/buf/validate/validate.pb.zig"),
+        .target = target,
+        .optimize = optimize,
+        .imports = &.{
+            .{ .name = "protobuf", .module = protobuf },
+            .{ .name = "google_protobuf_descriptor", .module = descriptor },
+        },
+    });
+    return b.addModule("protovalidate", .{
+        .root_source_file = b.path("src/protovalidate/protovalidate.zig"),
+        .target = target,
+        .optimize = optimize,
+        .imports = &.{
+            .{ .name = "protobuf", .module = protobuf },
+            .{ .name = "buf_validate_validate", .module = rules },
+            .{ .name = "google_protobuf_descriptor", .module = descriptor },
+            .{ .name = "public_names", .module = public_names },
+        },
+    });
+}
+
 fn add_unit_tests(b: *std.Build, graph: Graph, plugin: *std.Build.Step.Compile, test_step: *std.Build.Step) void {
     const targets = [_]struct { name: []const u8, module: ?*std.Build.Module }{
         .{ .name = "protobuf", .module = graph.protobuf },
         .{ .name = "connect", .module = graph.connect },
         .{ .name = "connect-colibri", .module = graph.connect_colibri },
         .{ .name = "oidc", .module = graph.oidc },
+        .{ .name = "protovalidate", .module = graph.protovalidate },
         .{ .name = "public-names", .module = graph.public_names },
         .{ .name = "plugin", .module = plugin.root_module },
     };

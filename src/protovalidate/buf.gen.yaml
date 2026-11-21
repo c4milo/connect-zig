@@ -1,0 +1,10 @@
+# `tools/generate_check.sh` runs `buf generate --template src/protovalidate/buf.gen.yaml` from
+# the root: the Zig code of validate.proto and of descriptor.proto, with the plugin this
+# repository builds (decision 47). The build gives each file as a module under the name the
+# plugin gives its .proto file: `buf_validate_validate` and `google_protobuf_descriptor`.
+version: v2
+inputs:
+  - directory: src/protovalidate/proto
+plugins:
+  - local: zig-out/bin/protoc-gen-connect-zig
+    out: src/protovalidate/gen

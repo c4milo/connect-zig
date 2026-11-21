@@ -10,6 +10,6 @@ const pepegrillo = @import("pepegrillo");
 
 pub fn main(init: std.process.Init) !void {
     return pepegrillo.coverage.main(init, .{
-        .directories = &.{ "src/protobuf", "src/connect", "src/connect_colibri", "src/oidc", "src/protoc_gen", "src/public_names" },
+        .directories = &.{ "src/protobuf", "src/connect", "src/connect_colibri", "src/oidc", "src/protovalidate", "src/protoc_gen", "src/public_names" },
     });
 }

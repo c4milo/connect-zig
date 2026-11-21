@@ -16,7 +16,7 @@ pub fn add(b: *std.Build, graph: Graph, plugin: *std.Build.Step.Compile) void {
     }) });
     const check = b.addRunArtifact(tool);
     // Zig's own x86-64 backend writes an incomplete line table, so each binary uses LLVM.
-    const modules = [_]?*std.Build.Module{ graph.protobuf, graph.connect, graph.connect_colibri, graph.oidc, plugin.root_module, graph.public_names };
+    const modules = [_]?*std.Build.Module{ graph.protobuf, graph.connect, graph.connect_colibri, graph.oidc, graph.protovalidate, plugin.root_module, graph.public_names };
     for (modules) |each| {
         const module = each orelse continue;
         check.addArtifactArg(b.addTest(.{ .root_module = module, .use_llvm = true }));
