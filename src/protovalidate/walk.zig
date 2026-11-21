@@ -50,6 +50,8 @@ pub const Site = struct {
     prefix: []const Element = &.{},
     /// Whether the value is a map entry's key.
     for_key: bool = false,
+    /// The predefined rules of the extensions that the rules at this site hold.
+    predefined: []const table.Rules.Predefined = &.{},
 };
 
 /// A rule that a value broke: what its violation states beside the field.

@@ -45,17 +45,17 @@ fn broken(comptime rule: []const u8, comptime message: []const u8) Broken {
 /// The rule path that leads each element's rule: `repeated.items`.
 const items_prefix: []const table.Element = table.rule_path(&.{}, &.{ .{ .message = pb.FieldRules, .name = "repeated" }, .{ .message = pb.RepeatedRules, .name = "items" } }).elements.items;
 
-pub fn check(comptime F: type, comptime kind: proto.Kind, comptime rules: pb.FieldRules, list: *const F, walk: *Walk, step: *Path) Fault!void {
+pub fn check(comptime F: type, comptime kind: proto.Kind, comptime rules: pb.FieldRules, comptime sites: field_file.Sites, list: *const F, walk: *Walk, step: *Path) Fault!void {
     if (list.is_empty()) {
         // validate.proto, Ignore.IGNORE_IF_ZERO_VALUE: "For repeated fields, the zero is an empty
         // list", and FieldRules.required refuses the zero value.
         if (comptime rules.required orelse false) return walk_file.violate(walk, step, comptime field_file.required_broken(.{}), false);
         if (comptime (rules.ignore orelse .ignore_unspecified) == .ignore_if_zero_value) return;
     }
-    if (comptime cel_rule.states(rules)) try cel_rule.check_field(rules, .{}, cel_rule.Whole(F).?{ .field = list }, walk, step);
+    try cel_rule.check_whole(F, rules, sites.field, list, walk, step);
     try check_size(F, comptime rules_of(rules), list, walk, step);
     if (comptime rules_of(rules).unique orelse false) try check_unique(F, list, walk, step);
-    try check_items(F, kind, comptime item_rules_of(rules), list, walk, step);
+    try check_items(F, kind, comptime item_rules_of(rules), sites.items, list, walk, step);
 }
 
 fn check_size(comptime F: type, comptime rules: pb.RepeatedRules, list: *const F, walk: *Walk, step: *const Path) Fault!void {
@@ -97,13 +97,13 @@ pub fn same(comptime E: type, a: E, b: E) bool {
     return a == b;
 }
 
-fn check_items(comptime F: type, comptime kind: proto.Kind, comptime rules: pb.FieldRules, list: *const F, walk: *Walk, step: *Path) Fault!void {
+fn check_items(comptime F: type, comptime kind: proto.Kind, comptime rules: pb.FieldRules, comptime predefined: []const table.Rules.Predefined, list: *const F, walk: *Walk, step: *Path) Fault!void {
     const E = F.Element;
     if (comptime !value_file.is_read(E, rules)) return;
     // validate.proto, Ignore.IGNORE_ALWAYS, on `repeated.items`.
     if (comptime (rules.ignore orelse .ignore_unspecified) == .ignore_always) return;
     const skips_zero = comptime (rules.ignore orelse .ignore_unspecified) == .ignore_if_zero_value;
-    const site: Site = comptime .{ .prefix = items_prefix };
+    const site: Site = comptime .{ .prefix = items_prefix, .predefined = predefined };
     var elements = list.iterator();
     for (0..proto.constants.limits.elements_max) |index| {
         const next = (elements.next() catch |failure| return walk_file.malformed(failure)) orelse return;

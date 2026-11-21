@@ -121,6 +121,7 @@ fn eval_call(comptime call: Node.Call, comptime R: type, comptime scope: Scope, 
     if (comptime std.mem.eql(u8, call.name, "has")) return eval_has(operands[0].select, scope, values, env);
     if (comptime std.mem.eql(u8, call.name, "dyn")) return eval(&operands[0], scope, values, env);
     if (comptime std.mem.eql(u8, call.name, "duration")) return comptime time.parse_duration(operands[0].string).?;
+    if (comptime collection.is_map_macro(call)) return collection.eval_map(call, R, scope, values, env);
     if (comptime collection.of_macro(call, scope) != null) return collection.eval_macro(call, scope, values, env);
     var taken: Operands(operands, scope) = undefined;
     inline for (operands, 0..) |*operand, index| taken[index] = try eval(operand, scope, values, env);
