@@ -282,13 +282,20 @@ Each step names the check that proves it. A step is done when its check passes i
     conformance harness v1.2.2 against `zig build protovalidate-executor`, with the cases that
     wait for steps 34 and 35 in `conformance/protovalidate_known_failing.yaml`, each under its
     reason.
-33. **A hook for each request message.** An interceptor may declare `on_message`, which a
-    route calls with each request message once it is decoded, before the handler takes it
-    (decision 47, which amends decisions 19 and 36). `protovalidate.Interceptor` validates the
-    message there and refuses it with `invalid_argument`. New public names:
-    `protovalidate.Interceptor` and `protovalidate.InterceptorOptions`. Check: `zig build
-    test-connect-colibri` runs the hook for a unary call and for each message of a stream, by
-    both kinds of handler; a new example project serves a method behind the interceptor.
+33. **A hook for each request message.** An interceptor may declare `on_message(app, ctx, T,
+    message)`, which a route calls with each request message once it is decoded, before the
+    handler takes it (decision 47, which amends decisions 19 and 36). An error it returns ends
+    the call as a handler's does. `protovalidate.Interceptor(connect, Values, options)`
+    validates the message there. It refuses a message that breaks a rule with
+    `invalid_argument`, a message that names the first violation, and a
+    `buf.validate.Violations` detail. The call's values hold what that error points to, in a
+    field `protovalidate` of the type `protovalidate.InterceptorRoom(connect, options)`. New
+    public names, all in `protovalidate`: `Interceptor`, `InterceptorOptions` and
+    `InterceptorRoom`, which a server's program names. `connect_colibri`'s root gains none.
+    Check: `zig build test-connect-colibri` runs the hook for a unary call and for each message
+    of a stream, by both kinds of handler; `zig build test-protovalidate` runs the interceptor
+    over a stand-in for `connect`; the example project `validate` serves methods behind the
+    interceptor over h2, h11 and h3.
 34. **CEL.** The plugin compiles `cel` and `cel_expression` rules, and the predefined rules of
     an extension, into Zig functions that the tables name (decision 47). New public names: the
     step names them. Check: the conformance cases of custom and predefined rules leave the
