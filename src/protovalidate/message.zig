@@ -7,6 +7,7 @@ const table = @import("table.zig");
 const constants = @import("constants.zig");
 const walk_file = @import("walk.zig");
 const field_file = @import("field.zig");
+const cel_rule = @import("cel/cel_rule.zig");
 const Walk = walk_file.Walk;
 const Path = walk_file.Path;
 const Fault = walk_file.Fault;
@@ -18,6 +19,7 @@ pub fn check(comptime T: type, message: *const T, walk: *Walk, parent: ?*const P
     walk.depth += 1;
     defer walk.depth -= 1;
     const rules = comptime table.of(T);
+    if (comptime cel_rule.states(rules.message)) try cel_rule.check_message(T, rules.message, message, walk, parent);
     inline for (rules.message.oneof.items) |oneof| try check_message_oneof(T, oneof, message, walk, parent);
     inline for (rules.oneofs) |oneof| try check_oneof(T, oneof, message, walk, parent);
     inline for (T.protobuf.fields) |field| try field_file.check(T, field, message, walk, parent);

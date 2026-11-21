@@ -149,14 +149,14 @@ fn check_entry(comptime Entry: type, comptime rules: pb.FieldRules, entry: *cons
     if (comptime side_read(K, key_rules)) {
         const skips_zero = comptime (key_rules.ignore orelse .ignore_unspecified) == .ignore_if_zero_value;
         if (!(skips_zero and shape.is_zero(K, &entry.key))) {
-            try value_file.check(K, key_rules, comptime .{ .prefix = prefix_of("keys"), .for_key = true }, &entry.key, walk, step);
+            try value_file.check(K, comptime table.field_named(Entry, "key").kind, key_rules, comptime .{ .prefix = prefix_of("keys"), .for_key = true }, &entry.key, walk, step);
         }
     }
     const value_rules = comptime value_rules_of(rules);
     if (comptime side_read(H, value_rules)) {
         const skips_zero = comptime (value_rules.ignore orelse .ignore_unspecified) == .ignore_if_zero_value;
         if (!(skips_zero and shape.is_zero(H, &entry.value))) {
-            try value_file.check_held(H, value_rules, comptime .{ .prefix = prefix_of("values") }, &entry.value, walk, step);
+            try value_file.check_held(H, comptime table.field_named(Entry, "value").kind, value_rules, comptime .{ .prefix = prefix_of("values") }, &entry.value, walk, step);
         }
     }
 }

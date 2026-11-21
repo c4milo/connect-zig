@@ -96,7 +96,6 @@ pub fn same(comptime E: type, a: E, b: E) bool {
 }
 
 fn check_items(comptime F: type, comptime kind: proto.Kind, comptime rules: pb.FieldRules, list: *const F, walk: *Walk, step: *Path) Fault!void {
-    _ = kind;
     const E = F.Element;
     if (comptime !value_file.is_read(E, rules)) return;
     // validate.proto, Ignore.IGNORE_ALWAYS, on `repeated.items`.
@@ -110,7 +109,7 @@ fn check_items(comptime F: type, comptime kind: proto.Kind, comptime rules: pb.F
         const element: *const E = if (comptime @TypeOf(next) == *const E) next else &next;
         if (skips_zero and shape.is_zero(E, element)) continue;
         step.element.subscript = .{ .index = index };
-        try value_file.check(E, rules, site, element, walk, step);
+        try value_file.check(E, kind, rules, site, element, walk, step);
     }
     unreachable;
 }

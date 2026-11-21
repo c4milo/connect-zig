@@ -63,7 +63,7 @@ pub fn is_set(comptime T: type, comptime field: proto.Field, message: *const T) 
 }
 
 /// The value of a oneof's member, or null when the oneof holds another member or none.
-fn member_of(comptime T: type, comptime field: proto.Field, message: *const T) ?*const shape.Holder(T, field) {
+pub fn member_of(comptime T: type, comptime field: proto.Field, message: *const T) ?*const shape.Holder(T, field) {
     const held = if (@field(message, field.oneof.?)) |*set| set else return null;
     const Union = @TypeOf(held.*);
     if (std.meta.activeTag(held.*) != @field(std.meta.Tag(Union), field.name)) return null;
@@ -82,16 +82,16 @@ pub fn check(comptime T: type, comptime field: proto.Field, message: *const T, w
     switch (comptime kind) {
         .repeated => try list_file.check(shape.Holder(T, field), field.kind, rules, &@field(message, field.name), walk, &step),
         .map => try map_file.check(shape.Holder(T, field), rules, &@field(message, field.name), walk, &step),
-        .plain => try check_plain(shape.Holder(T, field), rules, &@field(message, field.name), walk, &step),
+        .plain => try check_plain(shape.Holder(T, field), field.kind, rules, &@field(message, field.name), walk, &step),
         .optional => {
             const value = if (@field(message, field.name)) |*set| set else return unset(required, walk, &step);
-            try value_file.check(@TypeOf(value.*), rules, .{}, value, walk, &step);
+            try value_file.check(@TypeOf(value.*), field.kind, rules, .{}, value, walk, &step);
         },
         .member => {
             const value = member_of(T, field, message) orelse return unset(required, walk, &step);
-            try check_held(@TypeOf(value.*), rules, value, required, walk, &step);
+            try check_held(@TypeOf(value.*), field.kind, rules, value, required, walk, &step);
         },
-        .lazy => try check_held(shape.Holder(T, field), rules, &@field(message, field.name), required, walk, &step),
+        .lazy => try check_held(shape.Holder(T, field), field.kind, rules, &@field(message, field.name), required, walk, &step),
     }
 }
 
@@ -116,20 +116,20 @@ fn unset(comptime required: bool, walk: *Walk, step: *const Path) Fault!void {
 /// A value with no presence: the zero value breaks `required`, and IGNORE_IF_ZERO_VALUE passes
 /// over it (validate.proto, FieldRules.required: "the value of the field can't be the zero
 /// value").
-fn check_plain(comptime V: type, comptime rules: pb.FieldRules, value: *const V, walk: *Walk, step: *const Path) Fault!void {
+fn check_plain(comptime V: type, comptime kind: proto.Kind, comptime rules: pb.FieldRules, value: *const V, walk: *Walk, step: *const Path) Fault!void {
     const required = comptime rules.required orelse false;
     const skips_zero = comptime (rules.ignore orelse .ignore_unspecified) == .ignore_if_zero_value;
     if (comptime required or skips_zero) {
         if (shape.is_zero(V, value)) return unset(required, walk, step);
     }
-    try value_file.check(V, rules, .{}, value, walk, step);
+    try value_file.check(V, kind, rules, .{}, value, walk, step);
 }
 
 /// A member of a oneof, or a lazy field, whose message may be a `proto.Lazy`: the walk decodes
 /// it and reads the message.
-fn check_held(comptime H: type, comptime rules: pb.FieldRules, held: *const H, comptime required: bool, walk: *Walk, step: *const Path) Fault!void {
-    if (comptime !shape.is_lazy(H)) return value_file.check(H, rules, .{}, held, walk, step);
+fn check_held(comptime H: type, comptime kind: proto.Kind, comptime rules: pb.FieldRules, held: *const H, comptime required: bool, walk: *Walk, step: *const Path) Fault!void {
+    if (comptime !shape.is_lazy(H)) return value_file.check(H, kind, rules, .{}, held, walk, step);
     const decoded = held.get() catch |failure| return walk_file.malformed(failure);
     const value = decoded orelse return unset(required, walk, step);
-    try value_file.check(H.Message, rules, .{}, &value, walk, step);
+    try value_file.check(H.Message, kind, rules, .{}, &value, walk, step);
 }
