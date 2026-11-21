@@ -506,8 +506,17 @@ value as `rule` and the rule message as `rules`. A value is a scalar, a wrapper 
 `google.protobuf.Int64Value`, or a list of them.
 
 A rule the module has no check for stops your build, with a message that names it. That holds
-today for `pattern`, for CEL's `matches`, and for a predefined rule whose value is a message
-that is no wrapper.
+today for `pattern`, for CEL's `matches`, for a predefined rule whose value is a message that
+is no wrapper, and for the parts of CEL the module does not read yet: arithmetic on a
+timestamp or a duration, `timestamp(string)`, and `map`, `filter` and `string(number)`, which
+build a value that needs room.
+
+A large schema compiles in time that grows with its rules, about 13 ms for each CEL
+expression in a Debug build on one core of a 2.1 GHz Xeon: a message of 2,000 fields with
+2,003 expressions built in 28 s, and 100 messages with 2,300 expressions in 29 s. With
+standard rules alone, the second schema built in 3 s. A message takes at most about 1,000 repeated
+and map fields: Zig counts each one's type against a fixed limit of the struct that holds
+them.
 
 ### More examples
 
@@ -541,6 +550,12 @@ with `zig build test`, and serves its service with `zig build serve` for curl an
   strict messages and strict errors. 2822 of its 2872 cases pass. Each of the other 50 is
   listed in `conformance/protovalidate_known_failing.yaml` under its reason: a `pattern`, or
   an expression that calls `matches`, which wait for stdx's regular expressions.
+- `tools/lean_check.sh` builds a [Lean model](spec/lean/README.md) of the CEL syntax, written
+  from the CEL language definition, and requires the vector file beside the Zig grammar to be
+  what the model gives. A unit test reads each of the 6,647 expressions with the grammar the
+  compiler runs, and requires the model's tree or its refusal. No theorem is proved yet.
+- `zig build test-protovalidate -Drelease --fuzz=<runs>` runs Zig's fuzzer over that grammar:
+  a parse depends on its text alone, and a tree's text reads back as the same tree.
 - `tools/coverage_check.sh` converts every protobuf type with connect-zig and with Go's runtime,
   between binary and JSON both ways, and requires the same message.
 - `tools/interop_languages_check.sh` calls the server from [clients in Go, TypeScript, Python

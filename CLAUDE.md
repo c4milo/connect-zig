@@ -125,13 +125,16 @@ confirm a test fails. Report `CAUGHT` or `NOT CAUGHT` per mutation in the commit
   commands for real and renders the session with HyperFrames into `examples/<example>/
   walkthrough.gif`, which the README embeds. It needs Node 22 or later, FFmpeg and Chrome.
 - Generated code: `zig build test-generated` compiles the examples' generated code and runs its
-  round trips.
+  round trips, and those of `tools/wide`: one message of 600 fields with rules, which holds the
+  protobuf module, the plugin's table and `protovalidate` to a wide message.
+  `python3 tools/wide/wide_proto.py` writes its schema.
   `tools/gen` holds the checks' generated code, from `tools/proto` (decision 41).
   `tools/generate_check.sh` regenerates each `gen/` with `buf generate` and fails on a difference;
   `--write` rewrites it. It needs buf, or `BUF` naming it. It builds the plugin alone, with
   `zig build plugin`, so generated code that no longer compiles does not stop it. The root's
-  `buf.yaml` is the buf workspace of protovalidate's schemas alone: `src/protovalidate/proto`,
-  and `conformance/protovalidate/proto`, which imports it. Every other buf module stands alone.
+  `buf.yaml` is the buf workspace of the schemas that import validate.proto from this tree:
+  `src/protovalidate/proto`, `conformance/protovalidate/proto` and `tools/wide/proto`. Every
+  other buf module stands alone.
 - Interop: `tools/interop_check.sh` calls the socket server with `buf curl` in Connect, gRPC and
   gRPC-Web, over h2 and h3, with curl over h11 and h2, and with OpenTelemetry's Go SDK, which
   exports spans to the OTLP receiver and reads them back (decision 40), all over TLS with the
@@ -173,6 +176,16 @@ confirm a test fails. Report `CAUGHT` or `NOT CAUGHT` per mutation in the commit
   `build/protovalidate.zig` reads module by module from each file's header. A case that fails on
   purpose goes in `conformance/protovalidate_known_failing.yaml` under its reason. It needs git
   and go.
+- Lean: `zig build lean` builds the Lean model of `spec/lean/` with lake, through pepegrillo's
+  `lean` tool, and requires `src/protovalidate/cel/cel_vectors.txt` to be what the model gives;
+  `zig build lean -- write` rewrites it. A unit test of `protovalidate` replays the file against
+  the Zig grammar, with no Lean needed. `spec/lean/lean-toolchain` pins the release.
+  `tools/lean_check.sh` runs the step, and installs that release for x86-64 Linux, pinned by
+  SHA-256, when no lake is on the path and `LAKE` names none. `spec/lean/README.md` says what
+  the model holds and what it proves.
+- Fuzzer: `zig build test-<module> -Drelease --fuzz=<runs>` runs a module's fuzz properties
+  under Zig's fuzzer; Zig 0.16.0's test runner compiles in fuzz mode in ReleaseSafe alone.
+  `zig build test` runs each property over its corpus. `tools/ci.sh` does not run the fuzzer.
 - Interop across languages: `tools/interop_languages_check.sh [client...]` runs the clients of
   `interop/` (Go, TypeScript, Python, and Rust's tonic and connect-rust) against the interop
   server of `tools/interop_server/`, which `zig build run-interop-server -- [port]` starts;

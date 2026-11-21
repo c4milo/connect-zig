@@ -706,6 +706,25 @@ first. Cite an entry by number in code and commits ("decision 6").
         Past it `validate` ends with `TooManyItems`.
       - `&&`, `||`, `all` and `exists` absorb a side or an element that fails when another one
         decides the result, as CEL states them.
+      - The grammar is written once, over a builder (`cel_grammar.zig`). The compiler runs it
+        with a builder that makes the tree in its own memory, and a test runs the same code
+        at run time with a builder that writes into storage it passes. So Zig's fuzzer and
+        the vectors of a Lean model check the code that reads a schema's rules. Beaten: a
+        second reader for the tests, which a test would check in place of the first.
+      - The reader follows the CEL language definition's lexis: a string of three quotes, a
+        bytes literal's `b` before its `r`, `0x` in lower case, no line end in a string of
+        single quotes, the reserved words, a keyword as no field's name, a comma after a
+        list literal's last element, and a number's sign as part of its literal. It reads no
+        map literal, no message literal and no name that starts with ".".
+      - A Lean model in `spec/lean/` states the lexis and the grammar a second time, from the
+        language definition and production by production, where the Zig reads every level of
+        operators in one loop. Its vectors are replayed against the Zig grammar. The model
+        proves no theorem yet (spec/lean/README.md).
+      - A schema of thousands of rules compiles in time that grows with them. The compiler
+        reads each token once, keeps one tree for each expression's text, and finds a field's
+        entry by a search of a descriptor whose numbers rise. The plugin raises the
+        compiler's branch quota in a table whose literal makes more than 500 calls, since
+        Zig counts each call of a declaration's value against a quota of 1000.
       - The plugin still reads the predefined rules of an extension, since only its request
         holds an extension's descriptor. It writes each one's value into the table.
         - A rule message's generated type does not know an extension, so the extension's

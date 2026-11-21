@@ -308,6 +308,9 @@ Each step names the check that proves it. A step is done when its check passes i
     - Part d: the predefined rules of an extension. The plugin reads each extension's value
       and its rules from its request, and writes them into the table.
 
+    The grammar is one code for the compiler and for a test at run time. Zig's fuzzer and
+    the vectors of a Lean model in `spec/lean/` check it (decision 47 as amended).
+
     New public names: `protovalidate.Error` gains `Unevaluable`, for an expression that fails
     at run time. `Rules.Field` gains `predefined`, which the plugin writes. No root name is
     new. Check: `zig build test-protovalidate`, with each check's mutation caught, and the
@@ -1429,6 +1432,49 @@ ran on Linux x86-64 with Zig 0.16.0.
     `descriptor_pb.zig`, which an encoding by the same file cannot check.
   - The plugin walks the tags of a span in code of its own, about 40 lines, as the protobuf
     module exports no wire reader. The owner's word is owed on a public name for one.
+- **CEL: the grammar's checks, and large schemas** (step 34, decision 47 as amended). Run on a
+  Xeon at 2.1 GHz, x86-64 Linux, 4 cores. The owner asked whether a large schema compiles in
+  reasonable time, and for a fuzzer and a Lean model of the CEL reader.
+  - Compile time of a Debug build, a schema of M messages of N fields, each field with a CEL
+    rule of its own text and each message with three. Before and after:
+    1 × 200, 203 expressions, 10.7 s and 3.5 s; 1 × 500, 31.8 s and 8.0 s; 20 × 50, 1,060
+    expressions, 48.2 s and 13.4 s; 100 × 20, 2,300 expressions, 100.4 s and 27.7 s. After
+    alone: 1 × 1,000 in 14.4 s and 1 × 2,000 in 27.9 s, which did not compile before. With
+    standard rules alone, 100 × 20 built in 2.8 s and 1 × 1,000 in 3.6 s, where 1 × 1,000
+    took 23.1 s. A CEL expression costs about 13 ms.
+  - Where the time went: the reader read each token again at each level of operators, each
+    reader of a tree asked the compiler for a tree of its own, and each field searched the
+    table for its entry. The reader now holds one token ahead, `cel_parse.tree_of` gives one
+    tree for each text, and `table.entry_of` reads a place computed once for each type.
+  - Three limits fell. The protobuf module stopped at a message of about 500 fields: each
+    function that reads every field at compile time now raises its branch quota. The table of
+    a message with more than 1,000 `.of(` calls stopped the compiler: the plugin now writes
+    such a table in a block that raises the quota. One limit stays, and "What a later step
+    owes" names it: about 1,000 repeated and map fields in one message.
+  - `tools/wide` holds one message of 600 fields with rules, and `zig build test-generated`
+    reads it through binary, JSON and `validate`.
+  - The CEL reader was read against the language definition for the model. Nine things
+    differed, and each follows the definition now: a string of three quotes, a bytes literal's
+    prefix order, `0X`, a line end in a string of single quotes, the reserved words, a keyword
+    as a field's name, a comma after a list's last element, a double past the greatest one,
+    and a number's sign after a "!". One error was found in the reader itself: a string with a
+    numbered escape, such as `'é'`, did not compile.
+  - The Lean model, 6,647 vectors: the Zig grammar gave the model's tree or its refusal for
+    each. The first run differed on one, `r'a\'`, where the model was wrong: a raw string ends
+    at its first quote. `tools/lean_check.sh` printed `Build completed successfully`, and
+    exits 1 on a vector file that was changed.
+  - Zig's fuzzer: `zig build test-protovalidate -Drelease --fuzz=2M` ran 2,001,782 inputs,
+    1,423 of them unique, in 327 s, with no failure.
+  - `zig build test` printed 97 of 97 steps and 544 of 544 tests passed.
+    `tools/protovalidate_conformance_check.sh` printed `PASS (failed: 0, skipped: 50, passed:
+    2822, total: 2872)`. `tools/perf_check.sh` printed no operation past the baseline: the
+    small routed Connect call takes 4,177 instructions.
+  - Mutations, 64: a test caught 58, and the compiler stopped 6, where the tests' own
+    expressions no longer compiled. The CEL reader took 50 of them, the table 6, the plugin 4
+    and the protobuf module 4. Three of the first mutants did not compile for a reason of
+    their own, and each ran again in a form that compiles.
+  - pepegrillo moved to `e94a349`. Its commit linter still holds a subject to 72 columns, so
+    `b6f90a1` still fails `zig build lint-commits`.
 - **Ubuntu 26.04** (`fa83b86`, decision 44 as amended on 2026-11-20). CI's
   [run 191](https://github.com/c4milo/connect-zig/actions/runs/44673102412), the first on
   `ubuntu-26.04` and `ubuntu-26.04-arm`. Every job passed. Over TLS on arm64, connect-zig held
@@ -1487,6 +1533,18 @@ ran on Linux x86-64 with Zig 0.16.0.
 - For `protovalidate`, a `unique` list longer than `compared_items_max` fails with
   `TooManyItems` (decision 47). A program that needs longer lists needs a set in storage it
   passes. No step holds that yet.
+- For `protovalidate`, the parts of CEL that no rule of the conformance suite uses and the
+  module does not read yet: `timestamp(string)`, sums and differences of timestamps and
+  durations, the accessors of a timestamp such as `getFullYear`, `map` over a field,
+  `filter`, and `string` of a number. Each stops the build with a message that names it.
+- A generated message holds at most about 1,000 repeated and map fields. Zig counts each
+  `proto.Repeated(...)` of a struct's fields against a branch quota of 1000, which no
+  statement of the struct can raise. An alias for each element type, declared once in the
+  file, would take the calls out of the struct.
+- The Lean model states the CEL syntax and proves no theorem. A proof that the model reads the
+  text of each tree back as the tree would hold the grammar and the text to each other for
+  every tree, where the vectors hold 600. The format checks of step 32, a URI of RFC 3986
+  among them, have no model yet: one would follow the RFC's ABNF, with vectors as here.
 - `examples/socket_server` serves every example's service but `validate`'s. A route table names
   one `.Values` type, and each example's service names its own for its interceptor. A service
   that takes the table's `.Values` as a parameter would let the table hold the fields of both.

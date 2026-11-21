@@ -48,8 +48,16 @@ change the public API, and the entry marks each change that does.
   each one's value and rules into the table of the message that sets it, and `protovalidate`
   compiles them as it compiles a schema's own. A value is a scalar, a wrapper or a list of
   them.
-- Not yet: `pattern` and CEL's `matches`. A message with such a rule stops the build, with a
-  message that names the rule.
+- A CEL string of three quotes, `'''...'''`, which holds line ends, and a comma after the last
+  element of a list literal, as the CEL language definition states them.
+- A Lean model of the CEL syntax in `spec/lean/`, and `zig build lean`, which requires the
+  vectors a unit test replays to be what the model gives. `tools/lean_check.sh` runs it, and
+  is the check `lean` of `tools/ci.sh`.
+- The plugin raises the compiler's branch quota in the table of a message with more than 500
+  list and message rules, so a message of a thousand fields with rules compiles.
+- Not yet: `pattern` and CEL's `matches`, arithmetic on a timestamp or a duration, and
+  `timestamp(string)`. A message with such a rule stops the build, with a message that names
+  the rule.
 
 ### Changed
 
@@ -64,9 +72,23 @@ change the public API, and the entry marks each change that does.
   sink's peak memory under the full-stack load fell from 483 MiB to 378 MiB. A route search
   compares 8 octets at a time, and the small routed call takes 1.4% fewer instructions.
 - An h11 request head longer than 24,582 octets is refused (colibri's step 62).
+- A schema's CEL rules compile in about a third of the time: 2,300 expressions in 29 s of a
+  Debug build, where they took 100 s. The compiler reads each token once and keeps one tree
+  for each expression's text, and a field's rules are found without a search of the table.
+- The CEL reader follows the language definition's lexis where it did not. **Changes what
+  compiles.** A bytes literal's prefix is `b` then `r`, so `rb'x'` is refused. A hexadecimal
+  number starts with `0x` in lower case. A string in single quotes holds no line end. A
+  reserved word such as `package` names no variable, and a keyword such as `in` names no
+  field. A double past the greatest one is refused. `!-5` reads, since a number's sign is
+  part of its literal.
+- A table with two entries for one field stops the build.
 
 ### Fixed
 
+- A message of about 500 fields or more encodes and decodes. Before, the compiler stopped at
+  its default branch quota in `encode`, in `decode` and in the JSON writer.
+- A CEL string with a numbered escape, such as `'é'` or `'\x41'`, compiles. Before, the
+  build stopped in the escape's own code.
 - JSON encode writes a map key once, with its last entry's value, as protobuf's map rule says.
   Before, a map read from binary with a key twice wrote the key twice, which Go's protojson
   refuses. A map of more than 256 entries is written as received. Google's protobuf suite now
