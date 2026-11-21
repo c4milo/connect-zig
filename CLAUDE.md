@@ -105,11 +105,13 @@ confirm a test fails. Report `CAUGHT` or `NOT CAUGHT` per mutation in the commit
   dependency, its own `proto/` and `gen/`, and one `State` per program (decisions 41 and 42).
   `zig build examples` runs `zig build test` in each, with the root's package folder and cache;
   `zig build example-<name>` runs one project's check; `examples/README.md` lists them. The
-  in-memory checks (`eliza`, `streaming`, `interceptors`, `errors`, `github`, `oidc`) run over
-  `examples/harness`, whose h3 rounds use its test-only identity in `examples/harness/tls`
-  (decision 25). In a project's folder, run `zig build test --system ../../zig-pkg --cache-dir
-  ../../.zig-cache`, never a plain `zig build`, which fetches 500 MB again. `zig build serve --
-  [port]` serves a project's service over TLS on h11, h2 and h3. `zig build run-eliza-server --
+  in-memory checks (`eliza`, `streaming`, `interceptors`, `errors`, `github`, `oidc`,
+  `validate`) run over `examples/harness`, whose h3 rounds use its test-only identity in
+  `examples/harness/tls` (decision 25). `validate`'s schema takes validate.proto from the Buf
+  Schema Registry, at the commit its `proto/buf.lock` pins. In a project's folder, run `zig
+  build test --system ../../zig-pkg --cache-dir ../../.zig-cache`, never a plain `zig build`,
+  which fetches 500 MB again. `zig build serve -- [port]` serves a project's service over TLS on
+  h11, h2 and h3. `zig build run-eliza-server --
   [port]` serves every example's service on `colibri.Server` (`examples/socket_server`), and
   `zig build run-std-io-server -- [port]` serves ELIZA with no Rotor, on colibri's engine over
   `std.Io` (`examples/std_io`, decision 32); port 0 lets the kernel choose, and each server prints
