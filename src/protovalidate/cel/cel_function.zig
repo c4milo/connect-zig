@@ -7,50 +7,50 @@ const proto = @import("protobuf");
 const constants = @import("../constants.zig");
 const type_file = @import("cel_type.zig");
 const library = @import("cel_library.zig");
+const Function = @import("cel_node.zig").Function;
 const Bytes = type_file.Bytes;
 const Error = type_file.Error;
 const Timestamp = proto.wkt.Timestamp;
 
-/// One function for one list of operand types.
-const Overload = struct { name: []const u8, operands: []const type, result: type };
+/// One list of operand types a function takes, and the type it gives for them.
+const Overload = struct { operands: []const type, result: type };
 
 const text = []const u8;
 
-const overloads = [_]Overload{
-    .{ .name = "size", .operands = &.{text}, .result = i64 },
-    .{ .name = "size", .operands = &.{Bytes}, .result = i64 },
-    .{ .name = "int", .operands = &.{i64}, .result = i64 },
-    .{ .name = "int", .operands = &.{u64}, .result = i64 },
-    .{ .name = "int", .operands = &.{f64}, .result = i64 },
-    .{ .name = "int", .operands = &.{text}, .result = i64 },
-    .{ .name = "int", .operands = &.{Timestamp}, .result = i64 },
-    .{ .name = "uint", .operands = &.{i64}, .result = u64 },
-    .{ .name = "uint", .operands = &.{u64}, .result = u64 },
-    .{ .name = "uint", .operands = &.{f64}, .result = u64 },
-    .{ .name = "uint", .operands = &.{text}, .result = u64 },
-    .{ .name = "double", .operands = &.{i64}, .result = f64 },
-    .{ .name = "double", .operands = &.{u64}, .result = f64 },
-    .{ .name = "double", .operands = &.{f64}, .result = f64 },
-    .{ .name = "double", .operands = &.{text}, .result = f64 },
-    .{ .name = "string", .operands = &.{text}, .result = text },
-    .{ .name = "string", .operands = &.{Bytes}, .result = text },
-    .{ .name = "bytes", .operands = &.{text}, .result = Bytes },
-    .{ .name = "bytes", .operands = &.{Bytes}, .result = Bytes },
-    .{ .name = "bool", .operands = &.{bool}, .result = bool },
-    .{ .name = "bool", .operands = &.{text}, .result = bool },
-    .{ .name = "startsWith", .operands = &.{ text, text }, .result = bool },
-    .{ .name = "endsWith", .operands = &.{ text, text }, .result = bool },
-    .{ .name = "contains", .operands = &.{ text, text }, .result = bool },
-};
+/// The overloads of `function`. A switch finds a function's own in one step, so the compiler
+/// compares the operands of a few overloads and no name.
+fn overloads_of(comptime function: Function) []const Overload {
+    return switch (function) {
+        .size => &.{ .{ .operands = &.{text}, .result = i64 }, .{ .operands = &.{Bytes}, .result = i64 } },
+        .int => &.{
+            .{ .operands = &.{i64}, .result = i64 },       .{ .operands = &.{u64}, .result = i64 },
+            .{ .operands = &.{f64}, .result = i64 },       .{ .operands = &.{text}, .result = i64 },
+            .{ .operands = &.{Timestamp}, .result = i64 },
+        },
+        .uint => &.{
+            .{ .operands = &.{i64}, .result = u64 }, .{ .operands = &.{u64}, .result = u64 },
+            .{ .operands = &.{f64}, .result = u64 }, .{ .operands = &.{text}, .result = u64 },
+        },
+        .double => &.{
+            .{ .operands = &.{i64}, .result = f64 }, .{ .operands = &.{u64}, .result = f64 },
+            .{ .operands = &.{f64}, .result = f64 }, .{ .operands = &.{text}, .result = f64 },
+        },
+        .string => &.{ .{ .operands = &.{text}, .result = text }, .{ .operands = &.{Bytes}, .result = text } },
+        .bytes => &.{ .{ .operands = &.{text}, .result = Bytes }, .{ .operands = &.{Bytes}, .result = Bytes } },
+        .bool => &.{ .{ .operands = &.{bool}, .result = bool }, .{ .operands = &.{text}, .result = bool } },
+        .startsWith, .endsWith, .contains => &.{.{ .operands = &.{ text, text }, .result = bool }},
+        else => &.{},
+    };
+}
 
-/// The type `name` gives for operands of these types, or null when the module holds no such
-/// function for them.
-pub fn Result(comptime name: []const u8, comptime operands: []const type) ?type {
-    for (overloads) |overload| {
-        if (std.mem.eql(u8, overload.name, name) and same_types(overload.operands, operands)) return overload.result;
+/// The type `function` gives for operands of these types, or null when the module holds no
+/// such function for them.
+pub fn Result(comptime function: Function, comptime operands: []const type) ?type {
+    for (overloads_of(function)) |overload| {
+        if (same_types(overload.operands, operands)) return overload.result;
     }
     // protovalidate's own functions, each of which gives a bool.
-    return if (library.holds(name, operands)) bool else null;
+    return if (library.holds(function, operands)) bool else null;
 }
 
 fn same_types(comptime left: []const type, comptime right: []const type) bool {
@@ -61,25 +61,22 @@ fn same_types(comptime left: []const type, comptime right: []const type) bool {
     return true;
 }
 
-/// The result of `name` for `operands`, a tuple of the types `Result` took.
-pub fn run(comptime name: []const u8, comptime R: type, operands: anytype) Error!R {
-    if (comptime library.holds(name, &types_of(@TypeOf(operands)))) return library.run(name, operands);
+/// The result of `function` for `operands`, a tuple of the types `Result` took.
+pub fn run(comptime function: Function, comptime R: type, operands: anytype) Error!R {
     const first = operands[0];
-    if (comptime named(name, "size")) return size(first);
-    if (comptime named(name, "int")) return to_int(first);
-    if (comptime named(name, "uint")) return to_uint(first);
-    if (comptime named(name, "double")) return to_double(first);
-    if (comptime named(name, "string")) return to_string(first);
-    if (comptime named(name, "bytes")) return .{ .octets = octets_of(first) };
-    if (comptime named(name, "bool")) return to_bool(first);
-    if (comptime named(name, "startsWith")) return std.mem.startsWith(u8, first, operands[1]);
-    if (comptime named(name, "endsWith")) return std.mem.endsWith(u8, first, operands[1]);
-    if (comptime named(name, "contains")) return std.mem.indexOf(u8, first, operands[1]) != null;
-    comptime unreachable;
-}
-
-fn named(comptime name: []const u8, comptime other: []const u8) bool {
-    return std.mem.eql(u8, name, other);
+    return switch (function) {
+        .size => size(first),
+        .int => to_int(first),
+        .uint => to_uint(first),
+        .double => to_double(first),
+        .string => to_string(first),
+        .bytes => .{ .octets = octets_of(first) },
+        .bool => to_bool(first),
+        .startsWith => std.mem.startsWith(u8, first, operands[1]),
+        .endsWith => std.mem.endsWith(u8, first, operands[1]),
+        .contains => std.mem.indexOf(u8, first, operands[1]) != null,
+        else => library.run(function, operands),
+    };
 }
 
 /// The types of a tuple's values.
@@ -124,16 +121,18 @@ fn to_uint(value: anytype) Error!u64 {
     };
 }
 
-/// The whole part of a double as an `I`, when `I` holds it.
+/// The whole part of a double as an `I`, when the double is in the range cel-go converts,
+/// which protovalidate's libraries run: a uint takes no double below zero, so -0.5 fails
+/// where its whole part is 0, and an int takes no double at or below its least value.
 fn whole(comptime I: type, value: f64) Error!I {
     if (std.math.isNan(value)) return error.Unevaluable;
-    const truncated = @trunc(value);
     // The type's least value is a power of two, which a double holds, and the first value
     // past its greatest one is too.
     const least: f64 = @floatFromInt(std.math.minInt(I));
     const past: f64 = @floatFromInt(@as(u128, std.math.maxInt(I)) + 1);
-    if (truncated < least or truncated >= past) return error.Unevaluable;
-    return @intFromFloat(truncated);
+    const below = if (I == u64) value < least else value <= least;
+    if (below or value >= past) return error.Unevaluable;
+    return @intFromFloat(@trunc(value));
 }
 
 fn to_double(value: anytype) Error!f64 {
@@ -165,8 +164,8 @@ fn to_bool(value: anytype) Error!bool {
 
 const testing = std.testing;
 
-fn call(comptime name: []const u8, operands: anytype) Error!Result(name, &types_of(@TypeOf(operands))).? {
-    return run(name, comptime Result(name, &types_of(@TypeOf(operands))).?, operands);
+fn call(comptime function: Function, operands: anytype) Error!Result(function, &types_of(@TypeOf(operands))).? {
+    return run(function, comptime Result(function, &types_of(@TypeOf(operands))).?, operands);
 }
 
 fn str(comptime literal: []const u8) []const u8 {
@@ -175,62 +174,69 @@ fn str(comptime literal: []const u8) []const u8 {
 
 test "size counts a string's code points and a bytes value's octets" {
     const two = 2;
-    try testing.expectEqual(@as(i64, two), try call("size", .{str("\u{e9}a")}));
-    try testing.expectEqual(@as(i64, 0), try call("size", .{str("")}));
-    try testing.expectEqual(@as(i64, two + 1), try call("size", .{Bytes{ .octets = "\u{e9}a" }}));
-    try testing.expectError(error.Unevaluable, call("size", .{str("\xff")}));
-    try testing.expect(comptime Result("size", &.{i64}) == null);
-    try testing.expect(comptime Result("size", &.{ []const u8, []const u8 }) == null);
+    try testing.expectEqual(@as(i64, two), try call(.size, .{str("\u{e9}a")}));
+    try testing.expectEqual(@as(i64, 0), try call(.size, .{str("")}));
+    try testing.expectEqual(@as(i64, two + 1), try call(.size, .{Bytes{ .octets = "\u{e9}a" }}));
+    try testing.expectError(error.Unevaluable, call(.size, .{str("\xff")}));
+    try testing.expect(comptime Result(.size, &.{i64}) == null);
+    try testing.expect(comptime Result(.size, &.{ []const u8, []const u8 }) == null);
 }
 
 test "a conversion to an integer fails for a value the type does not hold" {
     const seven = 7;
-    try testing.expectEqual(@as(i64, seven), try call("int", .{@as(u64, seven)}));
-    try testing.expectError(error.Unevaluable, call("int", .{@as(u64, std.math.maxInt(u64))}));
-    try testing.expectEqual(@as(i64, -seven), try call("int", .{@as(f64, -7.9)}));
-    try testing.expectEqual(@as(i64, std.math.minInt(i64)), try call("int", .{@as(f64, -0x1p63)}));
-    try testing.expectError(error.Unevaluable, call("int", .{@as(f64, 0x1p63)}));
-    try testing.expectError(error.Unevaluable, call("int", .{std.math.nan(f64)}));
-    try testing.expectEqual(@as(i64, -seven), try call("int", .{str("-7")}));
-    try testing.expectError(error.Unevaluable, call("int", .{str("7.5")}));
-    try testing.expectEqual(@as(i64, seven), try call("int", .{Timestamp{ .seconds = seven, .nanos = 1 }}));
-    try testing.expectEqual(@as(i64, seven), try call("int", .{@as(i64, seven)}));
-    try testing.expectEqual(@as(u64, seven), try call("uint", .{@as(i64, seven)}));
-    try testing.expectError(error.Unevaluable, call("uint", .{@as(i64, -1)}));
-    try testing.expectEqual(@as(u64, seven), try call("uint", .{@as(f64, 7.9)}));
-    try testing.expectError(error.Unevaluable, call("uint", .{@as(f64, -1)}));
-    try testing.expectError(error.Unevaluable, call("uint", .{@as(f64, 0x1p64)}));
-    try testing.expectEqual(@as(u64, seven), try call("uint", .{str("7")}));
-    try testing.expectError(error.Unevaluable, call("uint", .{str("-7")}));
-    try testing.expectEqual(@as(u64, seven), try call("uint", .{@as(u64, seven)}));
+    try testing.expectEqual(@as(i64, seven), try call(.int, .{@as(u64, seven)}));
+    try testing.expectError(error.Unevaluable, call(.int, .{@as(u64, std.math.maxInt(u64))}));
+    try testing.expectEqual(@as(i64, -seven), try call(.int, .{@as(f64, -7.9)}));
+    // cel-go takes no double at or below the least int, and the next double above it is whole.
+    try testing.expectError(error.Unevaluable, call(.int, .{@as(f64, -0x1p63)}));
+    try testing.expectEqual(@as(i64, -0x7ffffffffffffc00), try call(.int, .{@as(f64, -0x1.fffffffffffffp62)}));
+    try testing.expectError(error.Unevaluable, call(.int, .{-std.math.inf(f64)}));
+    try testing.expectError(error.Unevaluable, call(.int, .{@as(f64, 0x1p63)}));
+    try testing.expectError(error.Unevaluable, call(.int, .{std.math.nan(f64)}));
+    try testing.expectEqual(@as(i64, -seven), try call(.int, .{str("-7")}));
+    try testing.expectError(error.Unevaluable, call(.int, .{str("7.5")}));
+    try testing.expectEqual(@as(i64, seven), try call(.int, .{Timestamp{ .seconds = seven, .nanos = 1 }}));
+    try testing.expectEqual(@as(i64, seven), try call(.int, .{@as(i64, seven)}));
+    try testing.expectEqual(@as(u64, seven), try call(.uint, .{@as(i64, seven)}));
+    try testing.expectError(error.Unevaluable, call(.uint, .{@as(i64, -1)}));
+    try testing.expectEqual(@as(u64, seven), try call(.uint, .{@as(f64, 7.9)}));
+    try testing.expectError(error.Unevaluable, call(.uint, .{@as(f64, -1)}));
+    // A uint takes no double below zero, whatever its whole part, and takes the zero below.
+    try testing.expectError(error.Unevaluable, call(.uint, .{@as(f64, -0.5)}));
+    try testing.expectEqual(@as(u64, 0), try call(.uint, .{@as(f64, -0.0)}));
+    try testing.expectEqual(@as(u64, 0), try call(.uint, .{@as(f64, 0.5)}));
+    try testing.expectError(error.Unevaluable, call(.uint, .{@as(f64, 0x1p64)}));
+    try testing.expectEqual(@as(u64, seven), try call(.uint, .{str("7")}));
+    try testing.expectError(error.Unevaluable, call(.uint, .{str("-7")}));
+    try testing.expectEqual(@as(u64, seven), try call(.uint, .{@as(u64, seven)}));
 }
 
 test "a conversion to a double, a string, bytes or a bool reads each type it takes" {
-    try testing.expectEqual(@as(f64, -1), try call("double", .{@as(i64, -1)}));
-    try testing.expectEqual(@as(f64, 1), try call("double", .{@as(u64, 1)}));
-    try testing.expectEqual(@as(f64, 1.5), try call("double", .{str("1.5")}));
-    try testing.expectEqual(@as(f64, 1.5), try call("double", .{@as(f64, 1.5)}));
-    try testing.expectError(error.Unevaluable, call("double", .{str("one")}));
-    try testing.expectEqualStrings("ab", try call("string", .{Bytes{ .octets = "ab" }}));
-    try testing.expectEqualStrings("ab", try call("string", .{str("ab")}));
-    try testing.expectError(error.Unevaluable, call("string", .{Bytes{ .octets = "\xff" }}));
-    try testing.expectEqualStrings("ab", (try call("bytes", .{str("ab")})).octets);
-    try testing.expectEqualStrings("ab", (try call("bytes", .{Bytes{ .octets = "ab" }})).octets);
-    try testing.expect(try call("bool", .{str("true")}) and try call("bool", .{str("T")}) and try call("bool", .{true}));
-    try testing.expect(!try call("bool", .{str("false")}) and !try call("bool", .{str("0")}));
-    try testing.expectError(error.Unevaluable, call("bool", .{str("yes")}));
-    try testing.expect(comptime Result("bool", &.{i64}) == null and Result("string", &.{i64}) == null);
-    try testing.expect(comptime Result("int", &.{bool}) == null and Result("uint", &.{Timestamp}) == null);
+    try testing.expectEqual(@as(f64, -1), try call(.double, .{@as(i64, -1)}));
+    try testing.expectEqual(@as(f64, 1), try call(.double, .{@as(u64, 1)}));
+    try testing.expectEqual(@as(f64, 1.5), try call(.double, .{str("1.5")}));
+    try testing.expectEqual(@as(f64, 1.5), try call(.double, .{@as(f64, 1.5)}));
+    try testing.expectError(error.Unevaluable, call(.double, .{str("one")}));
+    try testing.expectEqualStrings("ab", try call(.string, .{Bytes{ .octets = "ab" }}));
+    try testing.expectEqualStrings("ab", try call(.string, .{str("ab")}));
+    try testing.expectError(error.Unevaluable, call(.string, .{Bytes{ .octets = "\xff" }}));
+    try testing.expectEqualStrings("ab", (try call(.bytes, .{str("ab")})).octets);
+    try testing.expectEqualStrings("ab", (try call(.bytes, .{Bytes{ .octets = "ab" }})).octets);
+    try testing.expect(try call(.bool, .{str("true")}) and try call(.bool, .{str("T")}) and try call(.bool, .{true}));
+    try testing.expect(!try call(.bool, .{str("false")}) and !try call(.bool, .{str("0")}));
+    try testing.expectError(error.Unevaluable, call(.bool, .{str("yes")}));
+    try testing.expect(comptime Result(.bool, &.{i64}) == null and Result(.string, &.{i64}) == null);
+    try testing.expect(comptime Result(.int, &.{bool}) == null and Result(.uint, &.{Timestamp}) == null);
 }
 
 test "a string starts with, ends with and contains another" {
-    try testing.expect(try call("startsWith", .{ str("foobar"), str("foo") }));
-    try testing.expect(!try call("startsWith", .{ str("foobar"), str("bar") }));
-    try testing.expect(try call("endsWith", .{ str("foobar"), str("bar") }));
-    try testing.expect(!try call("endsWith", .{ str("foobar"), str("foo") }));
-    try testing.expect(try call("contains", .{ str("foobar"), str("oba") }));
-    try testing.expect(!try call("contains", .{ str("foobar"), str("abo") }));
-    try testing.expect(comptime Result("startsWith", &.{ i64, []const u8 }) == null);
-    try testing.expect(comptime Result("contains", &.{[]const u8}) == null);
-    try testing.expect(comptime Result("nothing", &.{[]const u8}) == null);
+    try testing.expect(try call(.startsWith, .{ str("foobar"), str("foo") }));
+    try testing.expect(!try call(.startsWith, .{ str("foobar"), str("bar") }));
+    try testing.expect(try call(.endsWith, .{ str("foobar"), str("bar") }));
+    try testing.expect(!try call(.endsWith, .{ str("foobar"), str("foo") }));
+    try testing.expect(try call(.contains, .{ str("foobar"), str("oba") }));
+    try testing.expect(!try call(.contains, .{ str("foobar"), str("abo") }));
+    try testing.expect(comptime Result(.startsWith, &.{ i64, []const u8 }) == null);
+    try testing.expect(comptime Result(.contains, &.{[]const u8}) == null);
+    try testing.expect(comptime Result(.unknown, &.{[]const u8}) == null);
 }

@@ -196,7 +196,7 @@ fn write_leaf(item: Item, doubles: Doubles, writer: *Writer) Writer.Error!void {
     switch (item) {
         .int => |value| try writer.print("{d}", .{value}),
         .uint => |value| try writer.print("{d}u", .{value}),
-        .double => |double| if (doubles == .texts) try writer.writeAll(double.text) else try writer.print("{e}", .{double.value}),
+        .double => |double| try write_double(double, doubles, writer),
         .boolean => |value| try writer.writeAll(if (value) "true" else "false"),
         .string => |octets| try write_octets("'", octets, false, writer),
         .bytes => |octets| try write_octets("b'", octets, true, writer),
@@ -204,6 +204,14 @@ fn write_leaf(item: Item, doubles: Doubles, writer: *Writer) Writer.Error!void {
         .name => |text| try writer.writeAll(text),
         else => unreachable,
     }
+}
+
+/// A double as its value, or as its text in the expression after its sign: a literal's text
+/// holds no sign, and a literal with a "-" before it has a value below zero or the zero below.
+fn write_double(double: Item.Double, doubles: Doubles, writer: *Writer) Writer.Error!void {
+    if (doubles == .values) return writer.print("{e}", .{double.value});
+    if (std.math.signbit(double.value)) try writer.writeAll("-");
+    try writer.writeAll(double.text);
 }
 
 fn write_octets(open: []const u8, octets: []const u8, comptime of_bytes: bool, writer: *Writer) Writer.Error!void {
@@ -220,9 +228,9 @@ fn write_operator(tree: *const Tree, at: Index, doubles: Doubles, writer: *Write
     switch (tree.items[at]) {
         .unary => |unary| {
             try writer.writeAll(unary.op.text());
-            // A "-" before an integer literal is the literal's sign, so an int that a "-"
-            // negates is written in brackets.
-            const bracketed = unary.op == .negate and tree.items[unary.of] == .int;
+            // A "-" before a number is the number's sign, so a part whose text starts with a
+            // number is written in brackets under a negation.
+            const bracketed = unary.op == .negate and starts_with_number(tree, unary.of);
             if (bracketed) try writer.writeAll("(");
             try write(tree, unary.of, doubles, writer);
             if (bracketed) try writer.writeAll(")");
@@ -242,6 +250,23 @@ fn write_operator(tree: *const Tree, at: Index, doubles: Doubles, writer: *Write
         else => unreachable,
     }
     try writer.writeAll(")");
+}
+
+/// Whether the text of the part at `start` starts with an int or a double: the number itself,
+/// or a selection, an index or a call on a part that starts with one.
+fn starts_with_number(tree: *const Tree, start: Index) bool {
+    var at = start;
+    // Each step moves to a part the part before it holds, so the parts bound the steps.
+    for (0..tree.item_count) |_| {
+        at = switch (tree.items[at]) {
+            .int, .double => return true,
+            .select => |select| select.of,
+            .index => |index| index.of,
+            .call => |call| call.target orelse return false,
+            else => return false,
+        };
+    }
+    return false;
 }
 
 fn write_member(tree: *const Tree, at: Index, doubles: Doubles, writer: *Writer) Writer.Error!void {

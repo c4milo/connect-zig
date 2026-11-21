@@ -28,8 +28,51 @@ pub const Node = union(enum) {
     pub const Unary = struct { op: UnaryOp, of: *const Node };
     pub const Binary = struct { op: BinaryOp, left: *const Node, right: *const Node };
     pub const Conditional = struct { condition: *const Node, then: *const Node, otherwise: *const Node };
-    /// `name(arguments)`, or `target.name(arguments)`.
-    pub const Call = struct { name: []const u8, target: ?*const Node = null, arguments: []const Node = &.{} };
+    /// `name(arguments)`, or `target.name(arguments)`. `function` is `Function.of(name)`.
+    pub const Call = struct { name: []const u8, function: Function, target: ?*const Node = null, arguments: []const Node = &.{} };
+};
+
+/// The function or the macro a call names. The parser finds it once, so the typing and the
+/// code compare no text. A member has the name its function has in an expression.
+pub const Function = enum {
+    /// A name the module holds no function for.
+    unknown,
+    has,
+    dyn,
+    duration,
+    matches,
+    all,
+    exists,
+    exists_one,
+    map,
+    filter,
+    size,
+    int,
+    uint,
+    double,
+    string,
+    bytes,
+    bool,
+    startsWith,
+    endsWith,
+    contains,
+    isEmail,
+    isHostname,
+    isUri,
+    isUriRef,
+    isHostAndPort,
+    isIp,
+    isIpPrefix,
+    isNan,
+    isInf,
+
+    /// The function `name` names. The compiler finds an enum's member by its name in one
+    /// step, where a comparison with each function's name takes it a step for each octet
+    /// (docs/performance.md).
+    pub fn of(comptime name: []const u8) Function {
+        if (!@hasField(Function, name)) return .unknown;
+        return @field(Function, name);
+    }
 };
 
 pub const UnaryOp = enum {
@@ -130,11 +173,23 @@ pub fn render(comptime node: *const Node) []const u8 {
     }
 }
 
-/// A "-" before an integer literal is the literal's sign, so an int that a "-" negates is
-/// written in brackets: "(-(5))" is a negation, and "-5" is a number.
+/// A "-" before a number is the number's sign, so a text that starts with a number is written
+/// in brackets when a "-" negates it: "(-(5))" is a negation, and "-5" is a number.
 fn render_operand(comptime unary: Node.Unary) []const u8 {
-    if (unary.op == .negate and unary.of.* == .int) return "(" ++ render(unary.of) ++ ")";
+    if (unary.op == .negate and starts_with_number(unary.of)) return "(" ++ render(unary.of) ++ ")";
     return render(unary.of);
+}
+
+/// Whether the text of `node` starts with an int or a double: the number itself, or a
+/// selection, an index or a call on a part that starts with one.
+fn starts_with_number(comptime node: *const Node) bool {
+    return switch (node.*) {
+        .int, .double => true,
+        .select => |select| starts_with_number(select.of),
+        .index => |index| starts_with_number(index.of),
+        .call => |call| if (call.target) |target| starts_with_number(target) else false,
+        else => false,
+    };
 }
 
 /// A call's target and the "." after it, or nothing for a call with none.

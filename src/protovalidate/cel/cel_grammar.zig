@@ -24,6 +24,7 @@ const node_file = @import("cel_node.zig");
 const BinaryOp = node_file.BinaryOp;
 const UnaryOp = node_file.UnaryOp;
 const Token = token_file.Token;
+const Mark = token_file.Mark;
 
 /// What is wrong with an expression's text. It holds no text of its own: `token` and `mark`
 /// lie in the expression and in the grammar.
@@ -32,7 +33,7 @@ pub const Problem = struct {
     /// The token the problem lies at.
     token: []const u8 = "",
     /// What the grammar expected before `token`.
-    mark: []const u8 = "",
+    mark: Mark = .none,
 
     pub const Kind = enum { none, ends_early, unexpected, expected, expected_name, reserved, not_int, negative_not_int, out_of_range, wrong_escape, too_deep };
 
@@ -46,7 +47,7 @@ pub const Problem = struct {
             .none => .{ "", "", "", "", "" },
             .ends_early => .{ "the expression ends early", "", "", "", "" },
             .unexpected => .{ "unexpected `", problem.token, "`", "", "" },
-            .expected => .{ "expected `", problem.mark, "` before `", problem.token, "`" },
+            .expected => .{ "expected `", problem.mark.text(), "` before `", problem.token, "`" },
             .expected_name => .{ "expected a name after `.`, before `", problem.token, "`", "", "" },
             .reserved => .{ "`", problem.token, "` is a reserved word", "", "" },
             .not_int => .{ "the number `", problem.token, "` is not an int", "", "" },
@@ -68,27 +69,25 @@ const and_level = 1;
 const relation_level = 2;
 const addition_level = 3;
 const multiplication_level = 4;
-/// The octets of an operator of two characters, such as "<=".
-const pair_len = 2;
 
-/// The binary operator that `token` is, or null. The tokens' reader gives each operator whole,
-/// so its first character and its length name it.
+/// The binary operator that `token` is, or null. The tokens' reader names each operator and
+/// the word "in", so no text is compared here.
 fn operator_of(token: Token) ?Operator {
-    if (token.kind == .identifier) return if (token.is_word("in")) .{ .op = .in, .level = relation_level } else null;
-    if (token.kind != .punctuation) return null;
-    const pair = token.text.len == pair_len;
-    return switch (token.text[0]) {
-        '|' => .{ .op = .@"or", .level = or_level },
-        '&' => .{ .op = .@"and", .level = and_level },
-        '<' => .{ .op = if (pair) .less_or_equal else .less, .level = relation_level },
-        '>' => .{ .op = if (pair) .greater_or_equal else .greater, .level = relation_level },
-        '=' => .{ .op = .equal, .level = relation_level },
-        '!' => if (pair) .{ .op = .not_equal, .level = relation_level } else null,
-        '+' => .{ .op = .add, .level = addition_level },
-        '-' => .{ .op = .subtract, .level = addition_level },
-        '*' => .{ .op = .multiply, .level = multiplication_level },
-        '/' => .{ .op = .divide, .level = multiplication_level },
-        '%' => .{ .op = .modulo, .level = multiplication_level },
+    if (token.word == .in) return .{ .op = .in, .level = relation_level };
+    return switch (token.mark) {
+        .@"or" => .{ .op = .@"or", .level = or_level },
+        .@"and" => .{ .op = .@"and", .level = and_level },
+        .less => .{ .op = .less, .level = relation_level },
+        .less_or_equal => .{ .op = .less_or_equal, .level = relation_level },
+        .greater => .{ .op = .greater, .level = relation_level },
+        .greater_or_equal => .{ .op = .greater_or_equal, .level = relation_level },
+        .equal => .{ .op = .equal, .level = relation_level },
+        .not_equal => .{ .op = .not_equal, .level = relation_level },
+        .plus => .{ .op = .add, .level = addition_level },
+        .minus => .{ .op = .subtract, .level = addition_level },
+        .star => .{ .op = .multiply, .level = multiplication_level },
+        .slash => .{ .op = .divide, .level = multiplication_level },
+        .percent => .{ .op = .modulo, .level = multiplication_level },
         else => null,
     };
 }
@@ -139,13 +138,13 @@ fn advance(comptime B: type, p: *Reader(B)) Token {
     return token;
 }
 
-fn take(comptime B: type, p: *Reader(B), mark: []const u8) bool {
-    if (!p.ahead.is(mark)) return false;
+fn take(comptime B: type, p: *Reader(B), mark: Mark) bool {
+    if (p.ahead.mark != mark) return false;
     _ = advance(B, p);
     return true;
 }
 
-fn expect(comptime B: type, p: *Reader(B), mark: []const u8) Error!void {
+fn expect(comptime B: type, p: *Reader(B), mark: Mark) Error!void {
     if (!take(B, p, mark)) return fail(B, p, .{ .kind = .expected, .mark = mark, .token = p.ahead.text });
 }
 
@@ -154,9 +153,9 @@ fn expression(comptime B: type, p: *Reader(B)) Error!B.Value {
     p.depth += 1;
     defer p.depth -= 1;
     const condition = try binary(B, p, 0);
-    if (!take(B, p, "?")) return condition;
+    if (!take(B, p, .question)) return condition;
     const then = try binary(B, p, 0);
-    try expect(B, p, ":");
+    try expect(B, p, .colon);
     const otherwise = try expression(B, p);
     return p.builder.conditional(condition, then, otherwise);
 }
@@ -177,31 +176,39 @@ fn binary(comptime B: type, p: *Reader(B), level: usize) Error!B.Value {
 }
 
 fn unary(comptime B: type, p: *Reader(B)) Error!B.Value {
-    const first = p.ahead;
-    if (!first.is("!") and !first.is("-")) return member(B, p);
+    const first = p.ahead.mark;
+    if (first != .bang and first != .minus) return member(B, p);
     // "Unary = ... | '!' {'!'} Member | '-' {'-'} Member": a run of one operator.
     var count: usize = 0;
     for (0..p.tokens.text.len) |_| {
-        if (!take(B, p, first.text)) break;
+        if (!take(B, p, first)) break;
         count += 1;
     }
-    const negates = first.is("-");
-    // A "-" before an integer literal is the literal's sign, so the least int is written.
-    const folded = negates and p.ahead.kind == .int;
-    var value = if (folded) try negative(B, p) else try member(B, p);
+    const negates = first == .minus;
+    // "INT_LIT ::= -? DIGIT+" and "FLOAT_LIT ::= -? ...": a number's sign is part of its
+    // literal, and "Unary" takes a run of "-" too, so "--5" has two readings. This reader
+    // takes cel-go's: one "-" before a number is the number's sign, so the least int is
+    // written and "-2.5.f()" calls `f` on -2.5. A run of two or more is a run of negations.
+    const signs = negates and count == 1 and (p.ahead.kind == .int or p.ahead.kind == .double);
+    if (signs) return negative(B, p);
+    var value = try member(B, p);
     const op: UnaryOp = if (negates) .negate else .not;
-    for (0..count - @intFromBool(folded)) |_| value = p.builder.unary(op, value);
+    for (0..count) |_| value = p.builder.unary(op, value);
     return value;
 }
 
-/// An integer literal after a "-", then what follows it.
+/// A number after a "-", which is its sign, then what follows it.
 fn negative(comptime B: type, p: *Reader(B)) Error!B.Value {
     return members(B, p, try negative_literal(B, p));
 }
 
-/// An integer literal after a "-", which is its sign.
+/// An int or a double literal after a "-", which is its sign.
 fn negative_literal(comptime B: type, p: *Reader(B)) Error!B.Value {
     const token = advance(B, p);
+    if (token.kind == .double) {
+        const double = literal.double(token.text) catch return fail(B, p, .{ .kind = .out_of_range, .token = token.text });
+        return p.builder.double(-double, token.text);
+    }
     const value = literal.magnitude(token.text) catch return fail(B, p, .{ .kind = .not_int, .token = token.text });
     const least: u64 = @as(u64, std.math.maxInt(i64)) + 1;
     if (value > least) return fail(B, p, .{ .kind = .negative_not_int, .token = token.text });
@@ -218,11 +225,11 @@ fn members(comptime B: type, p: *Reader(B), first: B.Value) Error!B.Value {
     var value = first;
     // Each turn passes a token, so the text's length bounds the turns.
     for (0..p.tokens.text.len) |_| {
-        if (take(B, p, ".")) {
+        if (take(B, p, .dot)) {
             value = try selection(B, p, value);
-        } else if (take(B, p, "[")) {
+        } else if (take(B, p, .open_bracket)) {
             const at = try expression(B, p);
-            try expect(B, p, "]");
+            try expect(B, p, .close_bracket);
             value = p.builder.index(value, at);
         } else return value;
     }
@@ -233,9 +240,9 @@ fn members(comptime B: type, p: *Reader(B), first: B.Value) Error!B.Value {
 fn selection(comptime B: type, p: *Reader(B), target: B.Value) Error!B.Value {
     const name = advance(B, p);
     // "SELECTOR ::= [_a-zA-Z][_a-zA-Z0-9]* - KEYWORD": a keyword names no field and no function.
-    if (name.kind != .identifier or is_keyword(name.text)) return fail(B, p, .{ .kind = .expected_name, .token = name.text });
-    if (!take(B, p, "(")) return p.builder.select(target, name.text);
-    return p.builder.call(name.text, target, try list(B, p, ")", .no_last_comma));
+    if (name.kind != .identifier or name.word.is_keyword()) return fail(B, p, .{ .kind = .expected_name, .token = name.text });
+    if (!take(B, p, .open_paren)) return p.builder.select(target, name.text);
+    return p.builder.call(name.text, target, try list(B, p, .close_paren, .no_last_comma));
 }
 
 /// Whether a comma may follow the last expression of a list: a list literal takes one
@@ -243,51 +250,32 @@ fn selection(comptime B: type, p: *Reader(B), target: B.Value) Error!B.Value {
 const LastComma = enum { last_comma, no_last_comma };
 
 /// The expressions up to `close`, with commas between them.
-fn list(comptime B: type, p: *Reader(B), close: []const u8, last: LastComma) Error!B.Arguments {
+fn list(comptime B: type, p: *Reader(B), close: Mark, last: LastComma) Error!B.Arguments {
     var arguments = p.builder.arguments();
     if (take(B, p, close)) return arguments;
     // Each turn passes an expression, so the text's length bounds the turns.
     for (0..p.tokens.text.len) |_| {
         p.builder.add(&arguments, try expression(B, p));
         if (take(B, p, close)) return arguments;
-        try expect(B, p, ",");
+        try expect(B, p, .comma);
         if (last == .last_comma and take(B, p, close)) return arguments;
     }
     return arguments;
 }
 
-/// "KEYWORD ::= BOOL_LIT | NULL_LIT | 'in'".
-fn is_keyword(word: []const u8) bool {
-    return in_words(&.{ "true", "false", "null", "in" }, word);
-}
-
-/// "RESERVED": the words a host language may hold, which name no variable and no function
-/// but one called on a target, as `a.package()` is.
-fn is_reserved(word: []const u8) bool {
-    return in_words(&.{ "as", "break", "const", "continue", "else", "for", "function", "if", "import", "let", "loop", "package", "namespace", "return", "var", "void", "while" }, word);
-}
-
-fn in_words(words: []const []const u8, word: []const u8) bool {
-    for (words) |each| {
-        if (std.mem.eql(u8, each, word)) return true;
-    }
-    return false;
-}
-
 fn primary(comptime B: type, p: *Reader(B)) Error!B.Value {
     const token = advance(B, p);
-    if (token.is("(")) {
+    if (token.mark == .open_paren) {
         const inner = try expression(B, p);
-        try expect(B, p, ")");
+        try expect(B, p, .close_paren);
         return inner;
     }
-    if (token.is("[")) return p.builder.list(try list(B, p, "]", .last_comma));
+    if (token.mark == .open_bracket) return p.builder.list(try list(B, p, .close_bracket, .last_comma));
     // "INT_LIT ::= -? DIGIT+" and "FLOAT_LIT ::= -? ...": a number's sign is part of the
     // literal, so "!-5" reads. A "-" before any other part is the operator, which `unary` reads.
-    if (token.is("-") and p.ahead.kind == .int) return negative_literal(B, p);
-    if (token.is("-") and p.ahead.kind == .double) return p.builder.unary(.negate, try number(B, p, advance(B, p)));
+    if (token.mark == .minus and (p.ahead.kind == .int or p.ahead.kind == .double)) return negative_literal(B, p);
     return switch (token.kind) {
-        .identifier => named(B, p, token.text),
+        .identifier => named(B, p, token),
         .int, .uint, .double => number(B, p, token),
         .string, .bytes => p.builder.text_literal(token.kind, token.text) orelse fail(B, p, .{ .kind = .wrong_escape, .token = token.text }),
         .end => fail(B, p, .{ .kind = .ends_early }),
@@ -296,15 +284,18 @@ fn primary(comptime B: type, p: *Reader(B)) Error!B.Value {
 }
 
 /// An identifier: a constant's word, a function's name before its arguments, or a name.
-fn named(comptime B: type, p: *Reader(B), name: []const u8) Error!B.Value {
-    if (std.mem.eql(u8, name, "true")) return p.builder.boolean(true);
-    if (std.mem.eql(u8, name, "false")) return p.builder.boolean(false);
-    if (std.mem.eql(u8, name, "null")) return p.builder.nothing();
-    if (std.mem.eql(u8, name, "in")) return fail(B, p, .{ .kind = .unexpected, .token = name });
-    // "IDENT ::= SELECTOR - RESERVED".
-    if (is_reserved(name)) return fail(B, p, .{ .kind = .reserved, .token = name });
-    if (!take(B, p, "(")) return p.builder.name(name);
-    return p.builder.call(name, null, try list(B, p, ")", .no_last_comma));
+fn named(comptime B: type, p: *Reader(B), token: Token) Error!B.Value {
+    switch (token.word) {
+        .literal_true => return p.builder.boolean(true),
+        .literal_false => return p.builder.boolean(false),
+        .literal_null => return p.builder.nothing(),
+        .in => return fail(B, p, .{ .kind = .unexpected, .token = token.text }),
+        // "IDENT ::= SELECTOR - RESERVED".
+        .reserved => return fail(B, p, .{ .kind = .reserved, .token = token.text }),
+        .name => {},
+    }
+    if (!take(B, p, .open_paren)) return p.builder.name(token.text);
+    return p.builder.call(token.text, null, try list(B, p, .close_paren, .no_last_comma));
 }
 
 fn number(comptime B: type, p: *Reader(B), token: Token) Error!B.Value {

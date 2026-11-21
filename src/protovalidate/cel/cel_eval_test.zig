@@ -89,7 +89,14 @@ test "an expression reads fields, compares them and joins the results" {
     try expect_true("this.data == b'\\xff\\x00' && this.data > b'\\xfe'", &sample);
     try expect_true("this.maybe == 9", &sample);
     // An int, a uint and a double compare by value.
-    try expect_true("this.big > this.a && this.big == 5 && this.ratio < this.a && this.ratio == 0.5 && 1u == 1", &sample);
+    try expect_true("this.big > this.a && this.big == 5u && this.ratio < this.a && this.ratio == 0.5 && 1u != 2u", &sample);
+    // Two numbers of different types stand in an order, and are equal or not behind `dyn` alone.
+    try expect_true("dyn(this.big) == 5 && dyn(1u) == 1 && this.big != dyn(5.5) && dyn(this.a) != 3u == false", &sample);
+    // Behind `dyn`, two values of unlike types are not equal, and a value of no element's type
+    // is no element.
+    try expect_true("dyn(this.a) != 'three' && !(dyn(this.name) == this.a) && !(dyn('a') in [1, 2]) && dyn(1u) in [1, 2]", &sample);
+    // A "-" before a number is its sign, which a member reads; two are two negations.
+    try expect_true("-2.5 < 0.0 && --2.5 > 0.0 && --5 == 5 && !-2.25.isInf() && -1.0.isInf(-1) == false", &sample);
     try expect_true("null == null", &sample);
 }
 
@@ -166,6 +173,7 @@ test "protovalidate's functions check a string's form" {
 test "a duration and a timestamp compare, and now is the time the caller passes" {
     const timed: Message = .{ .at = .{ .seconds = 1_049_587_300 }, .took = .{ .seconds = 9, .nanos = 5 } };
     try expect_true("this.took <= duration('10s') && this.took > duration('9s') && this.took != duration('9s')", &timed);
+    try expect_true("this.took > duration('-3s') && this.took < duration('+1h') && duration('-1.5s') < duration('0')", &timed);
     try expect_false("this.took <= duration('9s')", &timed);
     try expect_true("int(this.at) >= 1049587200 && int(this.at) <= 1080432000", &timed);
     try testing.expectError(error.TimeMissing, run("this.at < now", &timed));
@@ -179,14 +187,15 @@ test "a duration and a timestamp compare, and now is the time the caller passes"
 
 test "dyn moves a mistake of types to the run" {
     try testing.expectError(error.Unevaluable, run("dyn(this).missing == 'foo'", &sample));
-    try testing.expectError(error.Unevaluable, run("dyn(this).a == 'foo'", &sample));
     try testing.expectError(error.Unevaluable, run("dyn(this.a).b", &sample));
     try testing.expectError(error.Unevaluable, run("!dyn(this.a)", &sample));
     try testing.expectError(error.Unevaluable, run("dyn(this.name).size() + dyn(this).missing > 0", &sample));
     try testing.expectError(error.Unevaluable, run("has(dyn(this).missing)", &sample));
-    // What a function gives for a part that came through `dyn` came through it too.
-    try testing.expectError(error.Unevaluable, run("dyn(this.name).size() == 'six'", &sample));
-    try testing.expectError(error.Unevaluable, run("-dyn(this.a) == 'three'", &sample));
+    // What a function gives for a part that came through `dyn` came through it too, and two
+    // values of unlike types are not equal.
+    try expect_false("dyn(this).a == 'foo' || dyn(this.name).size() == 'six' || -dyn(this.a) == 'three'", &sample);
+    try expect_true("dyn(this).a != 'foo' && dyn(this.name).size() != 'six'", &sample);
+    try testing.expectError(error.Unevaluable, run("dyn(this.name).size() < 'six'", &sample));
     try expect_true("dyn(this).a == 3 && dyn(this.name).startsWith('foo')", &sample);
     // A side that fails is absorbed as any failure is, and a conditional may skip it.
     try expect_false("false && dyn(this).missing == 1", &sample);
@@ -204,6 +213,9 @@ test "an expression that does not parse or does not type is a problem of the bui
     try expect_problem("that.a", "undeclared reference to `that`");
     try expect_problem("this.a.startsWith('foo')", "found no matching overload for `startsWith` applied to (int, string)");
     try expect_problem("this.a == 'foo'", "found no matching overload for `==` applied to (int, string)");
+    try expect_problem("this.big == 5", "found no matching overload for `==` applied to (uint, int)");
+    try expect_problem("this.ratio != this.a", "found no matching overload for `!=` applied to (double, int)");
+    try expect_problem("this.wrapped == 1u", "found no matching overload for `==` applied to (wrapper(int), uint)");
     try expect_problem("this.a + 1u", "found no matching overload for `+` applied to (int, uint)");
     try expect_problem("this.name + this.name", "found no matching overload for `+` applied to (string, string)");
     try expect_problem("this.on * this.on", "found no matching overload for `*` applied to (bool, bool)");
@@ -223,6 +235,15 @@ test "an expression that does not parse or does not type is a problem of the bui
     try expect_problem("duration('ten')", "`ten` is no duration");
     try expect_problem("this.name.matches('a')", "`matches` waits for stdx's regular expressions (docs/design.md §8 step 35)");
     try expect_problem("unknown(this.a)", "found no matching overload for `unknown` applied to (int)");
+    // A name the module holds no function for, with the operands of a function it holds.
+    try expect_problem("this.name.nothing()", "found no matching overload for `nothing` applied to (string)");
+    // A conversion of a literal is computed once: one that fails is a problem of the build.
+    try expect_problem("int('x') == 1", "the conversion `int` fails for its literal");
+    try expect_problem("this.on || bool('k')", "the conversion `bool` fails for its literal");
+    try expect_problem("uint(-1) == 1u", "the conversion `uint` fails for its literal");
+    try expect_problem("double('b') > 1.0", "the conversion `double` fails for its literal");
+    try expect_problem("string(b'\\xff') == ''", "the conversion `string` fails for its literal");
+    try expect_problem("dyn(this.a, this.b)", "found no matching overload for `dyn` applied to (int, int)");
     try testing.expect(comptime program.problem_of("this.a < this.b", scope) == null);
 }
 

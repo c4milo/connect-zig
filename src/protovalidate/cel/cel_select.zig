@@ -4,13 +4,14 @@ const std = @import("std");
 const proto = @import("protobuf");
 const shape = @import("../shape.zig");
 const field_file = @import("../field.zig");
-const message_file = @import("../message.zig");
+const table = @import("../table.zig");
 const type_file = @import("cel_type.zig");
 const list_file = @import("cel_list.zig");
 
 /// The field of `M` that an expression names: its name in the .proto file.
 pub fn field_of(comptime M: type, comptime name: []const u8) ?proto.Field {
-    return message_file.field_of_name(M, name);
+    const place = table.place_of_name(M, .proto, name) orelse return null;
+    return M.protobuf.fields[place];
 }
 
 /// The CEL type of `field` of `M`, or null for a field the module does not read: a field of
@@ -124,4 +125,21 @@ test "a field that is set reads as its value, and a oneof's other member as its 
     try testing.expect(!has(Sample, named("text"), &full));
     const boxed: Sample = .{ .choice = .{ .boxed = .{ .value = true } } };
     try testing.expectEqual(@as(?bool, true), read(Sample, named("boxed"), &boxed));
+}
+
+/// A message whose field has one name in Zig and another in its .proto file.
+const Renamed = struct {
+    kind_: i32 = 0,
+    pub const FieldNumber = enum(u29) { kind = 1 };
+    pub const protobuf: proto.Descriptor = .{ .full_name = "t.Renamed", .fields = &.{
+        .{ .name = "kind_", .number = @intFromEnum(FieldNumber.kind), .kind = .int32, .json_name = "kind", .proto_name = "kind" },
+    } };
+};
+
+test "an expression names a field as its .proto file names it" {
+    const field = (comptime field_of(Renamed, "kind")) orelse return error.TestExpectedField;
+    try testing.expectEqualStrings("kind_", field.name);
+    try testing.expect(comptime field_of(Renamed, "kind_") == null);
+    const seven = 7;
+    try testing.expectEqual(@as(i64, seven), read(Renamed, field, &.{ .kind_ = seven }));
 }

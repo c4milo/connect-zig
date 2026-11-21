@@ -12,24 +12,41 @@ const Scope = type_file.Scope;
 /// What stops `text` from being compiled for the names of `scope`, or null. The problem starts
 /// with the expression, so a message with many rules shows which one is wrong.
 pub fn problem_of(comptime text: []const u8, comptime scope: Scope) ?[]const u8 {
-    comptime {
-        @setEvalBranchQuota(constants.cel_branches_per_octet * (text.len + 1));
-        switch (parser.parse(text)) {
-            .node => {},
-            .problem => |problem| return "`" ++ text ++ "`: " ++ problem,
-        }
-        return switch (check.type_of(parser.tree_of(text), scope)) {
-            .ok => null,
-            .problem => |problem| "`" ++ text ++ "`: " ++ problem,
-        };
-    }
+    return switch (Checked(text, scope).typed) {
+        .ok => null,
+        .problem => |problem| problem,
+    };
 }
 
 /// The type of the value `text` gives.
 pub fn Type(comptime text: []const u8, comptime scope: Scope) type {
+    return Checked(text, scope).typed.ok.type;
+}
+
+/// One expression's parse and typing for one scope, which the compiler computes once.
+///
+/// The compiler answers a call from its memory when it has answered the same call before. It
+/// keeps no answer of a function that raises its branch quota, nor of a function that calls
+/// one (docs/performance.md). So the quota is raised in `typed_of` alone, which this
+/// constant's value calls once. `problem_of`, `Type` and each part's typing in
+/// `cel_check.zig` raise no quota, and the compiler answers each of them once.
+fn Checked(comptime text: []const u8, comptime scope: Scope) type {
+    return struct {
+        const typed: type_file.Typed = typed_of(text, scope);
+    };
+}
+
+fn typed_of(comptime text: []const u8, comptime scope: Scope) type_file.Typed {
     comptime {
         @setEvalBranchQuota(constants.cel_branches_per_octet * (text.len + 1));
-        return evaluation.Result(parser.tree_of(text), scope);
+        switch (parser.parse(text)) {
+            .node => {},
+            .problem => |problem| return .{ .problem = "`" ++ text ++ "`: " ++ problem },
+        }
+        return switch (check.type_of(parser.tree_of(text), scope)) {
+            .ok => |ok| .{ .ok = ok },
+            .problem => |problem| .{ .problem = "`" ++ text ++ "`: " ++ problem },
+        };
     }
 }
 

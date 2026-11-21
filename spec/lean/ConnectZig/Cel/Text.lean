@@ -29,13 +29,23 @@ def writtenOctet (ofBytes : Bool) (b : UInt8) : Octets :=
   else if !ofBytes || (0x20 ≤ b && b ≤ 0x7e) then [b]
   else [0x5c, 0x78, hexDigit (b.toNat / 16), hexDigit (b.toNat % 16)]
 
+/-- Whether a tree's text starts with a number. A "-" before such a text is the number's sign,
+so a negation of the tree is written with the tree in brackets. -/
+def startsWithNumber : Expr → Bool
+  | .int _ => true
+  | .double _ _ => true
+  | .select of _ => startsWithNumber of
+  | .index of _ => startsWithNumber of
+  | .call _ (some target) _ => startsWithNumber target
+  | _ => false
+
 mutual
 
 /-- The text of a tree. -/
 def write : Expr → Octets
   | .int value => octetsOf (toString value)
   | .uint value => octetsOf (toString value) ++ octetsOf "u"
-  | .double text => text
+  | .double negative text => (if negative then octetsOf "-" else []) ++ text
   | .bool value => octetsOf (if value then "true" else "false")
   | .string octets => octetsOf "'" ++ octets.flatMap (writtenOctet false) ++ octetsOf "'"
   | .bytes octets => octetsOf "b'" ++ octets.flatMap (writtenOctet true) ++ octetsOf "'"
@@ -44,10 +54,10 @@ def write : Expr → Octets
   | .select of field => write of ++ octetsOf "." ++ field
   | .index of at_ => write of ++ octetsOf "[" ++ write at_ ++ octetsOf "]"
   | .unary .not of => octetsOf "(!" ++ write of ++ octetsOf ")"
-  -- A "-" before an int literal is the literal's sign, so an int that a "-" negates is written
-  -- in brackets.
-  | .unary .negate (.int value) => octetsOf "(-(" ++ write (.int value) ++ octetsOf "))"
-  | .unary .negate of => octetsOf "(-" ++ write of ++ octetsOf ")"
+  -- A "-" before a number is the number's sign, so a text that starts with a number is
+  -- written in brackets when a "-" negates it.
+  | .unary .negate of =>
+    if startsWithNumber of then octetsOf "(-(" ++ write of ++ octetsOf "))" else octetsOf "(-" ++ write of ++ octetsOf ")"
   | .binary op left right => octetsOf "(" ++ write left ++ octetsOf (" " ++ op.text ++ " ") ++ write right ++ octetsOf ")"
   | .conditional condition thenValue otherwise =>
     octetsOf "(" ++ write condition ++ octetsOf " ? " ++ write thenValue ++ octetsOf " : " ++ write otherwise ++ octetsOf ")"

@@ -97,7 +97,21 @@ fn of_binary(comptime binary: Node.Binary, comptime scope: Scope) Typed {
     };
     const dynamic = left.dynamic or right.dynamic;
     if (Overload(binary.op, left.type, right.type)) |R| return .{ .ok = .{ .type = R, .dynamic = dynamic } };
+    // Behind `dyn` the checker knows no type, so `==`, `!=` and `in` take any two values and
+    // compare them as they run: two values of unlike types are not equal (CEL language
+    // definition, "Equality").
+    if (dynamic and compares_as_it_runs(binary.op, right.type)) return .{ .ok = .{ .type = bool, .dynamic = true } };
     return mistake(dynamic, "found no matching overload for `" ++ binary.op.text() ++ "` applied to (" ++ type_file.name_of(left.type) ++ ", " ++ type_file.name_of(right.type) ++ ")");
+}
+
+/// Whether `op` behind `dyn` takes operands the checker has no overload for: `==` and `!=`,
+/// and `in` with a list or a map on its right.
+fn compares_as_it_runs(comptime op: BinaryOp, comptime R: type) bool {
+    return switch (op) {
+        .equal, .not_equal => R != Failing,
+        .in => collection.is_collection(R),
+        else => false,
+    };
 }
 
 /// The type `left op right` has, or null when the operator takes no such pair.
@@ -163,32 +177,58 @@ pub fn operands_of(comptime call: Node.Call) []const Node {
 
 fn of_call(comptime call: Node.Call, comptime scope: Scope) Typed {
     const operands = operands_of(call);
-    if (std.mem.eql(u8, call.name, "has")) return of_has(operands, scope);
-    if (std.mem.eql(u8, call.name, "dyn") and operands.len == 1) return of_dyn(&operands[0], scope);
-    if (std.mem.eql(u8, call.name, "duration") and operands.len == 1) return of_duration(&operands[0]);
-    if (std.mem.eql(u8, call.name, "matches")) return .{ .problem = "`matches` waits for stdx's regular expressions (docs/design.md §8 step 35)" };
+    switch (call.function) {
+        .has => return of_has(operands, scope),
+        .dyn => if (operands.len == 1) return of_dyn(&operands[0], scope),
+        .duration => if (operands.len == 1) return of_duration(&operands[0]),
+        .matches => return .{ .problem = "`matches` waits for stdx's regular expressions (docs/design.md §8 step 35)" },
+        else => {},
+    }
     if (collection.of_macro(call, scope)) |typed| return typed;
     const taken = switch (of_operands(operands, scope)) {
         .types => |taken| taken,
         .stopped => |typed| return typed,
     };
     if (taken.types.len == 1 and collection.is_size(call, taken.types[0])) return .{ .ok = .{ .type = i64, .dynamic = taken.dynamic } };
-    if (function.Result(call.name, taken.types)) |R| return .{ .ok = .{ .type = R, .dynamic = taken.dynamic } };
-    return mistake(taken.dynamic, "found no matching overload for `" ++ call.name ++ "` applied to (" ++ taken.names ++ ")");
+    const R = function.Result(call.function, taken.types) orelse {
+        return mistake(taken.dynamic, "found no matching overload for `" ++ call.name ++ "` applied to (" ++ names_of(taken.types) ++ ")");
+    };
+    if (converts_no_literal(call, operands, R)) return .{ .problem = "the conversion `" ++ call.name ++ "` fails for its literal" };
+    return .{ .ok = .{ .type = R, .dynamic = taken.dynamic } };
+}
+
+/// Whether `call` is a conversion of a literal that fails. cel-go computes such a conversion
+/// once, before the expression runs, and refuses the expression when it fails: `int('x')`
+/// and `bool('k')` can give no value. The compiler computes it here the same way.
+fn converts_no_literal(comptime call: Node.Call, comptime operands: []const Node, comptime R: type) bool {
+    const converts = switch (call.function) {
+        .int, .uint, .double, .string, .bytes, .bool => operands.len == 1,
+        else => false,
+    };
+    if (!converts) return false;
+    return switch (operands[0]) {
+        inline .int, .uint, .double, .boolean, .string => |value| fails(call.function, R, value),
+        .bytes => |octets| fails(call.function, R, Bytes{ .octets = octets }),
+        else => false,
+    };
+}
+
+fn fails(comptime converter: node_file.Function, comptime R: type, comptime value: anytype) bool {
+    _ = function.run(converter, R, .{value}) catch return true;
+    return false;
 }
 
 /// The types of a call's operands, or what stops the call: an operand's problem, or an operand
 /// that fails when it runs.
 const Taken = union(enum) {
-    types: struct { types: []const type, names: []const u8, dynamic: bool },
+    types: struct { types: []const type, dynamic: bool },
     stopped: Typed,
 };
 
 fn of_operands(comptime operands: []const Node, comptime scope: Scope) Taken {
     var types: []const type = &.{};
-    var names: []const u8 = "";
     var dynamic = false;
-    for (operands, 0..) |*operand, index| {
+    for (operands) |*operand| {
         const typed = switch (type_of(operand, scope)) {
             .ok => |ok| ok,
             .problem => |problem| return .{ .stopped = .{ .problem = problem } },
@@ -196,9 +236,16 @@ fn of_operands(comptime operands: []const Node, comptime scope: Scope) Taken {
         if (typed.type == Failing) return .{ .stopped = .{ .ok = typed } };
         dynamic = dynamic or typed.dynamic;
         types = types ++ [_]type{typed.type};
-        names = names ++ (if (index == 0) "" else ", ") ++ type_file.name_of(typed.type);
     }
-    return .{ .types = .{ .types = types, .names = names, .dynamic = dynamic } };
+    return .{ .types = .{ .types = types, .dynamic = dynamic } };
+}
+
+/// The names of `types`, with commas between them, for a call that takes no such operands.
+/// Only a mistake's message holds them, so only a mistake pays for them.
+fn names_of(comptime types: []const type) []const u8 {
+    var names: []const u8 = "";
+    for (types, 0..) |T, index| names = names ++ (if (index == 0) "" else ", ") ++ type_file.name_of(T);
+    return names;
 }
 
 /// `has(e.f)`: "e.f" selects a field (CEL language definition, "Macros").

@@ -69,6 +69,7 @@ fn IteratorOf(comptime T: type) type {
     return T.Iterator;
 }
 
+/// The iterator of a list's elements, of a list literal's, or of a map's keys.
 pub fn iterate(list: anytype) IteratorOf(@TypeOf(list)) {
     if (comptime @typeInfo(@TypeOf(list)) == .array) return .{ .items = list };
     return list.iterator();

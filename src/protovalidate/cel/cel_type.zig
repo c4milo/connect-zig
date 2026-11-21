@@ -56,7 +56,8 @@ pub const Scope = struct {
         // A macro's variable hides a name before it, so the last one wins.
         for (0..scope.names.len) |back| {
             const index = scope.names.len - 1 - back;
-            if (std.mem.eql(u8, scope.names[index], name)) return index;
+            // The lengths first: a comparison of two texts costs the compiler a call.
+            if (scope.names[index].len == name.len and std.mem.eql(u8, scope.names[index], name)) return index;
         }
         return null;
     }

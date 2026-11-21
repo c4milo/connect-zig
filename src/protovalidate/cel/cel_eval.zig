@@ -24,17 +24,21 @@ pub fn Result(comptime node: *const Node, comptime scope: Scope) type {
     return check.type_of(node, scope).ok.type;
 }
 
-/// The value of `node` for `values`, one for each name of `scope`.
+/// The value of `node` for `values`, one for each name of `scope`. Each part of an expression
+/// is one function: the helper of its kind is inline, since a function costs the compiler
+/// more than the helper's lines do (docs/performance.md).
 pub fn eval(comptime node: *const Node, comptime scope: Scope, values: anytype, env: *Env) Error!Result(node, scope) {
     if (comptime Result(node, scope) == Failing) return error.Unevaluable;
     switch (comptime node.*) {
         inline .int, .uint, .double, .boolean, .string => |value| return value,
         .bytes => |octets| return .{ .octets = octets },
         .null => return .{},
-        .name => |name| return eval_name(name, scope, values, env),
-        .select => |select| return eval_select(select, scope, values, env),
+        // Each of these takes the part itself, so its result's type is the question the
+        // typing answered for this part, which the compiler answers from its memory.
+        .name => return eval_name(node, scope, values, env),
+        .select => return eval_select(node, scope, values, env),
         .unary => |unary| return eval_unary(unary, scope, values, env),
-        .binary => |binary| return eval_binary(binary, scope, values, env),
+        .binary => return eval_binary(node, scope, values, env),
         .conditional => |conditional| return eval_conditional(conditional, comptime Result(node, scope), scope, values, env),
         .call => |call| return eval_call(call, comptime Result(node, scope), scope, values, env),
         .index => |index| return collection.eval_index(index, comptime Result(node, scope), scope, values, env),
@@ -48,12 +52,13 @@ pub fn eval_as(comptime R: type, comptime node: *const Node, comptime scope: Sco
     return eval(node, scope, values, env);
 }
 
-fn eval_name(comptime name: []const u8, comptime scope: Scope, values: anytype, env: *Env) Error!Result(&.{ .name = name }, scope) {
-    if (comptime scope.index_of(name)) |index| return values[index];
+inline fn eval_name(comptime node: *const Node, comptime scope: Scope, values: anytype, env: *Env) Error!Result(node, scope) {
+    if (comptime scope.index_of(node.name)) |index| return values[index];
     return env.now orelse error.TimeMissing;
 }
 
-fn eval_select(comptime select: Node.Select, comptime scope: Scope, values: anytype, env: *Env) Error!Result(&.{ .select = select }, scope) {
+inline fn eval_select(comptime node: *const Node, comptime scope: Scope, values: anytype, env: *Env) Error!Result(node, scope) {
+    const select = comptime node.select;
     const target = try eval(select.of, scope, values, env);
     const M = comptime type_file.MessageOf(@TypeOf(target)).?;
     return select_file.read(M, comptime select_file.field_of(M, select.field).?, pointer_to(M, &target));
@@ -66,13 +71,14 @@ fn pointer_to(comptime M: type, value: anytype) *const M {
     return value.*;
 }
 
-fn eval_unary(comptime unary: Node.Unary, comptime scope: Scope, values: anytype, env: *Env) Error!Result(unary.of, scope) {
+inline fn eval_unary(comptime unary: Node.Unary, comptime scope: Scope, values: anytype, env: *Env) Error!Result(unary.of, scope) {
     const operand = try eval(unary.of, scope, values, env);
     if (comptime unary.op == .not) return !operand;
     return number.negate(@TypeOf(operand), operand);
 }
 
-fn eval_binary(comptime binary: Node.Binary, comptime scope: Scope, values: anytype, env: *Env) Error!Result(&.{ .binary = binary }, scope) {
+inline fn eval_binary(comptime node: *const Node, comptime scope: Scope, values: anytype, env: *Env) Error!Result(node, scope) {
+    const binary = comptime node.binary;
     switch (comptime binary.op) {
         .@"and" => return eval_logic(binary, false, scope, values, env),
         .@"or" => return eval_logic(binary, true, scope, values, env),
@@ -80,9 +86,11 @@ fn eval_binary(comptime binary: Node.Binary, comptime scope: Scope, values: anyt
     }
     const left = try eval(binary.left, scope, values, env);
     const right = try eval(binary.right, scope, values, env);
+    // Behind `dyn` the two sides may be of unlike types, which are not equal.
+    const alike = comptime value_file.equal_as_they_run(@TypeOf(left), @TypeOf(right));
     return switch (comptime binary.op) {
-        .equal => value_file.equal(left, right),
-        .not_equal => !value_file.equal(left, right),
+        .equal => if (alike) value_file.equal(left, right) else false,
+        .not_equal => if (alike) !value_file.equal(left, right) else true,
         // A double that is not a number stands in no order, so each comparison is false.
         .less => value_file.order(left, right) == .lt,
         .greater => value_file.order(left, right) == .gt,
@@ -101,7 +109,7 @@ fn eval_binary(comptime binary: Node.Binary, comptime scope: Scope, values: anyt
 /// `left && right`, whose absorbing value is false, and `left || right`, whose is true. The
 /// operators are commutative over failures: a side that fails is absorbed when the other side
 /// gives the absorbing value (CEL language definition, "Logical Operators").
-fn eval_logic(comptime binary: Node.Binary, comptime absorbing: bool, comptime scope: Scope, values: anytype, env: *Env) Error!bool {
+inline fn eval_logic(comptime binary: Node.Binary, comptime absorbing: bool, comptime scope: Scope, values: anytype, env: *Env) Error!bool {
     const left = eval_as(bool, binary.left, scope, values, env) catch |failure| {
         const right = eval_as(bool, binary.right, scope, values, env) catch return failure;
         if (right == absorbing) return absorbing;
@@ -111,22 +119,25 @@ fn eval_logic(comptime binary: Node.Binary, comptime absorbing: bool, comptime s
     return eval_as(bool, binary.right, scope, values, env);
 }
 
-fn eval_conditional(comptime conditional: Node.Conditional, comptime R: type, comptime scope: Scope, values: anytype, env: *Env) Error!R {
+inline fn eval_conditional(comptime conditional: Node.Conditional, comptime R: type, comptime scope: Scope, values: anytype, env: *Env) Error!R {
     if (try eval(conditional.condition, scope, values, env)) return eval_as(R, conditional.then, scope, values, env);
     return eval_as(R, conditional.otherwise, scope, values, env);
 }
 
-fn eval_call(comptime call: Node.Call, comptime R: type, comptime scope: Scope, values: anytype, env: *Env) Error!R {
+inline fn eval_call(comptime call: Node.Call, comptime R: type, comptime scope: Scope, values: anytype, env: *Env) Error!R {
     const operands = comptime check.operands_of(call);
-    if (comptime std.mem.eql(u8, call.name, "has")) return eval_has(operands[0].select, scope, values, env);
-    if (comptime std.mem.eql(u8, call.name, "dyn")) return eval(&operands[0], scope, values, env);
-    if (comptime std.mem.eql(u8, call.name, "duration")) return comptime time.parse_duration(operands[0].string).?;
-    if (comptime collection.is_map_macro(call)) return collection.eval_map(call, R, scope, values, env);
-    if (comptime collection.of_macro(call, scope) != null) return collection.eval_macro(call, scope, values, env);
+    switch (comptime call.function) {
+        .has => return eval_has(operands[0].select, scope, values, env),
+        .dyn => return eval(&operands[0], scope, values, env),
+        .duration => return comptime time.parse_duration(operands[0].string).?,
+        .map => return collection.eval_map(call, R, scope, values, env),
+        .all, .exists, .exists_one => if (comptime collection.is_macro(call)) return collection.eval_macro(call, scope, values, env),
+        else => {},
+    }
     var taken: Operands(operands, scope) = undefined;
     inline for (operands, 0..) |*operand, index| taken[index] = try eval(operand, scope, values, env);
     if (comptime operands.len == 1 and collection.is_size(call, @TypeOf(taken[0]))) return list_file.count(taken[0], env);
-    return function.run(call.name, R, taken);
+    return function.run(call.function, R, taken);
 }
 
 /// The tuple of a call's operands' values.
@@ -136,7 +147,7 @@ fn Operands(comptime operands: []const Node, comptime scope: Scope) type {
     return std.meta.Tuple(types);
 }
 
-fn eval_has(comptime select: Node.Select, comptime scope: Scope, values: anytype, env: *Env) Error!bool {
+inline fn eval_has(comptime select: Node.Select, comptime scope: Scope, values: anytype, env: *Env) Error!bool {
     const target = try eval(select.of, scope, values, env);
     const M = comptime type_file.MessageOf(@TypeOf(target)).?;
     return select_file.has(M, comptime select_file.field_of(M, select.field).?, pointer_to(M, &target));

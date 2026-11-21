@@ -22,6 +22,12 @@ The model follows the language definition, production by production. The Zig gra
 the same language another way: one loop for every level of binary operators, and one token
 ahead. The two share no code and no structure, so an error in one shows as a difference.
 
+The definition gives one text two readings: a number's sign is part of its literal, and `Unary`
+takes a run of "-" too. The model takes cel-go's reading, which protovalidate's libraries run,
+and `tools/cel_differential_check.sh` holds to protovalidate-go. One "-" before a number is the
+number's sign, so "-2.5.f()" calls `f` on -2.5. A run of two or more is a run of negations of a
+number with no sign, so "--9223372036854775808" is no expression.
+
 ## What the model leaves out
 
 `protovalidate` reads no map literal, no message literal and no name that starts with ".". The
@@ -32,7 +38,7 @@ model has no such limit, and no vector nests that deep.
 
 ## How the Zig grammar is held to it
 
-`lake exe vectors --write <directory>` writes `cel_vectors.txt`: 6,647 expressions, each with
+`lake exe vectors --write <directory>` writes `cel_vectors.txt`: 6,655 expressions, each with
 the text of its tree or "!" for a text that is no expression. The expressions are:
 
 - every sequence of one, two and three tokens of an alphabet of 16;
@@ -53,7 +59,7 @@ of its 600 trees back as the tree.
 
 Nothing yet. The model is a definition that Lean accepts as total: each function ends, by a
 count of steps that falls. No theorem states a property of the grammar. The check above is a
-comparison on 6,647 cases, and Zig's fuzzer holds two more properties on any input: a parse
+comparison on 6,655 cases, and Zig's fuzzer holds two more properties on any input: a parse
 depends on its text alone, and a tree's text reads back as the tree.
 
 ## Commands

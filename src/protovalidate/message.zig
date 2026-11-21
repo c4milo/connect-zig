@@ -15,6 +15,9 @@ const Broken = walk_file.Broken;
 
 pub fn check(comptime T: type, message: *const T, walk: *Walk, parent: ?*const Path) Fault!void {
     comptime std.debug.assert(table.has_rules(T));
+    // The compiler counts each field of the loop below against this function's quota, and its
+    // default stops at a message of about 500 fields.
+    @setEvalBranchQuota(constants.eval_branches_per_rule * (T.protobuf.fields.len + 1));
     if (walk.depth == constants.path_depth_max) return error.TooDeep;
     walk.depth += 1;
     defer walk.depth -= 1;
@@ -27,13 +30,8 @@ pub fn check(comptime T: type, message: *const T, walk: *Walk, parent: ?*const P
 
 /// The field of `T` whose name in the .proto file is `name`.
 pub fn field_of_name(comptime T: type, comptime name: []const u8) ?proto.Field {
-    comptime {
-        @setEvalBranchQuota(constants.eval_branches_per_rule);
-        for (T.protobuf.fields) |field| {
-            if (std.mem.eql(u8, field.proto_name, name)) return field;
-        }
-        return null;
-    }
+    const place = table.place_of_name(T, .proto, name) orelse return null;
+    return T.protobuf.fields[place];
 }
 
 /// The names of a `(buf.validate.message).oneof` rule's fields, as its messages list them.
@@ -71,4 +69,22 @@ fn check_oneof(comptime T: type, comptime oneof: table.Rules.Oneof, message: *co
     // The path names the oneof alone: a oneof has no number and no type.
     const step: Path = .{ .parent = parent, .element = .{ .field_name = oneof.name } };
     try walk_file.violate(walk, &step, comptime .{ .id = "required", .message = "exactly one field is required in oneof" }, false);
+}
+
+const testing = std.testing;
+
+/// A message whose field has one name in Zig and another in its .proto file.
+const Renamed = struct {
+    kind_: i32 = 0,
+    pub const FieldNumber = enum(u29) { kind = 1 };
+    pub const protobuf: proto.Descriptor = .{ .full_name = "t.Renamed", .fields = &.{
+        .{ .name = "kind_", .number = @intFromEnum(FieldNumber.kind), .kind = .int32, .json_name = "kind", .proto_name = "kind" },
+    } };
+};
+
+test "a rule names a field as its .proto file names it" {
+    const field = (comptime field_of_name(Renamed, "kind")) orelse return error.TestExpectedField;
+    try testing.expectEqualStrings("kind_", field.name);
+    try testing.expect(comptime field_of_name(Renamed, "kind_") == null);
+    try testing.expect(comptime field_of_name(Renamed, "missing") == null);
 }

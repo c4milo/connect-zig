@@ -94,8 +94,9 @@ test "in finds a value among a list's elements and a map's keys" {
     try expect_false("5 in this.numbers || 'cy' in this.names || this.pick in [1, 2, 3]", &sample);
     try expect_true("this.pick in [2, 4] && 'b' in this.counts && 2 in this.by_id && !('c' in this.counts)", &sample);
     try expect_false("this.pick in this.numbers", &.{ .pick = four });
-    // A number is found by its value, whatever its type.
-    try expect_true("4u in this.numbers && 4.0 in this.numbers", &sample);
+    // Behind `dyn`, `in` still reads a list or a map: any other right side fails as it runs.
+    try testing.expectError(error.Unevaluable, run("dyn(this.pick) in this.pick", &sample));
+    try expect_true("dyn(this.pick) in this.numbers && !(dyn('four') in this.numbers) && !(dyn(4) in this.counts)", &sample);
 }
 
 test "an index takes a list's element and a map's value" {
@@ -124,6 +125,10 @@ test "all and exists read each element of a list, and each key of a map" {
     try expect_true("this.numbers.exists(this, this == 6)", &sample);
     // A variable named `now` is the variable, not the time.
     try expect_true("this.numbers.all(now, now > 0)", &sample);
+    // A list literal is a list: a macro reads each of its elements.
+    try expect_true("[2, 4, 6].all(n, n in this.numbers) && [1, 4].exists(n, n == this.pick)", &sample);
+    try expect_false("['ann', 'cy'].all(n, n in this.names) || [1, 2].exists(n, n > 2)", &sample);
+    try expect_true("['ann', 'ann', 'bob'].exists_one(n, n == 'bob') && ![1, 1].exists_one(n, n == 1)", &sample);
 }
 
 test "exists_one is true for one element alone, and reads a map's repeated key once" {
@@ -159,11 +164,16 @@ test "a mistake with a list or a map is a problem of the build" {
     try expect_problem("this.counts[1]", "found no matching overload for `[]` applied to (map(string, int), int)");
     try expect_problem("this.pick[0]", "found no matching overload for `[]` applied to (int, int)");
     try expect_problem("'a' in this.numbers", "found no matching overload for `in` applied to (string, list(int))");
+    // A list holds values of its elements' type: a number of another type is no element.
+    try expect_problem("4u in this.numbers", "found no matching overload for `in` applied to (uint, list(int))");
+    try expect_problem("4.0 in this.numbers", "found no matching overload for `in` applied to (double, list(int))");
     try expect_problem("1 in this.pick", "found no matching overload for `in` applied to (int, int)");
     try expect_problem("this.pick.all(n, true)", "the macro `all` reads a list or a map, not a int");
     try expect_problem("this.numbers.all(n, n)", "the macro `all` takes a bool for each element, not a int");
     try expect_problem("this.numbers.all(n)", "the macro `all` takes a name and an expression");
     try expect_problem("this.numbers.all(1, true)", "the macro `all` takes a name and an expression");
+    // A macro reads its target: a call of its name with no target is a call of a function.
+    try expect_problem("all(this.numbers, true)", "found no matching overload for `all` applied to (list(int), bool)");
     try expect_problem("this.numbers.all(n, m > 0)", "undeclared reference to `m`");
     try expect_problem("this.numbers.map(n, n * 2).size() > 0", "the macro `map` builds a list, which the module holds no room for");
     try expect_problem("this.numbers.filter(n, n > 2).size() > 0", "the macro `filter` builds a list, which the module holds no room for");

@@ -23,7 +23,9 @@ const units = [_]Unit{
 pub fn parse_duration(text: []const u8) ?Duration {
     if (text.len == 0) return null;
     const negative = text[0] == '-';
-    var rest = if (negative or text[0] == '+') text[1..] else text;
+    // The type is stated: the compiler reads a literal's duration, and there a slice of known
+    // bounds is a pointer to an array, which no shorter rest fits.
+    var rest: []const u8 = if (negative or text[0] == '+') text[1..] else text;
     if (std.mem.eql(u8, rest, "0")) return .{};
     if (rest.len == 0) return null;
     var total: i128 = 0;
@@ -114,6 +116,19 @@ test "a duration's text is numbers with a unit each, and a sign" {
     try expect_duration("1.5ns", 0, 1);
     try expect_duration("0.0000000001s", 0, 0);
     try expect_duration("1m6s", constants.seconds_per_minute + 6, 0);
+}
+
+test "the compiler reads a literal's duration as a program does" {
+    // An expression's `duration('...')` is read while the compiler types it.
+    const half_second_nanos = 500_000_000;
+    inline for (.{ "10s", "-3s", "+2m", "-1.5s", "1h30m", "0", "-0" }) |text| {
+        const compiled = comptime parse_duration(text).?;
+        const run = parse_duration(text).?;
+        try testing.expectEqual(run.seconds, compiled.seconds);
+        try testing.expectEqual(run.nanos, compiled.nanos);
+    }
+    try testing.expectEqual(@as(i32, -half_second_nanos), (comptime parse_duration("-1.5s").?).nanos);
+    try testing.expect(comptime parse_duration("-") == null and parse_duration("+s") == null and parse_duration("-1x") == null);
 }
 
 test "a text that states no duration, or one past the type's range, gives none" {

@@ -1,16 +1,18 @@
 #!/usr/bin/env python3
-"""Writes tools/wide/proto/wide/v1/wide.proto: one message of 600 fields with rules.
+"""Writes tools/wide/proto/wide/v1/wide.proto: one message of 1,200 fields with rules.
 
-The message is wider than any a person writes by hand. It holds the build to three things a
+The message is wider than any a person writes by hand. It holds the build to four things a
 message of about 500 fields or more needs (docs/design.md §8, "Large schemas"): the protobuf
 module reads each of its fields at compile time, the plugin raises the compiler's branch quota in
-its table, and `protovalidate` finds each field's rules without a search of the table.
+its table, `protovalidate` finds each field's rules without a search of the table, and each
+function that reads every field raises the quota itself. The compiler's default quota is 1000
+branches, so the message has more fields than that.
 
 Usage: python3 tools/wide/wide_proto.py, then tools/generate_check.sh --write.
 """
 import pathlib
 
-FIELDS = 600
+FIELDS = 1200
 CEL_EVERY = 60
 
 lines = [
@@ -25,7 +27,7 @@ lines = [
     "  string name = 1 [(buf.validate.field).string.min_len = 1];",
     "}",
     "",
-    "// A message of 600 fields: an int32, a string, a list and a message, 150 times.",
+    "// A message of 1,200 fields: an int32, a string, a list and a message, 300 times.",
     "message Wide {",
     "  option (buf.validate.message).cel = {",
     '    id: "wide.ends"',

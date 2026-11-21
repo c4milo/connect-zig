@@ -28,9 +28,16 @@ const Typed = @typeInfo(@FieldType(pb.FieldRules, "type")).optional.child;
 
 /// What stops the rules of `T`, or of a message it holds, from being checked, or null.
 pub fn rules_error(comptime T: type) ?[]const u8 {
-    comptime {
-        return of_message(T, &.{});
-    }
+    return Checked(T).problem;
+}
+
+/// The check of `T`, which the compiler runs once: `of_message` raises the compiler's branch
+/// quota, and the compiler keeps no answer of a function that does so, so the answer is a
+/// constant's value (docs/performance.md).
+fn Checked(comptime T: type) type {
+    return struct {
+        const problem: ?[]const u8 = of_message(T, &.{});
+    };
 }
 
 fn of_message(comptime T: type, comptime visited: []const type) ?[]const u8 {

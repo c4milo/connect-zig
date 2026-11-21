@@ -86,7 +86,14 @@ pub fn In(comptime L: type, comptime R: type) ?type {
     return if (value_file.equatable(L, V)) bool else null;
 }
 
+/// Whether `T` is a list or a map.
+pub fn is_collection(comptime T: type) bool {
+    return Variable(T) != null;
+}
+
 pub fn holds(collection: anytype, value: anytype, env: *Env) Error!bool {
+    // Behind `dyn` a value may be of a type no element has: it is no element then.
+    if (comptime !value_file.equal_as_they_run(Variable(@TypeOf(collection)).?, @TypeOf(value))) return false;
     if (comptime !list_file.is_map(@TypeOf(collection))) return list_file.list_holds(collection, value, env);
     var keys = collection.iterator();
     for (0..proto.constants.limits.elements_max) |_| {
@@ -98,26 +105,26 @@ pub fn holds(collection: anytype, value: anytype, env: *Env) Error!bool {
 
 /// Whether `call` is `size` of a list or of a map, whose type the caller found.
 pub fn is_size(comptime call: Node.Call, comptime operand: type) bool {
-    return std.mem.eql(u8, call.name, "size") and Variable(operand) != null;
+    return call.function == .size and Variable(operand) != null;
 }
 
-const macros = [_][]const u8{ "all", "exists", "exists_one" };
 /// A macro's arguments: its variable's name, and its expression.
 const macro_arguments = 2;
 
-fn is_macro(comptime call: Node.Call) bool {
+/// Whether `call` is `all`, `exists` or `exists_one` on a target.
+pub fn is_macro(comptime call: Node.Call) bool {
     if (call.target == null) return false;
-    for (macros) |name| {
-        if (std.mem.eql(u8, call.name, name)) return true;
-    }
-    return false;
+    return switch (call.function) {
+        .all, .exists, .exists_one => true,
+        else => false,
+    };
 }
 
 /// The type of a macro, or null when `call` is no macro: `target.all(x, p)`, `exists` and
 /// `exists_one`, where `x` names each element of a list or each key of a map in `p`.
 pub fn of_macro(comptime call: Node.Call, comptime scope: Scope) ?Typed {
-    if (std.mem.eql(u8, call.name, "map")) return of_map(call, scope);
-    if (std.mem.eql(u8, call.name, "filter")) return .{ .problem = no_room("filter") };
+    if (call.function == .map) return of_map(call, scope);
+    if (call.function == .filter) return .{ .problem = no_room("filter") };
     if (!is_macro(call)) return null;
     if (call.arguments.len != macro_arguments or call.arguments[0] != .name) return .{ .problem = "the macro `" ++ call.name ++ "` takes a name and an expression" };
     const target = switch (check.type_of(call.target.?, scope)) {
@@ -162,10 +169,6 @@ fn of_map(comptime call: Node.Call, comptime scope: Scope) Typed {
     return .{ .ok = .{ .type = [array.len]body.type, .dynamic = target.dynamic or body.dynamic } };
 }
 
-pub fn is_map_macro(comptime call: Node.Call) bool {
-    return std.mem.eql(u8, call.name, "map");
-}
-
 pub fn eval_map(comptime call: Node.Call, comptime R: type, comptime scope: Scope, values: anytype, env: *Env) Error!R {
     const source = try evaluation.eval(call.target.?, scope, values, env);
     const array = @typeInfo(R).array;
@@ -182,13 +185,8 @@ pub fn eval_macro(comptime call: Node.Call, comptime scope: Scope, values: anyty
     const collection = try evaluation.eval(call.target.?, scope, values, env);
     const inner = comptime scope.with(call.arguments[0].name, Variable(@TypeOf(collection)).?);
     const body = &call.arguments[1];
-    if (comptime std.mem.eql(u8, call.name, "exists_one")) return exists_one(collection, body, inner, values, env);
-    return every(collection, comptime std.mem.eql(u8, call.name, "exists"), body, inner, values, env);
-}
-
-fn iterator_of(collection: anytype) @TypeOf(if (list_file.is_map(@TypeOf(collection))) collection.iterator() else list_file.iterate(collection)) {
-    if (comptime list_file.is_map(@TypeOf(collection))) return collection.iterator();
-    return list_file.iterate(collection);
+    if (comptime call.function == .exists_one) return exists_one(collection, body, inner, values, env);
+    return every(collection, comptime call.function == .exists, body, inner, values, env);
 }
 
 /// `all`, whose absorbing value is false, and `exists`, whose is true. As `&&` and `||` do,
@@ -196,7 +194,7 @@ fn iterator_of(collection: anytype) @TypeOf(if (list_file.is_map(@TypeOf(collect
 /// expression fails; with none, a failure fails the macro (CEL language definition, "Macros").
 fn every(collection: anytype, comptime absorbing: bool, comptime body: *const Node, comptime inner: Scope, values: anytype, env: *Env) Error!bool {
     var failure: ?Error = null;
-    var elements = iterator_of(collection);
+    var elements = list_file.iterate(collection);
     for (0..proto.constants.limits.elements_max) |_| {
         const element = try elements.next(env) orelse return failure orelse !absorbing;
         const result = evaluation.eval_as(bool, body, inner, values ++ .{element}, env) catch |failed| {
@@ -213,7 +211,7 @@ fn every(collection: anytype, comptime absorbing: bool, comptime body: *const No
 fn exists_one(collection: anytype, comptime body: *const Node, comptime inner: Scope, values: anytype, env: *Env) Error!bool {
     const C = @TypeOf(collection);
     var matches: usize = 0;
-    var elements = iterator_of(collection);
+    var elements = list_file.iterate(collection);
     for (0..proto.constants.limits.elements_max) |_| {
         const element = try elements.next(env) orelse return matches == 1;
         if (comptime list_file.is_map(C)) {

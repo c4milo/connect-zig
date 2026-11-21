@@ -78,6 +78,7 @@ const corpus = [_][]const u8{
     "a || b && c || d",
     "a < b + c * d && e in f",
     "a - b - c",
+    "a - b * c + d % e",
     "a / b % c * d",
     "(a + b) * c",
     "a == b != c",
@@ -92,6 +93,9 @@ const corpus = [_][]const u8{
     "-(5)",
     "-5u",
     "-1.5",
+    "--1.5",
+    "-2.25.isInf()",
+    "-(1.5) - --5.f()",
     "a - -1",
     "this.all(k, this[k] == 1)",
     "has(this.version)",
@@ -256,4 +260,4 @@ test "the grammar reads each expression of the Lean model's vectors as the model
     try testing.expectEqual(@as(usize, vectors_len), checked);
 }
 /// The vectors the file holds: a file cut short fails.
-const vectors_len = 6647;
+const vectors_len = 6655;

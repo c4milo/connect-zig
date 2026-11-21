@@ -9,14 +9,26 @@ const Null = type_file.Null;
 const Timestamp = proto.wkt.Timestamp;
 const Duration = proto.wkt.Duration;
 
-/// Whether `==` and `!=` take a `L` and a `R`: two numbers of any numeric types, two values of
-/// one type, or a wrapper with null or with the type it wraps.
+/// Whether `==` and `!=` take a `L` and a `R`: two values of one type, or a wrapper with null
+/// or with the type it wraps. Two numbers of different types are not of one type: "_==_ :
+/// (A, A) -> bool" (CEL language definition, "List of Standard Definitions"), which cel-go's
+/// type checker holds an expression to.
 pub fn equatable(comptime L: type, comptime R: type) bool {
-    if (type_file.is_number(L) and type_file.is_number(R)) return true;
+    if (type_file.is_number(L) and type_file.is_number(R)) return L == R;
     if (@typeInfo(L) == .optional) return R == Null or equatable(@typeInfo(L).optional.child, R);
     if (@typeInfo(R) == .optional) return equatable(R, L);
     if (L != R) return false;
     return L == bool or L == []const u8 or L == Bytes or L == Null or L == Timestamp or L == Duration;
+}
+
+/// Whether a `L` and a `R` may be equal as an expression runs, which `dyn` leaves to the run:
+/// two values that `==` takes, and two numbers of any numeric types ("numeric values are
+/// compared across types", CEL language definition, "Equality"). Any other pair is not equal.
+pub fn equal_as_they_run(comptime L: type, comptime R: type) bool {
+    if (type_file.is_number(L) and type_file.is_number(R)) return true;
+    if (@typeInfo(L) == .optional) return R == Null or equal_as_they_run(@typeInfo(L).optional.child, R);
+    if (@typeInfo(R) == .optional) return equal_as_they_run(R, L);
+    return equatable(L, R);
 }
 
 /// Whether `<`, `<=`, `>` and `>=` take a `L` and a `R`.
@@ -102,8 +114,12 @@ test "a wrapper equals null when it is not set, and its value when it is" {
 }
 
 test "the pairs of types that compare" {
-    try testing.expect(equatable(i64, f64) and equatable(bool, bool) and equatable(?i64, Null) and equatable(Null, ?i64));
-    try testing.expect(equatable(?i64, u64) and equatable([]const u8, ?[]const u8) and equatable(?bool, ?bool));
+    try testing.expect(equatable(i64, i64) and equatable(bool, bool) and equatable(?i64, Null) and equatable(Null, ?i64));
+    try testing.expect(equatable(?i64, i64) and equatable([]const u8, ?[]const u8) and equatable(?bool, ?bool));
+    // Two numbers of different types are equal or not as they run, behind `dyn` alone.
+    try testing.expect(!equatable(i64, f64) and !equatable(u64, i64) and !equatable(?i64, u64) and !equatable(f64, ?u64));
+    try testing.expect(equal_as_they_run(i64, f64) and equal_as_they_run(?i64, u64) and equal_as_they_run(f64, ?u64) and equal_as_they_run(bool, bool));
+    try testing.expect(!equal_as_they_run(i64, []const u8) and !equal_as_they_run(?i64, bool) and !equal_as_they_run(Null, bool));
     try testing.expect(!equatable(i64, []const u8) and !equatable(bool, Null) and !equatable(?i64, bool) and !equatable(*const u8, *const u8));
     try testing.expect(ordered(i64, u64) and ordered([]const u8, []const u8) and ordered(Duration, Duration));
     try testing.expect(!ordered(i64, bool) and !ordered(Null, Null) and !ordered(?i64, i64) and !ordered(Timestamp, Duration));

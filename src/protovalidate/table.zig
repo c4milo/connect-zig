@@ -7,6 +7,7 @@ const proto = @import("protobuf");
 const pb = @import("buf_validate_validate");
 const descriptor_pb = @import("google_protobuf_descriptor");
 const constants = @import("constants.zig");
+const once = @import("table_once.zig");
 
 /// A field's type as a path element states it: descriptor.proto's FieldDescriptorProto.Type.
 pub const Type = descriptor_pb.FieldDescriptorProto.Type;
@@ -126,21 +127,8 @@ pub fn entry_of(comptime T: type, comptime number: u32) ?usize {
 /// so a message of many fields takes no search of its table for each one.
 fn Places(comptime T: type) type {
     return struct {
-        const of_field: [T.protobuf.fields.len]?usize = places_of(T);
+        const of_field: [T.protobuf.fields.len]?usize = once.places_of(T);
     };
-}
-
-fn places_of(comptime T: type) [T.protobuf.fields.len]?usize {
-    comptime {
-        @setEvalBranchQuota(constants.eval_branches_per_rule * (T.protobuf.fields.len + 1));
-        var places = [_]?usize{null} ** T.protobuf.fields.len;
-        for (of(T).fields, 0..) |entry, at| {
-            const place = place_of(T, entry.number) orelse continue;
-            // A field's first entry is its entry: `rules_error` refuses a second one.
-            if (places[place] == null) places[place] = at;
-        }
-        return places;
-    }
 }
 
 /// The place in the descriptor of `T` of the field numbered `number`, or null. A generated
@@ -172,20 +160,8 @@ const halves = 2;
 /// Whether the numbers of the fields of `T` rise, which the compiler reads once for each type.
 fn Order(comptime T: type) type {
     return struct {
-        const rises: bool = numbers_rise(T);
+        const rises: bool = once.numbers_rise(T);
     };
-}
-
-fn numbers_rise(comptime T: type) bool {
-    comptime {
-        @setEvalBranchQuota(constants.eval_branches_per_rule * (T.protobuf.fields.len + 1));
-        var previous: u32 = 0;
-        for (T.protobuf.fields) |field| {
-            if (field.number <= previous) return false;
-            previous = field.number;
-        }
-        return true;
-    }
 }
 
 /// The type a path element states for a field of `kind`: the same name in descriptor.proto,
@@ -213,15 +189,31 @@ pub fn type_of(comptime kind: proto.Kind) Type {
     };
 }
 
+/// Which name of a field a search reads: its name in Zig, or its name in the .proto file.
+pub const NameKind = enum { zig, proto };
+
+/// An enum with one member for each field of `T`. A member's name is the field's name of
+/// `kind`, and its value is the field's place in the descriptor. The compiler finds an enum's
+/// member by its name in one step, where a comparison with each field's name takes it a step
+/// for each octet of each field (docs/performance.md). It builds the enum once for each type:
+/// the enum is a constant's value, which `table_once.zig` computes.
+fn Names(comptime T: type, comptime kind: NameKind) type {
+    return struct {
+        const Enum: type = once.names_enum(T, kind);
+    };
+}
+
+/// The place in the descriptor of `T` of the field whose name of `kind` is `name`, or null.
+pub fn place_of_name(comptime T: type, comptime kind: NameKind, comptime name: []const u8) ?usize {
+    const Enum = Names(T, kind).Enum;
+    if (!@hasField(Enum, name)) return null;
+    return @intFromEnum(@field(Enum, name));
+}
+
 /// The descriptor's entry of the field of `Message` whose Zig name is `name`.
 pub fn field_named(comptime Message: type, comptime name: []const u8) proto.Field {
-    comptime {
-        @setEvalBranchQuota(constants.eval_branches_per_rule);
-        for (Message.protobuf.fields) |field| {
-            if (std.mem.eql(u8, field.name, name)) return field;
-        }
-        @compileError(Message.protobuf.full_name ++ " has no field " ++ name);
-    }
+    const place = place_of_name(Message, .zig, name) orelse @compileError(Message.protobuf.full_name ++ " has no field " ++ name);
+    return Message.protobuf.fields[place];
 }
 
 /// The path element of the rule `name` of the rule message `Message`: its number, its name in
@@ -263,6 +255,29 @@ const Plain = struct {
         proto.field_of(FieldNumber.name, .string, .{}),
     } };
 };
+
+/// A message whose second field has one name in Zig and another in its .proto file.
+const Renamed = struct {
+    plain: i32 = 0,
+    kind_: i32 = 0,
+    pub const FieldNumber = enum(u29) { plain = 1, kind = 2 };
+    pub const protobuf: proto.Descriptor = .{ .full_name = "t.Renamed", .fields = &.{
+        .{ .name = "plain", .number = @intFromEnum(FieldNumber.plain), .kind = .int32, .json_name = "plain", .proto_name = "plain" },
+        .{ .name = "kind_", .number = @intFromEnum(FieldNumber.kind), .kind = .int32, .json_name = "kind", .proto_name = "kind" },
+    } };
+};
+
+test "a field is found by its name in Zig, or by its name in the .proto file" {
+    try testing.expectEqual(@as(?usize, 0), comptime place_of_name(Renamed, .zig, "plain"));
+    try testing.expectEqual(@as(?usize, 1), comptime place_of_name(Renamed, .zig, "kind_"));
+    try testing.expectEqual(@as(?usize, null), comptime place_of_name(Renamed, .zig, "kind"));
+    try testing.expectEqual(@as(?usize, 0), comptime place_of_name(Renamed, .proto, "plain"));
+    try testing.expectEqual(@as(?usize, 1), comptime place_of_name(Renamed, .proto, "kind"));
+    try testing.expectEqual(@as(?usize, null), comptime place_of_name(Renamed, .proto, "kind_"));
+    try testing.expectEqual(@as(?usize, null), comptime place_of_name(Renamed, .proto, "missing"));
+    try testing.expectEqualStrings("kind", (comptime field_named(Renamed, "kind_")).proto_name);
+    try testing.expectEqualStrings("name", (comptime field_named(Sample, "name")).name);
+}
 
 test "a table is found by its declaration, and a field's rules by its number" {
     try testing.expect(comptime has_rules(Sample));

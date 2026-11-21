@@ -19,9 +19,11 @@ the tokens of `Cel.lex`:
 `protovalidate` reads no map literal, no message literal and no name that starts with ".", so
 the model has none: an expression that holds one has no tree.
 
-A number's sign is part of its literal ("INT_LIT ::= -? DIGIT+", "FLOAT_LIT ::= -? ..."). The
-model reads the last "-" of a run before a number as that sign. An int then holds its sign,
-and a double is a negation of its text, which states the same number.
+A number's sign is part of its literal ("INT_LIT ::= -? DIGIT+", "FLOAT_LIT ::= -? ..."), and
+`Unary` takes a run of "-" too, so the language definition gives "--5" two readings. The model
+takes cel-go's, which protovalidate's libraries run: one "-" before a number is the number's
+sign, which a member starts with, and a run of two or more is a run of negations of a number
+with no sign. So "-2.5.f()" calls `f` on -2.5, and "--9223372036854775808" has no tree.
 -/
 namespace ConnectZig.Cel
 
@@ -71,8 +73,8 @@ inductive Expr where
   | int (value : Int)
   /-- A uint literal. -/
   | uint (value : Nat)
-  /-- A double literal's text, without a sign. -/
-  | double (text : Octets)
+  /-- A double literal: whether a "-" is its sign, and its text without the sign. -/
+  | double (negative : Bool) (text : Octets)
   /-- `true` or `false`. -/
   | bool (value : Bool)
   /-- A string literal's octets. -/
@@ -156,7 +158,7 @@ def applyUnary (op : UnaryOp) : Nat → Expr → Expr
 /-- A literal number after a "-", which is its sign. -/
 def signed : List Token → Read
   | .int magnitude :: ts => if magnitude ≤ 2 ^ 63 then some (.int (-(magnitude : Int)), ts) else none
-  | .double text :: ts => if doubleInRange text then some (.unary .negate (.double text), ts) else none
+  | .double text :: ts => if doubleInRange text then some (.double true text, ts) else none
   | _ => none
 
 mutual
@@ -273,8 +275,8 @@ def multiplicationRest : Nat → Expr → List Token → Read
       multiplicationRest fuel (.binary .modulo left right) ts
     | _ => some (left, ts)
 
-/-- `Unary`: a member, a run of "!" before a member, or a run of "-" before a member. The last
-"-" of a run before an int literal is the literal's sign. -/
+/-- `Unary`: a member, a run of "!" before a member, or a run of "-" before a member. One "-"
+before a number is the number's sign, and the member reads it. -/
 def unary : Nat → List Token → Read
   | 0, _ => none
   | fuel + 1, ts =>
@@ -286,12 +288,11 @@ def unary : Nat → List Token → Read
     | .mark "-" :: _ =>
       let count := (ts.takeWhile (· == .mark "-")).length
       let rest := ts.drop count
-      match rest with
-      | .int _ :: _ => do
-        -- The run's last "-" is the sign of the int, which a member starts with.
-        let (operand, ts) ← member fuel (.mark "-" :: rest)
-        pure (applyUnary .negate (count - 1) operand, ts)
-      | _ => do
+      match count, rest with
+      -- One "-" before a number is the number's sign, which a member starts with.
+      | 1, .int _ :: _ => member fuel ts
+      | 1, .double _ :: _ => member fuel ts
+      | _, _ => do
         let (operand, ts) ← member fuel rest
         pure (applyUnary .negate count operand, ts)
     | _ => member fuel ts
@@ -351,7 +352,7 @@ def primary : Nat → List Token → Read
     | .mark "-" :: ts => signed ts
     | .int magnitude :: ts => if magnitude < 2 ^ 63 then some (.int magnitude, ts) else none
     | .uint magnitude :: ts => if magnitude < 2 ^ 64 then some (.uint magnitude, ts) else none
-    | .double text :: ts => if doubleInRange text then some (.double text, ts) else none
+    | .double text :: ts => if doubleInRange text then some (.double false text, ts) else none
     | .string octets :: ts => some (.string octets, ts)
     | .bytes octets :: ts => some (.bytes octets, ts)
     | _ => none

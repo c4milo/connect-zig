@@ -116,9 +116,10 @@ const Builder = struct {
         list_so_far.* = list_so_far.* ++ [_]Node{value};
     }
 
-    pub fn call(_: Builder, call_name: []const u8, comptime target: ?Node, comptime call_arguments: Arguments) Node {
-        if (target) |of| return .{ .call = .{ .name = call_name, .target = &of, .arguments = call_arguments } };
-        return .{ .call = .{ .name = call_name, .arguments = call_arguments } };
+    pub fn call(_: Builder, comptime call_name: []const u8, comptime target: ?Node, comptime call_arguments: Arguments) Node {
+        const function: node_file.Function = .of(call_name);
+        if (target) |of| return .{ .call = .{ .name = call_name, .function = function, .target = &of, .arguments = call_arguments } };
+        return .{ .call = .{ .name = call_name, .function = function, .arguments = call_arguments } };
     }
 
     pub fn list(_: Builder, comptime elements: Arguments) Node {
@@ -144,6 +145,8 @@ test "operators group by their level, and from the left within one" {
     try testing.expectEqualStrings("((a || (b && c)) || d)", comptime shown("a || b && c || d"));
     try testing.expectEqualStrings("((a < (b + (c * d))) && (e in f))", comptime shown("a < b + c * d && e in f"));
     try testing.expectEqualStrings("((a - b) - c)", comptime shown("a - b - c"));
+    try testing.expectEqualStrings("((a - (b * c)) + (d % e))", comptime shown("a - b * c + d % e"));
+    try testing.expectEqualStrings("((a * b) - (c / d))", comptime shown("a * b - c / d"));
     try testing.expectEqualStrings("(((a / b) % c) * d)", comptime shown("a / b % c * d"));
     try testing.expectEqualStrings("((a + b) * c)", comptime shown("(a + b) * c"));
     try testing.expectEqualStrings("((a == b) != c)", comptime shown("a == b != c"));
@@ -160,18 +163,28 @@ test "a unary operator binds tighter than a binary one, and repeats" {
     try testing.expectEqualStrings("((!a) && (!(!b)))", comptime shown("!a && !!b"));
     try testing.expectEqualStrings("((-a) - (-(-b)))", comptime shown("-a - --b"));
     try testing.expectEqualStrings("(-a.b)", comptime shown("-a.b"));
-    // A "-" before an integer is its sign, which the least int needs.
+    // One "-" before a number is its sign, which the least int needs, and a member starts
+    // with the number: cel-go reads it so.
     try testing.expectEqualStrings("-9223372036854775808", comptime shown("-9223372036854775808"));
-    try testing.expectEqualStrings("(-(-9223372036854775807))", comptime shown("--9223372036854775807"));
-    // A negation of an int in brackets is no literal's sign.
+    try testing.expectEqualStrings("-1.5e0", comptime shown("-1.5"));
+    try testing.expectEqualStrings("-1.5e0.f()", comptime shown("-1.5.f()"));
+    try testing.expectEqualStrings("-5.f()[0]", comptime shown("- 5.f()[0]"));
+    // A run of two or more is a run of negations, of a number with no sign.
+    try testing.expectEqualStrings("(-(-(9223372036854775807)))", comptime shown("--9223372036854775807"));
+    try testing.expectEqualStrings("problem: the number `9223372036854775808` is out of range", comptime shown("--9223372036854775808"));
+    try testing.expectEqualStrings("(-(-(1.5e0)))", comptime shown("--1.5"));
+    try testing.expectEqualStrings("(-(-(-(5.f()))))", comptime shown("---5.f()"));
+    // A negation of a number in brackets is no literal's sign.
     try testing.expectEqualStrings("(-(5))", comptime shown("-(5)"));
+    try testing.expectEqualStrings("(-(1.5e0))", comptime shown("-(1.5)"));
+    try testing.expectEqualStrings("(-(-5))", comptime shown("-(-5)"));
     try testing.expectEqualStrings("(-5u)", comptime shown("-5u"));
     try testing.expectEqualStrings("(a - 1)", comptime shown("a - 1"));
     try testing.expectEqualStrings("(a - -1)", comptime shown("a - -1"));
     // A number's sign is part of its literal, so a "!" takes a negative number, and no other
     // part that starts with "-".
     try testing.expectEqualStrings("(!-5)", comptime shown("!-5"));
-    try testing.expectEqualStrings("(!(!(-1.5e0)))", comptime shown("!!-1.5"));
+    try testing.expectEqualStrings("(!(!-1.5e0))", comptime shown("!!-1.5"));
     try testing.expectEqualStrings("(!-5.a)", comptime shown("!-5.a"));
     try testing.expectEqualStrings("problem: unexpected `-`", comptime shown("!-a"));
     try testing.expectEqualStrings("problem: unexpected `-`", comptime shown("!-5u"));
@@ -232,4 +245,30 @@ test "a wrong expression gives its problem" {
     try testing.expectEqualStrings("problem: the expression nests too deep", comptime shown("(" ** constants.cel_depth_max ++ "a" ++ ")" ** constants.cel_depth_max));
     // One level fewer is read.
     try testing.expect(comptime parse("(" ** (constants.cel_depth_max - 1) ++ "a" ++ ")" ** (constants.cel_depth_max - 1)) == .node);
+}
+
+/// Expressions that together hold each kind of token and each production of the grammar.
+const read_reference = [_][]const u8{
+    "this.name.size() < 100 && !this.name.startsWith('x') || this.name.endsWith(\"y\")",
+    "this.count % 4 == 0 || -this.count > 2 || this.count + 1 <= 10 * this.count / 3 - 0x1f",
+    "this.names.all(x, x.size() > 3) && this.names.size() < 23 && 'a' in this.names // a comment",
+    "has(this.leaf) ? this.leaf.name != r'\\d' : this.leaf.count >= 5u || this.ratio != 1.5e3",
+    "this.name in ['a', b'b', \'\'\'c\'\'\',] && [1, 2, 3][0] == 1 && true != false && null == null",
+    "this.took < duration('5s') || this.at < now ? 'it is \\'late\\'' : ''",
+};
+
+/// The branches the compiler may take to read `read_reference`: the count measured when the
+/// constant was written, and 2% more (docs/performance.md, "The compiler's time"). The tests
+/// do not build when the reader takes more. The commit that pays for a higher cost raises the
+/// constant and says why.
+const read_branches_max = 4_460;
+
+test "the compiler reads the reference expressions within their budget of branches" {
+    comptime {
+        @setEvalBranchQuota(read_branches_max);
+        for (read_reference) |text| {
+            var reader = grammar.start(Builder, text, .{});
+            _ = grammar.whole(Builder, &reader) catch @compileError(text ++ ": " ++ problem_text(reader.problem));
+        }
+    }
 }
