@@ -7,6 +7,9 @@ pub const Graph = struct {
     connect_colibri: *std.Build.Module,
     /// Null off a host target, where chapulin builds no `jws` calls (decision 34).
     oidc: ?*std.Build.Module,
+    /// The check of a message against its schema's rules (decision 47). Its generated modules
+    /// are its imports `buf_validate_validate` and `google_protobuf_descriptor`.
+    protovalidate: *std.Build.Module,
     public_names: *std.Build.Module,
     colibri: *std.Build.Dependency,
     /// stdx's CPU probe, which a program's TLS values take (colibri decision 97).

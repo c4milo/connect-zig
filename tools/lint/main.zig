@@ -152,10 +152,13 @@ pub const unreleased_acquire = rules.unreleased_acquire.Rule(.{
 pub const denied_words = rules.denied_words.Rule(.{
     // This file names the words to deny them. conformance/proto is connectrpc's copy, kept as
     // connectrpc wrote it, and examples/otlp/proto/opentelemetry is OpenTelemetry's (decision 40).
+    // src/protovalidate/proto and conformance/protovalidate/proto are protovalidate's and
+    // protobuf's, and conformance/protovalidate/gen is the code of the latter, whose schemas
+    // name a field with one of the words (decision 47).
     .scope = .{
         .extensions = &.{ lint.paths.zig_extension, ".md", ".sh", ".yml", ".proto" },
         .exclude_paths = &.{"tools/lint/main.zig"},
-        .exclude_directories = &.{ "conformance/proto", "examples/otlp/proto/opentelemetry" },
+        .exclude_directories = &.{ "conformance/proto", "examples/otlp/proto/opentelemetry", "src/protovalidate/proto", "conformance/protovalidate/proto", "conformance/protovalidate/gen" },
     },
     .words = &.{ "TODO", "FIXME", "XXX", "HACK" },
     .word_label = "unresolved marker",
