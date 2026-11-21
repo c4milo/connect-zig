@@ -269,7 +269,8 @@ first. Cite an entry by number in code and commits ("decision 6").
     `ClientCallWith(method, interceptors)` beside `ClientCall(method)`, which named two types for
     one and left no room for a client option but interceptors. Amended 2026-11-11: a server
     hook takes the call's `Context`, `AnyRequest` and `AnyResponse`, and `Call` goes (decision
-    36).
+    36). Amended 2026-11-21: an interceptor may also define `on_message`, which runs in list
+    order with each request message once it is decoded, and may refuse the call (decision 47).
 
 20. **Examples share their services.** The programs in `examples/` import the ELIZA and demo
     services, the in-memory link and its client loop from `examples/services/`, so each program
@@ -565,7 +566,9 @@ first. Cite an entry by number in code and commits ("decision 6").
       last to the stream's end, and a `ResponseStream` or a `Response`.
     - An interceptor takes `on_call(app, ctx, *const AnyRequest, *AnyResponse)` and
       `on_finish(app, ctx, *AnyResponse, ?RpcError)`: the request and the response without a
-      message, as connect-go's `AnyRequest` and `AnyResponse`.
+      message, as connect-go's `AnyRequest` and `AnyResponse`. Amended 2026-11-21: `on_message(app,
+      ctx, comptime T: type, *const T)` is the one hook that takes a message, of any type, so
+      one interceptor serves every method (decision 47).
     - Each of these is a view of the call the route keeps, valid during the callback that
       receives it. A program keeps nothing of it past the callback but what it copies.
 
@@ -713,6 +716,23 @@ first. Cite an entry by number in code and commits ("decision 6").
       decisions 19 and 36). `protovalidate.Interceptor` refuses a message with
       `invalid_argument` and a `buf.validate.Violations` detail. It takes the `connect` module
       as a parameter, as a generated `Routes` takes its transport (decision 2).
+      - The hook takes the message's type as a comptime parameter. A message with no rule
+        then costs no instruction, and one interceptor serves every method of a route table.
+      - An error's message and details must last until the reply is written, after the hook
+        returns. The call's values hold them (decision 35), in a field `protovalidate` of the
+        type `protovalidate.InterceptorRoom(connect, options)`, as `oidc` keeps its claims.
+        The room holds the report's storage too, so no message costs a fill of the stack.
+      - The error's message names the first violation's field and what it broke, and the
+        count of the others. A detail that does not fit its room holds the first violations
+        that do.
+      - A rule that reads the time takes it from a field `protovalidate_now` of the program's
+        `App`, which the program writes from its clock. With no such field the call fails
+        with `internal`: the rule cannot be checked, so the message is not passed on.
+      - A function handler of a client or bidirectional stream reads its messages through
+        `RequestStream(T).next`, which names no `App`. The stream holds the hook as a function
+        pointer with the `App` behind an untyped pointer: one indirect call for each message,
+        and only when an interceptor declares `on_message`. Beaten: an `App` type parameter on
+        `RequestStream`, which changes every such handler's signature.
     - `pattern` and CEL's `matches` take RE2's syntax. They wait for a regular expression
       module in stdx, which the owner chose on 2026-11-21 (design §8 step 35). Until then a
       rule with a pattern stops the build.
