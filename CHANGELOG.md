@@ -55,6 +55,13 @@ change the public API, and the entry marks each change that does.
   is the check `lean` of `tools/ci.sh`.
 - The plugin raises the compiler's branch quota in the table of a message with more than 500
   list and message rules, so a message of a thousand fields with rules compiles.
+- `tools/cel_differential_check.sh`, the check `cel-differential` of `tools/ci.sh`: random
+  CEL rules over random messages, with this library's verdicts held to those of
+  protovalidate-go v1.4.1, which runs cel-go.
+- `tools/compile_time_check.sh`, the check `compile-time`: the build of a schema of 690 CEL
+  rules against the build of the same schema with none, held to `bench/compile_time.txt`.
+  Unit tests hold the compiler's reading and typing of an expression to a count of branches,
+  and `tools/branch_budget.py` finds a new count.
 - Not yet: `pattern` and CEL's `matches`, arithmetic on a timestamp or a duration, and
   `timestamp(string)`. A message with such a rule stops the build, with a message that names
   the rule.
@@ -72,9 +79,16 @@ change the public API, and the entry marks each change that does.
   sink's peak memory under the full-stack load fell from 483 MiB to 378 MiB. A route search
   compares 8 octets at a time, and the small routed call takes 1.4% fewer instructions.
 - An h11 request head longer than 24,582 octets is refused (colibri's step 62).
-- A schema's CEL rules compile in about a third of the time: 2,300 expressions in 29 s of a
-  Debug build, where they took 100 s. The compiler reads each token once and keeps one tree
-  for each expression's text, and a field's rules are found without a search of the table.
+- A schema's CEL rules compile in a fifth of the time: 2,300 expressions in 20 s of a Debug
+  build, where they took 100 s, about 7.5 ms for a rule. The compiler reads each token once,
+  keeps one tree and one typing for each expression, and finds a function and a field by its
+  name in one step (docs/performance.md, "The compiler's time").
+- A CEL expression has the verdict protovalidate-go gives it. **Changes what compiles.** `==`,
+  `!=` and `in` take two values of one type, so `1 == 1u` stops the build, and behind `dyn`
+  two values of unlike types are not equal. A conversion of a literal that fails, such as
+  `int('x')`, stops the build. One `-` before a number is the number's sign, so
+  `-2.5.isInf()` asks -2.5, and `--9223372036854775808` is refused. `uint` takes no double
+  below zero, and `int` no double at or below the least int.
 - The CEL reader follows the language definition's lexis where it did not. **Changes what
   compiles.** A bytes literal's prefix is `b` then `r`, so `rb'x'` is refused. A hexadecimal
   number starts with `0x` in lower case. A string in single quotes holds no line end. A
@@ -87,6 +101,8 @@ change the public API, and the entry marks each change that does.
 
 - A message of about 500 fields or more encodes and decodes. Before, the compiler stopped at
   its default branch quota in `encode`, in `decode` and in the JSON writer.
+- A macro over a list literal, such as `[1, 2].all(n, n > 0)`, and a signed duration literal,
+  such as `duration('-3s')`, compile. Before, each stopped the build with a compiler error.
 - A CEL string with a numbered escape, such as `'é'` or `'\x41'`, compiles. Before, the
   build stopped in the escape's own code.
 - JSON encode writes a map key once, with its last entry's value, as protobuf's map rule says.

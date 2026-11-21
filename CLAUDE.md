@@ -125,8 +125,9 @@ confirm a test fails. Report `CAUGHT` or `NOT CAUGHT` per mutation in the commit
   commands for real and renders the session with HyperFrames into `examples/<example>/
   walkthrough.gif`, which the README embeds. It needs Node 22 or later, FFmpeg and Chrome.
 - Generated code: `zig build test-generated` compiles the examples' generated code and runs its
-  round trips, and those of `tools/wide`: one message of 600 fields with rules, which holds the
-  protobuf module, the plugin's table and `protovalidate` to a wide message.
+  round trips, and those of `tools/wide`: one message of 1,200 fields with rules, more than
+  the compiler's default branch quota, which holds the protobuf module, the plugin's table and
+  `protovalidate` to a wide message.
   `python3 tools/wide/wide_proto.py` writes its schema.
   `tools/gen` holds the checks' generated code, from `tools/proto` (decision 41).
   `tools/generate_check.sh` regenerates each `gen/` with `buf generate` and fails on a difference;
@@ -185,6 +186,24 @@ confirm a test fails. Report `CAUGHT` or `NOT CAUGHT` per mutation in the commit
   `tools/lean_check.sh` runs the step, and installs that release for x86-64 Linux, pinned by
   SHA-256, when no lake is on the path and `LAKE` names none. `spec/README.md` says what
   the model holds and what it proves.
+- CEL differential: `tools/cel_differential_check.sh [seed...]` writes a schema of random CEL
+  rules and a file of random messages for each seed, 1 when none is given
+  (`tools/cel_differential/generate.py`). It builds `zig build cel-differential-runner
+  -Dcel-differential=<folder>` over the schema's generated code, and runs it beside
+  `tools/cel_differential/reference`, which is protovalidate-go v1.4.1 on cel-go. It fails when
+  a message's verdict under a rule differs: valid, invalid with its message, a failure as the
+  rule runs, or a rule that does not compile. `tools/cel_differential/known.txt` holds the
+  differences that pass, each with its reason. `CEL_DIFFERENTIAL_RULES` and
+  `CEL_DIFFERENTIAL_MESSAGES` set a seed's size. It needs buf, python3 and go.
+- Compile time: `tools/compile_time_check.sh` builds `zig build compile-time-subject
+  -Dcompile-time=<folder>` over a schema of 690 CEL rules and over the same schema with none
+  (`tools/compile_time/schema.py`), five times each in turns. It fails when the ratio of the two least
+  times passes `bench/compile_time.txt` by more than 12%; `--write` records a new ratio, which
+  the commit that pays for it explains. Two unit tests hold the compiler's reading and typing
+  of reference expressions to a count of branches, `read_branches_max` and
+  `typing_branches_max`, and `python3 tools/branch_budget.py <file> <constant>` finds the
+  least count that builds (docs/performance.md, "The compiler's time"). It needs buf and
+  python3.
 - Fuzzer: `zig build test-<module> -Drelease --fuzz=<runs>` runs a module's fuzz properties
   under Zig's fuzzer; Zig 0.16.0's test runner compiles in fuzz mode in ReleaseSafe alone.
   `zig build test` runs each property over its corpus. `tools/ci.sh` does not run the fuzzer.

@@ -508,13 +508,20 @@ value as `rule` and the rule message as `rules`. A value is a scalar, a wrapper 
 A rule the module has no check for stops your build, with a message that names it. That holds
 today for `pattern`, for CEL's `matches`, for a predefined rule whose value is a message that
 is no wrapper, and for the parts of CEL the module does not read yet: arithmetic on a
-timestamp or a duration, `timestamp(string)`, and `map`, `filter` and `string(number)`, which
-build a value that needs room.
+timestamp or a duration, `timestamp(string)`, and `map`, `filter`, `string(number)` and `+`
+of two strings, which build a value that needs room.
 
-A large schema compiles in time that grows with its rules, about 13 ms for each CEL
+An expression has the verdict that protovalidate-go gives it, which runs cel-go: `==` takes
+two values of one type, a conversion of a literal that fails, such as `int('x')`, stops your
+build, and one `-` before a number is the number's sign. `tools/cel_differential_check.sh`
+compares the two libraries on random rules and random messages.
+
+A large schema compiles in time that grows with its rules, about 7.5 ms for each CEL
 expression in a Debug build on one core of a 2.1 GHz Xeon: a message of 2,000 fields with
-2,003 expressions built in 28 s, and 100 messages with 2,300 expressions in 29 s. With
-standard rules alone, the second schema built in 3 s. A message takes at most about 1,000 repeated
+2,003 expressions built in 21 s, and 100 messages with 2,300 expressions in 20 s. With
+standard rules alone, the second schema built in 3 s. A check written by hand costs the
+compiler 0.17 ms, so a rule cannot cost less: [docs/performance.md](docs/performance.md),
+"The compiler's time", says where the rest goes. A message takes at most about 1,000 repeated
 and map fields: Zig counts each one's type against a fixed limit of the struct that holds
 them.
 
@@ -552,8 +559,18 @@ with `zig build test`, and serves its service with `zig build serve` for curl an
   an expression that calls `matches`, which wait for stdx's regular expressions.
 - `tools/lean_check.sh` builds a [Lean model](spec/README.md) of the CEL syntax, written
   from the CEL language definition, and requires the vector file beside the Zig grammar to be
-  what the model gives. A unit test reads each of the 6,647 expressions with the grammar the
+  what the model gives. A unit test reads each of the 6,655 expressions with the grammar the
   compiler runs, and requires the model's tree or its refusal. No theorem is proved yet.
+- `tools/cel_differential_check.sh` writes random CEL rules and random messages from a seed,
+  and requires this library and
+  [protovalidate-go](https://github.com/bufbuild/protovalidate-go) v1.4.1, which runs cel-go,
+  to give each message the same verdict under each rule: valid, invalid with the same
+  message, a failure as the rule runs, or a rule that does not compile. On six seeds, 60,000
+  verdicts of 1,500 rules were the same. Its first runs found six differences, which
+  [decision 47](docs/decisions.md) lists.
+- `tools/compile_time_check.sh` holds what a schema's CEL rules cost the compiler to a
+  baseline, and unit tests hold the compiler's reading and typing of an expression to a count
+  of branches.
 - `zig build test-protovalidate -Drelease --fuzz=<runs>` runs Zig's fuzzer over that grammar:
   a parse depends on its text alone, and a tree's text reads back as the same tree.
 - `tools/coverage_check.sh` converts every protobuf type with connect-zig and with Go's runtime,

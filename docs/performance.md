@@ -155,6 +155,84 @@ failed (the owner's ruling of 2026-11-09). A new fast path joins this list the s
 | A `Lazy` child's object opened with its member's name | `json_encode.zig`, `write_lazy` | deep JSON encode +9.47%, local x86-64-v2 |
 | A message with no member written as `{}` in one call | `json_encode.zig`, `writes_none` | tree JSON encode +36.33%, local x86-64-v2 |
 
+## The compiler's time
+
+`protovalidate` compiles each CEL rule of a schema while the compiler builds the program (decision
+47), so a rule costs the compiler time, and a schema of thousands of rules costs it seconds. Zig
+0.16 runs comptime code in an interpreter. One step of it costs microseconds, where the same step
+of a built program costs under a nanosecond. Each number below is from Zig 0.16.0 in Debug, on a
+4-core 2.1 GHz Xeon.
+
+| Work at comptime | Cost |
+| --- | --- |
+| One turn of a loop | 3.5 µs |
+| One call of a function | 3 µs to 5 µs |
+| One slice of a slice | 5 µs |
+| One read of a comptime table | 4 µs |
+| `std.mem.eql` of two short texts | 20 µs |
+| `@hasField` or `@field` of an enum, by a name | one step, whatever the enum's size |
+| One function the compiler makes from a generic one | about 0.17 ms |
+
+The rules that follow from it:
+
+- **Find a name in the compiler's own table.** `@hasField(E, name)` and `@field(E, name)` find an
+  enum's member in one step. A loop of `std.mem.eql` over each name takes a call of 20 µs for each.
+  `cel_node.Function.of` finds a function so, and `table.place_of_name` finds a message's field
+  through an enum that the compiler builds once for the message.
+- **Raise the branch quota in a constant's value, and nowhere under a function that must be
+  answered once.** The compiler keeps the answer of a comptime call, and gives it again for the
+  same arguments. It keeps no answer of a function that calls `@setEvalBranchQuota`, and none of a
+  function that calls such a function. One raise under the typing made the compiler type each part
+  of an expression again for each question about it. So a function that needs a raised quota is
+  the value of a constant: `fn Kept(args) type { return struct { const value = compute(args); }; }`.
+  The compiler computes `Kept(args).value` once, under the quota `compute` raises, and answers
+  `Kept(args)` from memory.
+- **An answer from memory still counts.** The compiler adds the branches of a call's first run to
+  the caller's count each time it gives the answer again. So one evaluation takes the same count of
+  branches in each build, whatever the compiler computed before it, and a test states a cost as a
+  quota.
+- **Classify a text once, where it is read.** The tokens' reader names each operator and each
+  keyword as an enum's member, and the grammar compares no text.
+- **Make one function for one part.** A function that the compiler makes from a generic one costs
+  as much as 50 comptime calls. A helper with one caller is `inline`.
+- **A function that loops over a message's fields raises its own quota.** `inline for` counts each
+  field against the quota of the function that holds it, and the default quota stops at about 500
+  fields.
+
+What a CEL rule costs, measured on a schema of 690 rules of about 40 octets each
+(`tools/compile_time_check.sh`):
+
+| Stage | Before | Now |
+| --- | --- | --- |
+| The compiler reads the expression's text | 6.5 ms | 4.1 ms |
+| The compiler types the expression | 1.9 ms | 1.2 ms |
+| The compiler makes the rule's code | 3.4 ms | 2.2 ms |
+| One rule | 11.8 ms | 7.5 ms |
+
+A check written by hand as a Zig function costs the compiler 0.17 ms, and that is the floor: a
+rule cannot cost less while the compiler makes its code. The compiler reads a tree that is written
+as a Zig literal in 0.04 ms, where it reads the same tree from the expression's text in 4.1 ms. So
+a plugin that wrote each expression's tree beside its text would end the first row. It is not
+built: decision 47 rules that the table holds the text, and the owner has not ruled on the tree.
+
+Three checks hold the cost:
+
+- `cel_parse.zig` reads six reference expressions under `read_branches_max`, and
+  `cel_cost_test.zig` types twelve under `typing_branches_max`. Each constant is the count
+  measured when it was written, and 2% more, so the tests do not build when the reader or the
+  typing takes more. `python3 tools/branch_budget.py <file> <constant>` finds the least value
+  that builds. The commit that pays for a higher cost raises the constant and says why.
+- `cel_cost_test.zig` requires that no file on the typing's path names `@setEvalBranchQuota`,
+  the table's searches among them. The table's three functions that raise the quota are in
+  `table_once.zig`, and each is a constant's value.
+- `tools/compile_time_check.sh` builds the schema of 690 rules, and the same schema with no CEL
+  rule, five times each, in turns. It compares the least time of one with the least time of the
+  other, since a time depends on the machine and their ratio does not. It fails when the ratio
+  passes `bench/compile_time.txt` by more than 12%; two runs on one machine differ by 2%. It
+  holds what no count states, such as the code of each rule. A quota raise that was put back
+  under a search of the table on purpose raised the ratio by 10.6%, under the tolerance: the
+  test of the second point is what fails for it.
+
 ## The pitfalls
 
 | Symptom | Cause | Rule |
@@ -174,6 +252,9 @@ failed (the owner's ruling of 2026-11-09). A new fast path joins this list the s
 | Small binary encode took 9% more instructions, and small JSON encode 2.6%, when the routed calls joined the benchmark program. | The compiler lays out and inlines a program as a whole, and the calls' modules changed its choices for the codec's code. No library code changed. | A unit of work that links other modules is a program of its own, so each program's counts move only with its own code. |
 | Medium binary encode took 20% more time with `writer.len += n` after each inline write. | A store through the buffer, a `[]u8`, may be the length, so the compiler reads the length again from memory, and each write waits for the one before it. | A write reads the length once, stores its octets, then stores the length. Time such a change on x86: an M1 hides the wait. |
 | `tools/bench_check.sh` printed no row of the small message but its JSON decode+walk, from CI's run 141 to run 159. | `zig build bench` runs two programs into one file, and Zig 0.16's `File.writer` writes a file from its start, so `bench-call`'s table overwrote the codec table's first lines. | Each program writes standard output with `writerStreaming`, and `tools/bench_check.sh` fails when a message or a routed call lacks a row. |
+| A schema of 2,300 CEL rules built in 27.7 s, and in 19.7 s with the same rules. | The reader compared each identifier's text with 21 words, and a function under the typing raised the compiler's branch quota, so the compiler kept no answer and typed each part again for each question. | The compiler's time: an enum names each word once, and a constant's value raises the quota. |
+| A message of 2,000 fields stopped building once the quota was raised elsewhere. | `message.check` loops over the fields at comptime under its own quota, which a function it called had raised before. | A function that loops over a message's fields raises its own quota. `tools/wide` has 1,200 fields, more than the default quota. |
+| `duration('-3s')` stopped the build with a compiler error, and each test of the duration's reader passed. | The tests ran the reader as a program. At comptime a slice of known bounds is a pointer to an array, so `var rest = if (signed) text[1..] else text` took an array's type, which no shorter rest fits. | A function the compiler runs has a test that runs it at comptime, and a variable that holds slices of several lengths states `[]const u8`. |
 
 A pitfall that belongs to Zig and not to connect-zig moves to pepegrillo's
 `performance_zig.md`.
@@ -190,6 +271,9 @@ zig build costs                  # time the costs table on this machine
 tools/bench_check.sh             # time connect-zig beside Go's and Rust's runtimes, compare octets
 tools/fullstack_check.sh         # load the OTLP sink and the Collector over TLS and h2, on Linux
 tools/fullstack_check.sh production  # the production model alone
+tools/compile_time_check.sh      # what a schema's CEL rules cost the compiler, against its baseline
+tools/compile_time_check.sh --write   # record a new ratio, in the commit that pays for it
+python3 tools/branch_budget.py src/protovalidate/cel/cel_parse.zig read_branches_max   # the least budget that builds
 zig build install-bench -Dcpu=x86_64_v3
 valgrind --tool=callgrind --collect-atstart=no zig-out/bin/bench --instructions
 callgrind_annotate callgrind.out.<pid>   # the profile, by function and by line

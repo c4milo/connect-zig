@@ -1512,6 +1512,58 @@ ran on Linux x86-64 with Zig 0.16.0.
     at p99 2.55 ms, and the Collector 142,402, at p99 25.21 ms. A burst filled the sink's 64
     calls at 569,600 spans a second, with its core 94% busy, and a call was refused.
 
+- **CEL: the compiler's time, and cel-go's verdicts** (step 34, decision 47 as amended). Run on a
+  Xeon at 2.1 GHz, x86-64 Linux, 4 cores, Zig 0.16.0. The owner asked whether an expression
+  compiles in microseconds and how far the cost goes down, for a guard against a compile time
+  that grows back, and for a randomized differential test.
+  - Microseconds: no, while the compiler compiles the rule. A check written by hand as a Zig
+    function costs the compiler 0.17 ms. Zig runs comptime code as an interpreter, at about
+    3 µs a step, and a rule's text takes about a thousand steps to read. A tree written as a
+    Zig literal is read in 0.04 ms: the plugin could write it, which "What a later step owes"
+    names.
+  - A rule cost 11.8 ms and costs 7.5 ms: 6.5 ms and 4.1 ms to read its text, 1.9 ms and
+    1.2 ms to type it, 3.4 ms and 2.2 ms for its code. A schema of 100 messages of 20 fields,
+    2,300 expressions, built in 27.7 s and builds in 19.7 s. One message of 2,000 fields built
+    in 27.9 s and builds in 20.9 s.
+  - Where the time went. The reader compared each identifier's text with 21 words. A function
+    under the typing raised the compiler's branch quota, and the compiler keeps no answer of
+    such a function nor of its callers, so it typed each part again for each question. Each
+    part of an expression was two functions. docs/performance.md, "The compiler's time",
+    holds the costs and the rules.
+  - The guards. The compiler counts a call it answers from memory as the call counted when it
+    ran, so a count of branches is the same in each build. `read_branches_max` holds six
+    expressions' reading to 4,460 branches, and `typing_branches_max` twelve expressions'
+    typing to its count and 2% more. The reader took 6,781 branches before.
+    `tools/compile_time_check.sh` printed `690 CEL rules: 6796 ms with the rules, 1651 ms
+    without, 7.46 ms a rule on this machine`, and records the ratio 4.12. Two more runs gave
+    4.16 and 4.05. With a quota raise put back under a search of the table on purpose it
+    printed `ratio 4.56, baseline 4.12: +10.6%`, under its tolerance of 12%. So a unit test
+    refuses `@setEvalBranchQuota` in each file on the typing's path, and the table's functions
+    that raise the quota moved to `table_once.zig`: the test fails for that raise.
+  - One limit came back and fell again: a function that loops over a message's fields had
+    relied on another function's quota raise. `message.check` raises its own now, and
+    `tools/wide` has 1,200 fields, more than the default quota: without the raise,
+    `zig build test-generated` stops at `evaluation exceeded 1000 backwards branches`.
+  - The differential check. `tools/cel_differential_check.sh 3 4 5 6 7 8`, with 250 rules and
+    40 messages a seed, printed for each seed `10000 verdicts of 250 rules` and no difference
+    from protovalidate-go v1.4.1 on cel-go v0.33.2. Its first runs found six differences,
+    which decision 47 lists. Three were errors of this module that stopped a valid schema's
+    build or compiled a rule cel-go refuses: a macro over a list literal, a signed
+    `duration` literal, and `==` between numbers of two types.
+  - The grammar follows cel-go where the language definition gives two readings: one "-"
+    before a number is its sign. The Lean model changed with it, and its vector file holds
+    6,655 expressions.
+  - Mutations: 76 of the compile-time changes and 30 of the changes for cel-go's verdicts,
+    each `CAUGHT`. Seven of the first set were `NOT CAUGHT` until a test was written: the
+    level of "-" beside "*", a function's name the module does not hold, `dyn` with two
+    operands, a macro's name with no target, a field whose Zig name differs from its .proto
+    name, in the table and in an expression, and a cost under the budget's first margin of
+    10%. One of the second set was: `in` behind `dyn` with a right side that is no list.
+  - `zig build test` printed 97 of 97 steps and 552 of 552 tests passed.
+    `tools/protovalidate_conformance_check.sh` printed `PASS (failed: 0, skipped: 50, passed:
+    2822, total: 2872)`. `zig build test-protovalidate -Drelease --fuzz=300K` found no
+    failure. `tools/perf_check.sh` printed no operation past its baseline.
+
 ### What a later step owes
 
 - A stream that waits for an event of the program once its request ended (colibri issue 130).
@@ -1536,7 +1588,19 @@ ran on Linux x86-64 with Zig 0.16.0.
 - For `protovalidate`, the parts of CEL that no rule of the conformance suite uses and the
   module does not read yet: `timestamp(string)`, sums and differences of timestamps and
   durations, the accessors of a timestamp such as `getFullYear`, `map` over a field,
-  `filter`, and `string` of a number. Each stops the build with a message that names it.
+  `filter`, `string` of a number, and `+` of two strings. Each stops the build with a message
+  that names it.
+- For `protovalidate`, the tree of each CEL expression in the table. The compiler takes
+  4.1 ms to read a rule's text, and 0.04 ms to read the same tree as a Zig literal. The plugin
+  would run the grammar of `cel_grammar.zig` as a program and write each tree beside its
+  text, and a table written by hand would keep its text alone. It changes what a generated
+  file holds, and a tree that differs from its text needs a check, so the owner rules first.
+- For `protovalidate`, cel-go's typing behind `dyn`. cel-go gives the result of a function on
+  a dynamic value a type, and refuses `dyn(x).size() == 'a'`. This module marks the result as
+  dynamic and compiles the expression. The differential check writes no such rule yet.
+- For `protovalidate`, a differential check of the grammar alone against cel-go's parser, over
+  the Lean model's vectors and random texts. The check of verdicts holds the grammar only
+  through the rules it writes.
 - A generated message holds at most about 1,000 repeated and map fields. Zig counts each
   `proto.Repeated(...)` of a struct's fields against a branch quota of 1000, which no
   statement of the struct can raise. An alias for each element type, declared once in the

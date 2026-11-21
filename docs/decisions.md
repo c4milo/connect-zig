@@ -716,15 +716,47 @@ first. Cite an entry by number in code and commits ("decision 6").
         single quotes, the reserved words, a keyword as no field's name, a comma after a
         list literal's last element, and a number's sign as part of its literal. It reads no
         map literal, no message literal and no name that starts with ".".
+      - Where the definition gives a text two readings, the reader takes cel-go's, which
+        protovalidate's libraries run. One "-" before a number is the number's sign, which a
+        member starts with: "-2.5.isInf()" asks -2.5. A run of two or more is a run of
+        negations of a number with no sign. Beaten: the last "-" of a run as the sign, which
+        read "--9223372036854775808" where cel-go refuses it.
+      - An expression has the verdict protovalidate-go gives it. `tools/cel_differential_check.sh`
+        writes random rules and random messages, and compares this module's verdicts with
+        protovalidate-go's: valid, invalid with the violation's message, a failure as the
+        expression runs, and a rule that does not compile. Its first runs found six
+        differences, and each follows cel-go now:
+        - `==`, `!=` and `in` take two values of one type: `1 == 1u` stops the build. An
+          order takes two numbers of any types, as protovalidate's CEL does.
+        - Behind `dyn`, `==`, `!=` and `in` take any two values and compare them as they
+          run: two values of unlike types are not equal, and two numbers compare by value.
+        - A conversion of a literal that fails, such as `int('x')` and `bool('k')`, stops
+          the build: cel-go computes such a conversion once, before the expression runs.
+        - `uint` takes no double below zero, and `int` no double at or below the least int.
+        - A macro reads a list literal, and the compiler reads a signed `duration('-3s')`.
+          Both stopped the build with a compiler error before.
+        Beaten: the conformance suite alone, whose cases hold few expressions and found none
+        of the six. One difference stays: behind `dyn` this module compiles some expressions
+        that cel-go's checker refuses, since it marks a part as dynamic where cel-go gives
+        the part a type.
       - A Lean model in `spec/lean/` states the lexis and the grammar a second time, from the
         language definition and production by production, where the Zig reads every level of
         operators in one loop. Its vectors are replayed against the Zig grammar. The model
         proves no theorem yet (spec/README.md).
-      - A schema of thousands of rules compiles in time that grows with them. The compiler
-        reads each token once, keeps one tree for each expression's text, and finds a field's
-        entry by a search of a descriptor whose numbers rise. The plugin raises the
-        compiler's branch quota in a table whose literal makes more than 500 calls, since
-        Zig counts each call of a declaration's value against a quota of 1000.
+      - A schema of thousands of rules compiles in time that grows with them: about 7.5 ms
+        for a rule. The compiler runs comptime code as an interpreter, so the module counts
+        its steps (docs/performance.md, "The compiler's time"). An enum names each operator,
+        each keyword and each function once, and an enum that the compiler builds once for a
+        message finds a field by its name. The typing of an expression is a constant's
+        value, so the compiler computes it once. Tests hold the reading and the typing to a
+        count of branches, and `tools/compile_time_check.sh` holds the whole build to a
+        baseline. Not built: a plugin that writes each expression's tree beside its text,
+        which would end the 4 ms the compiler takes to read the text. It changes what the
+        table holds, so it waits for the owner's word.
+      - The compiler reads each token once, keeps one tree for each expression's text, and
+        finds a field's entry by a search of a descriptor whose numbers rise. The plugin
+        raises the compiler's branch quota in a table whose literal makes more than 500
+        calls, since Zig counts each call of a declaration's value against a quota of 1000.
       - The plugin still reads the predefined rules of an extension, since only its request
         holds an extension's descriptor. It writes each one's value into the table.
         - A rule message's generated type does not know an extension, so the extension's
