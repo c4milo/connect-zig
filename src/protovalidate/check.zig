@@ -79,20 +79,15 @@ fn of_message_oneof(comptime T: type, comptime fields: []const []const u8) ?[]co
 /// Each entry of the table names a field or a oneof that the message has.
 fn of_entries(comptime T: type, comptime rules: table.Rules) ?[]const u8 {
     const name = T.protobuf.full_name;
-    for (rules.fields) |entry| {
-        if (!has_number(T, entry.number)) return std.fmt.comptimePrint("{s}: the table holds rules for field {d}, which the message lacks", .{ name, entry.number });
+    for (rules.fields, 0..) |entry, at| {
+        const kept = table.entry_of(T, entry.number) orelse return std.fmt.comptimePrint("{s}: the table holds rules for field {d}, which the message lacks", .{ name, entry.number });
+        // One entry for each field: a second one would state rules that no check reads.
+        if (kept != at) return std.fmt.comptimePrint("{s}: the table holds two entries for field {d}", .{ name, entry.number });
     }
     for (rules.oneofs) |oneof| {
         if (!@hasField(T, oneof.field)) return name ++ ": the table holds rules for the oneof " ++ oneof.name ++ ", which the message lacks";
     }
     return null;
-}
-
-fn has_number(comptime T: type, comptime number: u32) bool {
-    for (T.protobuf.fields) |field| {
-        if (field.number == number) return true;
-    }
-    return false;
 }
 
 fn of_field(comptime T: type, comptime field: proto.Field, comptime visited: []const type) ?[]const u8 {
@@ -287,6 +282,7 @@ test "a rule with no check, a CEL rule and a rule the plugin could not write eac
     try testing.expect(comptime rules_error(Message(proto.Repeated(i32, .int32), .int32, field_rules(.{ .cel_expression = .of(&.{"this.size() > 0"}) }))) == null);
     try expect_problem(Message(i32, .int32, .{ .unsupported = "an extension's rule" }), "t.Message: an extension's rule");
     try expect_problem(Message(i32, .int32, .{ .fields = &.{.{ .number = 2, .rules = .{} }} }), "rules for field 2, which the message lacks");
+    try expect_problem(Message(i32, .int32, .{ .fields = &.{ .{ .number = 1, .rules = .{} }, .{ .number = 1, .rules = .{} } } }), "t.Message: the table holds two entries for field 1");
     try expect_problem(Message(i32, .int32, .{ .oneofs = &.{.{ .field = "choice", .name = "choice", .rules = .{} }} }), "rules for the oneof choice, which the message lacks");
 }
 

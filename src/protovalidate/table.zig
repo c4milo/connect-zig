@@ -94,11 +94,8 @@ pub fn of(comptime T: type) Rules {
 /// The rules of the field of `T` numbered `number`, or none.
 pub fn field_rules(comptime T: type, comptime number: u32) ?pb.FieldRules {
     comptime {
-        if (!has_rules(T)) return null;
-        for (of(T).fields) |entry| {
-            if (entry.number == number) return entry.rules;
-        }
-        return null;
+        const at = entry_of(T, number) orelse return null;
+        return of(T).fields[at].rules;
     }
 }
 
@@ -106,14 +103,88 @@ pub fn field_rules(comptime T: type, comptime number: u32) ?pb.FieldRules {
 pub fn predefined_of(comptime T: type, comptime number: u32, comptime site: Rules.Predefined.Where) []const Rules.Predefined {
     comptime {
         var list: []const Rules.Predefined = &.{};
-        if (!has_rules(T)) return list;
-        for (of(T).fields) |entry| {
-            if (entry.number != number) continue;
-            for (entry.predefined) |predefined| {
-                if (predefined.site == site) list = list ++ [_]Rules.Predefined{predefined};
-            }
+        const at = entry_of(T, number) orelse return list;
+        for (of(T).fields[at].predefined) |predefined| {
+            if (predefined.site == site) list = list ++ [_]Rules.Predefined{predefined};
         }
         return list;
+    }
+}
+
+/// The place in the table of `T` of the entry of the field numbered `number`, or null for a
+/// field with no entry and for a number the message lacks.
+pub fn entry_of(comptime T: type, comptime number: u32) ?usize {
+    comptime {
+        if (!has_rules(T)) return null;
+        const place = place_of(T, number) orelse return null;
+        return Places(T).of_field[place];
+    }
+}
+
+/// Where the table of `T` holds each field's entry: for each field, by its place in the
+/// descriptor, the place of its entry, or none. The compiler computes it once for each type,
+/// so a message of many fields takes no search of its table for each one.
+fn Places(comptime T: type) type {
+    return struct {
+        const of_field: [T.protobuf.fields.len]?usize = places_of(T);
+    };
+}
+
+fn places_of(comptime T: type) [T.protobuf.fields.len]?usize {
+    comptime {
+        @setEvalBranchQuota(constants.eval_branches_per_rule * (T.protobuf.fields.len + 1));
+        var places = [_]?usize{null} ** T.protobuf.fields.len;
+        for (of(T).fields, 0..) |entry, at| {
+            const place = place_of(T, entry.number) orelse continue;
+            // A field's first entry is its entry: `rules_error` refuses a second one.
+            if (places[place] == null) places[place] = at;
+        }
+        return places;
+    }
+}
+
+/// The place in the descriptor of `T` of the field numbered `number`, or null. A generated
+/// descriptor's numbers rise, so the search halves what is left at each step. A descriptor
+/// written by hand whose numbers do not rise is read field by field.
+pub fn place_of(comptime T: type, comptime number: u32) ?usize {
+    comptime {
+        const fields = T.protobuf.fields;
+        if (!Order(T).rises) {
+            for (fields, 0..) |field, place| {
+                if (field.number == number) return place;
+            }
+            return null;
+        }
+        var low: usize = 0;
+        var high: usize = fields.len;
+        // Each step halves the fields left, so the bits of a count bound the steps.
+        for (0..@bitSizeOf(usize)) |_| {
+            if (low == high) return null;
+            const middle = low + (high - low) / halves;
+            if (fields[middle].number == number) return middle;
+            if (fields[middle].number < number) low = middle + 1 else high = middle;
+        }
+        return null;
+    }
+}
+const halves = 2;
+
+/// Whether the numbers of the fields of `T` rise, which the compiler reads once for each type.
+fn Order(comptime T: type) type {
+    return struct {
+        const rises: bool = numbers_rise(T);
+    };
+}
+
+fn numbers_rise(comptime T: type) bool {
+    comptime {
+        @setEvalBranchQuota(constants.eval_branches_per_rule * (T.protobuf.fields.len + 1));
+        var previous: u32 = 0;
+        for (T.protobuf.fields) |field| {
+            if (field.number <= previous) return false;
+            previous = field.number;
+        }
+        return true;
     }
 }
 
@@ -202,6 +273,68 @@ test "a table is found by its declaration, and a field's rules by its number" {
     try testing.expectEqual(@as(?u64, 1), typed.string.min_len);
     try testing.expect(comptime field_rules(Sample, 2) == null);
     try testing.expect(comptime field_rules(Plain, 1) == null);
+}
+
+/// A message of five fields whose table holds entries for three of them, out of order, and a
+/// second entry for one.
+fn Wide(comptime numbers: [wide_len]u32) type {
+    return struct {
+        a: i32 = 0,
+        b: i32 = 0,
+        c: i32 = 0,
+        d: i32 = 0,
+        e: i32 = 0,
+        pub const protobuf: proto.Descriptor = .{ .full_name = "t.Wide", .fields = &.{
+            .{ .name = "a", .number = numbers[0], .kind = .int32, .json_name = "a", .proto_name = "a" },
+            .{ .name = "b", .number = numbers[1], .kind = .int32, .json_name = "b", .proto_name = "b" },
+            .{ .name = "c", .number = numbers[wide_c], .kind = .int32, .json_name = "c", .proto_name = "c" },
+            .{ .name = "d", .number = numbers[wide_d], .kind = .int32, .json_name = "d", .proto_name = "d" },
+            .{ .name = "e", .number = numbers[wide_e], .kind = .int32, .json_name = "e", .proto_name = "e" },
+        } };
+        pub const protovalidate: Rules = .{
+            .fields = &.{
+                .{ .number = numbers[wide_e], .rules = .{ .type = .{ .int32 = .{ .@"const" = wide_e } } }, .predefined = &.{
+                    .{ .site = .items, .number = extension_number, .name = "t.x", .type = .type_bool, .value = .{ .boolean = true }, .cel = &.{} },
+                    .{ .number = extension_number, .name = "t.y", .type = .type_bool, .value = .{ .boolean = true }, .cel = &.{} },
+                } },
+                .{ .number = numbers[0], .rules = .{ .type = .{ .int32 = .{ .@"const" = 0 } } } },
+                .{ .number = numbers[wide_c], .rules = .{ .type = .{ .int32 = .{ .@"const" = wide_c } } } },
+                // A second entry of one field, which the first one hides.
+                .{ .number = numbers[0], .rules = .{ .type = .{ .int32 = .{ .@"const" = 1 } } } },
+                // An entry of no field.
+                .{ .number = missing_number, .rules = .{} },
+            },
+        };
+    };
+}
+const wide_len = 5;
+const wide_c = 2;
+const wide_d = 3;
+const wide_e = 4;
+const extension_number = 1161;
+const missing_number = 99;
+
+test "a field's entry is found by its number, whatever the order of the table and of the descriptor" {
+    // Numbers that rise, which a search halves, and numbers that do not, which it reads in turn.
+    inline for (.{ [wide_len]u32{ 1, 3, 7, 20, 536_870_911 }, [wide_len]u32{ 20, 3, 536_870_911, 1, 7 } }) |numbers| {
+        const W = Wide(numbers);
+        inline for (numbers, 0..) |number, place| try testing.expectEqual(@as(?usize, place), comptime place_of(W, number));
+        inline for (.{ 0, 2, 8, 19, 21, missing_number }) |absent| try testing.expect(comptime place_of(W, absent) == null);
+        try testing.expectEqual(@as(?i32, 0), (comptime field_rules(W, numbers[0])).?.type.?.int32.@"const");
+        try testing.expectEqual(@as(?i32, wide_c), (comptime field_rules(W, numbers[wide_c])).?.type.?.int32.@"const");
+        try testing.expectEqual(@as(?i32, wide_e), (comptime field_rules(W, numbers[wide_e])).?.type.?.int32.@"const");
+        try testing.expect(comptime field_rules(W, numbers[1]) == null);
+        try testing.expect(comptime field_rules(W, numbers[wide_d]) == null);
+        try testing.expect(comptime field_rules(W, missing_number) == null);
+        try testing.expectEqual(@as(?usize, 1), comptime entry_of(W, numbers[0]));
+        // A field's predefined rules are those of its entry that lie at the site asked for.
+        const at_items = comptime predefined_of(W, numbers[wide_e], .items);
+        try testing.expectEqual(@as(usize, 1), at_items.len);
+        try testing.expectEqualStrings("t.x", at_items[0].name);
+        try testing.expectEqualStrings("t.y", (comptime predefined_of(W, numbers[wide_e], .field))[0].name);
+        try testing.expectEqual(@as(usize, 0), (comptime predefined_of(W, numbers[wide_e], .keys)).len);
+        try testing.expectEqual(@as(usize, 0), (comptime predefined_of(W, numbers[0], .field)).len);
+    }
 }
 
 test "a rule's path takes each number, name and type from validate.proto's descriptors" {
