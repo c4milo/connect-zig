@@ -14,6 +14,8 @@ const rule_string = @import("rule_string.zig");
 const rule_bytes = @import("rule_bytes.zig");
 const rule_time = @import("rule_time.zig");
 const rule_field_mask = @import("rule_field_mask.zig");
+const cel_rule = @import("cel/cel_rule.zig");
+const cel_type = @import("cel/cel_type.zig");
 const Walk = walk_file.Walk;
 const Path = walk_file.Path;
 const Site = walk_file.Site;
@@ -29,9 +31,10 @@ pub fn is_read(comptime V: type, comptime rules: pb.FieldRules) bool {
     return !states_nothing(rules) or table.has_rules(V);
 }
 
-/// Checks `value` against the rules of its type, then, for a message, against the message's
-/// own table.
-pub fn check(comptime V: type, comptime rules: pb.FieldRules, comptime site: Site, value: *const V, walk: *Walk, path: *const Path) Fault!void {
+/// Checks `value`, of `kind`, against the CEL rules and the rules of its type, then, for a
+/// message, against the message's own table.
+pub fn check(comptime V: type, comptime kind: proto.Kind, comptime rules: pb.FieldRules, comptime site: Site, value: *const V, walk: *Walk, path: *const Path) Fault!void {
+    if (comptime cel_rule.states(rules)) try cel_rule.check_field(rules, site, cel_type.from(kind, V, value), walk, path);
     if (comptime rules.type) |typed| try check_typed(V, typed, site, value, walk, path);
     if (comptime table.has_rules(V)) try message_file.check(V, value, walk, path);
 }
@@ -46,17 +49,17 @@ pub fn Held(comptime H: type) type {
 
 /// Checks the value that `holder` holds. A message that is absent is read as its default: a map
 /// entry with no value holds the value's default ("Maps", language guide).
-pub fn check_held(comptime H: type, comptime rules: pb.FieldRules, comptime site: Site, holder: *const H, walk: *Walk, path: *const Path) Fault!void {
+pub fn check_held(comptime H: type, comptime kind: proto.Kind, comptime rules: pb.FieldRules, comptime site: Site, holder: *const H, walk: *Walk, path: *const Path) Fault!void {
     const V = Held(H);
     if (comptime shape.is_lazy(H)) {
         const decoded = (holder.get() catch |failure| return walk_file.malformed(failure)) orelse V{};
-        return check(V, rules, site, &decoded, walk, path);
+        return check(V, kind, rules, site, &decoded, walk, path);
     }
     if (comptime @typeInfo(H) == .optional) {
         const absent: V = .{};
-        return check(V, rules, site, if (holder.*) |*set| set else &absent, walk, path);
+        return check(V, kind, rules, site, if (holder.*) |*set| set else &absent, walk, path);
     }
-    return check(V, rules, site, holder, walk, path);
+    return check(V, kind, rules, site, holder, walk, path);
 }
 
 /// The scalar a value holds: itself, or a well-known wrapper's `value`.

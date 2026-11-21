@@ -61,3 +61,28 @@ pub const prefix_len_digits_max = 3;
 /// octets of one UTF-8 sequence (RFC 3629 §3).
 pub const pct_encoded_digits = 2;
 pub const utf8_sequence_len_max = 4;
+/// CEL: the letters before a string literal's quote, at most: "r" and "b" (CEL language
+/// definition, "Syntax"), and the octets an escape takes at least: its backslash and one more.
+pub const cel_string_prefix_len_max = 2;
+pub const cel_escape_len_min = 2;
+/// CEL: the deepest an expression's parts nest. The parser calls itself once for each level,
+/// so the limit bounds its stack while the compiler runs it.
+pub const cel_depth_max = 32;
+/// CEL: the backward branches the compiler may take for each octet of an expression while it
+/// reads, types and unfolds it.
+pub const cel_branches_per_octet = 20_000;
+/// CEL: the digits of the escapes "\\uHHHH", "\\UHHHHHHHH" and of an octal escape, and the base
+/// of an octal number (CEL language definition, "Syntax").
+pub const cel_escape_u_digits = 4;
+pub const cel_escape_long_u_digits = 8;
+pub const cel_escape_octal_digits = 3;
+pub const octal_base = 8;
+/// The nanoseconds of a microsecond and of a millisecond, and the seconds of a minute and of an
+/// hour: the units of a duration's text (CEL language definition, "Timestamps and Durations").
+pub const nanos_per_microsecond = 1_000;
+pub const nanos_per_millisecond = 1_000_000;
+pub const seconds_per_minute = 60;
+pub const seconds_per_hour = 3_600;
+/// The most seconds of a google.protobuf.Duration, either side of zero: about 10,000 years
+/// (google/protobuf/duration.proto).
+pub const duration_seconds_max = 315_576_000_000;

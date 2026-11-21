@@ -20,6 +20,8 @@ const rule_string = @import("rule_string.zig");
 const rule_bytes = @import("rule_bytes.zig");
 const rule_time = @import("rule_time.zig");
 const rule_field_mask = @import("rule_field_mask.zig");
+const cel_rule = @import("cel/cel_rule.zig");
+const cel_type = @import("cel/cel_type.zig");
 
 /// The member of `buf.validate.FieldRules` that holds a field's typed rules.
 const Typed = @typeInfo(@FieldType(pb.FieldRules, "type")).optional.child;
@@ -52,7 +54,7 @@ fn of_message(comptime T: type, comptime visited: []const type) ?[]const u8 {
 /// `(buf.validate.message)`: its CEL rules, and each `oneof` rule's field names.
 fn of_message_rules(comptime T: type, comptime rules: pb.MessageRules) ?[]const u8 {
     const name = T.protobuf.full_name;
-    if (!rules.cel.is_empty() or !rules.cel_expression.is_empty()) return name ++ ": a CEL rule waits for docs/design.md §8 step 34";
+    if (cel_rule.problem_of(rules, *const T)) |problem| return name ++ ": " ++ problem;
     for (rules.oneof.items) |oneof| {
         if (of_message_oneof(T, oneof.fields.items)) |problem| return problem;
     }
@@ -105,7 +107,7 @@ fn of_field(comptime T: type, comptime field: proto.Field, comptime visited: []c
 }
 
 fn of_list(comptime F: type, comptime kind: proto.Kind, comptime rules: pb.FieldRules, comptime where: []const u8, comptime visited: []const type) ?[]const u8 {
-    if (of_cel(rules, where)) |problem| return problem;
+    if (of_whole(rules, where)) |problem| return problem;
     if (rules.type) |typed| {
         if (typed != .repeated) return where ++ ": mismatched rule type and field type: " ++ @tagName(typed) ++ " rules on a repeated field";
     }
@@ -117,7 +119,7 @@ fn of_list(comptime F: type, comptime kind: proto.Kind, comptime rules: pb.Field
 }
 
 fn of_map(comptime F: type, comptime rules: pb.FieldRules, comptime where: []const u8, comptime visited: []const type) ?[]const u8 {
-    if (of_cel(rules, where)) |problem| return problem;
+    if (of_whole(rules, where)) |problem| return problem;
     if (rules.type) |typed| {
         if (typed != .map) return where ++ ": mismatched rule type and field type: " ++ @tagName(typed) ++ " rules on a map field";
     }
@@ -129,15 +131,16 @@ fn of_map(comptime F: type, comptime rules: pb.FieldRules, comptime where: []con
     return of_value(value_file.Held(@FieldType(Entry, "value")), value.kind, map_file.value_rules_of(rules), where ++ " (map.values)", visited);
 }
 
-fn of_cel(comptime rules: pb.FieldRules, comptime where: []const u8) ?[]const u8 {
-    if (rules.cel.is_empty() and rules.cel_expression.is_empty()) return null;
-    return where ++ ": a CEL rule waits for docs/design.md §8 step 34";
+/// The CEL rules of a repeated field or of a map, whose `this` is the whole list or map.
+fn of_whole(comptime rules: pb.FieldRules, comptime where: []const u8) ?[]const u8 {
+    if (!cel_rule.states(rules)) return null;
+    return where ++ ": a CEL rule of a repeated field or of a map waits for docs/design.md §8 step 34";
 }
 
 /// One value's rules: they fit the value's type, the module checks each one, and the value's
 /// own message, if it is one, has rules that can be checked.
 fn of_value(comptime V: type, comptime kind: proto.Kind, comptime rules: pb.FieldRules, comptime where: []const u8, comptime visited: []const type) ?[]const u8 {
-    if (of_cel(rules, where)) |problem| return problem;
+    if (cel_rule.problem_of(rules, cel_type.Of(kind, V))) |problem| return where ++ ": " ++ problem;
     if (rules.type) |typed| {
         if (!fits(typed, V, kind)) return where ++ ": mismatched rule type and field type: " ++ @tagName(typed) ++ " rules on a field of another type";
         if (of_typed(typed)) |rule| return where ++ ": the rule " ++ @tagName(typed) ++ "." ++ rule ++ " has no check";
@@ -270,9 +273,12 @@ test "rules of another type than the field's are a mismatch" {
 
 test "a rule with no check, a CEL rule and a rule the plugin could not write each stop the type" {
     try expect_problem(Message([]const u8, .string, field_rules(.{ .type = .{ .string = .{ .pattern = "a" } } })), "t.Message.val: the rule string.pattern has no check");
-    try expect_problem(Message(i32, .int32, field_rules(.{ .cel_expression = .of(&.{"this > 0"}) })), "t.Message.val: a CEL rule waits");
-    try expect_problem(Message(i32, .int32, field_rules(.{ .cel = .of(&.{.{ .id = "a", .expression = "this > 0" }}) })), "a CEL rule waits");
-    try expect_problem(Message(i32, .int32, .{ .message = .{ .cel_expression = .of(&.{"this.val > 0"}) } }), "t.Message: a CEL rule waits");
+    try expect_problem(Message(i32, .int32, field_rules(.{ .cel_expression = .of(&.{"this > "}) })), "t.Message.val: `this > `: the expression ends early");
+    try expect_problem(Message(i32, .int32, field_rules(.{ .cel = .of(&.{.{ .id = "a", .expression = "this.size() > 0" }}) })), "found no matching overload for `size` applied to (int)");
+    try expect_problem(Message(i32, .int32, .{ .message = .{ .cel_expression = .of(&.{"this.missing > 0"}) } }), "t.Message: `this.missing > 0`: undefined field `missing` of t.Message");
+    try expect_problem(Message(i32, .int32, .{ .message = .{ .cel = .of(&.{.{ .id = "a", .expression = "this.val" }}) } }), "a rule's expression gives a bool or a string, not a int");
+    try expect_problem(Message(i32, .int32, field_rules(.{ .cel = .of(&.{.{ .id = "a" }}) })), "t.Message.val: ``: the expression ends early");
+    try expect_problem(Message(proto.Repeated(i32, .int32), .int32, field_rules(.{ .cel_expression = .of(&.{"this.size() > 0"}) })), "a CEL rule of a repeated field or of a map waits");
     try expect_problem(Message(i32, .int32, .{ .unsupported = "an extension's rule" }), "t.Message: an extension's rule");
     try expect_problem(Message(i32, .int32, .{ .fields = &.{.{ .number = 2, .rules = .{} }} }), "rules for field 2, which the message lacks");
     try expect_problem(Message(i32, .int32, .{ .oneofs = &.{.{ .field = "choice", .name = "choice", .rules = .{} }} }), "rules for the oneof choice, which the message lacks");

@@ -74,6 +74,7 @@ pub fn Interceptor(comptime connect: type, comptime Values: type, comptime optio
                 error.TooManyItems => .{ .code = .resource_exhausted, .message = "a list or a map is too long to validate" },
                 error.TooDeep => .{ .code = .invalid_argument, .message = "the message nests too deep to validate" },
                 error.Malformed => .{ .code = .invalid_argument, .message = "malformed message" },
+                error.Unevaluable => .{ .code = .internal, .message = "a rule of the message's schema failed as it ran" },
             };
             return null;
         }

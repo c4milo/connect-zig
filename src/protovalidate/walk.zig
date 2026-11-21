@@ -28,10 +28,13 @@ pub const Error = error{
     /// A repeated field's or a nested message's octets do not decode: `decode` never read
     /// the message.
     Malformed,
+    /// A CEL rule's expression failed as it ran, such as by a division by zero: the rule
+    /// gave no verdict.
+    Unevaluable,
 };
 
 /// What ends a walk early: an error `validate` returns, or a report with no room left.
-pub const Fault = error{ ReportFull, TimeMissing, TooDeep, TooManyItems, Malformed };
+pub const Fault = error{ ReportFull, TimeMissing, TooDeep, TooManyItems, Malformed, Unevaluable };
 
 pub const Walk = struct {
     report: *report_file.Report,
@@ -71,6 +74,12 @@ pub fn rule_broken(comptime Rules: type, comptime kind: []const u8, comptime sit
 pub fn violate(walk: *Walk, path: ?*const Path, comptime broken: Broken, comptime for_key: bool) Fault!void {
     const entry: report_file.Entry = comptime .{ .rule = broken.rule, .rule_id = broken.id, .message = broken.message, .for_key = for_key };
     if (!report_file.add(walk.report, path, entry)) return error.ReportFull;
+}
+
+/// Writes a violation whose message the run gave: a CEL rule's own text. The message lasts as
+/// long as the report: it is comptime data.
+pub fn violate_text(walk: *Walk, path: ?*const Path, comptime rule: ?pb.FieldPath, comptime id: []const u8, message: []const u8, comptime for_key: bool) Fault!void {
+    if (!report_file.add(walk.report, path, .{ .rule = rule, .rule_id = id, .message = message, .for_key = for_key })) return error.ReportFull;
 }
 
 /// The `Malformed` fault for any error of the protobuf module's readers: octets that `decode`
