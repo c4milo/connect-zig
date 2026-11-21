@@ -1,8 +1,8 @@
 # connect-zig rules
 
 connect-zig is Connect RPC for Zig 0.16: a protobuf runtime, a protocol core for Connect, gRPC
-and gRPC-Web, `connect_colibri` over colibri, `oidc` for OpenID Connect bearer tokens, and the
-protoc plugin `protoc-gen-connect-zig`.
+and gRPC-Web, `connect_colibri` over colibri, `oidc` for OpenID Connect bearer tokens,
+`protovalidate` for the rules of a schema, and the protoc plugin `protoc-gen-connect-zig`.
 Home: github.com/c4milo/connect-zig.
 
 It follows the conventions of the libraries it builds on: colibri, stdx and pepegrillo. Read their
@@ -35,8 +35,8 @@ code. The same holds for colibri's and stdx's `docs/decisions.md`.
    only. Hostile input returns an error value and fails closed.
 6. **Every spec rule cited, in the code.** A check that exists because a spec demands it names
    the spec and the section in a comment on the line that does the checking: the Connect
-   protocol, gRPC's HTTP/2 and gRPC-Web documents, the protobuf encoding guide, and the proto3
-   JSON mapping (design §1).
+   protocol, gRPC's HTTP/2 and gRPC-Web documents, the protobuf encoding guide, the proto3
+   JSON mapping, and protovalidate's `validate.proto` (design §1).
 
 ## The public API is written first
 
@@ -72,7 +72,7 @@ confirm a test fails. Report `CAUGHT` or `NOT CAUGHT` per mutation in the commit
 
 - A Conventional Commit: `type(scope)!: description`. Types: `feat`, `fix`, `docs`, `test`,
   `refactor`, `perf`, `build`, `ci`, `chore`. Scopes: `protobuf`, `connect`, `connect-colibri`,
-  `oidc`, `plugin`, `examples`, `build`, `ci`, `docs`.
+  `oidc`, `protovalidate`, `plugin`, `examples`, `build`, `ci`, `docs`.
 - The description is imperative, lowercase, with no final period, and the subject stays at or
   under 72 columns. The body says why, in at most 4 paragraphs and 150 words, lines at or under
   100 columns.
