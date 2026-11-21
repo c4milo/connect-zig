@@ -1610,8 +1610,20 @@ ran on Linux x86-64 with Zig 0.16.0.
     length admitted, a size that ignores a list of views, and a table without its last member.
     Each was `CAUGHT`.
   - Then decode with validation took 52 to 759 ns, 12 to 62 times as fast as protovalidate-go,
-    and connect-zig was the fastest in all six. Validation alone, protovalidate-buffa was faster
-    in two: the valid `Medium`, 349 ns to 509, and the valid `Rules`, 34 ns to 109. A CEL index
+    and connect-zig was the fastest in all six.
+  - A profile of `Medium` showed two more costs in string rules. `min_len` and `max_len` counted
+    every octet, and the form checks searched one octet a step, since `std.mem.indexOfScalar`
+    compares a vector only from 32 octets. A length rule now stops once its count settles it,
+    the form checks search a 64-bit word a step (`octet_search.zig`), and `uuid`, `tuuid` and
+    a hostname's labels read tables. `validate medium valid` fell from 5,112 instructions to
+    3,295, and `validate small valid` from 570 to 348. docs/performance.md's table holds what
+    the judge reported with each one off. Mutations: 11 more, each `CAUGHT`. A twelfth, of a
+    `max_len` test of the octets, was equivalent, and the test went.
+  - Then decode with validation took 47 to 584 ns, 17 to 71 times as fast as protovalidate-go.
+    Validation alone of the valid `Medium` took 331 ns to protovalidate-buffa's 351. Times on
+    this machine move between runs: the valid `Rules` message, whose code and count did not
+    change, took 355 ns in this run and 241 in the one before, so protovalidate-buffa, at 299,
+    was faster in it this time. Its validation alone stays faster, 34 ns to 109. A CEL index
     of a map, `this[k]`, reads the entries from the last one until it finds the key, so `all`
     over a map reads its entries once for each key. "What a later step owes" names it.
   - The README's chart comes from a named CI run of the check.

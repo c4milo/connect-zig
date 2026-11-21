@@ -108,8 +108,9 @@ change the public API, and the entry marks each change that does.
 - A table with two entries for one field stops the build.
 - CEL's `size` of a repeated field that `decode_into` stored reads no element, and an index of
   one reads only the element at its place. A string form check, such as `email`, `uri` or
-  `hostname`, looks each octet up in a table. On this tree's Xeon, validating the benchmark's
-  `Medium` message takes half the instructions it took.
+  `hostname`, looks each octet up in a table, and finds a separator eight octets at a time.
+  `min_len` and `max_len` count a string's characters only until the count settles the rule.
+  docs/performance.md lists what each costs when it is switched off.
 - `tools/perf_check.sh` also counts `protovalidate` on the six messages of the validation
   benchmark, `bench-validate --instructions`, against `bench/instructions.txt`.
 

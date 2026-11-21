@@ -80,6 +80,7 @@ test {
     _ = @import("cel/cel_cost_test.zig");
     _ = @import("cel_reader.zig");
     _ = @import("octet_class.zig");
+    _ = @import("octet_search.zig");
     _ = @import("cel/cel_library.zig");
     _ = @import("cel/cel_list.zig");
     _ = @import("cel/cel_predefined_test.zig");

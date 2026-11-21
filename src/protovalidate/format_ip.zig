@@ -2,6 +2,7 @@
 //! address in dotted decimal and an IPv6 address in its text form, "well-defined in the
 //! internet standard RFC 3986", with a zone identifier after "%" for IPv6.
 const std = @import("std");
+const octet_search = @import("octet_search.zig");
 const constants = @import("constants.zig");
 
 /// The versions a rule asks for: CEL's `isIp()` and `isIp(0)` take either.
@@ -11,7 +12,7 @@ pub const Version = enum { any, v4, v6 };
 /// leading zero. Returns the address, most significant octet first.
 pub fn parse_ipv4(text: []const u8) ?u32 {
     var address: u32 = 0;
-    var parts = std.mem.splitScalar(u8, text, '.');
+    var parts = octet_search.split(text, '.');
     for (0..constants.ipv4_len) |_| {
         const octet = parse_dec_octet(parts.next() orelse return null) orelse return null;
         address = address << @bitSizeOf(u8) | octet;
@@ -88,9 +89,9 @@ pub fn parse_ipv6(text: []const u8) ?u128 {
 /// Reads one group, or the IPv4 address that ends the text, and the separator after it. Returns
 /// what follows, or null for text that is no address.
 fn next_group(groups: *Groups, text: []const u8) ?[]const u8 {
-    const end = std.mem.indexOfScalar(u8, text, ':') orelse text.len;
+    const end = octet_search.index_of(text, ':') orelse text.len;
     const part = text[0..end];
-    if (std.mem.indexOfScalar(u8, part, '.') != null) {
+    if (octet_search.index_of(part, '.') != null) {
         // ls32: an IPv4 address takes the place of the last two groups, at the text's end. A
         // ":" after it starts an empty group, which the next read refuses.
         const ipv4 = parse_ipv4(part) orelse return null;
@@ -122,9 +123,9 @@ fn parse_h16(text: []const u8) ?u16 {
 pub fn is_ip(text: []const u8, version: Version) bool {
     if (version != .v6 and parse_ipv4(text) != null) return true;
     if (version == .v4) return false;
-    const percent = std.mem.indexOfScalar(u8, text, '%') orelse return parse_ipv6(text) != null;
+    const percent = octet_search.index_of(text, '%') orelse return parse_ipv6(text) != null;
     const zone = text[percent + 1 ..];
-    if (zone.len == 0 or std.mem.indexOfScalar(u8, zone, 0) != null) return false;
+    if (zone.len == 0 or octet_search.index_of(zone, 0) != null) return false;
     return parse_ipv6(text[0..percent]) != null;
 }
 
@@ -132,7 +133,7 @@ pub fn is_ip(text: []const u8, version: Version) bool {
 /// bits after the prefix are zero (validate.proto, StringRules.ip_prefix: "The prefix must have
 /// all zeros for the unmasked bits"). A prefix takes no zone identifier.
 pub fn is_ip_prefix(text: []const u8, version: Version, strict: bool) bool {
-    const slash = std.mem.indexOfScalar(u8, text, '/') orelse return false;
+    const slash = octet_search.index_of(text, '/') orelse return false;
     const length = parse_prefix_len(text[slash + 1 ..]) orelse return false;
     const address = text[0..slash];
     if (version != .v6) {

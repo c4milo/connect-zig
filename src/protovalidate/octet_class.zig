@@ -8,6 +8,8 @@ const octet_count = std.math.maxInt(u8) + 1;
 
 /// ASCII's letters and digits.
 pub const alphanumeric = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+/// The hexadecimal digits, in both cases.
+pub const hexadecimal = "0123456789abcdefABCDEF";
 
 /// A table of the octets `members` holds: true at each of them.
 fn table_of(comptime members: []const u8) [octet_count]bool {

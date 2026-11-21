@@ -51,29 +51,43 @@ pub fn check(comptime rules: pb.StringRules, comptime site: Site, value: []const
 /// The characters of a string: its Unicode code points, which CEL's `size()` counts. Each code
 /// point of UTF-8 starts with one octet that is no continuation octet (RFC 3629 §3).
 pub fn characters(value: []const u8) usize {
-    const continuation_mask = 0b1100_0000;
-    const continuation_bits = 0b1000_0000;
     var count: usize = 0;
     for (value) |octet| {
-        if (octet & continuation_mask != continuation_bits) count += 1;
+        if (starts_character(octet)) count += 1;
     }
     return count;
 }
 
+/// Whether `value` holds `least` characters or more. A string holds no more characters than
+/// octets, so a shorter one holds fewer, and the count stops at `least`.
+fn has_characters(value: []const u8, least: u64) bool {
+    if (value.len < least) return false;
+    var count: u64 = 0;
+    for (value) |octet| {
+        if (count == least) return true;
+        if (starts_character(octet)) count += 1;
+    }
+    return count == least;
+}
+
+fn starts_character(octet: u8) bool {
+    const continuation_mask = 0b1100_0000;
+    const continuation_bits = 0b1000_0000;
+    return octet & continuation_mask != continuation_bits;
+}
+
 fn check_characters(comptime rules: pb.StringRules, comptime site: Site, value: []const u8, walk: *Walk, path: *const Path) Fault!void {
-    if (comptime rules.len == null and rules.min_len == null and rules.max_len == null) return;
-    const count = characters(value);
     // validate.proto, string.len: "uint(this.size()) != rules.len".
     if (comptime rules.len) |exact| {
-        if (count != exact) try walk_file.violate(walk, path, comptime broken(site, "len", "len", "must be " ++ text.of(exact) ++ " characters"), site.for_key);
+        if (characters(value) != exact) try walk_file.violate(walk, path, comptime broken(site, "len", "len", "must be " ++ text.of(exact) ++ " characters"), site.for_key);
     }
     // validate.proto, string.min_len: "uint(this.size()) < rules.min_len".
     if (comptime rules.min_len) |least| {
-        if (count < least) try walk_file.violate(walk, path, comptime broken(site, "min_len", "min_len", "must be at least " ++ text.of(least) ++ " characters"), site.for_key);
+        if (!has_characters(value, least)) try walk_file.violate(walk, path, comptime broken(site, "min_len", "min_len", "must be at least " ++ text.of(least) ++ " characters"), site.for_key);
     }
     // validate.proto, string.max_len: "uint(this.size()) > rules.max_len".
     if (comptime rules.max_len) |most| {
-        if (count > most) try walk_file.violate(walk, path, comptime broken(site, "max_len", "max_len", "must be at most " ++ text.of(most) ++ " characters"), site.for_key);
+        if (has_characters(value, most +| 1)) try walk_file.violate(walk, path, comptime broken(site, "max_len", "max_len", "must be at most " ++ text.of(most) ++ " characters"), site.for_key);
     }
 }
 
@@ -216,6 +230,14 @@ test "a string's characters are its code points, whatever octets each takes" {
     try testing.expectEqual(@as(usize, 3), characters("abc"));
     try testing.expectEqual(@as(usize, 2), characters("你好"));
     try testing.expectEqual(@as(usize, 3), characters("a😀é"));
+}
+
+test "a string holds a count of characters when its count reaches it" {
+    const strings = [_][]const u8{ "", "a", "ab", "é", "你好", "a😀é", "Ada Lovelace", "\x80\x80a", "a\x80\x80" };
+    for (strings) |value| {
+        const count = characters(value);
+        for (0..value.len + 2) |least| try testing.expectEqual(count >= least, has_characters(value, least));
+    }
 }
 
 test "each well-known form names its rule, and the two with no empty rule say so" {

@@ -2,6 +2,7 @@
 //! identifiers validate.proto states as fixed patterns: UUID, trimmed UUID, ULID, a Protobuf
 //! name and an HTTP header's name and value (validate.proto, StringRules).
 const std = @import("std");
+const octet_search = @import("octet_search.zig");
 const octet_class = @import("octet_class.zig");
 const constants = @import("constants.zig");
 const format_ip = @import("format_ip.zig");
@@ -12,7 +13,7 @@ const format_ip = @import("format_ip.zig");
 pub fn is_hostname(value: []const u8) bool {
     const name = if (std.mem.endsWith(u8, value, ".")) value[0 .. value.len - 1] else value;
     if (name.len > constants.hostname_len_max) return false;
-    var labels = std.mem.splitScalar(u8, name, '.');
+    var labels = octet_search.split(name, '.');
     var last: []const u8 = "";
     while (labels.next()) |label| {
         if (!is_label(label)) return false;
@@ -27,7 +28,7 @@ fn is_label(label: []const u8) bool {
     if (label.len == 0 or label.len > constants.hostname_label_len_max) return false;
     if (label[0] == '-' or label[label.len - 1] == '-') return false;
     for (label) |octet| {
-        if (!std.ascii.isAlphanumeric(octet) and octet != '-') return false;
+        if (!octet_class.has(octet_class.alphanumeric ++ "-", octet)) return false;
     }
     return true;
 }
@@ -43,14 +44,14 @@ fn all_digits(text: []const u8) bool {
 /// standard": one or more characters of atext or ".", then "@", then labels separated by dots,
 /// each as a hostname's (https://html.spec.whatwg.org/multipage/input.html#valid-e-mail-address).
 pub fn is_email(value: []const u8) bool {
-    const at = std.mem.indexOfScalar(u8, value, '@') orelse return false;
+    const at = octet_search.index_of(value, '@') orelse return false;
     const local = value[0..at];
     if (local.len == 0) return false;
     for (local) |octet| {
         if (!is_email_local(octet)) return false;
     }
     // An empty domain is one empty label, which `is_label` refuses.
-    var labels = std.mem.splitScalar(u8, value[at + 1 ..], '.');
+    var labels = octet_search.split(value[at + 1 ..], '.');
     while (labels.next()) |label| {
         if (!is_label(label)) return false;
     }
@@ -98,19 +99,22 @@ fn is_port(text: []const u8) bool {
 /// [0-9a-fA-F]{12}$".
 pub fn is_uuid(value: []const u8) bool {
     if (value.len != constants.uuid_text_len) return false;
-    for (value, 0..) |octet, index| {
-        const hyphen = std.mem.indexOfScalar(usize, &constants.uuid_hyphens, index) != null;
-        if (hyphen and octet != '-') return false;
-        if (!hyphen and !std.ascii.isHex(octet)) return false;
+    var start: usize = 0;
+    for (constants.uuid_hyphens) |hyphen| {
+        if (value[hyphen] != '-' or !all_hexadecimal(value[start..hyphen])) return false;
+        start = hyphen + 1;
     }
-    return true;
+    return all_hexadecimal(value[start..]);
 }
 
 /// validate.proto, string.tuuid: "^[0-9a-fA-F]{32}$".
 pub fn is_tuuid(value: []const u8) bool {
-    if (value.len != constants.tuuid_text_len) return false;
-    for (value) |octet| {
-        if (!std.ascii.isHex(octet)) return false;
+    return value.len == constants.tuuid_text_len and all_hexadecimal(value);
+}
+
+fn all_hexadecimal(text: []const u8) bool {
+    for (text) |octet| {
+        if (!octet_class.has(octet_class.hexadecimal, octet)) return false;
     }
     return true;
 }
@@ -129,7 +133,7 @@ pub fn is_ulid(value: []const u8) bool {
 /// validate.proto, string.protobuf_fqn: "^[A-Za-z_][A-Za-z_0-9]*(\.[A-Za-z_][A-Za-z_0-9]*)*$".
 pub fn is_protobuf_fqn(value: []const u8) bool {
     // An empty name is one empty part, which the loop refuses.
-    var parts = std.mem.splitScalar(u8, value, '.');
+    var parts = octet_search.split(value, '.');
     while (parts.next()) |part| {
         if (part.len == 0 or std.ascii.isDigit(part[0])) return false;
         for (part) |octet| {

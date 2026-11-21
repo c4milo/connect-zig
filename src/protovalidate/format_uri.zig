@@ -4,6 +4,7 @@
 //! The text is split as RFC 3986 Appendix B splits it, at the first "#", then the first "?",
 //! and each part is then checked against the rule of §3 that names it.
 const std = @import("std");
+const octet_search = @import("octet_search.zig");
 const octet_class = @import("octet_class.zig");
 const constants = @import("constants.zig");
 const format_ip = @import("format_ip.zig");
@@ -11,7 +12,7 @@ const format_ip = @import("format_ip.zig");
 /// RFC 3986 §3: URI = scheme ":" hier-part [ "?" query ] [ "#" fragment ].
 pub fn is_uri(text: []const u8) bool {
     const main = without_query_and_fragment(text) orelse return false;
-    const colon = std.mem.indexOfScalar(u8, main, ':') orelse return false;
+    const colon = octet_search.index_of(main, ':') orelse return false;
     return is_scheme(main[0..colon]) and is_hier_part(main[colon + 1 ..], .any);
 }
 
@@ -26,12 +27,12 @@ pub fn is_uri_ref(text: []const u8) bool {
 /// The text before its query and its fragment, or null when either is not well formed.
 fn without_query_and_fragment(text: []const u8) ?[]const u8 {
     var main = text;
-    if (std.mem.indexOfScalar(u8, main, '#')) |hash| {
+    if (octet_search.index_of(main, '#')) |hash| {
         // RFC 3986 §3.5: fragment = *( pchar / "/" / "?" ).
         if (!is_part(main[hash + 1 ..], .query)) return null;
         main = main[0..hash];
     }
-    if (std.mem.indexOfScalar(u8, main, '?')) |mark| {
+    if (octet_search.index_of(main, '?')) |mark| {
         // RFC 3986 §3.4: query = *( pchar / "/" / "?" ).
         if (!is_part(main[mark + 1 ..], .query)) return null;
         main = main[0..mark];
@@ -63,13 +64,13 @@ fn is_hier_part(text: []const u8, first: First) bool {
     const authority_mark = "//";
     if (std.mem.startsWith(u8, text, authority_mark)) {
         const rest = text[authority_mark.len..];
-        const path_start = std.mem.indexOfScalar(u8, rest, '/') orelse rest.len;
+        const path_start = octet_search.index_of(rest, '/') orelse rest.len;
         // RFC 3986 §3.3: path-abempty = *( "/" segment ).
         return is_authority(rest[0..path_start]) and is_part(rest[path_start..], .path);
     }
     if (first == .no_scheme) {
-        const segment_end = std.mem.indexOfScalar(u8, text, '/') orelse text.len;
-        if (std.mem.indexOfScalar(u8, text[0..segment_end], ':') != null) return false;
+        const segment_end = octet_search.index_of(text, '/') orelse text.len;
+        if (octet_search.index_of(text[0..segment_end], ':') != null) return false;
     }
     return is_part(text, .path);
 }
@@ -77,18 +78,18 @@ fn is_hier_part(text: []const u8, first: First) bool {
 /// RFC 3986 §3.2: authority = [ userinfo "@" ] host [ ":" port ].
 fn is_authority(text: []const u8) bool {
     var rest = text;
-    if (std.mem.indexOfScalar(u8, rest, '@')) |at| {
+    if (octet_search.index_of(rest, '@')) |at| {
         // RFC 3986 §3.2.1: userinfo = *( unreserved / pct-encoded / sub-delims / ":" ).
         if (!is_part(rest[0..at], .userinfo)) return false;
         rest = rest[at + 1 ..];
     }
     if (std.mem.startsWith(u8, rest, "[")) {
-        const close = std.mem.indexOfScalar(u8, rest, ']') orelse return false;
+        const close = octet_search.index_of(rest, ']') orelse return false;
         if (!is_ip_literal(rest[1..close])) return false;
         const after = rest[close + 1 ..];
         return after.len == 0 or (after[0] == ':' and is_port(after[1..]));
     }
-    const colon = std.mem.indexOfScalar(u8, rest, ':') orelse return is_reg_name(rest);
+    const colon = octet_search.index_of(rest, ':') orelse return is_reg_name(rest);
     return is_reg_name(rest[0..colon]) and is_port(rest[colon + 1 ..]);
 }
 
@@ -105,7 +106,7 @@ fn is_port(text: []const u8) bool {
 /// what lies between the brackets.
 fn is_ip_literal(text: []const u8) bool {
     if (text.len != 0 and text[0] == 'v') return is_ip_future(text[1..]);
-    const percent = std.mem.indexOfScalar(u8, text, '%') orelse return format_ip.parse_ipv6(text) != null;
+    const percent = octet_search.index_of(text, '%') orelse return format_ip.parse_ipv6(text) != null;
     const zone_mark = "%25";
     if (!std.mem.startsWith(u8, text[percent..], zone_mark)) return false;
     const zone = text[percent + zone_mark.len ..];
@@ -115,7 +116,7 @@ fn is_ip_literal(text: []const u8) bool {
 /// RFC 3986 §3.2.2: IPvFuture = "v" 1*HEXDIG "." 1*( unreserved / sub-delims / ":" ). `text`
 /// is what follows the "v".
 fn is_ip_future(text: []const u8) bool {
-    const dot = std.mem.indexOfScalar(u8, text, '.') orelse return false;
+    const dot = octet_search.index_of(text, '.') orelse return false;
     if (dot == 0 or dot + 1 == text.len) return false;
     for (text[0..dot]) |octet| {
         if (!std.ascii.isHex(octet)) return false;
@@ -177,7 +178,7 @@ fn taken_len(text: []const u8, part: Part) ?usize {
     if (text[0] != '%') return if (part.takes(text[0])) 1 else null;
     if (text.len <= constants.pct_encoded_digits) return null;
     for (text[1..][0..constants.pct_encoded_digits]) |digit| {
-        if (!std.ascii.isHex(digit)) return null;
+        if (!octet_class.has(octet_class.hexadecimal, digit)) return null;
     }
     return constants.pct_encoded_digits + 1;
 }
