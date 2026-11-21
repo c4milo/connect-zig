@@ -70,5 +70,7 @@ fn find(descriptors: []const pb.FileDescriptorProto, path: []const u8) ?pb.FileD
 
 test {
     _ = names;
+    _ = @import("rules_literal.zig");
     _ = @import("main_test.zig");
+    _ = @import("rules_test.zig");
 }

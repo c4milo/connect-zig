@@ -52,6 +52,8 @@ pub fn build(b: *std.Build) void {
             .optimize = optimize,
             .imports = &.{
                 .{ .name = "protobuf", .module = graph.protobuf },
+                // The types of protovalidate's options, which the plugin reads (decision 47).
+                .{ .name = "buf_validate_validate", .module = graph.protovalidate.import_table.get("buf_validate_validate").? },
                 .{ .name = "public_names", .module = graph.public_names },
             },
         }),
