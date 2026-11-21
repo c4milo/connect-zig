@@ -1626,7 +1626,10 @@ ran on Linux x86-64 with Zig 0.16.0.
     was faster in it this time. Its validation alone stays faster, 34 ns to 109. A CEL index
     of a map, `this[k]`, reads the entries from the last one until it finds the key, so `all`
     over a map reads its entries once for each key. "What a later step owes" names it.
-  - The README's chart comes from a named CI run of the check.
+  - The README's chart comes from CI's run 201, at a36988d, on an AMD EPYC 9V45. There
+    connect-zig decoded and validated 13 to 58 times as fast as protovalidate-go, and was the
+    fastest in all six. Validation alone, protovalidate-buffa was faster in two: the valid
+    `Medium`, 177 ns to 190, and the valid `Rules`, 20 ns to 71.
 
 ### What a later step owes
 

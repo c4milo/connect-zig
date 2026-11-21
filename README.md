@@ -70,6 +70,13 @@ is faster in none of the 16 cells charted.
 
 </details>
 
+**Validation.** One decode of a request message and one validation of it against the rules of
+its schema, beside protovalidate-go, protovalidate-es on Node.js, protovalidate-buffa and
+prost-protovalidate. From CI's [run 201](https://github.com/c4milo/connect-zig/actions/runs/44961446526), on an AMD EPYC 9V45 core: connect-zig is 13 to
+58 times as fast as protovalidate-go, and the fastest of the five in all six cases.
+
+![Bars of the speed of a decode with a validation through connect-zig, protovalidate-buffa, prost-protovalidate and protovalidate-es, in multiples of protovalidate-go's, on x86-64: connect-zig is 13 to 58 times as fast as protovalidate-go and the fastest in 6 of 6 cases](docs/images/validate-vs-go.svg)
+
 ## Try it in 30 seconds
 
 You need [Zig 0.16.0](https://ziglang.org/download/#release-0.16.0) and curl.

@@ -175,3 +175,32 @@ embedded descriptor.
 
 Each verdict is "valid", or "invalid:" and the rule ids of the violations in order. The check
 fails when two implementations give one message different verdicts.
+
+CI's [run 201](https://github.com/c4milo/connect-zig/actions/runs/44961446526) ran the check at commit a36988d, on an AMD EPYC 9V45, x86-64. Each of the
+five gave each message the same verdict. The nanoseconds of one decode and one validation, which
+the README's chart draws:
+
+| Message | connect-zig | protovalidate-go | protovalidate-es | protovalidate-buffa | prost-protovalidate |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| `Small`, valid | 23.2 | 470.1 | 802.9 | 58.4 | 532.7 |
+| `Small`, invalid | 33.0 | 1,532.7 | 3,802.4 | 85.0 | 1,583.5 |
+| `Medium`, valid | 332.1 | 4,320.6 | 19,007.2 | 588.7 | 21,235.8 |
+| `Medium`, invalid | 283.7 | 8,015.4 | 25,255.2 | 731.1 | 26,864.3 |
+| `Rules`, valid | 147.7 | 5,887.1 | 14,168.1 | 155.9 | 13,713.2 |
+| `Rules`, invalid | 129.7 | 7,525.3 | 15,915.4 | 220.6 | 12,801.3 |
+
+The nanoseconds of one validation of a message decoded before:
+
+| Message | connect-zig | protovalidate-go | protovalidate-es | protovalidate-buffa | prost-protovalidate |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| `Small`, valid | 9.8 | 276.2 | 303.7 | 26.0 | 482.6 |
+| `Small`, invalid | 19.7 | 1,332.4 | 3,330.4 | 56.4 | 1,511.9 |
+| `Medium`, valid | 189.5 | 3,019.3 | 16,987.3 | 176.8 | 20,088.8 |
+| `Medium`, invalid | 162.5 | 6,882.6 | 24,199.6 | 348.7 | 25,308.4 |
+| `Rules`, valid | 70.7 | 4,951.5 | 13,812.8 | 19.7 | 13,260.1 |
+| `Rules`, invalid | 64.1 | 5,697.4 | 15,013.1 | 90.7 | 12,467.1 |
+
+protovalidate-buffa validates two messages faster: the valid `Medium` and the valid `Rules`. Its
+plugin writes Rust code for each rule, as connect-zig's compiler does. In `Rules`, a CEL index
+of a map, `this[k]`, reads connect-zig's entries from the last one until it finds the key
+(docs/design.md, "What a later step owes").
