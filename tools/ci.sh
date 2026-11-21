@@ -12,7 +12,7 @@
 # `--list` as a job of its own, so each shows apart in GitHub.
 set -eu
 cd "$(dirname "$0")/.."
-checks="format commits test release package bench costs bench-compare fullstack perf generated interop interop-languages interop-servers coverage line-coverage conformance protobuf-conformance"
+checks="format commits test release package bench costs bench-compare fullstack perf generated interop interop-languages interop-servers coverage line-coverage conformance protobuf-conformance protovalidate-conformance"
 only=""
 case "${1:-}" in
     --list)
@@ -122,6 +122,8 @@ check() {
         conformance) tools/conformance_check.sh ;;
         # Google's protobuf conformance suite, in binary and JSON (decision 38).
         protobuf-conformance) tools/protobuf_conformance_check.sh ;;
+        # protovalidate's conformance harness, against the rules the library checks (decision 47).
+        protovalidate-conformance) tools/protovalidate_conformance_check.sh ;;
         *)
             echo "no check named $1" >&2
             return 2

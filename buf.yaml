@@ -1,6 +1,8 @@
 # The buf workspace of protovalidate's schemas (decision 47): validate.proto with the
-# descriptor.proto it imports, which the `protovalidate` module is generated from. Every other
-# buf module of this tree stands alone, under the buf.yaml of its own folder.
+# descriptor.proto it imports, which the `protovalidate` module is generated from, and the
+# schemas of protovalidate's conformance suite, which import validate.proto. Every other buf
+# module of this tree stands alone, under the buf.yaml of its own folder.
 version: v2
 modules:
   - path: src/protovalidate/proto
+  - path: conformance/protovalidate/proto
