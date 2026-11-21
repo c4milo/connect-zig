@@ -79,20 +79,39 @@ pub fn check(comptime T: type, comptime field: proto.Field, message: *const T, w
     const required = comptime rules.required orelse false;
     if (comptime !required and !reads(T, field, kind, rules)) return;
     var step: Path = .{ .parent = parent, .element = comptime element_of(field) };
+    const site: Site = comptime .{ .predefined = table.predefined_of(T, field.number, .field) };
     switch (comptime kind) {
-        .repeated => try list_file.check(shape.Holder(T, field), field.kind, rules, &@field(message, field.name), walk, &step),
-        .map => try map_file.check(shape.Holder(T, field), rules, &@field(message, field.name), walk, &step),
-        .plain => try check_plain(shape.Holder(T, field), field.kind, rules, &@field(message, field.name), walk, &step),
+        .repeated => try list_file.check(shape.Holder(T, field), field.kind, rules, comptime sites_of(T, field), &@field(message, field.name), walk, &step),
+        .map => try map_file.check(shape.Holder(T, field), rules, comptime sites_of(T, field), &@field(message, field.name), walk, &step),
+        .plain => try check_plain(shape.Holder(T, field), field.kind, rules, site, &@field(message, field.name), walk, &step),
         .optional => {
             const value = if (@field(message, field.name)) |*set| set else return unset(required, walk, &step);
-            try value_file.check(@TypeOf(value.*), field.kind, rules, .{}, value, walk, &step);
+            try value_file.check(@TypeOf(value.*), field.kind, rules, site, value, walk, &step);
         },
         .member => {
             const value = member_of(T, field, message) orelse return unset(required, walk, &step);
-            try check_held(@TypeOf(value.*), field.kind, rules, value, required, walk, &step);
+            try check_held(@TypeOf(value.*), field.kind, rules, site, value, required, walk, &step);
         },
-        .lazy => try check_held(shape.Holder(T, field), field.kind, rules, &@field(message, field.name), required, walk, &step),
+        .lazy => try check_held(shape.Holder(T, field), field.kind, rules, site, &@field(message, field.name), required, walk, &step),
     }
+}
+
+/// The predefined rules of a repeated field or of a map, by where each lies: the field's own
+/// rules, or those of its elements, of its keys or of its values.
+pub const Sites = struct {
+    field: []const table.Rules.Predefined = &.{},
+    items: []const table.Rules.Predefined = &.{},
+    keys: []const table.Rules.Predefined = &.{},
+    values: []const table.Rules.Predefined = &.{},
+};
+
+pub fn sites_of(comptime T: type, comptime field: proto.Field) Sites {
+    return .{
+        .field = table.predefined_of(T, field.number, .field),
+        .items = table.predefined_of(T, field.number, .items),
+        .keys = table.predefined_of(T, field.number, .keys),
+        .values = table.predefined_of(T, field.number, .values),
+    };
 }
 
 /// Whether the walk has anything to read of the field: a rule of its own, or a message with a
@@ -116,20 +135,20 @@ fn unset(comptime required: bool, walk: *Walk, step: *const Path) Fault!void {
 /// A value with no presence: the zero value breaks `required`, and IGNORE_IF_ZERO_VALUE passes
 /// over it (validate.proto, FieldRules.required: "the value of the field can't be the zero
 /// value").
-fn check_plain(comptime V: type, comptime kind: proto.Kind, comptime rules: pb.FieldRules, value: *const V, walk: *Walk, step: *const Path) Fault!void {
+fn check_plain(comptime V: type, comptime kind: proto.Kind, comptime rules: pb.FieldRules, comptime site: Site, value: *const V, walk: *Walk, step: *const Path) Fault!void {
     const required = comptime rules.required orelse false;
     const skips_zero = comptime (rules.ignore orelse .ignore_unspecified) == .ignore_if_zero_value;
     if (comptime required or skips_zero) {
         if (shape.is_zero(V, value)) return unset(required, walk, step);
     }
-    try value_file.check(V, kind, rules, .{}, value, walk, step);
+    try value_file.check(V, kind, rules, site, value, walk, step);
 }
 
 /// A member of a oneof, or a lazy field, whose message may be a `proto.Lazy`: the walk decodes
 /// it and reads the message.
-fn check_held(comptime H: type, comptime kind: proto.Kind, comptime rules: pb.FieldRules, held: *const H, comptime required: bool, walk: *Walk, step: *const Path) Fault!void {
-    if (comptime !shape.is_lazy(H)) return value_file.check(H, kind, rules, .{}, held, walk, step);
+fn check_held(comptime H: type, comptime kind: proto.Kind, comptime rules: pb.FieldRules, comptime site: Site, held: *const H, comptime required: bool, walk: *Walk, step: *const Path) Fault!void {
+    if (comptime !shape.is_lazy(H)) return value_file.check(H, kind, rules, site, held, walk, step);
     const decoded = held.get() catch |failure| return walk_file.malformed(failure);
     const value = decoded orelse return unset(required, walk, step);
-    try value_file.check(H.Message, kind, rules, .{}, &value, walk, step);
+    try value_file.check(H.Message, kind, rules, site, &value, walk, step);
 }

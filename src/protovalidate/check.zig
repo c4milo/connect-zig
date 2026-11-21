@@ -99,15 +99,16 @@ fn of_field(comptime T: type, comptime field: proto.Field, comptime visited: []c
     const where = T.protobuf.full_name ++ "." ++ field.proto_name;
     const rules = field_file.rules_of(T, field);
     const F = shape.Holder(T, field);
+    const sites = field_file.sites_of(T, field);
     return switch (shape.of(T, field)) {
-        .repeated => of_list(F, field.kind, rules, where, visited),
-        .map => of_map(F, rules, where, visited),
-        else => of_value(shape.Value(T, field), field.kind, rules, where, visited),
+        .repeated => of_list(F, field.kind, rules, sites, where, visited),
+        .map => of_map(F, rules, sites, where, visited),
+        else => of_value(shape.Value(T, field), field.kind, rules, sites.field, where, visited),
     };
 }
 
-fn of_list(comptime F: type, comptime kind: proto.Kind, comptime rules: pb.FieldRules, comptime where: []const u8, comptime visited: []const type) ?[]const u8 {
-    if (of_whole(F, rules, where)) |problem| return problem;
+fn of_list(comptime F: type, comptime kind: proto.Kind, comptime rules: pb.FieldRules, comptime sites: field_file.Sites, comptime where: []const u8, comptime visited: []const type) ?[]const u8 {
+    if (of_whole(F, rules, sites.field, where)) |problem| return problem;
     if (rules.type) |typed| {
         if (typed != .repeated) return where ++ ": mismatched rule type and field type: " ++ @tagName(typed) ++ " rules on a repeated field";
     }
@@ -115,11 +116,11 @@ fn of_list(comptime F: type, comptime kind: proto.Kind, comptime rules: pb.Field
     if (unhandled(pb.RepeatedRules, list_rules, &list_file.handled)) |rule| return where ++ ": the rule repeated." ++ rule ++ " has no check";
     // validate.proto, repeated.unique: CEL's `unique` reads a list of scalars.
     if ((list_rules.unique orelse false) and kind.holds_message()) return where ++ ": repeated.unique on a field of messages";
-    return of_value(F.Element, kind, list_file.item_rules_of(rules), where ++ " (repeated.items)", visited);
+    return of_value(F.Element, kind, list_file.item_rules_of(rules), sites.items, where ++ " (repeated.items)", visited);
 }
 
-fn of_map(comptime F: type, comptime rules: pb.FieldRules, comptime where: []const u8, comptime visited: []const type) ?[]const u8 {
-    if (of_whole(F, rules, where)) |problem| return problem;
+fn of_map(comptime F: type, comptime rules: pb.FieldRules, comptime sites: field_file.Sites, comptime where: []const u8, comptime visited: []const type) ?[]const u8 {
+    if (of_whole(F, rules, sites.field, where)) |problem| return problem;
     if (rules.type) |typed| {
         if (typed != .map) return where ++ ": mismatched rule type and field type: " ++ @tagName(typed) ++ " rules on a map field";
     }
@@ -127,22 +128,24 @@ fn of_map(comptime F: type, comptime rules: pb.FieldRules, comptime where: []con
     const Entry = F.Element;
     const key = table.field_named(Entry, "key");
     const value = table.field_named(Entry, "value");
-    if (of_value(@FieldType(Entry, "key"), key.kind, map_file.key_rules_of(rules), where ++ " (map.keys)", visited)) |problem| return problem;
-    return of_value(value_file.Held(@FieldType(Entry, "value")), value.kind, map_file.value_rules_of(rules), where ++ " (map.values)", visited);
+    if (of_value(@FieldType(Entry, "key"), key.kind, map_file.key_rules_of(rules), sites.keys, where ++ " (map.keys)", visited)) |problem| return problem;
+    return of_value(value_file.Held(@FieldType(Entry, "value")), value.kind, map_file.value_rules_of(rules), sites.values, where ++ " (map.values)", visited);
 }
 
 /// The CEL rules of a repeated field or of a map, whose `this` is the whole list or map.
-fn of_whole(comptime F: type, comptime rules: pb.FieldRules, comptime where: []const u8) ?[]const u8 {
-    if (!cel_rule.states(rules)) return null;
+fn of_whole(comptime F: type, comptime rules: pb.FieldRules, comptime predefined: []const table.Rules.Predefined, comptime where: []const u8) ?[]const u8 {
+    if (!cel_rule.states(rules) and predefined.len == 0) return null;
     const This = cel_rule.Whole(F) orelse return where ++ ": a CEL rule reads no map whose values are of the message's own type";
-    const problem = cel_rule.problem_of(rules, This) orelse return null;
+    if (cel_rule.problem_of(rules, This)) |problem| return where ++ ": " ++ problem;
+    const problem = cel_rule.predefined_problem_of(rules, predefined, This) orelse return null;
     return where ++ ": " ++ problem;
 }
 
 /// One value's rules: they fit the value's type, the module checks each one, and the value's
 /// own message, if it is one, has rules that can be checked.
-fn of_value(comptime V: type, comptime kind: proto.Kind, comptime rules: pb.FieldRules, comptime where: []const u8, comptime visited: []const type) ?[]const u8 {
+fn of_value(comptime V: type, comptime kind: proto.Kind, comptime rules: pb.FieldRules, comptime predefined: []const table.Rules.Predefined, comptime where: []const u8, comptime visited: []const type) ?[]const u8 {
     if (cel_rule.problem_of(rules, cel_type.Of(kind, V))) |problem| return where ++ ": " ++ problem;
+    if (cel_rule.predefined_problem_of(rules, predefined, cel_type.Of(kind, V))) |problem| return where ++ ": " ++ problem;
     if (rules.type) |typed| {
         if (!fits(typed, V, kind)) return where ++ ": mismatched rule type and field type: " ++ @tagName(typed) ++ " rules on a field of another type";
         if (of_typed(typed)) |rule| return where ++ ": the rule " ++ @tagName(typed) ++ "." ++ rule ++ " has no check";

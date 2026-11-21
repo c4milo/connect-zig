@@ -116,9 +116,8 @@ fn is_macro(comptime call: Node.Call) bool {
 /// The type of a macro, or null when `call` is no macro: `target.all(x, p)`, `exists` and
 /// `exists_one`, where `x` names each element of a list or each key of a map in `p`.
 pub fn of_macro(comptime call: Node.Call, comptime scope: Scope) ?Typed {
-    if (std.mem.eql(u8, call.name, "map") or std.mem.eql(u8, call.name, "filter")) {
-        return .{ .problem = "the macro `" ++ call.name ++ "` builds a list, which the module holds no room for" };
-    }
+    if (std.mem.eql(u8, call.name, "map")) return of_map(call, scope);
+    if (std.mem.eql(u8, call.name, "filter")) return .{ .problem = no_room("filter") };
     if (!is_macro(call)) return null;
     if (call.arguments.len != macro_arguments or call.arguments[0] != .name) return .{ .problem = "the macro `" ++ call.name ++ "` takes a name and an expression" };
     const target = switch (check.type_of(call.target.?, scope)) {
@@ -137,6 +136,46 @@ pub fn of_macro(comptime call: Node.Call, comptime scope: Scope) ?Typed {
         return check.mistake(body.dynamic, "the macro `" ++ call.name ++ "` takes a bool for each element, not a " ++ type_file.name_of(body.type));
     }
     return .{ .ok = .{ .type = bool, .dynamic = target.dynamic or body.dynamic } };
+}
+
+fn no_room(comptime macro: []const u8) []const u8 {
+    return "the macro `" ++ macro ++ "` builds a list, which the module holds no room for";
+}
+
+/// `list.map(x, t)` over a list whose length the compiler knows: a list literal, or the list
+/// of a predefined rule's value. The result is a list of that length. A repeated field has no
+/// such length, so its `map` has no room.
+fn of_map(comptime call: Node.Call, comptime scope: Scope) Typed {
+    if (call.target == null or call.arguments.len != macro_arguments or call.arguments[0] != .name) return .{ .problem = no_room("map") };
+    const target = switch (check.type_of(call.target.?, scope)) {
+        .ok => |ok| ok,
+        .problem => |problem| return .{ .problem = problem },
+    };
+    if (target.type == Failing) return .{ .ok = target };
+    if (@typeInfo(target.type) != .array) return .{ .problem = no_room("map") };
+    const array = @typeInfo(target.type).array;
+    const body = switch (check.type_of(&call.arguments[1], scope.with(call.arguments[0].name, array.child))) {
+        .ok => |ok| ok,
+        .problem => |problem| return .{ .problem = problem },
+    };
+    if (body.type == Failing) return .{ .ok = body };
+    return .{ .ok = .{ .type = [array.len]body.type, .dynamic = target.dynamic or body.dynamic } };
+}
+
+pub fn is_map_macro(comptime call: Node.Call) bool {
+    return std.mem.eql(u8, call.name, "map");
+}
+
+pub fn eval_map(comptime call: Node.Call, comptime R: type, comptime scope: Scope, values: anytype, env: *Env) Error!R {
+    const source = try evaluation.eval(call.target.?, scope, values, env);
+    const array = @typeInfo(R).array;
+    const inner = comptime scope.with(call.arguments[0].name, @typeInfo(@TypeOf(source)).array.child);
+    var mapped: std.meta.Tuple(&([_]type{array.child} ** array.len)) = undefined;
+    inline for (0..array.len) |index| {
+        try env.spend();
+        mapped[index] = try evaluation.eval(&call.arguments[1], inner, values ++ .{source[index]}, env);
+    }
+    return mapped;
 }
 
 pub fn eval_macro(comptime call: Node.Call, comptime scope: Scope, values: anytype, env: *Env) Error!bool {

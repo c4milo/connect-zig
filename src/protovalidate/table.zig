@@ -30,6 +30,45 @@ pub const Rules = struct {
         /// The field's number, which names it in the message's descriptor.
         number: u32,
         rules: pb.FieldRules,
+        /// The predefined rules of the extensions that the field's rules hold, which the
+        /// plugin reads from its request (design §8 step 34). An extension lies in a rule
+        /// message, so `rules` state the type whose rule message holds it.
+        predefined: []const Predefined = &.{},
+    };
+
+    /// One extension of a rule message, such as `(my.rules.even)` of `Int32Rules`, with the
+    /// CEL rules its declaration states in `(buf.validate.predefined)` (validate.proto,
+    /// PredefinedRules).
+    pub const Predefined = struct {
+        /// Which of the field's rules holds the extension: the field's own, or those of its
+        /// elements, of its keys or of its values.
+        site: Where = .field,
+        /// The extension's number, its full name and its type, which a violation's rule path
+        /// states.
+        number: u32,
+        name: []const u8,
+        type: Type,
+        /// The extension's value, which an expression reads as `rule`.
+        value: Value,
+        cel: []const pb.Rule,
+
+        pub const Where = enum { field, items, keys, values };
+
+        /// A scalar, or a list of scalars of one type. An enum's value is an int, and a
+        /// wrapper's is the scalar it holds.
+        pub const Value = union(enum) {
+            boolean: bool,
+            int: i64,
+            uint: u64,
+            double: f64,
+            string: []const u8,
+            bytes: []const u8,
+            booleans: []const bool,
+            ints: []const i64,
+            uints: []const u64,
+            doubles: []const f64,
+            strings: []const []const u8,
+        };
     };
 
     pub const Oneof = struct {
@@ -60,6 +99,21 @@ pub fn field_rules(comptime T: type, comptime number: u32) ?pb.FieldRules {
             if (entry.number == number) return entry.rules;
         }
         return null;
+    }
+}
+
+/// The predefined rules of the field of `T` numbered `number` that lie at `site`.
+pub fn predefined_of(comptime T: type, comptime number: u32, comptime site: Rules.Predefined.Where) []const Rules.Predefined {
+    comptime {
+        var list: []const Rules.Predefined = &.{};
+        if (!has_rules(T)) return list;
+        for (of(T).fields) |entry| {
+            if (entry.number != number) continue;
+            for (entry.predefined) |predefined| {
+                if (predefined.site == site) list = list ++ [_]Rules.Predefined{predefined};
+            }
+        }
+        return list;
     }
 }
 

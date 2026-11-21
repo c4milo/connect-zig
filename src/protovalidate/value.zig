@@ -35,6 +35,7 @@ pub fn is_read(comptime V: type, comptime rules: pb.FieldRules) bool {
 /// message, against the message's own table.
 pub fn check(comptime V: type, comptime kind: proto.Kind, comptime rules: pb.FieldRules, comptime site: Site, value: *const V, walk: *Walk, path: *const Path) Fault!void {
     if (comptime cel_rule.states(rules)) try cel_rule.check_field(rules, site, cel_type.from(kind, V, value), walk, path);
+    if (comptime site.predefined.len != 0) try cel_rule.check_predefined(rules, site, cel_type.from(kind, V, value), walk, path);
     if (comptime rules.type) |typed| try check_typed(V, typed, site, value, walk, path);
     if (comptime table.has_rules(V)) try message_file.check(V, value, walk, path);
 }

@@ -70,14 +70,14 @@ fn subscript_of(comptime K: type, key: K) @typeInfo(@FieldType(table.Element, "s
     };
 }
 
-pub fn check(comptime F: type, comptime rules: pb.FieldRules, map: *const F, walk: *Walk, step: *Path) Fault!void {
+pub fn check(comptime F: type, comptime rules: pb.FieldRules, comptime sites: field_file.Sites, map: *const F, walk: *Walk, step: *Path) Fault!void {
     if (map.is_empty()) {
         // validate.proto, Ignore.IGNORE_IF_ZERO_VALUE: "For map fields, the zero is an empty
         // map", and FieldRules.required refuses the zero value.
         if (comptime rules.required orelse false) return walk_file.violate(walk, step, comptime field_file.required_broken(.{}), false);
         if (comptime (rules.ignore orelse .ignore_unspecified) == .ignore_if_zero_value) return;
     }
-    if (comptime cel_rule.states(rules)) try cel_rule.check_field(rules, .{}, cel_rule.Whole(F).?{ .field = map }, walk, step);
+    try cel_rule.check_whole(F, rules, sites.field, map, walk, step);
     const Entry = F.Element;
     const map_rules = comptime rules_of(rules);
     const counts = comptime map_rules.min_pairs != null or map_rules.max_pairs != null;
@@ -90,7 +90,7 @@ pub fn check(comptime F: type, comptime rules: pb.FieldRules, map: *const F, wal
     if (comptime map_rules.min_pairs != null) {
         if (!compares) return error.TooManyItems;
     }
-    const pairs = try check_entries(F, rules, map, entries, compares, walk, step);
+    const pairs = try check_entries(F, rules, sites, map, entries, compares, walk, step);
     try check_size(map_rules, pairs, walk, step);
 }
 
@@ -113,7 +113,7 @@ fn check_size(comptime rules: pb.MapRules, pairs: usize, walk: *Walk, step: *con
 }
 
 /// Checks each entry that the map keeps, and returns how many it keeps.
-fn check_entries(comptime F: type, comptime rules: pb.FieldRules, map: *const F, entries: usize, compares: bool, walk: *Walk, step: *Path) Fault!usize {
+fn check_entries(comptime F: type, comptime rules: pb.FieldRules, comptime sites: field_file.Sites, map: *const F, entries: usize, compares: bool, walk: *Walk, step: *Path) Fault!usize {
     const Entry = F.Element;
     const K = @FieldType(Entry, "key");
     step.element.key_type = comptime table.type_of(table.field_named(Entry, "key").kind);
@@ -129,7 +129,7 @@ fn check_entries(comptime F: type, comptime rules: pb.FieldRules, map: *const F,
         if (compares and try key_again(F, each, entry.key, entries)) continue;
         pairs += 1;
         step.element.subscript = subscript_of(K, entry.key);
-        try check_entry(Entry, rules, entry, walk, step);
+        try check_entry(Entry, rules, sites, entry, walk, step);
     }
     return pairs;
 }
@@ -144,21 +144,21 @@ fn key_again(comptime F: type, after: F.Iterator, key: @FieldType(F.Element, "ke
     return false;
 }
 
-fn check_entry(comptime Entry: type, comptime rules: pb.FieldRules, entry: *const Entry, walk: *Walk, step: *const Path) Fault!void {
+fn check_entry(comptime Entry: type, comptime rules: pb.FieldRules, comptime sites: field_file.Sites, entry: *const Entry, walk: *Walk, step: *const Path) Fault!void {
     const K = @FieldType(Entry, "key");
     const H = @FieldType(Entry, "value");
     const key_rules = comptime key_rules_of(rules);
     if (comptime side_read(K, key_rules)) {
         const skips_zero = comptime (key_rules.ignore orelse .ignore_unspecified) == .ignore_if_zero_value;
         if (!(skips_zero and shape.is_zero(K, &entry.key))) {
-            try value_file.check(K, comptime table.field_named(Entry, "key").kind, key_rules, comptime .{ .prefix = prefix_of("keys"), .for_key = true }, &entry.key, walk, step);
+            try value_file.check(K, comptime table.field_named(Entry, "key").kind, key_rules, comptime .{ .prefix = prefix_of("keys"), .for_key = true, .predefined = sites.keys }, &entry.key, walk, step);
         }
     }
     const value_rules = comptime value_rules_of(rules);
     if (comptime side_read(H, value_rules)) {
         const skips_zero = comptime (value_rules.ignore orelse .ignore_unspecified) == .ignore_if_zero_value;
         if (!(skips_zero and shape.is_zero(H, &entry.value))) {
-            try value_file.check_held(H, comptime table.field_named(Entry, "value").kind, value_rules, comptime .{ .prefix = prefix_of("values") }, &entry.value, walk, step);
+            try value_file.check_held(H, comptime table.field_named(Entry, "value").kind, value_rules, comptime .{ .prefix = prefix_of("values"), .predefined = sites.values }, &entry.value, walk, step);
         }
     }
 }
