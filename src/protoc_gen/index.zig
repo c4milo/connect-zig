@@ -25,13 +25,19 @@ const wkt_names = [_][]const u8{
     "NullValue",  "Struct",      "Value",      "ListValue",
 };
 
+/// One extension: its full name, and its declaration.
+pub const Extension = struct { full_name: []const u8, field: pb.FieldDescriptorProto };
+
 pub const Index = struct {
     entries: std.StringHashMapUnmanaged(Entry) = .empty,
+    /// Each extension of the request's files, under the message it extends and its number.
+    extensions: std.StringHashMapUnmanaged(Extension) = .empty,
 
     pub fn build(arena: Allocator, files: []const pb.FileDescriptorProto) Error!Index {
         var index: Index = .{};
         for (files) |file| {
             const prefix = try package_prefix(arena, file.package);
+            try index.add_extensions(arena, prefix, file.extension);
             var messages = file.message_type.iterator();
             while (try messages.next()) |message| try index.add_message(arena, file.name orelse "", prefix, "", message.*);
             var enums = file.enum_type.iterator();
@@ -47,6 +53,7 @@ pub const Index = struct {
         const zig_path = if (parent.len == 0) zig_name else try std.fmt.allocPrint(arena, "{s}.{s}", .{ parent, zig_name });
         try index.entries.put(arena, full, .{ .file = file, .zig_path = zig_path, .message = message });
         const nested_prefix = try std.fmt.allocPrint(arena, "{s}.", .{full});
+        try index.add_extensions(arena, nested_prefix, message.extension);
         var nested = message.nested_type.iterator();
         while (try nested.next()) |child| try index.add_message(arena, file, nested_prefix, zig_path, child.*);
         var enums = message.enum_type.iterator();
@@ -59,6 +66,22 @@ pub const Index = struct {
         const zig_name = try names.identifier(arena, name);
         const zig_path = if (parent.len == 0) zig_name else try std.fmt.allocPrint(arena, "{s}.{s}", .{ parent, zig_name });
         try index.entries.put(arena, full, .{ .file = file, .zig_path = zig_path });
+    }
+
+    /// The extensions that a file or a message declares, whose names `prefix` scopes.
+    fn add_extensions(index: *Index, arena: Allocator, prefix: []const u8, extensions: anytype) Error!void {
+        var each = extensions.iterator();
+        while (try each.next()) |extension| {
+            const extendee = strip_dot(extension.extendee orelse continue);
+            const number: u32 = std.math.cast(u32, extension.number orelse continue) orelse continue;
+            const full = try std.fmt.allocPrint(arena, "{s}{s}", .{ prefix, extension.name orelse "" });
+            try index.extensions.put(arena, try extension_key(arena, extendee, number), .{ .full_name = full, .field = extension.* });
+        }
+    }
+
+    /// The extension numbered `number` of the message named `extendee`, or null.
+    pub fn extension_of(index: *const Index, arena: Allocator, extendee: []const u8, number: u32) Allocator.Error!?Extension {
+        return index.extensions.get(try extension_key(arena, extendee, number));
     }
 
     pub fn get(index: *const Index, full_name: []const u8) Error!Entry {
@@ -88,6 +111,10 @@ pub const Index = struct {
         return false;
     }
 };
+
+fn extension_key(arena: Allocator, extendee: []const u8, number: u32) Allocator.Error![]const u8 {
+    return std.fmt.allocPrint(arena, "{s}#{d}", .{ extendee, number });
+}
 
 pub fn strip_dot(type_name: []const u8) []const u8 {
     return if (type_name.len > 0 and type_name[0] == '.') type_name[1..] else type_name;

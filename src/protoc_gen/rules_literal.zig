@@ -8,6 +8,8 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 const proto = @import("protobuf");
 const names = @import("names.zig");
+const index_file = @import("index.zig");
+const rules_predefined = @import("rules_predefined.zig");
 const constants = @import("constants.zig");
 
 pub const Error = Allocator.Error || proto.Error;
@@ -21,11 +23,21 @@ pub const Writer = struct {
     numbers: std.ArrayList(Number) = .empty,
     /// The names from the field to the value being written: "name", "string", "max_len".
     path: std.ArrayList([]const u8) = .empty,
-    /// The full name of a rule message that holds a field its generated type does not know: a
-    /// predefined rule of an extension, or a rule of a later validate.proto.
-    unknown_in: ?[]const u8 = null,
+    /// The request's messages and extensions, or none where a test reads no extension.
+    index: ?*const index_file.Index = null,
+    /// Whether the rules being written are a field's, where a predefined rule applies.
+    in_field: bool = false,
+    /// The predefined rules that the field's rule messages hold, in the order read.
+    predefined: std.ArrayList(rules_predefined.Entry) = .empty,
+    /// Why the table cannot state one of the message's rules: the first reason found.
+    unsupported: ?[]const u8 = null,
 
-    fn print(writer: *Writer, comptime format: []const u8, args: anytype) Allocator.Error!void {
+    /// Marks the table unsupported, with the first reason alone.
+    pub fn refuse(writer: *Writer, comptime format: []const u8, args: anytype) Allocator.Error!void {
+        if (writer.unsupported == null) writer.unsupported = try std.fmt.allocPrint(writer.arena, format, args);
+    }
+
+    pub fn print(writer: *Writer, comptime format: []const u8, args: anytype) Allocator.Error!void {
         try writer.text.print(writer.arena, format, args);
     }
 
@@ -37,12 +49,12 @@ pub const Writer = struct {
 
     /// The name of the value being written: its path, joined with dots. No field's name holds
     /// a dot, so no two values of one message share a name.
-    fn path_name(writer: *Writer) Allocator.Error![]const u8 {
+    pub fn path_name(writer: *Writer) Allocator.Error![]const u8 {
         return std.mem.join(writer.arena, ".", writer.path.items);
     }
 
     /// Writes `number_text` in place, or names it in `RuleNumber` and writes the name.
-    fn number(writer: *Writer, number_text: []const u8, magnitude: u64) Error!void {
+    pub fn number(writer: *Writer, number_text: []const u8, magnitude: u64) Error!void {
         if (magnitude <= constants.unnamed_number_max) return writer.text.appendSlice(writer.arena, number_text);
         const name = try writer.path_name();
         try writer.numbers.append(writer.arena, .{ .name = name, .text = number_text });
@@ -54,7 +66,7 @@ pub const Writer = struct {
 /// message with no field set.
 pub fn message(writer: *Writer, comptime T: type, value: *const T) Error!void {
     if (comptime @hasField(T, "_unknown")) {
-        if (value._unknown.bytes.len != 0) writer.unknown_in = T.protobuf.full_name;
+        if (value._unknown.bytes.len != 0) try rules_predefined.read(writer, T, value._unknown.bytes);
     }
     var first = true;
     try writer.text.appendSlice(writer.arena, ".{");
@@ -162,7 +174,7 @@ fn scalar_or_message(writer: *Writer, comptime V: type, value: *const V) Error!v
 
 /// A float as a float literal: digits with a point, so the magic-numbers rule reads no integer.
 /// A value with no decimal form, NaN or an infinity, is written from its bits, which are named.
-fn float(writer: *Writer, comptime V: type, value: V) Error!void {
+pub fn float(writer: *Writer, comptime V: type, value: V) Error!void {
     const Bits = std.meta.Int(.unsigned, @bitSizeOf(V));
     if (!std.math.isFinite(value)) {
         const bits: Bits = @bitCast(value);
@@ -234,7 +246,7 @@ test "a rule message is written as the literal of its type, with each number abo
     try testing.expectEqual(@as(usize, 1), writer.numbers.items.len);
     try testing.expectEqualStrings("val.string.max_len", writer.numbers.items[0].name);
     try testing.expectEqualStrings("64", writer.numbers.items[0].text);
-    try testing.expect(writer.unknown_in == null);
+    try testing.expect(writer.unsupported == null);
 }
 
 test "numbers, floats, lists and nested rules keep their values" {
@@ -289,6 +301,6 @@ test "an enum's unnamed number and a rule the types do not know are both kept in
     const decoded = try proto.decode(validate.FieldRules, &string_rules);
     var unknown: Writer = .{ .arena = arena };
     try message(&unknown, validate.FieldRules, &decoded);
-    try testing.expectEqualStrings("buf.validate.StringRules", unknown.unknown_in.?);
+    try testing.expectEqualStrings("buf.validate.StringRules holds field 1161, which neither the plugin's validate.proto nor an extension of the request states", unknown.unsupported.?);
     try testing.expectEqualStrings(".{ .type = .{ .string = .{} } }", unknown.text.items);
 }

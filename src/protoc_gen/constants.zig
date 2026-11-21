@@ -10,5 +10,8 @@ pub const io_buffer_len = 64 * 1024;
 pub const unnamed_number_max = 1;
 /// The declaration of a generated message that names the numbers of its rules.
 pub const rule_number_container = "RuleNumber";
+/// The names that lead to a rule message of a field's own rules, the field and its type, as
+/// "val.float" is: the fewest a rule message of a field has.
+pub const own_rules_path_len = 2;
 /// The declaration of a generated message that holds its rules: `protovalidate.Rules`.
 pub const rules_declaration = "protovalidate";

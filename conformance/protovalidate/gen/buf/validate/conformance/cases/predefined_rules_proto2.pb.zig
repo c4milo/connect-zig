@@ -21,9 +21,12 @@ pub const PredefinedFloatRuleProto2 = struct {
 
     pub const protovalidate: validate.Rules = .{
         .fields = &.{
-            .{ .number = @intFromEnum(@This().FieldNumber.val), .rules = .{ .type = .{ .float = .{} } } },
+            .{ .number = @intFromEnum(@This().FieldNumber.val), .rules = .{ .type = .{ .float = .{} } }, .predefined = &.{.{ .number = @This().RuleNumber.@"val.float.(buf.validate.conformance.cases.float_abs_range_proto2).number", .name = "buf.validate.conformance.cases.float_abs_range_proto2", .type = .type_float, .value = .{ .double = 1.0 }, .cel = &.{.{ .id = "float.abs_range.proto2", .message = "float value is out of range", .expression = "this >= -rule && this <= rule" }} }} },
         },
-        .unsupported = "buf.validate.FloatRules holds a rule the plugin's validate.proto does not state: a predefined rule of an extension, or a later release's (docs/design.md §8 step 34)",
+    };
+
+    pub const RuleNumber = struct {
+        pub const @"val.float.(buf.validate.conformance.cases.float_abs_range_proto2).number" = 1161;
     };
 };
 
@@ -44,9 +47,12 @@ pub const PredefinedDoubleRuleProto2 = struct {
 
     pub const protovalidate: validate.Rules = .{
         .fields = &.{
-            .{ .number = @intFromEnum(@This().FieldNumber.val), .rules = .{ .type = .{ .double = .{} } } },
+            .{ .number = @intFromEnum(@This().FieldNumber.val), .rules = .{ .type = .{ .double = .{} } }, .predefined = &.{.{ .number = @This().RuleNumber.@"val.double.(buf.validate.conformance.cases.double_abs_range_proto2).number", .name = "buf.validate.conformance.cases.double_abs_range_proto2", .type = .type_double, .value = .{ .double = 1.0 }, .cel = &.{.{ .id = "double.abs_range.proto2", .message = "double value is out of range", .expression = "this >= -rule && this <= rule" }} }} },
         },
-        .unsupported = "buf.validate.DoubleRules holds a rule the plugin's validate.proto does not state: a predefined rule of an extension, or a later release's (docs/design.md §8 step 34)",
+    };
+
+    pub const RuleNumber = struct {
+        pub const @"val.double.(buf.validate.conformance.cases.double_abs_range_proto2).number" = 1161;
     };
 };
 
@@ -67,9 +73,13 @@ pub const PredefinedInt32RuleProto2 = struct {
 
     pub const protovalidate: validate.Rules = .{
         .fields = &.{
-            .{ .number = @intFromEnum(@This().FieldNumber.val), .rules = .{ .type = .{ .int32 = .{} } } },
+            .{ .number = @intFromEnum(@This().FieldNumber.val), .rules = .{ .type = .{ .int32 = .{} } }, .predefined = &.{.{ .number = @This().RuleNumber.@"val.int32.(buf.validate.conformance.cases.int32_abs_in_proto2).number", .name = "buf.validate.conformance.cases.int32_abs_in_proto2", .type = .type_int32, .value = .{ .ints = &.{@This().RuleNumber.@"val.int32.(buf.validate.conformance.cases.int32_abs_in_proto2).value.0"} }, .cel = &.{.{ .id = "int32.abs_in.proto2", .message = "must be in absolute value of list", .expression = "this in rule || this in rule.map(n, -n)" }} }} },
         },
-        .unsupported = "buf.validate.Int32Rules holds a rule the plugin's validate.proto does not state: a predefined rule of an extension, or a later release's (docs/design.md §8 step 34)",
+    };
+
+    pub const RuleNumber = struct {
+        pub const @"val.int32.(buf.validate.conformance.cases.int32_abs_in_proto2).number" = 1161;
+        pub const @"val.int32.(buf.validate.conformance.cases.int32_abs_in_proto2).value.0" = -2;
     };
 };
 
@@ -90,9 +100,13 @@ pub const PredefinedInt64RuleProto2 = struct {
 
     pub const protovalidate: validate.Rules = .{
         .fields = &.{
-            .{ .number = @intFromEnum(@This().FieldNumber.val), .rules = .{ .type = .{ .int64 = .{} } } },
+            .{ .number = @intFromEnum(@This().FieldNumber.val), .rules = .{ .type = .{ .int64 = .{} } }, .predefined = &.{.{ .number = @This().RuleNumber.@"val.int64.(buf.validate.conformance.cases.int64_abs_in_proto2).number", .name = "buf.validate.conformance.cases.int64_abs_in_proto2", .type = .type_message, .value = .{ .ints = &.{@This().RuleNumber.@"val.int64.(buf.validate.conformance.cases.int64_abs_in_proto2).value.0"} }, .cel = &.{.{ .id = "int64.abs_in.proto2", .message = "must be in absolute value of list", .expression = "this in rule || this in rule.map(n, -n)" }} }} },
         },
-        .unsupported = "buf.validate.Int64Rules holds a rule the plugin's validate.proto does not state: a predefined rule of an extension, or a later release's (docs/design.md §8 step 34)",
+    };
+
+    pub const RuleNumber = struct {
+        pub const @"val.int64.(buf.validate.conformance.cases.int64_abs_in_proto2).number" = 1161;
+        pub const @"val.int64.(buf.validate.conformance.cases.int64_abs_in_proto2).value.0" = -2;
     };
 };
 
@@ -113,9 +127,12 @@ pub const PredefinedUInt32RuleProto2 = struct {
 
     pub const protovalidate: validate.Rules = .{
         .fields = &.{
-            .{ .number = @intFromEnum(@This().FieldNumber.val), .rules = .{ .type = .{ .uint32 = .{} } } },
+            .{ .number = @intFromEnum(@This().FieldNumber.val), .rules = .{ .type = .{ .uint32 = .{} } }, .predefined = &.{.{ .number = @This().RuleNumber.@"val.uint32.(buf.validate.conformance.cases.uint32_even_proto2).number", .name = "buf.validate.conformance.cases.uint32_even_proto2", .type = .type_bool, .value = .{ .boolean = true }, .cel = &.{.{ .id = "uint32.even.proto2", .message = "uint32 value is not even", .expression = "this % 2u == 0u" }} }} },
         },
-        .unsupported = "buf.validate.UInt32Rules holds a rule the plugin's validate.proto does not state: a predefined rule of an extension, or a later release's (docs/design.md §8 step 34)",
+    };
+
+    pub const RuleNumber = struct {
+        pub const @"val.uint32.(buf.validate.conformance.cases.uint32_even_proto2).number" = 1161;
     };
 };
 
@@ -136,9 +153,12 @@ pub const PredefinedUInt64RuleProto2 = struct {
 
     pub const protovalidate: validate.Rules = .{
         .fields = &.{
-            .{ .number = @intFromEnum(@This().FieldNumber.val), .rules = .{ .type = .{ .uint64 = .{} } } },
+            .{ .number = @intFromEnum(@This().FieldNumber.val), .rules = .{ .type = .{ .uint64 = .{} } }, .predefined = &.{.{ .number = @This().RuleNumber.@"val.uint64.(buf.validate.conformance.cases.uint64_even_proto2).number", .name = "buf.validate.conformance.cases.uint64_even_proto2", .type = .type_bool, .value = .{ .boolean = true }, .cel = &.{.{ .id = "uint64.even.proto2", .message = "uint64 value is not even", .expression = "this % 2u == 0u" }} }} },
         },
-        .unsupported = "buf.validate.UInt64Rules holds a rule the plugin's validate.proto does not state: a predefined rule of an extension, or a later release's (docs/design.md §8 step 34)",
+    };
+
+    pub const RuleNumber = struct {
+        pub const @"val.uint64.(buf.validate.conformance.cases.uint64_even_proto2).number" = 1161;
     };
 };
 
@@ -159,9 +179,12 @@ pub const PredefinedSInt32RuleProto2 = struct {
 
     pub const protovalidate: validate.Rules = .{
         .fields = &.{
-            .{ .number = @intFromEnum(@This().FieldNumber.val), .rules = .{ .type = .{ .sint32 = .{} } } },
+            .{ .number = @intFromEnum(@This().FieldNumber.val), .rules = .{ .type = .{ .sint32 = .{} } }, .predefined = &.{.{ .number = @This().RuleNumber.@"val.sint32.(buf.validate.conformance.cases.sint32_even_proto2).number", .name = "buf.validate.conformance.cases.sint32_even_proto2", .type = .type_bool, .value = .{ .boolean = true }, .cel = &.{.{ .id = "sint32.even.proto2", .message = "sint32 value is not even", .expression = "this % 2 == 0" }} }} },
         },
-        .unsupported = "buf.validate.SInt32Rules holds a rule the plugin's validate.proto does not state: a predefined rule of an extension, or a later release's (docs/design.md §8 step 34)",
+    };
+
+    pub const RuleNumber = struct {
+        pub const @"val.sint32.(buf.validate.conformance.cases.sint32_even_proto2).number" = 1161;
     };
 };
 
@@ -182,9 +205,12 @@ pub const PredefinedSInt64RuleProto2 = struct {
 
     pub const protovalidate: validate.Rules = .{
         .fields = &.{
-            .{ .number = @intFromEnum(@This().FieldNumber.val), .rules = .{ .type = .{ .sint64 = .{} } } },
+            .{ .number = @intFromEnum(@This().FieldNumber.val), .rules = .{ .type = .{ .sint64 = .{} } }, .predefined = &.{.{ .number = @This().RuleNumber.@"val.sint64.(buf.validate.conformance.cases.sint64_even_proto2).number", .name = "buf.validate.conformance.cases.sint64_even_proto2", .type = .type_bool, .value = .{ .boolean = true }, .cel = &.{.{ .id = "sint64.even.proto2", .message = "sint64 value is not even", .expression = "this % 2 == 0" }} }} },
         },
-        .unsupported = "buf.validate.SInt64Rules holds a rule the plugin's validate.proto does not state: a predefined rule of an extension, or a later release's (docs/design.md §8 step 34)",
+    };
+
+    pub const RuleNumber = struct {
+        pub const @"val.sint64.(buf.validate.conformance.cases.sint64_even_proto2).number" = 1161;
     };
 };
 
@@ -205,9 +231,12 @@ pub const PredefinedFixed32RuleProto2 = struct {
 
     pub const protovalidate: validate.Rules = .{
         .fields = &.{
-            .{ .number = @intFromEnum(@This().FieldNumber.val), .rules = .{ .type = .{ .fixed32 = .{} } } },
+            .{ .number = @intFromEnum(@This().FieldNumber.val), .rules = .{ .type = .{ .fixed32 = .{} } }, .predefined = &.{.{ .number = @This().RuleNumber.@"val.fixed32.(buf.validate.conformance.cases.fixed32_even_proto2).number", .name = "buf.validate.conformance.cases.fixed32_even_proto2", .type = .type_bool, .value = .{ .boolean = true }, .cel = &.{.{ .id = "fixed32.even.proto2", .message = "fixed32 value is not even", .expression = "this % 2u == 0u" }} }} },
         },
-        .unsupported = "buf.validate.Fixed32Rules holds a rule the plugin's validate.proto does not state: a predefined rule of an extension, or a later release's (docs/design.md §8 step 34)",
+    };
+
+    pub const RuleNumber = struct {
+        pub const @"val.fixed32.(buf.validate.conformance.cases.fixed32_even_proto2).number" = 1161;
     };
 };
 
@@ -228,9 +257,12 @@ pub const PredefinedFixed64RuleProto2 = struct {
 
     pub const protovalidate: validate.Rules = .{
         .fields = &.{
-            .{ .number = @intFromEnum(@This().FieldNumber.val), .rules = .{ .type = .{ .fixed64 = .{} } } },
+            .{ .number = @intFromEnum(@This().FieldNumber.val), .rules = .{ .type = .{ .fixed64 = .{} } }, .predefined = &.{.{ .number = @This().RuleNumber.@"val.fixed64.(buf.validate.conformance.cases.fixed64_even_proto2).number", .name = "buf.validate.conformance.cases.fixed64_even_proto2", .type = .type_bool, .value = .{ .boolean = true }, .cel = &.{.{ .id = "fixed64.even.proto2", .message = "fixed64 value is not even", .expression = "this % 2u == 0u" }} }} },
         },
-        .unsupported = "buf.validate.Fixed64Rules holds a rule the plugin's validate.proto does not state: a predefined rule of an extension, or a later release's (docs/design.md §8 step 34)",
+    };
+
+    pub const RuleNumber = struct {
+        pub const @"val.fixed64.(buf.validate.conformance.cases.fixed64_even_proto2).number" = 1161;
     };
 };
 
@@ -251,9 +283,12 @@ pub const PredefinedSFixed32RuleProto2 = struct {
 
     pub const protovalidate: validate.Rules = .{
         .fields = &.{
-            .{ .number = @intFromEnum(@This().FieldNumber.val), .rules = .{ .type = .{ .sfixed32 = .{} } } },
+            .{ .number = @intFromEnum(@This().FieldNumber.val), .rules = .{ .type = .{ .sfixed32 = .{} } }, .predefined = &.{.{ .number = @This().RuleNumber.@"val.sfixed32.(buf.validate.conformance.cases.sfixed32_even_proto2).number", .name = "buf.validate.conformance.cases.sfixed32_even_proto2", .type = .type_bool, .value = .{ .boolean = true }, .cel = &.{.{ .id = "sfixed32.even.proto2", .message = "sfixed32 value is not even", .expression = "this % 2 == 0" }} }} },
         },
-        .unsupported = "buf.validate.SFixed32Rules holds a rule the plugin's validate.proto does not state: a predefined rule of an extension, or a later release's (docs/design.md §8 step 34)",
+    };
+
+    pub const RuleNumber = struct {
+        pub const @"val.sfixed32.(buf.validate.conformance.cases.sfixed32_even_proto2).number" = 1161;
     };
 };
 
@@ -274,9 +309,12 @@ pub const PredefinedSFixed64RuleProto2 = struct {
 
     pub const protovalidate: validate.Rules = .{
         .fields = &.{
-            .{ .number = @intFromEnum(@This().FieldNumber.val), .rules = .{ .type = .{ .sfixed64 = .{} } } },
+            .{ .number = @intFromEnum(@This().FieldNumber.val), .rules = .{ .type = .{ .sfixed64 = .{} } }, .predefined = &.{.{ .number = @This().RuleNumber.@"val.sfixed64.(buf.validate.conformance.cases.sfixed64_even_proto2).number", .name = "buf.validate.conformance.cases.sfixed64_even_proto2", .type = .type_bool, .value = .{ .boolean = true }, .cel = &.{.{ .id = "sfixed64.even.proto2", .message = "sfixed64 value is not even", .expression = "this % 2 == 0" }} }} },
         },
-        .unsupported = "buf.validate.SFixed64Rules holds a rule the plugin's validate.proto does not state: a predefined rule of an extension, or a later release's (docs/design.md §8 step 34)",
+    };
+
+    pub const RuleNumber = struct {
+        pub const @"val.sfixed64.(buf.validate.conformance.cases.sfixed64_even_proto2).number" = 1161;
     };
 };
 
@@ -297,9 +335,12 @@ pub const PredefinedBoolRuleProto2 = struct {
 
     pub const protovalidate: validate.Rules = .{
         .fields = &.{
-            .{ .number = @intFromEnum(@This().FieldNumber.val), .rules = .{ .type = .{ .bool = .{} } } },
+            .{ .number = @intFromEnum(@This().FieldNumber.val), .rules = .{ .type = .{ .bool = .{} } }, .predefined = &.{.{ .number = @This().RuleNumber.@"val.bool.(buf.validate.conformance.cases.bool_false_proto2).number", .name = "buf.validate.conformance.cases.bool_false_proto2", .type = .type_bool, .value = .{ .boolean = true }, .cel = &.{.{ .id = "bool.false.proto2", .message = "bool value is not false", .expression = "this == false" }} }} },
         },
-        .unsupported = "buf.validate.BoolRules holds a rule the plugin's validate.proto does not state: a predefined rule of an extension, or a later release's (docs/design.md §8 step 34)",
+    };
+
+    pub const RuleNumber = struct {
+        pub const @"val.bool.(buf.validate.conformance.cases.bool_false_proto2).number" = 1161;
     };
 };
 
@@ -320,9 +361,12 @@ pub const PredefinedStringRuleProto2 = struct {
 
     pub const protovalidate: validate.Rules = .{
         .fields = &.{
-            .{ .number = @intFromEnum(@This().FieldNumber.val), .rules = .{ .type = .{ .string = .{} } } },
+            .{ .number = @intFromEnum(@This().FieldNumber.val), .rules = .{ .type = .{ .string = .{} } }, .predefined = &.{.{ .number = @This().RuleNumber.@"val.string.(buf.validate.conformance.cases.string_valid_path_proto2).number", .name = "buf.validate.conformance.cases.string_valid_path_proto2", .type = .type_bool, .value = .{ .boolean = true }, .cel = &.{.{ .id = "string.valid_path.proto2", .expression = "!this.matches('^([^/.][^/]?|[^/][^/.]|[^/]{3,})(/([^/.][^/]?|[^/][^/.]|[^/]{3,}))*$') ? 'not a valid path: `%s`'.format([this]) : ''" }} }} },
         },
-        .unsupported = "buf.validate.StringRules holds a rule the plugin's validate.proto does not state: a predefined rule of an extension, or a later release's (docs/design.md §8 step 34)",
+    };
+
+    pub const RuleNumber = struct {
+        pub const @"val.string.(buf.validate.conformance.cases.string_valid_path_proto2).number" = 1161;
     };
 };
 
@@ -343,9 +387,12 @@ pub const PredefinedBytesRuleProto2 = struct {
 
     pub const protovalidate: validate.Rules = .{
         .fields = &.{
-            .{ .number = @intFromEnum(@This().FieldNumber.val), .rules = .{ .type = .{ .bytes = .{} } } },
+            .{ .number = @intFromEnum(@This().FieldNumber.val), .rules = .{ .type = .{ .bytes = .{} } }, .predefined = &.{.{ .number = @This().RuleNumber.@"val.bytes.(buf.validate.conformance.cases.bytes_valid_path_proto2).number", .name = "buf.validate.conformance.cases.bytes_valid_path_proto2", .type = .type_bool, .value = .{ .boolean = true }, .cel = &.{.{ .id = "bytes.valid_path.proto2", .expression = "!string(this).matches('^([^/.][^/]?|[^/][^/.]|[^/]{3,})(/([^/.][^/]?|[^/][^/.]|[^/]{3,}))*$') ? 'not a valid path: `%s`'.format([this]) : ''" }} }} },
         },
-        .unsupported = "buf.validate.BytesRules holds a rule the plugin's validate.proto does not state: a predefined rule of an extension, or a later release's (docs/design.md §8 step 34)",
+    };
+
+    pub const RuleNumber = struct {
+        pub const @"val.bytes.(buf.validate.conformance.cases.bytes_valid_path_proto2).number" = 1161;
     };
 };
 
@@ -366,9 +413,12 @@ pub const PredefinedEnumRuleProto2 = struct {
 
     pub const protovalidate: validate.Rules = .{
         .fields = &.{
-            .{ .number = @intFromEnum(@This().FieldNumber.val), .rules = .{ .type = .{ .@"enum" = .{} } } },
+            .{ .number = @intFromEnum(@This().FieldNumber.val), .rules = .{ .type = .{ .@"enum" = .{} } }, .predefined = &.{.{ .number = @This().RuleNumber.@"val.enum.(buf.validate.conformance.cases.enum_non_zero_proto2).number", .name = "buf.validate.conformance.cases.enum_non_zero_proto2", .type = .type_bool, .value = .{ .boolean = true }, .cel = &.{.{ .id = "enum.non_zero.proto2", .message = "enum value is not non-zero", .expression = "int(this) != 0" }} }} },
         },
-        .unsupported = "buf.validate.EnumRules holds a rule the plugin's validate.proto does not state: a predefined rule of an extension, or a later release's (docs/design.md §8 step 34)",
+    };
+
+    pub const RuleNumber = struct {
+        pub const @"val.enum.(buf.validate.conformance.cases.enum_non_zero_proto2).number" = 1161;
     };
 
     pub const EnumProto2 = enum(i32) {
@@ -400,9 +450,12 @@ pub const PredefinedRepeatedRuleProto2 = struct {
 
     pub const protovalidate: validate.Rules = .{
         .fields = &.{
-            .{ .number = @intFromEnum(@This().FieldNumber.val), .rules = .{ .type = .{ .repeated = .of(&.{}) } } },
+            .{ .number = @intFromEnum(@This().FieldNumber.val), .rules = .{ .type = .{ .repeated = .of(&.{}) } }, .predefined = &.{.{ .number = @This().RuleNumber.@"val.repeated.(buf.validate.conformance.cases.repeated_at_least_five_proto2).number", .name = "buf.validate.conformance.cases.repeated_at_least_five_proto2", .type = .type_bool, .value = .{ .boolean = true }, .cel = &.{.{ .id = "repeated.at_least_five.proto2", .message = "repeated field must have at least five values", .expression = "uint(this.size()) >= 5u" }} }} },
         },
-        .unsupported = "buf.validate.RepeatedRules holds a rule the plugin's validate.proto does not state: a predefined rule of an extension, or a later release's (docs/design.md §8 step 34)",
+    };
+
+    pub const RuleNumber = struct {
+        pub const @"val.repeated.(buf.validate.conformance.cases.repeated_at_least_five_proto2).number" = 1161;
     };
 };
 
@@ -423,9 +476,12 @@ pub const PredefinedDurationRuleProto2 = struct {
 
     pub const protovalidate: validate.Rules = .{
         .fields = &.{
-            .{ .number = @intFromEnum(@This().FieldNumber.val), .rules = .{ .type = .{ .duration = .{} } } },
+            .{ .number = @intFromEnum(@This().FieldNumber.val), .rules = .{ .type = .{ .duration = .{} } }, .predefined = &.{.{ .number = @This().RuleNumber.@"val.duration.(buf.validate.conformance.cases.duration_too_long_proto2).number", .name = "buf.validate.conformance.cases.duration_too_long_proto2", .type = .type_bool, .value = .{ .boolean = true }, .cel = &.{.{ .id = "duration.too_long.proto2", .message = "duration can't be longer than 10 seconds", .expression = "this <= duration('10s')" }} }} },
         },
-        .unsupported = "buf.validate.DurationRules holds a rule the plugin's validate.proto does not state: a predefined rule of an extension, or a later release's (docs/design.md §8 step 34)",
+    };
+
+    pub const RuleNumber = struct {
+        pub const @"val.duration.(buf.validate.conformance.cases.duration_too_long_proto2).number" = 1161;
     };
 };
 
@@ -446,9 +502,12 @@ pub const PredefinedTimestampRuleProto2 = struct {
 
     pub const protovalidate: validate.Rules = .{
         .fields = &.{
-            .{ .number = @intFromEnum(@This().FieldNumber.val), .rules = .{ .type = .{ .timestamp = .{} } } },
+            .{ .number = @intFromEnum(@This().FieldNumber.val), .rules = .{ .type = .{ .timestamp = .{} } }, .predefined = &.{.{ .number = @This().RuleNumber.@"val.timestamp.(buf.validate.conformance.cases.timestamp_in_range_proto2).number", .name = "buf.validate.conformance.cases.timestamp_in_range_proto2", .type = .type_bool, .value = .{ .boolean = true }, .cel = &.{.{ .id = "timestamp.time_range.proto2", .message = "timestamp out of range", .expression = "int(this) >= 1049587200 && int(this) <= 1080432000" }} }} },
         },
-        .unsupported = "buf.validate.TimestampRules holds a rule the plugin's validate.proto does not state: a predefined rule of an extension, or a later release's (docs/design.md §8 step 34)",
+    };
+
+    pub const RuleNumber = struct {
+        pub const @"val.timestamp.(buf.validate.conformance.cases.timestamp_in_range_proto2).number" = 1161;
     };
 };
 
@@ -469,9 +528,12 @@ pub const PredefinedWrappedFloatRuleProto2 = struct {
 
     pub const protovalidate: validate.Rules = .{
         .fields = &.{
-            .{ .number = @intFromEnum(@This().FieldNumber.val), .rules = .{ .type = .{ .float = .{} } } },
+            .{ .number = @intFromEnum(@This().FieldNumber.val), .rules = .{ .type = .{ .float = .{} } }, .predefined = &.{.{ .number = @This().RuleNumber.@"val.float.(buf.validate.conformance.cases.float_abs_range_proto2).number", .name = "buf.validate.conformance.cases.float_abs_range_proto2", .type = .type_float, .value = .{ .double = 1.0 }, .cel = &.{.{ .id = "float.abs_range.proto2", .message = "float value is out of range", .expression = "this >= -rule && this <= rule" }} }} },
         },
-        .unsupported = "buf.validate.FloatRules holds a rule the plugin's validate.proto does not state: a predefined rule of an extension, or a later release's (docs/design.md §8 step 34)",
+    };
+
+    pub const RuleNumber = struct {
+        pub const @"val.float.(buf.validate.conformance.cases.float_abs_range_proto2).number" = 1161;
     };
 };
 
@@ -492,9 +554,12 @@ pub const PredefinedWrappedDoubleRuleProto2 = struct {
 
     pub const protovalidate: validate.Rules = .{
         .fields = &.{
-            .{ .number = @intFromEnum(@This().FieldNumber.val), .rules = .{ .type = .{ .double = .{} } } },
+            .{ .number = @intFromEnum(@This().FieldNumber.val), .rules = .{ .type = .{ .double = .{} } }, .predefined = &.{.{ .number = @This().RuleNumber.@"val.double.(buf.validate.conformance.cases.double_abs_range_proto2).number", .name = "buf.validate.conformance.cases.double_abs_range_proto2", .type = .type_double, .value = .{ .double = 1.0 }, .cel = &.{.{ .id = "double.abs_range.proto2", .message = "double value is out of range", .expression = "this >= -rule && this <= rule" }} }} },
         },
-        .unsupported = "buf.validate.DoubleRules holds a rule the plugin's validate.proto does not state: a predefined rule of an extension, or a later release's (docs/design.md §8 step 34)",
+    };
+
+    pub const RuleNumber = struct {
+        pub const @"val.double.(buf.validate.conformance.cases.double_abs_range_proto2).number" = 1161;
     };
 };
 
@@ -515,9 +580,13 @@ pub const PredefinedWrappedInt32RuleProto2 = struct {
 
     pub const protovalidate: validate.Rules = .{
         .fields = &.{
-            .{ .number = @intFromEnum(@This().FieldNumber.val), .rules = .{ .type = .{ .int32 = .{} } } },
+            .{ .number = @intFromEnum(@This().FieldNumber.val), .rules = .{ .type = .{ .int32 = .{} } }, .predefined = &.{.{ .number = @This().RuleNumber.@"val.int32.(buf.validate.conformance.cases.int32_abs_in_proto2).number", .name = "buf.validate.conformance.cases.int32_abs_in_proto2", .type = .type_int32, .value = .{ .ints = &.{@This().RuleNumber.@"val.int32.(buf.validate.conformance.cases.int32_abs_in_proto2).value.0"} }, .cel = &.{.{ .id = "int32.abs_in.proto2", .message = "must be in absolute value of list", .expression = "this in rule || this in rule.map(n, -n)" }} }} },
         },
-        .unsupported = "buf.validate.Int32Rules holds a rule the plugin's validate.proto does not state: a predefined rule of an extension, or a later release's (docs/design.md §8 step 34)",
+    };
+
+    pub const RuleNumber = struct {
+        pub const @"val.int32.(buf.validate.conformance.cases.int32_abs_in_proto2).number" = 1161;
+        pub const @"val.int32.(buf.validate.conformance.cases.int32_abs_in_proto2).value.0" = -2;
     };
 };
 
@@ -538,9 +607,13 @@ pub const PredefinedWrappedInt64RuleProto2 = struct {
 
     pub const protovalidate: validate.Rules = .{
         .fields = &.{
-            .{ .number = @intFromEnum(@This().FieldNumber.val), .rules = .{ .type = .{ .int64 = .{} } } },
+            .{ .number = @intFromEnum(@This().FieldNumber.val), .rules = .{ .type = .{ .int64 = .{} } }, .predefined = &.{.{ .number = @This().RuleNumber.@"val.int64.(buf.validate.conformance.cases.int64_abs_in_proto2).number", .name = "buf.validate.conformance.cases.int64_abs_in_proto2", .type = .type_message, .value = .{ .ints = &.{@This().RuleNumber.@"val.int64.(buf.validate.conformance.cases.int64_abs_in_proto2).value.0"} }, .cel = &.{.{ .id = "int64.abs_in.proto2", .message = "must be in absolute value of list", .expression = "this in rule || this in rule.map(n, -n)" }} }} },
         },
-        .unsupported = "buf.validate.Int64Rules holds a rule the plugin's validate.proto does not state: a predefined rule of an extension, or a later release's (docs/design.md §8 step 34)",
+    };
+
+    pub const RuleNumber = struct {
+        pub const @"val.int64.(buf.validate.conformance.cases.int64_abs_in_proto2).number" = 1161;
+        pub const @"val.int64.(buf.validate.conformance.cases.int64_abs_in_proto2).value.0" = -2;
     };
 };
 
@@ -561,9 +634,12 @@ pub const PredefinedWrappedUInt32RuleProto2 = struct {
 
     pub const protovalidate: validate.Rules = .{
         .fields = &.{
-            .{ .number = @intFromEnum(@This().FieldNumber.val), .rules = .{ .type = .{ .uint32 = .{} } } },
+            .{ .number = @intFromEnum(@This().FieldNumber.val), .rules = .{ .type = .{ .uint32 = .{} } }, .predefined = &.{.{ .number = @This().RuleNumber.@"val.uint32.(buf.validate.conformance.cases.uint32_even_proto2).number", .name = "buf.validate.conformance.cases.uint32_even_proto2", .type = .type_bool, .value = .{ .boolean = true }, .cel = &.{.{ .id = "uint32.even.proto2", .message = "uint32 value is not even", .expression = "this % 2u == 0u" }} }} },
         },
-        .unsupported = "buf.validate.UInt32Rules holds a rule the plugin's validate.proto does not state: a predefined rule of an extension, or a later release's (docs/design.md §8 step 34)",
+    };
+
+    pub const RuleNumber = struct {
+        pub const @"val.uint32.(buf.validate.conformance.cases.uint32_even_proto2).number" = 1161;
     };
 };
 
@@ -584,9 +660,12 @@ pub const PredefinedWrappedUInt64RuleProto2 = struct {
 
     pub const protovalidate: validate.Rules = .{
         .fields = &.{
-            .{ .number = @intFromEnum(@This().FieldNumber.val), .rules = .{ .type = .{ .uint64 = .{} } } },
+            .{ .number = @intFromEnum(@This().FieldNumber.val), .rules = .{ .type = .{ .uint64 = .{} } }, .predefined = &.{.{ .number = @This().RuleNumber.@"val.uint64.(buf.validate.conformance.cases.uint64_even_proto2).number", .name = "buf.validate.conformance.cases.uint64_even_proto2", .type = .type_bool, .value = .{ .boolean = true }, .cel = &.{.{ .id = "uint64.even.proto2", .message = "uint64 value is not even", .expression = "this % 2u == 0u" }} }} },
         },
-        .unsupported = "buf.validate.UInt64Rules holds a rule the plugin's validate.proto does not state: a predefined rule of an extension, or a later release's (docs/design.md §8 step 34)",
+    };
+
+    pub const RuleNumber = struct {
+        pub const @"val.uint64.(buf.validate.conformance.cases.uint64_even_proto2).number" = 1161;
     };
 };
 
@@ -607,9 +686,12 @@ pub const PredefinedWrappedBoolRuleProto2 = struct {
 
     pub const protovalidate: validate.Rules = .{
         .fields = &.{
-            .{ .number = @intFromEnum(@This().FieldNumber.val), .rules = .{ .type = .{ .bool = .{} } } },
+            .{ .number = @intFromEnum(@This().FieldNumber.val), .rules = .{ .type = .{ .bool = .{} } }, .predefined = &.{.{ .number = @This().RuleNumber.@"val.bool.(buf.validate.conformance.cases.bool_false_proto2).number", .name = "buf.validate.conformance.cases.bool_false_proto2", .type = .type_bool, .value = .{ .boolean = true }, .cel = &.{.{ .id = "bool.false.proto2", .message = "bool value is not false", .expression = "this == false" }} }} },
         },
-        .unsupported = "buf.validate.BoolRules holds a rule the plugin's validate.proto does not state: a predefined rule of an extension, or a later release's (docs/design.md §8 step 34)",
+    };
+
+    pub const RuleNumber = struct {
+        pub const @"val.bool.(buf.validate.conformance.cases.bool_false_proto2).number" = 1161;
     };
 };
 
@@ -630,9 +712,12 @@ pub const PredefinedWrappedStringRuleProto2 = struct {
 
     pub const protovalidate: validate.Rules = .{
         .fields = &.{
-            .{ .number = @intFromEnum(@This().FieldNumber.val), .rules = .{ .type = .{ .string = .{} } } },
+            .{ .number = @intFromEnum(@This().FieldNumber.val), .rules = .{ .type = .{ .string = .{} } }, .predefined = &.{.{ .number = @This().RuleNumber.@"val.string.(buf.validate.conformance.cases.string_valid_path_proto2).number", .name = "buf.validate.conformance.cases.string_valid_path_proto2", .type = .type_bool, .value = .{ .boolean = true }, .cel = &.{.{ .id = "string.valid_path.proto2", .expression = "!this.matches('^([^/.][^/]?|[^/][^/.]|[^/]{3,})(/([^/.][^/]?|[^/][^/.]|[^/]{3,}))*$') ? 'not a valid path: `%s`'.format([this]) : ''" }} }} },
         },
-        .unsupported = "buf.validate.StringRules holds a rule the plugin's validate.proto does not state: a predefined rule of an extension, or a later release's (docs/design.md §8 step 34)",
+    };
+
+    pub const RuleNumber = struct {
+        pub const @"val.string.(buf.validate.conformance.cases.string_valid_path_proto2).number" = 1161;
     };
 };
 
@@ -653,9 +738,12 @@ pub const PredefinedWrappedBytesRuleProto2 = struct {
 
     pub const protovalidate: validate.Rules = .{
         .fields = &.{
-            .{ .number = @intFromEnum(@This().FieldNumber.val), .rules = .{ .type = .{ .bytes = .{} } } },
+            .{ .number = @intFromEnum(@This().FieldNumber.val), .rules = .{ .type = .{ .bytes = .{} } }, .predefined = &.{.{ .number = @This().RuleNumber.@"val.bytes.(buf.validate.conformance.cases.bytes_valid_path_proto2).number", .name = "buf.validate.conformance.cases.bytes_valid_path_proto2", .type = .type_bool, .value = .{ .boolean = true }, .cel = &.{.{ .id = "bytes.valid_path.proto2", .expression = "!string(this).matches('^([^/.][^/]?|[^/][^/.]|[^/]{3,})(/([^/.][^/]?|[^/][^/.]|[^/]{3,}))*$') ? 'not a valid path: `%s`'.format([this]) : ''" }} }} },
         },
-        .unsupported = "buf.validate.BytesRules holds a rule the plugin's validate.proto does not state: a predefined rule of an extension, or a later release's (docs/design.md §8 step 34)",
+    };
+
+    pub const RuleNumber = struct {
+        pub const @"val.bytes.(buf.validate.conformance.cases.bytes_valid_path_proto2).number" = 1161;
     };
 };
 
@@ -676,9 +764,12 @@ pub const PredefinedRepeatedWrappedFloatRuleProto2 = struct {
 
     pub const protovalidate: validate.Rules = .{
         .fields = &.{
-            .{ .number = @intFromEnum(@This().FieldNumber.val), .rules = .{ .type = .{ .repeated = .of(&.{ .items = .of(&.{ .type = .{ .float = .{} } }) }) } } },
+            .{ .number = @intFromEnum(@This().FieldNumber.val), .rules = .{ .type = .{ .repeated = .of(&.{ .items = .of(&.{ .type = .{ .float = .{} } }) }) } }, .predefined = &.{.{ .site = .items, .number = @This().RuleNumber.@"val.repeated.items.float.(buf.validate.conformance.cases.float_abs_range_proto2).number", .name = "buf.validate.conformance.cases.float_abs_range_proto2", .type = .type_float, .value = .{ .double = 1.0 }, .cel = &.{.{ .id = "float.abs_range.proto2", .message = "float value is out of range", .expression = "this >= -rule && this <= rule" }} }} },
         },
-        .unsupported = "buf.validate.FloatRules holds a rule the plugin's validate.proto does not state: a predefined rule of an extension, or a later release's (docs/design.md §8 step 34)",
+    };
+
+    pub const RuleNumber = struct {
+        pub const @"val.repeated.items.float.(buf.validate.conformance.cases.float_abs_range_proto2).number" = 1161;
     };
 };
 
@@ -699,9 +790,12 @@ pub const PredefinedRepeatedWrappedDoubleRuleProto2 = struct {
 
     pub const protovalidate: validate.Rules = .{
         .fields = &.{
-            .{ .number = @intFromEnum(@This().FieldNumber.val), .rules = .{ .type = .{ .repeated = .of(&.{ .items = .of(&.{ .type = .{ .double = .{} } }) }) } } },
+            .{ .number = @intFromEnum(@This().FieldNumber.val), .rules = .{ .type = .{ .repeated = .of(&.{ .items = .of(&.{ .type = .{ .double = .{} } }) }) } }, .predefined = &.{.{ .site = .items, .number = @This().RuleNumber.@"val.repeated.items.double.(buf.validate.conformance.cases.double_abs_range_proto2).number", .name = "buf.validate.conformance.cases.double_abs_range_proto2", .type = .type_double, .value = .{ .double = 1.0 }, .cel = &.{.{ .id = "double.abs_range.proto2", .message = "double value is out of range", .expression = "this >= -rule && this <= rule" }} }} },
         },
-        .unsupported = "buf.validate.DoubleRules holds a rule the plugin's validate.proto does not state: a predefined rule of an extension, or a later release's (docs/design.md §8 step 34)",
+    };
+
+    pub const RuleNumber = struct {
+        pub const @"val.repeated.items.double.(buf.validate.conformance.cases.double_abs_range_proto2).number" = 1161;
     };
 };
 
@@ -722,9 +816,13 @@ pub const PredefinedRepeatedWrappedInt32RuleProto2 = struct {
 
     pub const protovalidate: validate.Rules = .{
         .fields = &.{
-            .{ .number = @intFromEnum(@This().FieldNumber.val), .rules = .{ .type = .{ .repeated = .of(&.{ .items = .of(&.{ .type = .{ .int32 = .{} } }) }) } } },
+            .{ .number = @intFromEnum(@This().FieldNumber.val), .rules = .{ .type = .{ .repeated = .of(&.{ .items = .of(&.{ .type = .{ .int32 = .{} } }) }) } }, .predefined = &.{.{ .site = .items, .number = @This().RuleNumber.@"val.repeated.items.int32.(buf.validate.conformance.cases.int32_abs_in_proto2).number", .name = "buf.validate.conformance.cases.int32_abs_in_proto2", .type = .type_int32, .value = .{ .ints = &.{@This().RuleNumber.@"val.repeated.items.int32.(buf.validate.conformance.cases.int32_abs_in_proto2).value.0"} }, .cel = &.{.{ .id = "int32.abs_in.proto2", .message = "must be in absolute value of list", .expression = "this in rule || this in rule.map(n, -n)" }} }} },
         },
-        .unsupported = "buf.validate.Int32Rules holds a rule the plugin's validate.proto does not state: a predefined rule of an extension, or a later release's (docs/design.md §8 step 34)",
+    };
+
+    pub const RuleNumber = struct {
+        pub const @"val.repeated.items.int32.(buf.validate.conformance.cases.int32_abs_in_proto2).number" = 1161;
+        pub const @"val.repeated.items.int32.(buf.validate.conformance.cases.int32_abs_in_proto2).value.0" = -2;
     };
 };
 
@@ -745,9 +843,13 @@ pub const PredefinedRepeatedWrappedInt64RuleProto2 = struct {
 
     pub const protovalidate: validate.Rules = .{
         .fields = &.{
-            .{ .number = @intFromEnum(@This().FieldNumber.val), .rules = .{ .type = .{ .repeated = .of(&.{ .items = .of(&.{ .type = .{ .int64 = .{} } }) }) } } },
+            .{ .number = @intFromEnum(@This().FieldNumber.val), .rules = .{ .type = .{ .repeated = .of(&.{ .items = .of(&.{ .type = .{ .int64 = .{} } }) }) } }, .predefined = &.{.{ .site = .items, .number = @This().RuleNumber.@"val.repeated.items.int64.(buf.validate.conformance.cases.int64_abs_in_proto2).number", .name = "buf.validate.conformance.cases.int64_abs_in_proto2", .type = .type_message, .value = .{ .ints = &.{@This().RuleNumber.@"val.repeated.items.int64.(buf.validate.conformance.cases.int64_abs_in_proto2).value.0"} }, .cel = &.{.{ .id = "int64.abs_in.proto2", .message = "must be in absolute value of list", .expression = "this in rule || this in rule.map(n, -n)" }} }} },
         },
-        .unsupported = "buf.validate.Int64Rules holds a rule the plugin's validate.proto does not state: a predefined rule of an extension, or a later release's (docs/design.md §8 step 34)",
+    };
+
+    pub const RuleNumber = struct {
+        pub const @"val.repeated.items.int64.(buf.validate.conformance.cases.int64_abs_in_proto2).number" = 1161;
+        pub const @"val.repeated.items.int64.(buf.validate.conformance.cases.int64_abs_in_proto2).value.0" = -2;
     };
 };
 
@@ -768,9 +870,12 @@ pub const PredefinedRepeatedWrappedUInt32RuleProto2 = struct {
 
     pub const protovalidate: validate.Rules = .{
         .fields = &.{
-            .{ .number = @intFromEnum(@This().FieldNumber.val), .rules = .{ .type = .{ .repeated = .of(&.{ .items = .of(&.{ .type = .{ .uint32 = .{} } }) }) } } },
+            .{ .number = @intFromEnum(@This().FieldNumber.val), .rules = .{ .type = .{ .repeated = .of(&.{ .items = .of(&.{ .type = .{ .uint32 = .{} } }) }) } }, .predefined = &.{.{ .site = .items, .number = @This().RuleNumber.@"val.repeated.items.uint32.(buf.validate.conformance.cases.uint32_even_proto2).number", .name = "buf.validate.conformance.cases.uint32_even_proto2", .type = .type_bool, .value = .{ .boolean = true }, .cel = &.{.{ .id = "uint32.even.proto2", .message = "uint32 value is not even", .expression = "this % 2u == 0u" }} }} },
         },
-        .unsupported = "buf.validate.UInt32Rules holds a rule the plugin's validate.proto does not state: a predefined rule of an extension, or a later release's (docs/design.md §8 step 34)",
+    };
+
+    pub const RuleNumber = struct {
+        pub const @"val.repeated.items.uint32.(buf.validate.conformance.cases.uint32_even_proto2).number" = 1161;
     };
 };
 
@@ -791,9 +896,12 @@ pub const PredefinedRepeatedWrappedUInt64RuleProto2 = struct {
 
     pub const protovalidate: validate.Rules = .{
         .fields = &.{
-            .{ .number = @intFromEnum(@This().FieldNumber.val), .rules = .{ .type = .{ .repeated = .of(&.{ .items = .of(&.{ .type = .{ .uint64 = .{} } }) }) } } },
+            .{ .number = @intFromEnum(@This().FieldNumber.val), .rules = .{ .type = .{ .repeated = .of(&.{ .items = .of(&.{ .type = .{ .uint64 = .{} } }) }) } }, .predefined = &.{.{ .site = .items, .number = @This().RuleNumber.@"val.repeated.items.uint64.(buf.validate.conformance.cases.uint64_even_proto2).number", .name = "buf.validate.conformance.cases.uint64_even_proto2", .type = .type_bool, .value = .{ .boolean = true }, .cel = &.{.{ .id = "uint64.even.proto2", .message = "uint64 value is not even", .expression = "this % 2u == 0u" }} }} },
         },
-        .unsupported = "buf.validate.UInt64Rules holds a rule the plugin's validate.proto does not state: a predefined rule of an extension, or a later release's (docs/design.md §8 step 34)",
+    };
+
+    pub const RuleNumber = struct {
+        pub const @"val.repeated.items.uint64.(buf.validate.conformance.cases.uint64_even_proto2).number" = 1161;
     };
 };
 
@@ -814,9 +922,12 @@ pub const PredefinedRepeatedWrappedBoolRuleProto2 = struct {
 
     pub const protovalidate: validate.Rules = .{
         .fields = &.{
-            .{ .number = @intFromEnum(@This().FieldNumber.val), .rules = .{ .type = .{ .repeated = .of(&.{ .items = .of(&.{ .type = .{ .bool = .{} } }) }) } } },
+            .{ .number = @intFromEnum(@This().FieldNumber.val), .rules = .{ .type = .{ .repeated = .of(&.{ .items = .of(&.{ .type = .{ .bool = .{} } }) }) } }, .predefined = &.{.{ .site = .items, .number = @This().RuleNumber.@"val.repeated.items.bool.(buf.validate.conformance.cases.bool_false_proto2).number", .name = "buf.validate.conformance.cases.bool_false_proto2", .type = .type_bool, .value = .{ .boolean = true }, .cel = &.{.{ .id = "bool.false.proto2", .message = "bool value is not false", .expression = "this == false" }} }} },
         },
-        .unsupported = "buf.validate.BoolRules holds a rule the plugin's validate.proto does not state: a predefined rule of an extension, or a later release's (docs/design.md §8 step 34)",
+    };
+
+    pub const RuleNumber = struct {
+        pub const @"val.repeated.items.bool.(buf.validate.conformance.cases.bool_false_proto2).number" = 1161;
     };
 };
 
@@ -837,9 +948,12 @@ pub const PredefinedRepeatedWrappedStringRuleProto2 = struct {
 
     pub const protovalidate: validate.Rules = .{
         .fields = &.{
-            .{ .number = @intFromEnum(@This().FieldNumber.val), .rules = .{ .type = .{ .repeated = .of(&.{ .items = .of(&.{ .type = .{ .string = .{} } }) }) } } },
+            .{ .number = @intFromEnum(@This().FieldNumber.val), .rules = .{ .type = .{ .repeated = .of(&.{ .items = .of(&.{ .type = .{ .string = .{} } }) }) } }, .predefined = &.{.{ .site = .items, .number = @This().RuleNumber.@"val.repeated.items.string.(buf.validate.conformance.cases.string_valid_path_proto2).number", .name = "buf.validate.conformance.cases.string_valid_path_proto2", .type = .type_bool, .value = .{ .boolean = true }, .cel = &.{.{ .id = "string.valid_path.proto2", .expression = "!this.matches('^([^/.][^/]?|[^/][^/.]|[^/]{3,})(/([^/.][^/]?|[^/][^/.]|[^/]{3,}))*$') ? 'not a valid path: `%s`'.format([this]) : ''" }} }} },
         },
-        .unsupported = "buf.validate.StringRules holds a rule the plugin's validate.proto does not state: a predefined rule of an extension, or a later release's (docs/design.md §8 step 34)",
+    };
+
+    pub const RuleNumber = struct {
+        pub const @"val.repeated.items.string.(buf.validate.conformance.cases.string_valid_path_proto2).number" = 1161;
     };
 };
 
@@ -860,9 +974,12 @@ pub const PredefinedRepeatedWrappedBytesRuleProto2 = struct {
 
     pub const protovalidate: validate.Rules = .{
         .fields = &.{
-            .{ .number = @intFromEnum(@This().FieldNumber.val), .rules = .{ .type = .{ .repeated = .of(&.{ .items = .of(&.{ .type = .{ .bytes = .{} } }) }) } } },
+            .{ .number = @intFromEnum(@This().FieldNumber.val), .rules = .{ .type = .{ .repeated = .of(&.{ .items = .of(&.{ .type = .{ .bytes = .{} } }) }) } }, .predefined = &.{.{ .site = .items, .number = @This().RuleNumber.@"val.repeated.items.bytes.(buf.validate.conformance.cases.bytes_valid_path_proto2).number", .name = "buf.validate.conformance.cases.bytes_valid_path_proto2", .type = .type_bool, .value = .{ .boolean = true }, .cel = &.{.{ .id = "bytes.valid_path.proto2", .expression = "!string(this).matches('^([^/.][^/]?|[^/][^/.]|[^/]{3,})(/([^/.][^/]?|[^/][^/.]|[^/]{3,}))*$') ? 'not a valid path: `%s`'.format([this]) : ''" }} }} },
         },
-        .unsupported = "buf.validate.BytesRules holds a rule the plugin's validate.proto does not state: a predefined rule of an extension, or a later release's (docs/design.md §8 step 34)",
+    };
+
+    pub const RuleNumber = struct {
+        pub const @"val.repeated.items.bytes.(buf.validate.conformance.cases.bytes_valid_path_proto2).number" = 1161;
     };
 };
 
@@ -886,10 +1003,13 @@ pub const PredefinedAndCustomRuleProto2 = struct {
 
     pub const protovalidate: validate.Rules = .{
         .fields = &.{
-            .{ .number = @intFromEnum(@This().FieldNumber.a), .rules = .{ .type = .{ .sint32 = .{} }, .cel = .of(&.{.{ .id = "predefined_and_custom_rule_scalar_proto2", .expression = "this > 24 ? '' : 'a must be greater than 24'" }}) } },
+            .{ .number = @intFromEnum(@This().FieldNumber.a), .rules = .{ .type = .{ .sint32 = .{} }, .cel = .of(&.{.{ .id = "predefined_and_custom_rule_scalar_proto2", .expression = "this > 24 ? '' : 'a must be greater than 24'" }}) }, .predefined = &.{.{ .number = @This().RuleNumber.@"a.sint32.(buf.validate.conformance.cases.sint32_even_proto2).number", .name = "buf.validate.conformance.cases.sint32_even_proto2", .type = .type_bool, .value = .{ .boolean = true }, .cel = &.{.{ .id = "sint32.even.proto2", .message = "sint32 value is not even", .expression = "this % 2 == 0" }} }} },
             .{ .number = @intFromEnum(@This().FieldNumber.b), .rules = .{ .cel = .of(&.{.{ .id = "predefined_and_custom_rule_embedded_proto2", .message = "b.c must be a multiple of 3", .expression = "this.c % 3 == 0" }}) } },
         },
-        .unsupported = "buf.validate.SInt32Rules holds a rule the plugin's validate.proto does not state: a predefined rule of an extension, or a later release's (docs/design.md §8 step 34)",
+    };
+
+    pub const RuleNumber = struct {
+        pub const @"a.sint32.(buf.validate.conformance.cases.sint32_even_proto2).number" = 1161;
     };
 
     pub const Nested = struct {
@@ -909,9 +1029,12 @@ pub const PredefinedAndCustomRuleProto2 = struct {
 
         pub const protovalidate: validate.Rules = .{
             .fields = &.{
-                .{ .number = @intFromEnum(@This().FieldNumber.c), .rules = .{ .type = .{ .sint32 = .{} }, .cel = .of(&.{.{ .id = "predefined_and_custom_rule_nested_proto2", .expression = "this > 0 ? '' : 'c must be positive'" }}) } },
+                .{ .number = @intFromEnum(@This().FieldNumber.c), .rules = .{ .type = .{ .sint32 = .{} }, .cel = .of(&.{.{ .id = "predefined_and_custom_rule_nested_proto2", .expression = "this > 0 ? '' : 'c must be positive'" }}) }, .predefined = &.{.{ .number = @This().RuleNumber.@"c.sint32.(buf.validate.conformance.cases.sint32_even_proto2).number", .name = "buf.validate.conformance.cases.sint32_even_proto2", .type = .type_bool, .value = .{ .boolean = true }, .cel = &.{.{ .id = "sint32.even.proto2", .message = "sint32 value is not even", .expression = "this % 2 == 0" }} }} },
             },
-            .unsupported = "buf.validate.SInt32Rules holds a rule the plugin's validate.proto does not state: a predefined rule of an extension, or a later release's (docs/design.md §8 step 34)",
+        };
+
+        pub const RuleNumber = struct {
+            pub const @"c.sint32.(buf.validate.conformance.cases.sint32_even_proto2).number" = 1161;
         };
     };
 };
@@ -933,12 +1056,12 @@ pub const StandardPredefinedAndCustomRuleProto2 = struct {
 
     pub const protovalidate: validate.Rules = .{
         .fields = &.{
-            .{ .number = @intFromEnum(@This().FieldNumber.a), .rules = .{ .type = .{ .sint32 = .{ .less_than = .{ .lt = @This().RuleNumber.@"a.sint32.lt" } } }, .cel = .of(&.{.{ .id = "standard_predefined_and_custom_rule_scalar_proto2", .expression = "this > 24 ? '' : 'a must be greater than 24'" }}) } },
+            .{ .number = @intFromEnum(@This().FieldNumber.a), .rules = .{ .type = .{ .sint32 = .{ .less_than = .{ .lt = @This().RuleNumber.@"a.sint32.lt" } } }, .cel = .of(&.{.{ .id = "standard_predefined_and_custom_rule_scalar_proto2", .expression = "this > 24 ? '' : 'a must be greater than 24'" }}) }, .predefined = &.{.{ .number = @This().RuleNumber.@"a.sint32.(buf.validate.conformance.cases.sint32_even_proto2).number", .name = "buf.validate.conformance.cases.sint32_even_proto2", .type = .type_bool, .value = .{ .boolean = true }, .cel = &.{.{ .id = "sint32.even.proto2", .message = "sint32 value is not even", .expression = "this % 2 == 0" }} }} },
         },
-        .unsupported = "buf.validate.SInt32Rules holds a rule the plugin's validate.proto does not state: a predefined rule of an extension, or a later release's (docs/design.md §8 step 34)",
     };
 
     pub const RuleNumber = struct {
         pub const @"a.sint32.lt" = 28;
+        pub const @"a.sint32.(buf.validate.conformance.cases.sint32_even_proto2).number" = 1161;
     };
 };

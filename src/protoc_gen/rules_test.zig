@@ -12,7 +12,12 @@ fn field(name: []const u8, number: i32, kind: pb.Type, label: pb.Label) pb.Field
 
 /// The response to a request of one file, demo/v1/demo.proto, that holds `messages`.
 fn respond(arena: std.mem.Allocator, messages: []const pb.DescriptorProto) !pb.CodeGeneratorResponse {
-    const file: pb.FileDescriptorProto = .{ .name = "demo/v1/demo.proto", .package = "demo.v1", .message_type = .of(messages), .syntax = "proto3" };
+    return respond_extended(arena, messages, &.{});
+}
+
+/// The response to a request of one file that holds `messages` and declares `extensions`.
+fn respond_extended(arena: std.mem.Allocator, messages: []const pb.DescriptorProto, extensions: []const pb.FieldDescriptorProto) !pb.CodeGeneratorResponse {
+    const file: pb.FileDescriptorProto = .{ .name = "demo/v1/demo.proto", .package = "demo.v1", .message_type = .of(messages), .extension = .of(extensions), .syntax = "proto3" };
     const request: pb.CodeGeneratorRequest = .{ .file_to_generate = .of(&.{"demo/v1/demo.proto"}), .proto_file = .of(&.{file}) };
     const bytes = try proto.encode(pb.CodeGeneratorRequest, &request, try arena.alloc(u8, try proto.encoded_len(pb.CodeGeneratorRequest, &request)));
     return main.respond(arena, bytes);
@@ -167,7 +172,55 @@ test "a rule the plugin's types do not know marks the table unsupported" {
     var value = field("value", 1, .string, .optional);
     value.options = .{ .rules = try proto.decode(@import("buf_validate_validate").FieldRules, &field_rules) };
     const code = try generated(arena, &.{.{ .name = "Extended", .field = .of(&.{value}) }});
-    try expect_contains(code, "        .unsupported = \"buf.validate.StringRules holds a rule the plugin's validate.proto does not state");
+    try expect_contains(code, "        .unsupported = \"buf.validate.StringRules holds field 1161, which neither the plugin's validate.proto nor an extension of the request states\",\n");
+}
+
+test "a predefined rule of an extension is written with the entry of the field that holds it" {
+    var arena_state = std.heap.ArenaAllocator.init(testing.allocator);
+    defer arena_state.deinit();
+    const arena = arena_state.allocator();
+    const validate = @import("buf_validate_validate");
+    // extend buf.validate.Int32Rules { optional bool even = 1161 [(buf.validate.predefined).cel = { ... }]; }
+    const even_number = 1161;
+    const even: pb.FieldDescriptorProto = .{
+        .name = "even",
+        .extendee = ".buf.validate.Int32Rules",
+        .number = even_number,
+        .type = .bool,
+        .label = .optional,
+        .options = .{ .predefined = .{ .cel = .of(&.{.{ .id = "int32.even", .message = "must be even", .expression = "!rule || this % 2 == 0" }}) } },
+    };
+    // `(even) = true` in an Int32Rules: field 1161, a varint of 1.
+    const even_record = [_]u8{ 0xc8, 0x48, 0x01 };
+    const int32_rules: validate.Int32Rules = .{ .greater_than = .{ .gt = 0 }, ._unknown = .{ .bytes = &even_record } };
+    var count = field("count", 1, .int32, .optional);
+    count.options = .{ .rules = .{ .type = .{ .int32 = int32_rules } } };
+    const item_rules: validate.FieldRules = .{ .type = .{ .int32 = .{ ._unknown = .{ .bytes = &even_record } } } };
+    const list_rules: validate.RepeatedRules = .{ .items = .of(&item_rules) };
+    var parts = field("parts", 2, .int32, .repeated);
+    parts.options = .{ .rules = .{ .type = .{ .repeated = .of(&list_rules) } } };
+    var plain = field("plain", 3, .int32, .optional);
+    plain.options = .{ .rules = .{ .type = .{ .int32 = .{ .@"const" = 1 } } } };
+    const counted: pb.DescriptorProto = .{ .name = "Counted", .field = .of(&.{ count, parts, plain }) };
+
+    const response = try respond_extended(arena, &.{counted}, &.{even});
+    try testing.expect(response.@"error" == null);
+    var files = response.file.iterator();
+    const code = (try files.next()).?.content.?;
+    const cel = ".cel = &.{.{ .id = \"int32.even\", .message = \"must be even\", .expression = \"!rule || this % 2 == 0\" }}";
+    try expect_contains(code, "            .{ .number = @intFromEnum(@This().FieldNumber.count), .rules = .{ .type = .{ .int32 = .{ .greater_than = .{ .gt = 0 } } } }, " ++
+        ".predefined = &.{.{ .number = @This().RuleNumber.@\"count.int32.(demo.v1.even).number\", .name = \"demo.v1.even\", .type = .type_bool, .value = .{ .boolean = true }, " ++ cel ++ " }} },\n");
+    try expect_contains(code, "            .{ .number = @intFromEnum(@This().FieldNumber.parts), .rules = .{ .type = .{ .repeated = .of(&.{ .items = .of(&.{ .type = .{ .int32 = .{} } }) }) } }, " ++
+        ".predefined = &.{.{ .site = .items, .number = @This().RuleNumber.@\"parts.repeated.items.int32.(demo.v1.even).number\", .name = \"demo.v1.even\", .type = .type_bool, .value = .{ .boolean = true }, " ++ cel ++ " }} },\n");
+    // A field with no extension keeps the line it had.
+    try expect_contains(code, "            .{ .number = @intFromEnum(@This().FieldNumber.plain), .rules = .{ .type = .{ .int32 = .{ .@\"const\" = 1 } } } },\n");
+    try expect_contains(code, "        pub const @\"count.int32.(demo.v1.even).number\" = 1161;\n        pub const @\"parts.repeated.items.int32.(demo.v1.even).number\" = 1161;\n");
+    try expect_absent(code, ".unsupported");
+
+    // The same rules with no file that declares the extension: the table is unsupported.
+    const undeclared = try generated(arena, &.{counted});
+    try expect_contains(undeclared, "        .unsupported = \"buf.validate.Int32Rules holds field 1161, which neither the plugin's validate.proto nor an extension of the request states\",\n");
+    try expect_absent(undeclared, ".predefined");
 }
 
 test "a field or a nested type named as a declaration of the table is refused" {

@@ -10,6 +10,7 @@ const names = @import("names.zig");
 const index_file = @import("index.zig");
 const generate_out = @import("generate_out.zig");
 const rules_literal = @import("rules_literal.zig");
+const rules_predefined = @import("rules_predefined.zig");
 const constants = @import("constants.zig");
 const Out = generate_out.Out;
 const Index = index_file.Index;
@@ -77,13 +78,13 @@ pub fn write(out: *Out, full: []const u8, message: pb.DescriptorProto, entries: 
     if (map_entry or !try has_table(out.index, out.arena, full)) return;
     try check_names(message);
     out.uses_protovalidate = true;
-    var writer: Writer = .{ .arena = out.arena };
+    var writer: Writer = .{ .arena = out.arena, .index = out.index };
     try write_message_rules(&writer, message, depth + 1);
     try write_field_rules(&writer, entries, depth + 1);
     try write_oneof_rules(&writer, message, depth + 1);
-    if (writer.unknown_in) |rule_message| {
+    if (writer.unsupported) |why| {
         try indent(&writer, depth + 1);
-        try writer.text.print(out.arena, ".unsupported = \"{s} holds a rule the plugin's validate.proto does not state: a predefined rule of an extension, or a later release's (docs/design.md §8 step 34)\",\n", .{rule_message});
+        try writer.text.print(out.arena, ".unsupported = {s},\n", .{try names.string_literal(out.arena, why)});
     }
     try out.print("\n", .{});
     try out.indent(depth);
@@ -132,7 +133,8 @@ fn write_message_rules(writer: *Writer, message: pb.DescriptorProto, depth: usiz
     try writer.text.appendSlice(writer.arena, ",\n");
 }
 
-/// `.fields = &.{ ... },`: one line for each field with `(buf.validate.field)`.
+/// `.fields = &.{ ... },`: one line for each field with `(buf.validate.field)`, which ends with
+/// the predefined rules that the field's rules hold.
 fn write_field_rules(writer: *Writer, entries: []const Entry, depth: usize) Error!void {
     var opened = false;
     for (entries) |*entry| {
@@ -145,8 +147,11 @@ fn write_field_rules(writer: *Writer, entries: []const Entry, depth: usize) Erro
         try indent(writer, depth + 1);
         try writer.text.print(writer.arena, ".{{ .number = @intFromEnum(@This().FieldNumber.{s}), .rules = ", .{entry.name});
         try writer.path.append(writer.arena, entry.field.name orelse "");
+        writer.in_field = true;
         try rules_literal.message(writer, @TypeOf(rules.*), rules);
+        writer.in_field = false;
         _ = writer.path.pop();
+        try rules_predefined.write(writer);
         try writer.text.appendSlice(writer.arena, " },\n");
     }
     if (!opened) return;

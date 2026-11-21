@@ -73,4 +73,5 @@ test {
     _ = @import("rules_literal.zig");
     _ = @import("main_test.zig");
     _ = @import("rules_test.zig");
+    _ = @import("rules_predefined_test.zig");
 }

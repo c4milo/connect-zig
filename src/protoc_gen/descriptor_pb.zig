@@ -84,14 +84,20 @@ pub const FieldOptions = struct {
     /// `(buf.validate.field)`: protovalidate's extension of FieldOptions (validate.proto,
     /// "extend google.protobuf.FieldOptions"; decision 47).
     rules: ?validate.FieldRules = null,
-    pub const FieldNumber = enum(u29) { @"packed" = 2, features = 21, rules = 1159 };
+    /// `(buf.validate.predefined)`: the CEL rules of an extension of a rule message
+    /// (validate.proto, PredefinedRules).
+    predefined: ?validate.PredefinedRules = null,
+    pub const FieldNumber = enum(u29) { @"packed" = 2, features = 21, rules = 1159, predefined = 1160 };
     pub const protobuf: Descriptor = .{ .full_name = "google.protobuf.FieldOptions", .fields = &.{
-        field_of(FieldNumber.@"packed", .bool, .{}), field_of(FieldNumber.features, .message, .{}), field_of(FieldNumber.rules, .message, .{}),
+        field_of(FieldNumber.@"packed", .bool, .{}),     field_of(FieldNumber.features, .message, .{}), field_of(FieldNumber.rules, .message, .{}),
+        field_of(FieldNumber.predefined, .message, .{}),
     } };
 };
 
 pub const FieldDescriptorProto = struct {
     name: ?[]const u8 = null,
+    /// The message an extension extends, as ".package.Message".
+    extendee: ?[]const u8 = null,
     number: ?i32 = null,
     label: ?Label = null,
     type: ?Type = null,
@@ -100,11 +106,13 @@ pub const FieldDescriptorProto = struct {
     oneof_index: ?i32 = null,
     json_name: ?[]const u8 = null,
     proto3_optional: ?bool = null,
-    pub const FieldNumber = enum(u29) { name = 1, number = 3, label = 4, type = 5, type_name = 6, options = 8, oneof_index = 9, json_name = 10, proto3_optional = 17 };
+    pub const FieldNumber = enum(u29) { name = 1, extendee = 2, number = 3, label = 4, type = 5, type_name = 6, options = 8, oneof_index = 9, json_name = 10, proto3_optional = 17 };
     pub const protobuf: Descriptor = .{ .full_name = "google.protobuf.FieldDescriptorProto", .fields = &.{
-        field_of(FieldNumber.name, .string, .{}),       field_of(FieldNumber.number, .int32, .{}),     field_of(FieldNumber.label, .@"enum", .{}),
-        field_of(FieldNumber.type, .@"enum", .{}),      field_of(FieldNumber.type_name, .string, .{}), field_of(FieldNumber.options, .message, .{}),
-        field_of(FieldNumber.oneof_index, .int32, .{}), field_of(FieldNumber.json_name, .string, .{}), field_of(FieldNumber.proto3_optional, .bool, .{}),
+        field_of(FieldNumber.name, .string, .{}),      field_of(FieldNumber.extendee, .string, .{}),
+        field_of(FieldNumber.number, .int32, .{}),     field_of(FieldNumber.label, .@"enum", .{}),
+        field_of(FieldNumber.type, .@"enum", .{}),     field_of(FieldNumber.type_name, .string, .{}),
+        field_of(FieldNumber.options, .message, .{}),  field_of(FieldNumber.oneof_index, .int32, .{}),
+        field_of(FieldNumber.json_name, .string, .{}), field_of(FieldNumber.proto3_optional, .bool, .{}),
     } };
 };
 
@@ -175,10 +183,13 @@ pub const DescriptorProto = struct {
     enum_type: Repeated(EnumDescriptorProto, .message) = .{},
     options: ?MessageOptions = null,
     oneof_decl: Repeated(OneofDescriptorProto, .message) = .{},
-    pub const FieldNumber = enum(u29) { name = 1, field = 2, nested_type = 3, enum_type = 4, options = 7, oneof_decl = 8 };
+    /// The extensions a message declares, which its name scopes.
+    extension: Repeated(FieldDescriptorProto, .message) = .{},
+    pub const FieldNumber = enum(u29) { name = 1, field = 2, nested_type = 3, enum_type = 4, extension = 6, options = 7, oneof_decl = 8 };
     pub const protobuf: Descriptor = .{ .full_name = "google.protobuf.DescriptorProto", .fields = &.{
-        field_of(FieldNumber.name, .string, .{}),       field_of(FieldNumber.field, .message, .{}),   field_of(FieldNumber.nested_type, .message, .{}),
-        field_of(FieldNumber.enum_type, .message, .{}), field_of(FieldNumber.options, .message, .{}), field_of(FieldNumber.oneof_decl, .message, .{}),
+        field_of(FieldNumber.name, .string, .{}),        field_of(FieldNumber.field, .message, .{}),     field_of(FieldNumber.nested_type, .message, .{}),
+        field_of(FieldNumber.enum_type, .message, .{}),  field_of(FieldNumber.extension, .message, .{}), field_of(FieldNumber.options, .message, .{}),
+        field_of(FieldNumber.oneof_decl, .message, .{}),
     } };
 };
 
@@ -227,15 +238,18 @@ pub const FileDescriptorProto = struct {
     message_type: Repeated(DescriptorProto, .message) = .{},
     enum_type: Repeated(EnumDescriptorProto, .message) = .{},
     service: Repeated(ServiceDescriptorProto, .message) = .{},
+    /// The extensions a file declares at its top level.
+    extension: Repeated(FieldDescriptorProto, .message) = .{},
     options: ?FileOptions = null,
     syntax: ?[]const u8 = null,
     /// The edition of a file whose syntax is "editions": an `Edition` number such as 1000.
     edition: ?i32 = null,
-    pub const FieldNumber = enum(u29) { name = 1, package = 2, dependency = 3, message_type = 4, enum_type = 5, service = 6, options = 8, syntax = 12, edition = 14 };
+    pub const FieldNumber = enum(u29) { name = 1, package = 2, dependency = 3, message_type = 4, enum_type = 5, service = 6, extension = 7, options = 8, syntax = 12, edition = 14 };
     pub const protobuf: Descriptor = .{ .full_name = "google.protobuf.FileDescriptorProto", .fields = &.{
         field_of(FieldNumber.name, .string, .{}),          field_of(FieldNumber.package, .string, .{}),    field_of(FieldNumber.dependency, .string, .{}),
         field_of(FieldNumber.message_type, .message, .{}), field_of(FieldNumber.enum_type, .message, .{}), field_of(FieldNumber.service, .message, .{}),
-        field_of(FieldNumber.options, .message, .{}),      field_of(FieldNumber.syntax, .string, .{}),     field_of(FieldNumber.edition, .int32, .{}),
+        field_of(FieldNumber.extension, .message, .{}),    field_of(FieldNumber.options, .message, .{}),   field_of(FieldNumber.syntax, .string, .{}),
+        field_of(FieldNumber.edition, .int32, .{}),
     } };
 };
 
