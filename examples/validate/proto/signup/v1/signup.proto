@@ -1,0 +1,43 @@
+// The validate example's service: its request states its rules with protovalidate's options,
+// and a server interceptor checks each request message against them.
+syntax = "proto3";
+
+package signup.v1;
+
+import "buf/validate/validate.proto";
+
+service SignupService {
+  // Register takes one account.
+  rpc Register(RegisterRequest) returns (RegisterResponse);
+  // RegisterMany takes a stream of accounts, and answers how many it took.
+  rpc RegisterMany(stream RegisterRequest) returns (RegisterManyResponse);
+}
+
+message RegisterRequest {
+  string email = 1 [(buf.validate.field).string.email = true];
+  string name = 2 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 64
+  }];
+  int32 age = 3 [(buf.validate.field).int32 = {
+    gte: 13
+    lt: 150
+  }];
+  repeated string tags = 4 [(buf.validate.field).repeated = {
+    max_items: 4
+    unique: true
+    items: {
+      string: {min_len: 1}
+    }
+  }];
+}
+
+message RegisterResponse {
+  // The account's name, as the request gave it.
+  string name = 1;
+}
+
+message RegisterManyResponse {
+  // The accounts the server took.
+  int32 accepted = 1;
+}

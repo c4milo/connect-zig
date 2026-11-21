@@ -1,0 +1,12 @@
+.{
+    .name = .validate,
+    .version = "0.0.0",
+    .fingerprint = 0x42123254e7a875d8,
+    .minimum_zig_version = "0.16.0",
+    .dependencies = .{
+        // A project of your own names connect-zig by URL: `zig fetch --save git+https://github.com/c4milo/connect-zig`.
+        .connect_zig = .{ .path = "../.." },
+        .harness = .{ .path = "../harness" },
+    },
+    .paths = .{ "build.zig", "build.zig.zon", "buf.gen.yaml", "proto", "gen", "src" },
+}

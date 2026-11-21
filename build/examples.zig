@@ -26,6 +26,7 @@ const projects = [_]Project{
     .{ .name = "otlp", .description = "Export a trace to the OTLP receiver and read it back" },
     .{ .name = "quickstart", .description = "Serve the README's GreetService and call it over h11, h2 and h3" },
     .{ .name = "socket_server", .description = "Build the server of every example's service" },
+    .{ .name = "validate", .description = "Run calls behind an interceptor that validates each request message" },
 };
 
 const Project = struct { name: []const u8, description: []const u8 };

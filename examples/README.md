@@ -30,6 +30,7 @@ Start at the top: each project adds one layer to the one before it.
 | [std_io](std_io) | ELIZA on colibri's engine over `std.Io`, with no Rotor, and a client over TCP |
 | [otlp](otlp) | OpenTelemetry's trace receiver, a real API, which OpenTelemetry's Go SDK calls |
 | [socket_server](socket_server) | Every service above on one socket, for curl and buf curl |
+| [validate](validate) | A service that checks each request against the protovalidate rules of its schema |
 
 ## Run them
 
