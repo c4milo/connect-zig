@@ -1406,6 +1406,29 @@ ran on Linux x86-64 with Zig 0.16.0.
     the elements read. Each has a test now. Two checks no input reached are gone.
   - The commit `b6f90a1` has a subject of 74 columns, 2 past the limit, and `zig build
     lint-commits` refuses it. A rewrite of a pushed commit needs the owner's word.
+- **CEL, part d** (step 34, decision 47 as amended). Run on a Xeon at 2.1 GHz, x86-64 Linux.
+  - The module's side came first, in `e12c39d`: `Rules.Field.predefined`, and the check of
+    each entry's CEL rules, which read the field as `this`, the extension's value as `rule`
+    and the rule message as `rules`. Of its 20 mutations a test caught 17 and the compiler
+    stopped 3.
+  - The plugin's side, in `95ecace`, is `src/protoc_gen/rules_predefined.zig`. It finds each
+    extension of a rule message in the request, reads its records from the message's unknown
+    fields, and writes the field's `predefined` list. `zig build test-plugin` printed 31 of 31
+    tests passed, and `zig build test` 97 of 97 steps and 533 of 533 tests.
+    `tools/generate_check.sh` matched every `gen/`.
+  - `tools/protovalidate_conformance_check.sh` printed `PASS (failed: 0, skipped: 50, passed:
+    2822, total: 2872)`. 208 cases of `predefined_rules` left the list. The 50 listed cases
+    wait for step 35: 36 predefined rules whose expression calls `matches`, and 14 of
+    `pattern`.
+  - Mutations of the plugin's side, 76: a test caught each one. Six of the first mutants did
+    not compile for a reason of their own, and each ran again in a form that compiles.
+  - A reading of the mutation list before its run found five checks with no test: a wrapper's
+    default for a bool and for a string, the member of `Predefined.Value` for each type, a list
+    of no value, two CEL rules of one extension, and FieldRules itself as a site. Each has a
+    test now. A test with hand-written octets holds the four new numbers of
+    `descriptor_pb.zig`, which an encoding by the same file cannot check.
+  - The plugin walks the tags of a span in code of its own, about 40 lines, as the protobuf
+    module exports no wire reader. The owner's word is owed on a public name for one.
 - **Ubuntu 26.04** (`fa83b86`, decision 44 as amended on 2026-11-20). CI's
   [run 191](https://github.com/c4milo/connect-zig/actions/runs/44673102412), the first on
   `ubuntu-26.04` and `ubuntu-26.04-arm`. Every job passed. Over TLS on arm64, connect-zig held

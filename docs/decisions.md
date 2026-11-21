@@ -708,6 +708,21 @@ first. Cite an entry by number in code and commits ("decision 6").
         decides the result, as CEL states them.
       - The plugin still reads the predefined rules of an extension, since only its request
         holds an extension's descriptor. It writes each one's value into the table.
+        - A rule message's generated type does not know an extension, so the extension's
+          records lie among the message's unknown fields (decision 24). The plugin finds each
+          record's extension in its request, by the rule message's name and the record's
+          number, and reads the values through a `Repeated` view of that span.
+        - The protobuf module gives no list of the numbers in a span. The plugin walks the
+          span's tags itself, in `rules_predefined.zig`, and reads no value there. Beaten: a
+          public name for the module's wire reader, for one caller, which waits for the
+          owner's word.
+        - A value is a scalar, a wrapper of wrappers.proto, which CEL reads as its scalar, or
+          a list of them. Any other value, such as a Duration, marks the table unsupported,
+          and the build stops with a message that names the extension.
+        - An extension with no `(buf.validate.predefined).cel` states no rule, and the plugin
+          passes over it. A field that neither the plugin's validate.proto nor an extension
+          of the request states marks the table unsupported, so a rule of a later
+          validate.proto never goes unchecked.
     - The table holds the generated types of `validate.proto` itself, such as
       `buf.validate.FieldRules`. The plugin reads each option with that type, and writes it as
       a Zig literal from the type's own descriptor, so the plugin names no rule. A violation's
