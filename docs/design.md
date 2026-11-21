@@ -296,10 +296,24 @@ Each step names the check that proves it. A step is done when its check passes i
     of a stream, by both kinds of handler; `zig build test-protovalidate` runs the interceptor
     over a stand-in for `connect`; the example project `validate` serves methods behind the
     interceptor over h2, h11 and h3.
-34. **CEL.** The plugin compiles `cel` and `cel_expression` rules, and the predefined rules of
-    an extension, into Zig functions that the tables name (decision 47). New public names: the
-    step names them. Check: the conformance cases of custom and predefined rules leave the
-    known-failing list.
+34. **CEL.** The module compiles `cel` and `cel_expression` rules at comptime, from the text
+    the table holds (decision 47 as amended on 2026-11-21). The step has four parts, and each
+    ends with its conformance cases off the known-failing list.
+    - Part a: the tokens, the parser, each part's type from the message's descriptor, and the
+      code it unfolds into, for the rules of a message and of a scalar or message field.
+    - Part b: lists and maps, with their macros, and the rules of `repeated.items`, `map.keys`
+      and `map.values`.
+    - Part c: protovalidate's own functions, such as `isEmail`, over the format checks of step
+      32, and `format`.
+    - Part d: the predefined rules of an extension. The plugin reads each extension's value
+      and its rules from its request, and writes them into the table.
+
+    New public names: `protovalidate.Error` gains `Unevaluable`, for an expression that fails
+    at run time. `Rules.Field` gains `predefined`, which the plugin writes. No root name is
+    new. Check: `zig build test-protovalidate`, with each check's mutation caught, and the
+    conformance cases of custom rules, of the library's functions and of predefined rules
+    leave the known-failing list. The cases whose expression calls `matches` stay, for step
+    35.
 35. **Patterns.** `pattern` rules and CEL's `matches` run on stdx's regular expression module
     (decision 47). New public names: none. Check: the conformance cases of patterns leave the
     known-failing list.
