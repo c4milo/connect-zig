@@ -9,6 +9,7 @@ const shape = @import("shape.zig");
 const walk_file = @import("walk.zig");
 const value_file = @import("value.zig");
 const field_file = @import("field.zig");
+const cel_rule = @import("cel/cel_rule.zig");
 const Walk = walk_file.Walk;
 const Path = walk_file.Path;
 const Site = walk_file.Site;
@@ -51,6 +52,7 @@ pub fn check(comptime F: type, comptime kind: proto.Kind, comptime rules: pb.Fie
         if (comptime rules.required orelse false) return walk_file.violate(walk, step, comptime field_file.required_broken(.{}), false);
         if (comptime (rules.ignore orelse .ignore_unspecified) == .ignore_if_zero_value) return;
     }
+    if (comptime cel_rule.states(rules)) try cel_rule.check_field(rules, .{}, cel_rule.Whole(F).?{ .field = list }, walk, step);
     try check_size(F, comptime rules_of(rules), list, walk, step);
     if (comptime rules_of(rules).unique orelse false) try check_unique(F, list, walk, step);
     try check_items(F, kind, comptime item_rules_of(rules), list, walk, step);

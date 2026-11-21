@@ -18,6 +18,7 @@ const walk_file = @import("walk.zig");
 const value_file = @import("value.zig");
 const field_file = @import("field.zig");
 const list_file = @import("list.zig");
+const cel_rule = @import("cel/cel_rule.zig");
 const Walk = walk_file.Walk;
 const Path = walk_file.Path;
 const Site = walk_file.Site;
@@ -76,6 +77,7 @@ pub fn check(comptime F: type, comptime rules: pb.FieldRules, map: *const F, wal
         if (comptime rules.required orelse false) return walk_file.violate(walk, step, comptime field_file.required_broken(.{}), false);
         if (comptime (rules.ignore orelse .ignore_unspecified) == .ignore_if_zero_value) return;
     }
+    if (comptime cel_rule.states(rules)) try cel_rule.check_field(rules, .{}, cel_rule.Whole(F).?{ .field = map }, walk, step);
     const Entry = F.Element;
     const map_rules = comptime rules_of(rules);
     const counts = comptime map_rules.min_pairs != null or map_rules.max_pairs != null;

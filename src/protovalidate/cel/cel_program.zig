@@ -42,7 +42,7 @@ pub fn Type(comptime text: []const u8, comptime scope: Scope) type {
 }
 
 /// The value of `text` for `values`, a tuple with one value for each name of `scope`.
-pub fn run(comptime text: []const u8, comptime scope: Scope, values: anytype, env: *const type_file.Env) type_file.Error!Type(text, scope) {
+pub fn run(comptime text: []const u8, comptime scope: Scope, values: anytype, env: *type_file.Env) type_file.Error!Type(text, scope) {
     const node = comptime tree_of(text);
     return evaluation.eval(&node, scope, values, env);
 }

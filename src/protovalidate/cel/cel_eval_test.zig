@@ -51,7 +51,8 @@ const scope: Scope = .{ .types = &.{*const Message} };
 
 /// The value `text` gives for `message`, with no time.
 fn run(comptime text: []const u8, message: *const Message) Error!program.Type(text, scope) {
-    return program.run(text, scope, .{message}, &.{});
+    var env: Env = .{};
+    return program.run(text, scope, .{message}, &env);
 }
 
 fn expect_true(comptime text: []const u8, message: *const Message) !void {
@@ -63,8 +64,8 @@ fn expect_false(comptime text: []const u8, message: *const Message) !void {
 }
 
 fn expect_problem(comptime text: []const u8, comptime expected: []const u8) !void {
-    const problem = comptime program.problem_of(text, scope) orelse return error.TestExpectedProblem;
-    try testing.expectEqualStrings("`" ++ text ++ "`: " ++ expected, problem);
+    const problem = comptime program.problem_of(text, scope);
+    try testing.expectEqualStrings("`" ++ text ++ "`: " ++ expected, problem orelse return error.TestExpectedProblem);
 }
 
 /// The numbers of `sample`, which the expressions of the tests state too.
@@ -105,6 +106,10 @@ test "arithmetic follows each number's type" {
     try testing.expectError(error.Unevaluable, run("this.a % (this.b - 4) == 0", &sample));
     try testing.expectError(error.Unevaluable, run("this.big - 6u", &sample));
     try testing.expectError(error.Unevaluable, run("9223372036854775807 + this.a", &sample));
+    // A double that is not a number stands in no order: each comparison with it is false.
+    try expect_false("0.0 / (this.ratio - 0.5) <= 1.0 || 0.0 / (this.ratio - 0.5) >= 1.0", &sample);
+    try expect_false("0.0 / (this.ratio - 0.5) < 1.0 || 0.0 / (this.ratio - 0.5) > 1.0 || 0.0 / (this.ratio - 0.5) == 0.0 / (this.ratio - 0.5)", &sample);
+    try expect_true("0.0 / (this.ratio - 0.5) != 1.0", &sample);
 }
 
 test "a conditional gives the side its condition picks" {
@@ -147,6 +152,17 @@ test "functions convert and read strings" {
     try testing.expectError(error.Unevaluable, run("int(this.name) == 0", &sample));
 }
 
+test "protovalidate's functions check a string's form" {
+    const address: Message = .{ .name = "10.0.0.0/8", .a = 4, .on = true };
+    try expect_true("this.name.isIpPrefix() && this.name.isIpPrefix(this.a) && this.name.isIpPrefix(this.on) && this.name.isIpPrefix(this.a, this.on)", &address);
+    try expect_false("this.name.isIp() || this.name.isIpPrefix(6) || this.name.isEmail() || this.name.isUri()", &address);
+    try expect_true("'ada@example.com'.isEmail() && 'example.com'.isHostname() && 'a:80'.isHostAndPort(true) && '/a'.isUriRef() && 'a:b'.isUri()", &address);
+    try expect_true("has(this.a) ? this.name.isIpPrefix(this.a) : this.name.isIpPrefix()", &address);
+    try expect_true("(0.0 / (this.ratio)).isNan() && (1.0 / this.ratio).isInf() && (1.0 / this.ratio).isInf(1) && !(1.0 / this.ratio).isInf(0 - 1)", &address);
+    try expect_problem("this.a.isEmail()", "found no matching overload for `isEmail` applied to (int)");
+    try expect_problem("this.name.isIp('4')", "found no matching overload for `isIp` applied to (string, string)");
+}
+
 test "a duration and a timestamp compare, and now is the time the caller passes" {
     const timed: Message = .{ .at = .{ .seconds = 1_049_587_300 }, .took = .{ .seconds = 9, .nanos = 5 } };
     try expect_true("this.took <= duration('10s') && this.took > duration('9s') && this.took != duration('9s')", &timed);
@@ -154,7 +170,7 @@ test "a duration and a timestamp compare, and now is the time the caller passes"
     try expect_true("int(this.at) >= 1049587200 && int(this.at) <= 1080432000", &timed);
     try testing.expectError(error.TimeMissing, run("this.at < now", &timed));
     try testing.expectError(error.TimeMissing, run("now == now", &timed));
-    const later: Env = .{ .now = .{ .seconds = 1_049_587_301 } };
+    var later: Env = .{ .now = .{ .seconds = 1_049_587_301 } };
     try testing.expect(try program.run("this.at < now && now == now && !(now < this.at)", scope, .{&timed}, &later));
     try testing.expect(!try program.run("this.at > now", scope, .{&timed}, &later));
     // A check that reads no time needs none.
@@ -168,6 +184,9 @@ test "dyn moves a mistake of types to the run" {
     try testing.expectError(error.Unevaluable, run("!dyn(this.a)", &sample));
     try testing.expectError(error.Unevaluable, run("dyn(this.name).size() + dyn(this).missing > 0", &sample));
     try testing.expectError(error.Unevaluable, run("has(dyn(this).missing)", &sample));
+    // What a function gives for a part that came through `dyn` came through it too.
+    try testing.expectError(error.Unevaluable, run("dyn(this.name).size() == 'six'", &sample));
+    try testing.expectError(error.Unevaluable, run("-dyn(this.a) == 'three'", &sample));
     try expect_true("dyn(this).a == 3 && dyn(this.name).startsWith('foo')", &sample);
     // A side that fails is absorbed as any failure is, and a conditional may skip it.
     try expect_false("false && dyn(this).missing == 1", &sample);
@@ -186,9 +205,12 @@ test "an expression that does not parse or does not type is a problem of the bui
     try expect_problem("this.a.startsWith('foo')", "found no matching overload for `startsWith` applied to (int, string)");
     try expect_problem("this.a == 'foo'", "found no matching overload for `==` applied to (int, string)");
     try expect_problem("this.a + 1u", "found no matching overload for `+` applied to (int, uint)");
+    try expect_problem("this.name + this.name", "found no matching overload for `+` applied to (string, string)");
+    try expect_problem("this.on * this.on", "found no matching overload for `*` applied to (bool, bool)");
     try expect_problem("this.ratio % 2.0", "found no matching overload for `%` applied to (double, double)");
     try expect_problem("this.name < 1", "found no matching overload for `<` applied to (string, int)");
     try expect_problem("this.on && 1", "found no matching overload for `&&` applied to (bool, int)");
+    try expect_problem("this.a || this.on", "found no matching overload for `||` applied to (int, bool)");
     try expect_problem("!this.a", "found no matching overload for `!` applied to (int)");
     try expect_problem("-this.big", "found no matching overload for `-` applied to (uint)");
     try expect_problem("-this.name", "found no matching overload for `-` applied to (string)");
@@ -201,15 +223,15 @@ test "an expression that does not parse or does not type is a problem of the bui
     try expect_problem("duration('ten')", "`ten` is no duration");
     try expect_problem("this.name.matches('a')", "`matches` waits for stdx's regular expressions (docs/design.md §8 step 35)");
     try expect_problem("unknown(this.a)", "found no matching overload for `unknown` applied to (int)");
-    try expect_problem("[1]", "the module reads no list and no map in an expression yet");
     try testing.expect(comptime program.problem_of("this.a < this.b", scope) == null);
 }
 
 test "this may be a scalar, as a field's rule has it" {
     const of_int: Scope = .{ .types = &.{i64} };
-    try testing.expect(try program.run("this > 42", of_int, .{@as(i64, 43)}, &.{}));
-    try testing.expect(!try program.run("this > 42", of_int, .{@as(i64, 42)}, &.{}));
-    try testing.expect(try program.run("this % 2u == 0u", .{ .types = &.{u64} }, .{@as(u64, 4)}, &.{}));
-    try testing.expect(try program.run("this.startsWith('a')", .{ .types = &.{[]const u8} }, .{@as([]const u8, "abc")}, &.{}));
+    var env: Env = .{};
+    try testing.expect(try program.run("this > 42", of_int, .{@as(i64, 43)}, &env));
+    try testing.expect(!try program.run("this > 42", of_int, .{@as(i64, 42)}, &env));
+    try testing.expect(try program.run("this % 2u == 0u", .{ .types = &.{u64} }, .{@as(u64, 4)}, &env));
+    try testing.expect(try program.run("this.startsWith('a')", .{ .types = &.{[]const u8} }, .{@as([]const u8, "abc")}, &env));
     try testing.expect(comptime program.problem_of("this.a", of_int) != null);
 }

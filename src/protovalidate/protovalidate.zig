@@ -75,6 +75,9 @@ test {
     _ = @import("cel/cel_eval_test.zig");
     _ = @import("cel/cel_rule.zig");
     _ = @import("cel/cel_rule_test.zig");
+    _ = @import("cel/cel_collection_test.zig");
+    _ = @import("cel/cel_library.zig");
+    _ = @import("cel/cel_list.zig");
     _ = @import("shape.zig");
     _ = @import("text.zig");
     _ = @import("rule_number.zig");

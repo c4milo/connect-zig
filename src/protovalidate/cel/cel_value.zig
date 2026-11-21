@@ -84,6 +84,7 @@ test "values of one type are equal by value, and numbers across their types" {
     try testing.expect(equal(true, true) and !equal(true, false));
     try testing.expect(equal(text("a"), text("a")) and !equal(text("a"), text("b")));
     try testing.expect(equal(Bytes{ .octets = "a" }, Bytes{ .octets = "a" }) and !equal(Bytes{ .octets = "a" }, Bytes{ .octets = "" }));
+    try testing.expect(!equal(Bytes{ .octets = "a" }, Bytes{ .octets = "b" }));
     try testing.expect(equal(Null{}, Null{}));
     try testing.expect(equal(Timestamp{ .seconds = 1, .nanos = 2 }, Timestamp{ .seconds = 1, .nanos = 2 }));
     try testing.expect(!equal(Duration{ .seconds = 1, .nanos = 2 }, Duration{ .seconds = 1 }));

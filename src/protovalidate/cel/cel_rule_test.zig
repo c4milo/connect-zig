@@ -168,3 +168,66 @@ test "a rule that reads now takes the caller's time, and fails without it" {
     // A timestamp that is not set has no value for the rule.
     try outcome(Dividing, &.{ .div = 1 }, .{});
 }
+
+const PairsEntry = struct {
+    key: []const u8 = "",
+    value: i32 = 0,
+    pub const FieldNumber = enum(u29) { key = 1, value = 2 };
+    pub const protobuf: proto.Descriptor = .{ .full_name = "t.Lists.PairsEntry", .map_entry = true, .fields = &.{
+        proto.field_of(FieldNumber.key, .string, .{}), proto.field_of(FieldNumber.value, .int32, .{}),
+    } };
+};
+
+const Lists = struct {
+    numbers: proto.Repeated(i32, .int32) = .{},
+    pairs: proto.Repeated(PairsEntry, .message) = .{},
+    pub const FieldNumber = enum(u29) { numbers = 1, pairs = 2 };
+    pub const protobuf: proto.Descriptor = .{ .full_name = "t.Lists", .fields = &.{
+        proto.field_of(FieldNumber.numbers, .int32, .{}), proto.field_of(FieldNumber.pairs, .message, .{}),
+    } };
+    const item: pb.FieldRules = .{ .cel = .of(&.{.{ .id = "item", .message = "an item must be positive", .expression = "this > 0" }}) };
+    const key: pb.FieldRules = .{ .cel = .of(&.{.{ .id = "key", .message = "a key must not be bad", .expression = "this != 'bad'" }}) };
+    const value: pb.FieldRules = .{ .cel_expression = .of(&.{"this < 10"}) };
+    /// The first value that the rule of a map's values refuses.
+    const limit = 10;
+    pub const protovalidate: Rules = .{ .fields = &.{
+        .{ .number = @intFromEnum(FieldNumber.numbers), .rules = .{
+            .cel = .of(&.{.{ .id = "sized", .message = "numbers must hold two", .expression = "this.size() == 2" }}),
+            .type = .{ .repeated = .of(&.{ .items = .of(&item) }) },
+        } },
+        .{ .number = @intFromEnum(FieldNumber.pairs), .rules = .{
+            .cel = .of(&.{.{ .id = "summed", .message = "each value must be positive", .expression = "this.all(k, this[k] > 0)" }}),
+            .type = .{ .map = .of(&.{ .keys = .of(&key), .values = .of(&value) }) },
+        } },
+    } };
+};
+
+test "a list's own CEL rule reads the whole list, and an element's rule each element" {
+    var checked: Checked = undefined;
+    const two = 2;
+    try testing.expectEqual(@as(usize, 0), (try checked.of(Lists, &.{ .numbers = .of(&.{ 1, two }) })).len);
+    try walk_test.expect_one(try checked.of(Lists, &.{ .numbers = .of(&.{1}) }), "numbers", "cel[0]", "sized");
+    // An element's rule lies under `repeated.items` in the field's rules.
+    try walk_test.expect_one(try checked.of(Lists, &.{ .numbers = .of(&.{ 1, 0 }) }), "numbers[1]", "repeated.items.cel[0]", "item");
+    try testing.expectEqualStrings("an item must be positive", checked.report.violations()[0].message.?);
+}
+
+/// A map alone would break the rule of `numbers`, which an empty list does not keep.
+fn with_pairs(pairs: []const PairsEntry) Lists {
+    const numbers = comptime [_]i32{ 1, 1 };
+    return .{ .numbers = .of(&numbers), .pairs = .of(pairs) };
+}
+
+test "a map's own CEL rule reads the whole map, and a key's and a value's rule each entry" {
+    var checked: Checked = undefined;
+    try testing.expectEqual(@as(usize, 0), (try checked.of(Lists, &with_pairs(&.{.{ .key = "k", .value = 1 }}))).len);
+    try walk_test.expect_one(try checked.of(Lists, &with_pairs(&.{.{ .key = "k", .value = 0 }})), "pairs", "cel[0]", "summed");
+    const keyed = try checked.of(Lists, &with_pairs(&.{.{ .key = "bad", .value = 1 }}));
+    try walk_test.expect_one(keyed, "pairs[\"bad\"]", "map.keys.cel[0]", "key");
+    try testing.expectEqual(@as(?bool, true), keyed[0].for_key);
+    const valued = try checked.of(Lists, &with_pairs(&.{.{ .key = "k", .value = Lists.limit }}));
+    try walk_test.expect_one(valued, "pairs[\"k\"]", "map.values.cel_expression[0]", "this < 10");
+    try testing.expectEqual(@as(?bool, null), valued[0].for_key);
+    // A list with no element is read by its own rule too: it has no presence to skip it by.
+    try walk_test.expect_one(try checked.of(Lists, &.{}), "numbers", "cel[0]", "sized");
+}
