@@ -1,0 +1,3 @@
+# The differences between this library and protovalidate-go that tools/cel_differential_check.sh
+# passes: a regular expression that matches this library's reason for a rule it does not
+# compile, a tab, and why the difference stands.

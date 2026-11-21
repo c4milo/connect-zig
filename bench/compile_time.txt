@@ -1,0 +1,3 @@
+# The build of tools/compile_time_check.sh's schema with its CEL rules, as a multiple of its
+# build without them, from tools/compile_time_check.sh --write.
+ratio|4.12

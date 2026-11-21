@@ -20,6 +20,7 @@ const line_coverage = @import("build/line_coverage.zig");
 const lean = @import("build/lean.zig");
 const fullstack = @import("build/fullstack.zig");
 const protovalidate = @import("build/protovalidate.zig");
+const schema_programs = @import("build/schema_programs.zig");
 
 const Graph = @import("build/graph.zig").Graph;
 
@@ -80,6 +81,7 @@ pub fn build(b: *std.Build) void {
     lean.add(b);
     bench.add(b, graph.public_names, target);
     fullstack.add(b, graph);
+    schema_programs.add(b, graph);
 }
 
 fn modules(b: *std.Build, stdx: *std.Build.Dependency, colibri: *std.Build.Dependency, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode) Graph {

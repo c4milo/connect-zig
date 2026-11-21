@@ -12,7 +12,7 @@
 # `--list` as a job of its own, so each shows apart in GitHub.
 set -eu
 cd "$(dirname "$0")/.."
-checks="format commits test release package bench costs bench-compare fullstack perf generated interop interop-languages interop-servers coverage line-coverage conformance protobuf-conformance protovalidate-conformance lean"
+checks="format commits test release package bench costs bench-compare fullstack perf generated interop interop-languages interop-servers coverage line-coverage conformance protobuf-conformance protovalidate-conformance cel-differential compile-time lean"
 only=""
 case "${1:-}" in
     --list)
@@ -124,6 +124,11 @@ check() {
         protobuf-conformance) tools/protobuf_conformance_check.sh ;;
         # protovalidate's conformance harness, against the rules the library checks (decision 47).
         protovalidate-conformance) tools/protovalidate_conformance_check.sh ;;
+        # Random CEL rules over random messages: this library's verdicts against those of
+        # protovalidate-go, which runs cel-go (decision 47).
+        cel-differential) tools/cel_differential_check.sh 1 2 3 ;;
+        # What a schema's CEL rules cost the compiler, against bench/compile_time.txt.
+        compile-time) tools/compile_time_check.sh ;;
         # The Lean model of the CEL syntax, and the vectors a unit test replays against the Zig
         # grammar (spec/README.md).
         lean) tools/lean_check.sh ;;
