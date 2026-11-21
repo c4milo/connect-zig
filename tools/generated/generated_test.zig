@@ -6,6 +6,8 @@ const proto = @import("protobuf");
 const kitchen = @import("kitchen");
 const eliza = @import("eliza");
 const large = @import("large");
+const protovalidate = @import("protovalidate");
+const wide = @import("wide");
 
 test "every generated declaration compiles" {
     testing.refAllDecls(kitchen);
@@ -56,4 +58,55 @@ test "a split file's pieces name each other, and round-trip as one file would" {
     try testing.expectEqual(@as(i64, 80), back.owner.?.field_80);
     try testing.expectEqual(.unary, large.LedgerService.get_ledger.stream_type);
     try testing.expectEqual(@as(u32, 81), large.Ledger.protobuf.fields[80].number);
+}
+
+/// The values the wide message's tests set, each past the rule of its field.
+const past_expression = 2000;
+const past_items_limit = 100;
+/// The octets the wide message's tests encode into: a few fields are set.
+const wide_room = 4096;
+
+test "a message of 600 fields round-trips through binary and JSON" {
+    const leaf: wide.Leaf = .{ .name = "end" };
+    const message: wide.Wide = .{ .f1 = 1, .f2 = "ab", .f299 = .of(&.{ 1, 0 }), .f597 = 1, .f598 = "last text", .f600 = leaf };
+    var binary: [wide_room]u8 = undefined;
+    const bytes = try proto.encode(wide.Wide, &message, &binary);
+    try testing.expectEqual(bytes.len, try proto.encoded_len(wide.Wide, &message));
+    const back = try proto.decode(wide.Wide, bytes);
+    try testing.expectEqual(@as(i32, 1), back.f1);
+    try testing.expectEqualStrings("last text", back.f598);
+    try testing.expectEqualStrings("end", back.f600.?.name);
+    var text: [wide_room]u8 = undefined;
+    const json = try proto.encode_json(wide.Wide, &back, &text);
+    try testing.expectEqualStrings("{\"f1\":1,\"f2\":\"ab\",\"f299\":[1,0],\"f597\":1,\"f598\":\"last text\",\"f600\":{\"name\":\"end\"}}", json);
+    var scratch: [wide_room]u8 = undefined;
+    var tokens: [wide_room]u8 = undefined;
+    const again = try proto.decode_json(wide.Wide, json, &scratch, &tokens);
+    try testing.expectEqual(@as(i32, 1), again.f597);
+    var elements = again.f299.iterator();
+    try testing.expectEqual(@as(?i32, 1), try elements.next());
+}
+
+test "a message of 600 fields is checked against the rules of each field" {
+    try testing.expect(comptime protovalidate.rules_error(wide.Wide) == null);
+    var storage: [protovalidate.constants.report_bytes_default]u8 align(@alignOf(protovalidate.Violation)) = undefined;
+    var report: protovalidate.Report = .init(&storage);
+    const leaf: wide.Leaf = .{ .name = "end" };
+    const valid: wide.Wide = .{ .f1 = 1, .f2 = "ab", .f299 = .of(&.{ 1, 0 }), .f597 = 1, .f598 = "last text", .f600 = leaf };
+    try protovalidate.validate(wide.Wide, &valid, .{}, &report);
+    try testing.expectEqual(@as(usize, 0), report.violations().len);
+
+    // The first field breaks its expression and the message's, and the last three fields break
+    // their rules: a string that is refused, an element past its limit, and an empty name.
+    const invalid: wide.Wide = .{ .f1 = past_expression, .f598 = "x", .f599 = .of(&.{past_items_limit}), .f600 = .{} };
+    try testing.expectError(error.Invalid, protovalidate.validate(wide.Wide, &invalid, .{}, &report));
+    const expected = [_][]const u8{ "wide.ends", "this < 1001", "string.not_in", "int32.lt", "string.min_len" };
+    try testing.expectEqual(expected.len, report.violations().len);
+    for (expected) |id| {
+        var found = false;
+        for (report.violations()) |violation| {
+            if (std.mem.eql(u8, violation.rule_id.?, id)) found = true;
+        }
+        try testing.expect(found);
+    }
 }

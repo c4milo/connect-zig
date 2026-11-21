@@ -58,8 +58,10 @@ fn add_coverage(b: *std.Build, graph: Graph, schemas: Schemas) void {
 }
 
 /// `zig build test-generated`: the code `buf generate` wrote for the examples compiles, and its
-/// messages round-trip. `tools/generate_check.sh` compares that code with what buf writes now,
-/// which needs buf, so it runs from `tools/ci.sh` and not from `zig build test` (design §8 step 6).
+/// messages round-trip. So does the wide message of tools/wide, 600 fields with rules, which
+/// `protovalidate` also checks. `tools/generate_check.sh` compares that code with what buf
+/// writes now, which needs buf, so it runs from `tools/ci.sh` and not from `zig build test`
+/// (design §8 step 6).
 fn add_generated(b: *std.Build, graph: Graph) *std.Build.Step {
     // A generated file reaches another by the module name its header states (design §8 step 6):
     // kitchen.proto and large.proto import shared.proto as `kitchen_v1_shared`.
@@ -74,6 +76,8 @@ fn add_generated(b: *std.Build, graph: Graph) *std.Build.Step {
             .{ .name = "kitchen", .module = generated(b, graph, "examples/protobuf_messages/gen/kitchen/v1/kitchen.pb.zig", &.{shared_import}) },
             .{ .name = "eliza", .module = generated(b, graph, "examples/eliza/gen/connectrpc/eliza/v1/eliza.pb.zig", &.{}) },
             .{ .name = "large", .module = generated(b, graph, "examples/protobuf_messages/gen/large/v1/large.pb.zig", &.{shared_import}) },
+            .{ .name = "protovalidate", .module = graph.protovalidate },
+            .{ .name = "wide", .module = generated(b, graph, "tools/wide/gen/wide/v1/wide.pb.zig", &.{.{ .name = "protovalidate", .module = graph.protovalidate }}) },
         },
     });
     const run = b.addRunArtifact(b.addTest(.{ .name = "generated", .root_module = module }));
