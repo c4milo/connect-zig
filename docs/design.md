@@ -1297,6 +1297,41 @@ ran on Linux x86-64 with Zig 0.16.0.
     MiB and 55 MiB, and connect-go to 144 MiB and 131 MiB.
   - A local run in an arm64 container before it gave 4.5 times connect-go's rate and 1.8 times
     connect-rust's, with every span counted.
+- **protovalidate's standard rules** (step 32, decision 47). Run on a Xeon at 2.1 GHz, x86-64
+  Linux, with buf 1.74.0 and go 1.24.7.
+  - `zig build test-protovalidate` printed 72 of 72 tests passed, and `zig build test-plugin` 20
+    of 20. `zig build test` passed. The lint reads the module and each generated table with
+    every rule (decision 17).
+  - `tools/generate_check.sh` printed a match for each `gen/`. No example's generated code
+    changed: a message with no rule keeps the code it had.
+  - `tools/protovalidate_conformance_check.sh` built the harness from protovalidate's commit
+    `4baed765`, the release v1.2.2. With strict messages and strict errors it printed `PASS
+    (failed: 0, skipped: 1054, passed: 1818, total: 2872)`. Of the 1,054 listed cases, 796 state
+    a CEL rule, 244 a predefined rule and 14 a `pattern`.
+  - The suites `library/*` are 635 of the CEL cases. They state `string`'s well-known forms as
+    CEL expressions. An executor that called `format_name.zig`, `format_ip.zig` and
+    `format_uri.zig` in the expressions' place passed all 635. The tree does not keep it.
+  - The suite found two faults, now fixed. A map's message values were not read, since an
+    entry holds its value as an optional. A timestamp in a rule's message was not written as RFC
+    3339 text.
+  - Mutations of the plugin, against `zig build test-plugin`: 29 of 29 CAUGHT.
+  - Mutations of the library, against `zig build test-protovalidate`: 343. A test caught 336:
+    78 of the walk, the report and the tables, 124 of the rules, and 134 of the formats and
+    the messages' text. The compiler stopped 4 more: each made a table of the tests' own
+    messages one that `rules_error` refuses. 3 are NOT CAUGHT and equivalent: an IPv6 host with
+    no brackets, a userinfo with an "@" and a path with a "?" cannot arrive, because the text
+    is split at those characters first.
+  - Mutations of the conformance check, 6 of 6 CAUGHT: a validation error answered as success
+    failed 754 cases; rules that cannot be checked answered as a run-time error failed 29; a
+    failing case left off the list and a passing case put on it failed 1 each; another message
+    for `string.min_len` failed 2; and a map key's violation with no `for_key` failed 11.
+  - The first run of each set found mutations that no test caught. Each now has a test: a
+    message's `oneof` rules, a oneof with `required` unset, strings compared by their octets,
+    a map entry's path, equal bounds of a range, a port's and an IPv4 octet's letters and digit
+    count, the text after an IPv6 host's bracket, a URI's host and zone, and the fraction and
+    leap day of a timestamp's text. Six checks that no input could reach are gone: a hostname's,
+    an email domain's and a Protobuf name's empty text, the end of an IPv4 address inside an
+    IPv6 one, a prefix's empty length, and a list's reset of its path.
 - **Ubuntu 26.04** (`fa83b86`, decision 44 as amended on 2026-11-20). CI's
   [run 191](https://github.com/c4milo/connect-zig/actions/runs/44673102412), the first on
   `ubuntu-26.04` and `ubuntu-26.04-arm`. Every job passed. Over TLS on arm64, connect-zig held
@@ -1342,3 +1377,16 @@ ran on Linux x86-64 with Zig 0.16.0.
 - For `oidc`, a measurement before any change: a client sends one token with each call, and
   the verifier checks its signature each time. If that cost shows in a server's profile, a
   verifier may keep the last tokens it took.
+- For `protovalidate`, what step 35 needs of stdx's regular expression module:
+  - RE2's syntax, as CEL's `matches` takes it. The suite's patterns hold a flag group, anchors,
+    classes, a hex escape range and Perl classes: `(?i)^[a-z0-9]+$`, `^[\x00-\x7F]+$` and
+    `\* \\ \w`.
+  - A search: `matches` is true when any part of the text matches, so a pattern states its
+    own anchors.
+  - Time linear in the text, no allocator, and a pattern that is comptime data in generated
+    code, with the size of what a match needs known at comptime.
+  - `bytes.pattern` reads its value as UTF-8, and a value that is not UTF-8 is a run-time
+    error, not a violation.
+- For `protovalidate`, a `unique` list longer than `compared_items_max` fails with
+  `TooManyItems` (decision 47). A program that needs longer lists needs a set in storage it
+  passes. No step holds that yet.
