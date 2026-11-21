@@ -682,8 +682,25 @@ first. Cite an entry by number in code and commits ("decision 6").
     - No rule is read at run time. The plugin writes a message's rules as a table,
       `pub const protovalidate: validate.Rules`, beside its `protobuf` descriptor. `validate`
       reads the table at comptime, as `encode` reads the descriptor, so a rule that a field
-      lacks costs no instruction. A CEL expression becomes a Zig function that the plugin
-      writes (design §8 step 34).
+      lacks costs no instruction.
+    - A CEL expression compiles at comptime too, in the module. Amended by the owner on
+      2026-11-21: the plugin was to write each expression as a Zig function. The table already
+      holds each rule's expression as text. The module parses the text at comptime, gives each
+      part a type from the message's descriptor, and unfolds it into plain code, as it does for
+      a standard rule (design §8 step 34).
+      - A generated file stays data, which the lint of decision 17 reads as it is. A function
+        that the plugin wrote would need a name for each number of its expression, and a split
+        at cognitive complexity 15.
+      - A table written by hand takes CEL rules as a generated one does.
+      - An expression that does not parse, that names a field its message lacks, or that calls
+        a function with the wrong types stops the build through `rules_error`, as a rule that
+        does not fit its field does. `dyn` moves such an error to run time, as CEL states it.
+      - An expression that fails at run time, such as a division by zero, ends `validate` with
+        `Unevaluable`. The message is not valid and not refused: the rule gave no verdict.
+      - The module compiles the CEL it has a use for, and grows by use. A function or a macro
+        it does not hold stops the build with a message that names it.
+      - The plugin still reads the predefined rules of an extension, since only its request
+        holds an extension's descriptor. It writes each one's value into the table.
     - The table holds the generated types of `validate.proto` itself, such as
       `buf.validate.FieldRules`. The plugin reads each option with that type, and writes it as
       a Zig literal from the type's own descriptor, so the plugin names no rule. A violation's
@@ -743,7 +760,8 @@ first. Cite an entry by number in code and commits ("decision 6").
 
     Beaten: a repository of its own, for the reasons above; a CEL interpreter at run time, as
     every other protovalidate library has, which needs an allocator and messages read through
-    reflection (decisions 4 and 6); rule tables written by hand in the library, a second copy
+    reflection (decisions 4 and 6); a Zig function that the plugin writes for each CEL
+    expression, which puts a CEL compiler in the plugin and code in each generated file; rule tables written by hand in the library, a second copy
     of `validate.proto`'s shape with each rule's number typed in; the rules as encoded octets
     that `validate` decodes at comptime, which no reader can check against the schema; and a
     check function that the plugin writes for each message, which passes cognitive complexity
