@@ -1,0 +1,18 @@
+{
+  "id": "not-a-uuid",
+  "name": "Ada Lovelace",
+  "email": "ada@",
+  "website": "example.com/ada",
+  "host": "api.example.com",
+  "ip": "192.0.2.10",
+  "age": 9,
+  "quota": "500",
+  "score": 1.5,
+  "plan": "PLAN_PRO",
+  "tags": ["math", "math"],
+  "limits": {"reads": 100, "writes": -1},
+  "token": "c2hvcnQ=",
+  "ttl": "0s",
+  "password": "short",
+  "confirm": "other"
+}

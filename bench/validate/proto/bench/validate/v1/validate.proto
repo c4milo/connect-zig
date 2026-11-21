@@ -1,0 +1,107 @@
+// The schema of the validation benchmark (tools/validate_compare_check.sh). Each implementation
+// validates the same messages against its rules: connect-zig's protovalidate, protovalidate-go,
+// protovalidate-es on Node.js, and protovalidate-buffa and prost-protovalidate in Rust. The rules
+// hold no `pattern`, which connect-zig does not read yet.
+syntax = "proto3";
+
+package bench.validate.v1;
+
+import "buf/validate/validate.proto";
+import "google/protobuf/duration.proto";
+
+option go_package = "github.com/c4milo/connect-zig/bench/validate/go/gen/bench/validate/v1;validatev1";
+
+// A small request: three fields, each with one standard rule.
+message Small {
+  string name = 1 [(buf.validate.field).string = {min_len: 1, max_len: 64}];
+  int32 age = 2 [(buf.validate.field).int32 = {gte: 0, lte: 150}];
+  string email = 3 [(buf.validate.field).string.email = true];
+}
+
+enum Plan {
+  PLAN_UNSPECIFIED = 0;
+  PLAN_FREE = 1;
+  PLAN_PRO = 2;
+}
+
+message Address {
+  string line = 1 [(buf.validate.field).string.min_len = 1];
+  string city = 2 [(buf.validate.field).string = {min_len: 1, max_len: 80}];
+  string country = 3 [(buf.validate.field).string.len = 2];
+}
+
+// A typical request of an API: a standard rule of each kind, and two CEL rules of the message.
+message Medium {
+  option (buf.validate.message).cel = {
+    id: "medium.confirm"
+    message: "confirm must equal password"
+    expression: "this.confirm == this.password"
+  };
+  option (buf.validate.message).cel = {
+    id: "medium.pro_quota"
+    message: "a pro plan needs a quota of 1000 or more"
+    expression: "this.plan != 2 || this.quota >= 1000u"
+  };
+
+  string id = 1 [(buf.validate.field).string.uuid = true];
+  string name = 2 [(buf.validate.field).string = {min_len: 1, max_len: 64}];
+  string email = 3 [(buf.validate.field).string.email = true];
+  string website = 4 [(buf.validate.field).string.uri = true];
+  string host = 5 [(buf.validate.field).string.hostname = true];
+  string ip = 6 [(buf.validate.field).string.ip = true];
+  int32 age = 7 [(buf.validate.field).int32 = {gte: 13, lt: 150}];
+  uint64 quota = 8 [(buf.validate.field).uint64 = {gt: 0, lte: 1000000}];
+  double score = 9 [(buf.validate.field).double = {gte: 0, lte: 1, finite: true}];
+  Plan plan = 10 [(buf.validate.field).enum = {defined_only: true, not_in: [0]}];
+  repeated string tags = 11 [(buf.validate.field).repeated = {
+    min_items: 1
+    max_items: 8
+    unique: true
+    items: {string: {min_len: 1, max_len: 16}}
+  }];
+  map<string, int32> limits = 12 [(buf.validate.field).map = {
+    max_pairs: 8
+    keys: {string: {min_len: 1}}
+    values: {int32: {gte: 0}}
+  }];
+  Address address = 13 [(buf.validate.field).required = true];
+  bytes token = 14 [(buf.validate.field).bytes = {min_len: 16, max_len: 64}];
+  google.protobuf.Duration ttl = 15 [(buf.validate.field).duration = {
+    gt: {seconds: 0}
+    lte: {seconds: 86400}
+  }];
+  string password = 16 [(buf.validate.field).string.min_len = 8];
+  string confirm = 17;
+}
+
+// CEL rules alone, over lists, a map and two fields of the message.
+message Rules {
+  option (buf.validate.message).cel = {
+    id: "rules.range"
+    message: "low must not exceed high"
+    expression: "this.low <= this.high"
+  };
+  option (buf.validate.message).cel = {
+    id: "rules.first"
+    message: "the first value must not be under low"
+    expression: "this.values.size() == 0 || this.values[0] >= this.low"
+  };
+
+  repeated int64 values = 1 [(buf.validate.field).cel = {
+    id: "rules.positive"
+    message: "each value must be positive"
+    expression: "this.all(v, v > 0)"
+  }];
+  repeated string names = 2 [(buf.validate.field).cel = {
+    id: "rules.names"
+    message: "a name must start with a, and there are at most 10"
+    expression: "this.exists(n, n.startsWith('a')) && this.size() <= 10"
+  }];
+  map<string, int64> weights = 3 [(buf.validate.field).cel = {
+    id: "rules.weights"
+    message: "each weight must not be negative, under a short key"
+    expression: "this.all(k, this[k] >= 0 && k.size() <= 8)"
+  }];
+  int64 low = 4;
+  int64 high = 5;
+}

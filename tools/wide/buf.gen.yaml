@@ -1,5 +1,5 @@
 # `tools/generate_check.sh` runs `buf generate --template tools/wide/buf.gen.yaml` from the root:
-# the Zig code of wide.v1.Wide, a message of 600 fields with rules, with the plugin this
+# the Zig code of wide.v1.Wide, a message of 1,200 fields with rules, with the plugin this
 # repository builds. The schema imports validate.proto from the root's buf workspace.
 version: v2
 inputs:

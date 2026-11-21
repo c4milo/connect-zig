@@ -1591,6 +1591,21 @@ ran on Linux x86-64 with Zig 0.16.0.
     grammar and the Lean model differ on 0`. With "%" given the level of "+" on purpose, the
     replay of seed 7 printed `differ on 165`.
 
+- **protovalidate beside the other implementations** (step 34, decision 47). The owner asked for
+  a chart of the popular protovalidate libraries in Go, Zig, Node.js and Rust.
+  - `tools/validate_compare_check.sh` runs five, docs/benchmarks.md, "Validation", says how,
+    and each gave each of the six messages the same verdict on the first run.
+  - On this tree's Xeon at 2.1 GHz, decode with validation: connect-zig took 59 to 932 ns, and
+    was 13 to 67 times as fast as protovalidate-go. It was the fastest in 5 of 6 cases.
+    protovalidate-buffa, whose plugin writes Rust code for each rule, was faster in one: the
+    valid message of CEL rules alone, 295 ns to connect-zig's 519.
+  - Validation alone, protovalidate-buffa was faster in three: the valid `Medium`, 348 ns to
+    850, and both `Rules` messages, 35 ns to 410 and 190 to 284. A repeated field and a map of
+    connect-zig are views of the octets, so validation decodes what Buffa decoded before. And a
+    CEL index of a map, `this[k]`, reads the entries from the last one until it finds the key,
+    so `all` over a map reads its entries once for each key. "What a later step owes" names it.
+  - The README's chart comes from a named CI run of the check.
+
 ### What a later step owes
 
 - A stream that waits for an event of the program once its request ended (colibri issue 130).
@@ -1623,6 +1638,10 @@ ran on Linux x86-64 with Zig 0.16.0.
   would run the grammar of `cel_grammar.zig` as a program and write each tree beside its
   text, and a table written by hand would keep its text alone. It changes what a generated
   file holds, and a tree that differs from its text needs a check, so the owner rules first.
+- For `protovalidate`, a CEL index of a map, `this[k]`, without a pass over the entries for
+  each key. A macro over a map gives each key with its value, so an expression that indexes
+  the map by the macro's variable could read the value the macro holds. The validation
+  benchmark's `Rules` messages measure it.
 - For `protovalidate`, cel-go's typing behind `dyn`. cel-go gives the result of a function on
   a dynamic value a type, and refuses `dyn(x).size() == 'a'`. This module marks the result as
   dynamic and compiles the expression. The differential check writes no such rule yet.

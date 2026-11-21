@@ -1,0 +1,12 @@
+# The Go code of the validation benchmark's schema. Run from the repository root, with
+# protoc-gen-go at the version go.mod pins on the path:
+#   buf generate --template bench/validate/go/buf.gen.yaml --path bench/validate/proto/bench/validate/v1
+# The schema's go_package names the package, and validate.proto's own go_package names the code
+# protovalidate-go registers it with.
+version: v2
+inputs:
+  - directory: .
+plugins:
+  - local: protoc-gen-go
+    out: bench/validate/go/gen
+    opt: module=github.com/c4milo/connect-zig/bench/validate/go/gen

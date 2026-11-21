@@ -1,0 +1,9 @@
+# `tools/generate_check.sh` runs `buf generate --template bench/validate/buf.gen.yaml` from the
+# root: the Zig code of the validation benchmark's schema, with the plugin this repository
+# builds. The schema imports validate.proto from the root's buf workspace.
+version: v2
+inputs:
+  - directory: bench/validate/proto
+plugins:
+  - local: zig-out/bin/protoc-gen-connect-zig
+    out: bench/validate/gen

@@ -1,0 +1,11 @@
+{
+  "name": "validate-node",
+  "private": true,
+  "description": "The validation benchmark's Node.js program: protovalidate-es over bench/validate/proto.",
+  "type": "module",
+  "main": "main.js",
+  "dependencies": {
+    "@bufbuild/protobuf": "2.17.0",
+    "@bufbuild/protovalidate": "1.3.0"
+  }
+}

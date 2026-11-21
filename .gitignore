@@ -4,3 +4,7 @@ zig-pkg/
 spec/lean/.lake/
 .claude/
 ci-charts/
+
+# The packages of the validation benchmark's Node.js program, when a person installs them there:
+# tools/validate_compare_check.sh installs them in a copy.
+bench/validate/node/node_modules/

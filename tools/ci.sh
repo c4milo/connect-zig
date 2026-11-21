@@ -12,7 +12,7 @@
 # `--list` as a job of its own, so each shows apart in GitHub.
 set -eu
 cd "$(dirname "$0")/.."
-checks="format citations commits test release package bench costs bench-compare fullstack perf generated interop interop-languages interop-servers coverage line-coverage conformance protobuf-conformance protovalidate-conformance cel-differential compile-time lean"
+checks="format citations commits test release package bench costs bench-compare fullstack perf generated interop interop-languages interop-servers coverage line-coverage conformance protobuf-conformance protovalidate-conformance cel-differential compile-time validate-compare lean"
 only=""
 case "${1:-}" in
     --list)
@@ -63,6 +63,7 @@ draw_charts() {
     [ "$(uname -m)" = aarch64 ] && suffix="-arm64"
     case "$2" in
         bench-compare) drawings="speed_chart:speed-vs-go call_chart:call-vs-go routes_chart:call-routes" ;;
+        validate-compare) drawings="validate_chart:validate-vs-go" ;;
         fullstack) drawings="fullstack_chart:fullstack:tls fullstack_chart:fullstack-cleartext:cleartext" ;;
     esac
     for drawing in ${drawings}; do
@@ -132,6 +133,12 @@ check() {
         cel-differential) tools/cel_differential_check.sh 1 2 3 ;;
         # What a schema's CEL rules cost the compiler, against bench/compile_time.txt.
         compile-time) tools/compile_time_check.sh ;;
+        # protovalidate's implementations in Zig, Go, Node.js and Rust on one schema: the times
+        # report and never gate; every verdict must match (docs/benchmarks.md, "Validation").
+        validate-compare) validate="$(tools/validate_compare_check.sh 2>&1)" && validate_status=0 || validate_status=$?
+            report_only validate-compare "${validate}"
+            draw_charts "${validate}" validate-compare
+            return "${validate_status}" ;;
         # The Lean model of the CEL syntax, and the vectors a unit test replays against the Zig
         # grammar (spec/README.md).
         lean) tools/lean_check.sh ;;

@@ -1,0 +1,19 @@
+{
+  "id": "6f1c2a9e-3b4d-4e5f-8a7b-9c0d1e2f3a4b",
+  "name": "Ada Lovelace",
+  "email": "ada@example.com",
+  "website": "https://example.com/ada",
+  "host": "api.example.com",
+  "ip": "192.0.2.10",
+  "age": 36,
+  "quota": "5000",
+  "score": 0.75,
+  "plan": "PLAN_PRO",
+  "tags": ["math", "engines", "notes"],
+  "limits": {"reads": 100, "writes": 10},
+  "address": {"line": "12 St James's Square", "city": "London", "country": "GB"},
+  "token": "MDEyMzQ1Njc4OWFiY2RlZmdoaWo=",
+  "ttl": "3600s",
+  "password": "analytical-engine",
+  "confirm": "analytical-engine"
+}

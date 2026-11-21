@@ -154,6 +154,16 @@ confirm a test fails. Report `CAUGHT` or `NOT CAUGHT` per mutation in the commit
   connect-rust, and checks each writes the same bytes as Zig. The
   Rust build needs buf, or `BUF` naming it. `tools/ci.sh` runs `zig build bench -- --quick`, and
   its `bench-compare` check runs `tools/bench_check.sh`.
+- Validation benchmark: `tools/validate_compare_check.sh [--quick]` times connect-zig's
+  `protovalidate` (`zig build bench-validate -- <dir>`, `bench/validate_main.zig`),
+  protovalidate-go (`bench/validate/go`), protovalidate-es on Node.js (`bench/validate/node`),
+  and protovalidate-buffa and prost-protovalidate (`bench/validate/rust`) on the schema of
+  `bench/validate/proto` and the messages of `bench/validate/cases`. It fails when two give one
+  message different verdicts. `tools/validate_chart.py` draws the README's chart from its
+  output, and `tools/ci.sh` runs it as `validate-compare`. `tools/generate_check.sh` holds
+  `bench/validate/gen`; `bench/validate/go/buf.gen.yaml` says how the Go code is written. It
+  needs buf, go, node with npm and cargo; prost-protovalidate's build runs protoc, which
+  `PROTOC` names or the script downloads, pinned by SHA-256 (docs/benchmarks.md, "Validation").
 - Coverage: `tools/coverage_check.sh` compares every protobuf type with Go's runtime through
   `buf convert`, over the JSON cases in `tools/testdata/`, and the binary cases with upb's,
   Python's protobuf pinned in `tools/upb_requirements.txt`, for closed enums and unchecked

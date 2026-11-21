@@ -133,3 +133,44 @@ spans, not compressed, on 16 connections of 4 streams. The calls a second:
 | connect-go | 5,333 | 368 | 7,067 | 519 |
 | Collector | 12,958 | 728 | 17,759 | 965 |
 | Vector | 4,250 | 243 | 8,264 | 304 |
+
+## Validation
+
+`tools/validate_compare_check.sh` times five implementations of protovalidate on one schema,
+`bench/validate/proto`, and requires each to give each message the same verdict:
+
+| Implementation | Language | How it checks a rule | Messages |
+| --- | --- | --- | --- |
+| connect-zig's `protovalidate` | Zig | Code the compiler makes from each rule, CEL included (decision 47) | the plugin's |
+| [protovalidate-go](https://github.com/bufbuild/protovalidate-go) v1.4.1 | Go | Rules read from descriptors once, CEL run by cel-go | protoc-gen-go's |
+| [protovalidate-es](https://github.com/bufbuild/protovalidate-es) 1.3.0 | TypeScript on Node.js | Rules read from descriptors once, CEL run by its own interpreter | protobuf-es 2.17.0 |
+| [protovalidate-buffa](https://github.com/mathematic-inc/protovalidate-buffa) 0.8.0 | Rust | Rust code its plugin writes from each rule, CEL included | Buffa 0.9.2, connect-rust's codec |
+| [prost-protovalidate](https://github.com/zs-dima/prost-protovalidate) 0.6.1 | Rust | Rules read through prost-reflect once, CEL run by an interpreter | prost 0.14 |
+
+The first three are Buf's own. protovalidate-buffa and prost-protovalidate are the two Rust
+crates most downloaded in November 2026, about 535,000 and 314,000 times; Buf publishes no Rust
+library yet.
+
+The schema holds three messages. `Small` has three fields of one standard rule each. `Medium` is a
+typical request of an API: a standard rule of each kind, among them `uuid`, `email`, `uri`,
+`hostname`, `ip`, a repeated field with `unique`, a map, a required message, bytes and a
+duration, and two CEL rules of the message. `Rules` holds CEL rules alone, over lists, a map
+and two fields. `bench/validate/cases` holds a valid and an invalid message of each as JSON, and
+`buf convert` encodes them. The schema holds no `pattern`, which connect-zig does not read yet.
+
+Each program keeps one validator for every call, as a server does, and times as
+bench/measure.zig does: the median of 11 batches of about 20 ms. It times two things for each
+message:
+
+- the decode of its octets and one validation of what the decode gives, which a server runs for
+  each request, and which the chart draws;
+- one validation of the message decoded before, which the second table holds.
+
+The first is the one to compare. connect-zig's message reads a repeated field and a map from the
+octets as validation runs, where the other implementations' decode built a list and a map
+before it. So connect-zig's validation alone includes work that the others count in their
+decode. protovalidate-es reads the schema's descriptors from a FileDescriptorSet, as code that
+protoc-gen-es writes builds them from an embedded descriptor.
+
+Each verdict is "valid", or "invalid:" and the rule ids of the violations in order. The check
+fails when two implementations give one message different verdicts.

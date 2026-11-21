@@ -58,6 +58,10 @@ change the public API, and the entry marks each change that does.
 - `docs/specs/cel/langdef.md`, the CEL language definition as cel-spec published it at
   v0.25.3, with its checksum. `tools/citations_check.sh`, the check `citations`, requires each
   citation of it in the code to name one of its sections.
+- `tools/validate_compare_check.sh`, the check `validate-compare`: connect-zig's
+  `protovalidate`, protovalidate-go, protovalidate-es on Node.js, protovalidate-buffa and
+  prost-protovalidate on one schema, each message's verdict required to match.
+  `tools/validate_chart.py` draws `docs/images/validate-vs-go.svg` from its output.
 - `tools/lean_check.sh [seed...]` also compares the Lean model with the Zig grammar on
   expressions that the model draws from a seed, a new seed on each run.
 - `tools/cel_differential_check.sh`, the check `cel-differential` of `tools/ci.sh`: random

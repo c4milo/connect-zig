@@ -1,9 +1,9 @@
 #!/bin/sh
 # Regenerates tools/gen, bench/gen, conformance/gen, the code of validate.proto in
 # src/protovalidate/gen, the code of protovalidate's conformance suite, the wide message of
-# tools/wide and each example project's gen/ with `buf generate` and the plugin this tree
-# builds, into a temporary directory, and fails when one differs from the committed code
-# (design §8 step 6).
+# tools/wide, the validation benchmark's schema in bench/validate/gen and each example project's
+# gen/ with `buf generate` and the plugin this tree builds, into a temporary directory, and fails
+# when one differs from the committed code (design §8 step 6).
 # With --write it rewrites them instead. It needs buf on the path, or BUF naming it.
 set -eu
 cd "$(dirname "$0")/.."
@@ -11,7 +11,7 @@ buf="${BUF:-buf}"
 # The plugin alone: the rest of the build compiles the generated code this script rewrites.
 zig build plugin
 # Each output directory, and the template that writes it.
-targets="tools/gen:tools/buf.gen.yaml bench/gen:bench/buf.gen.yaml conformance/gen:conformance/buf.gen.yaml src/protovalidate/gen:src/protovalidate/buf.gen.yaml conformance/protovalidate/gen:conformance/protovalidate/buf.gen.yaml tools/wide/gen:tools/wide/buf.gen.yaml"
+targets="tools/gen:tools/buf.gen.yaml bench/gen:bench/buf.gen.yaml conformance/gen:conformance/buf.gen.yaml src/protovalidate/gen:src/protovalidate/buf.gen.yaml conformance/protovalidate/gen:conformance/protovalidate/buf.gen.yaml tools/wide/gen:tools/wide/buf.gen.yaml bench/validate/gen:bench/validate/buf.gen.yaml"
 scratch="$(mktemp -d)"
 trap 'rm -rf "${scratch}"' EXIT
 for target in ${targets}; do
