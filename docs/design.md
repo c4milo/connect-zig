@@ -1339,6 +1339,39 @@ ran on Linux x86-64 with Zig 0.16.0.
     leap day of a timestamp's text. Six checks that no input could reach are gone: a hostname's,
     an email domain's and a Protobuf name's empty text, the end of an IPv4 address inside an
     IPv6 one, a prefix's empty length, and a list's reset of its path.
+- **A hook for each request message** (step 33, decision 47). Run on a Xeon at 2.1 GHz, x86-64
+  Linux, with buf 1.74.0.
+  - `zig build test-connect-colibri` printed 72 of 72 tests passed, 7 of them the hook's
+    (`message_hook_test.zig`). They run a route for each place that decodes a request message:
+    a function handler's one message and its `RequestStream`, a type handler's `on_message`,
+    and the `on_request` of a server stream's type handler.
+  - `zig build test-protovalidate` printed 83 of 83 tests passed, 11 of them the
+    interceptor's and its error text's, over a stand-in for `connect`.
+  - `zig build example-validate` printed "every call answered as expected over h2, h11 and
+    h3": an account taken over Connect, one refused in JSON with 1 violation, one refused over
+    gRPC with 3, a stream of 2 taken over gRPC-Web, and a stream refused at its second
+    account, whose third no handler took. `zig build serve` answered curl 400 and
+    `invalid_argument`, with the message "email: must be a valid email address (and 1 more)"
+    and a `buf.validate.Violations` detail.
+  - `zig build test` passed, and `tools/generate_check.sh` matched each `gen/`. The example's
+    schema takes validate.proto from the Buf Schema Registry at v1.2.2, whose file equals the
+    tree's.
+  - `tools/perf_check.sh` with valgrind 3.22 counted 4,177 instructions for the small routed
+    Connect call and 4,430 in 256 routes, as before the hook: a route whose interceptors declare
+    no `on_message` makes no call for a message.
+  - Mutations of the hook, against `zig build test-connect-colibri`, 14 of 14 CAUGHT: the hook
+    skipped at each of the four places, run after the handler, its error dropped, only the
+    first interceptor run, the list read backwards, no list read, a stream with no hook, a
+    refused message passed on, a refusal that is not the call's failure, a failed stream read
+    on, and a message counted after the hook.
+  - Mutations of the interceptor, against `zig build test-protovalidate`: 29. A test caught 28.
+    The compiler stopped 1: with `values_error` refusing every `.Values`, the tests' own
+    interceptor does not build.
+  - Mutations of the example, against `zig build example-validate`, 2 of 2 CAUGHT: routes that
+    list no interceptor, and a schema with no email rule.
+  - The step changes one thing a program may see: `RequestStream(T).next` gives no message
+    after its stream failed. Before, `next` read the body again when a handler asked after a
+    failure.
 - **Ubuntu 26.04** (`fa83b86`, decision 44 as amended on 2026-11-20). CI's
   [run 191](https://github.com/c4milo/connect-zig/actions/runs/44673102412), the first on
   `ubuntu-26.04` and `ubuntu-26.04-arm`. Every job passed. Over TLS on arm64, connect-zig held
@@ -1397,3 +1430,6 @@ ran on Linux x86-64 with Zig 0.16.0.
 - For `protovalidate`, a `unique` list longer than `compared_items_max` fails with
   `TooManyItems` (decision 47). A program that needs longer lists needs a set in storage it
   passes. No step holds that yet.
+- `examples/socket_server` serves every example's service but `validate`'s. A route table names
+  one `.Values` type, and each example's service names its own for its interceptor. A service
+  that takes the table's `.Values` as a parameter would let the table hold the fields of both.

@@ -430,6 +430,30 @@ standard rules, and walks nested messages, repeated fields and maps. A rule that
 such as `timestamp.lt_now`, takes it from `.{ .now = ... }`. `report.encode` writes the
 violations as a `buf.validate.Violations`, which an error carries as a detail.
 
+A server checks each request with `protovalidate.Interceptor`. A route calls an interceptor's
+`on_message` with each request message once it is decoded, before the handler takes it: a unary
+call's one message, and each message of a stream.
+
+```zig
+const validation: protovalidate.InterceptorOptions = .{};
+
+// What each call keeps for itself: what the error of a refused message points to.
+pub const Values = struct {
+    protovalidate: protovalidate.InterceptorRoom(connect, validation) = .{},
+};
+
+const Validate = protovalidate.Interceptor(connect, Values, validation);
+
+pub const route_options: rpc.RouteOptions = .{ .interceptors = &.{Validate} };
+```
+
+The route table names `Values` as its `.Values`. A message that breaks a rule ends its call with
+`invalid_argument`. The error's message names the first violation, such as "email: must be a
+valid email address (and 1 more)", and its detail is a `buf.validate.Violations` that holds each
+one. A message type with no rule costs its call no instruction. The interceptor takes the
+`connect` module as a parameter, because `protovalidate` imports none.
+[examples/validate](examples/validate) serves a service behind it.
+
 A rule the module has no check for stops your build, with a message that names it. That holds
 today for CEL rules, for the predefined rules of an extension and for `pattern`.
 
@@ -495,8 +519,8 @@ missing required field (decision 23).
 Not yet done:
 
 - a stream that waits for an event of the program once its request ended (colibri issue 130);
-- in `protovalidate`: CEL rules and the predefined rules of an extension, `pattern`, and a server
-  interceptor that validates each request (docs/design.md §8 steps 33 to 35).
+- in `protovalidate`: CEL rules and the predefined rules of an extension, and `pattern`
+  (docs/design.md §8 steps 34 and 35).
 
 ## Contributing
 

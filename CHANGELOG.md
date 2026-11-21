@@ -24,8 +24,19 @@ change the public API, and the entry marks each change that does.
 - The package exports `protovalidate`, and the generated code of validate.proto and of
   descriptor.proto as `buf_validate_validate` and `google_protobuf_descriptor`.
 - A message with no rule, in itself or in a message it holds, keeps the code it had.
-- Not yet: CEL rules and the predefined rules of an extension, `pattern`, and a server
-  interceptor. A message with such a rule stops the build, with a message that names the rule.
+- A server interceptor may declare `on_message(app, ctx, T, message)`. A route calls it with
+  each request message once it is decoded, before the handler takes it: a unary call's one
+  message, and each message of a stream, for a function handler and for a type handler. An
+  error it returns ends the call. A route whose interceptors declare none makes no call for a
+  message.
+- `protovalidate.Interceptor(connect, Values, options)` validates each request message in that
+  hook. A message that breaks a rule ends its call with `invalid_argument`, a message that
+  names the first violation, and a `buf.validate.Violations` detail. The route table's
+  `.Values` holds a `protovalidate.InterceptorRoom(connect, options)` in a field
+  `protovalidate`. The example project `validate` serves a service behind it.
+- `RequestStream(T).next` gives no message after its stream failed.
+- Not yet: CEL rules and the predefined rules of an extension, and `pattern`. A message with
+  such a rule stops the build, with a message that names the rule.
 
 ### Changed
 
