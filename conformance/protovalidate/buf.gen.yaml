@@ -1,0 +1,10 @@
+# `tools/generate_check.sh` runs `buf generate --template conformance/protovalidate/buf.gen.yaml`
+# from the root: the Zig code of the messages of protovalidate's conformance suite, with the
+# plugin this repository builds (decision 47). The schemas import validate.proto from the other
+# module of the root's buf workspace.
+version: v2
+inputs:
+  - directory: conformance/protovalidate/proto
+plugins:
+  - local: zig-out/bin/protoc-gen-connect-zig
+    out: conformance/protovalidate/gen

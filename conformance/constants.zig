@@ -119,3 +119,22 @@ pub const testee_token_len_max = 1 << 16;
 pub const testee_io_buffer_len = 1 << 12;
 /// The requests one run of the runner sends stay far below this bound.
 pub const testee_requests_max = 1 << 24;
+
+// The protovalidate executor's named sizes (decision 47).
+
+/// The longest TestConformanceRequest the executor reads: the descriptors of every schema of
+/// the suite, about 1 MiB, and one suite's cases.
+pub const executor_request_bytes_max = 32 * 1024 * 1024;
+/// The octets of one case's result, encoded: its name and its violations.
+pub const executor_result_bytes = 256 * 1024;
+/// The octets of one case's report: room for the violations of a case that breaks many rules.
+pub const executor_report_bytes = 256 * 1024;
+/// The octets stdin and stdout each buffer.
+pub const executor_io_buffer_len = 64 * 1024;
+/// The most cases of one request. The suite holds fewer than 3,000 in all.
+pub const executor_cases_max = 65_536;
+/// The nanoseconds of one second, for the time the executor passes to `validate`.
+pub const executor_nanos_per_second = 1_000_000_000;
+/// The backward branches the compiler may take while it lists one schema's messages: the suite's
+/// largest file declares about 250.
+pub const executor_eval_branches = 100_000;
