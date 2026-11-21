@@ -10,6 +10,23 @@ change the public API, and the entry marks each change that does.
 
 ## Unreleased
 
+### Added
+
+- `protovalidate`, a module that checks a message against the
+  [protovalidate](https://github.com/bufbuild/protovalidate) v1.2.2 rules of its schema
+  (decision 47). The plugin writes each message's `(buf.validate.message)`,
+  `(buf.validate.oneof)` and `(buf.validate.field)` options as a table, `pub const
+  protovalidate`, beside its descriptor. `protovalidate.validate` reads the table at compile
+  time, so no rule is parsed at run time, and writes each violation into a `Report` over storage
+  the program passes. It checks `required`, `ignore`, oneofs and every standard rule but
+  `pattern`: numbers, bool, enum, string with each well-known form, bytes, repeated fields, maps,
+  Any, Duration, Timestamp and FieldMask.
+- The package exports `protovalidate`, and the generated code of validate.proto and of
+  descriptor.proto as `buf_validate_validate` and `google_protobuf_descriptor`.
+- A message with no rule, in itself or in a message it holds, keeps the code it had.
+- Not yet: CEL rules and the predefined rules of an extension, `pattern`, and a server
+  interceptor. A message with such a rule stops the build, with a message that names the rule.
+
 ### Changed
 
 - connect-zig builds on colibri v0.19.0. **Changes a program's setup.** A program that serves TLS
@@ -33,6 +50,9 @@ change the public API, and the entry marks each change that does.
 
 ### Checked
 
+- protovalidate's conformance harness v1.2.2 runs against the library, with strict messages
+  and strict errors. 1818 of 2872 cases pass, and `conformance/protovalidate_known_failing.yaml`
+  lists the other 1054, each under its reason.
 - Receivers on connect-go and connect-rust join the full-stack check, each on one core. In CI's
   run 182, one core of connect-zig held 8.2 times connect-go's spans a second over TLS on arm64
   and 5.0 times on x86-64, and 2.8 and 1.9 times connect-rust's.

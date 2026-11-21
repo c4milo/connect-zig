@@ -682,9 +682,9 @@ first. Cite an entry by number in code and commits ("decision 6").
       lacks costs no instruction. A CEL expression becomes a Zig function that the plugin
       writes (design §8 step 34).
     - The table holds the generated types of `validate.proto` itself, such as
-      `buf.validate.FieldRules`. The plugin writes each rule message as a Zig literal from its
-      descriptor in the request, so the plugin knows no rule by name. A violation's rule path
-      takes each rule's number, name and type from the generated descriptor.
+      `buf.validate.FieldRules`. The plugin reads each option with that type, and writes it as
+      a Zig literal from the type's own descriptor, so the plugin names no rule. A violation's
+      rule path takes each rule's number, name and type from the generated descriptor.
     - The package exports that generated code as the module `buf_validate_validate`, the name
       the plugin gives `buf/validate/validate.proto`, and `google_protobuf_descriptor`, which
       it imports. A program's generated code that names `buf.validate.Violations` imports the
@@ -701,6 +701,11 @@ first. Cite an entry by number in code and commits ("decision 6").
       field's path, the rule's path, the rule's id and a message, as `buf.validate.Violation`
       holds them. A full report ends the walk and says so. A standard rule's message is a
       comptime string.
+    - The module holds no set, so it compares the elements of a `unique` list, and the keys of
+      a map, pair by pair, up to `compared_items_max` of them. A longer `unique` list fails with
+      `TooManyItems`. A map is read as a program reads it with `map_get`: the last entry of a
+      key is the map's. A longer map is read entry by entry, which checks more than the map
+      holds and never less, and is refused where `min_pairs` would count a key twice.
     - A rule that reads the time takes it from `Options.now` (decision 3). A message whose
       rules need the time fails with `TimeMissing` when the caller passed none.
     - A server checks each request message in an interceptor's `on_message` hook, which runs

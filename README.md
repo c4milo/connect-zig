@@ -106,6 +106,7 @@ buf curl --cacert examples/harness/tls/ca.pem --protocol grpc --schema examples/
 | `connect` | The Connect, gRPC and gRPC-Web rules, as functions over headers and bytes. |
 | `connect_colibri` | Routes for colibri's server, and calls for colibri's client. Programs import it as `rpc`. |
 | `oidc` | The check of an OpenID Connect bearer token, and a server interceptor that requires one. |
+| `protovalidate` | The check of a message against the [protovalidate](https://github.com/bufbuild/protovalidate) rules of its schema. |
 | `protoc-gen-connect-zig` | The plugin `buf generate` runs to write your `.pb.zig` files. |
 
 ### What works today
@@ -388,6 +389,50 @@ The route table's `.Values` serves any interceptor: it is a struct you declare, 
 starts with its defaults (decision 35). One table names one type for all its routes, so a table
 that joins services declares one struct with the fields of each.
 
+### 7. Validate a message
+
+The `protovalidate` module checks a message against the rules its schema states with
+[protovalidate](https://github.com/bufbuild/protovalidate)'s options:
+
+```proto
+import "buf/validate/validate.proto";
+
+message User {
+  string email = 1 [(buf.validate.field).string.email = true];
+  int32 age = 2 [(buf.validate.field).int32 = {gte: 18, lt: 150}];
+  repeated string tags = 3 [(buf.validate.field).repeated = {max_items: 8, unique: true}];
+}
+```
+
+The plugin writes the rules beside each message, as a table that `validate` reads when your
+program compiles (decision 47). No rule is read or parsed at run time, and the module allocates
+nothing: your program passes the report's storage.
+
+```zig
+const protovalidate = @import("protovalidate");
+
+var storage: [protovalidate.constants.report_bytes_default]u8 align(@alignOf(protovalidate.Violation)) = undefined;
+var report: protovalidate.Report = .init(&storage);
+protovalidate.validate(User, &user, .{}, &report) catch |failure| switch (failure) {
+    // Each violation is a `buf.validate.Violation`: the field's path, the rule's path, the
+    // rule's id, such as "string.email", and a message.
+    error.Invalid => for (report.violations()) |violation| {
+        std.debug.print("{s}: {s}\n", .{ violation.rule_id.?, violation.message.? });
+    },
+    else => return failure,
+};
+```
+
+Import it as `connect_zig.module("protovalidate")`, and give a generated file that holds rules
+the same module: its header names it. A message with no rule keeps the code it had. `validate`
+checks `required`, `ignore`, a oneof's `required`, a message's `oneof` rules and each type's
+standard rules, and walks nested messages, repeated fields and maps. A rule that reads the time,
+such as `timestamp.lt_now`, takes it from `.{ .now = ... }`. `report.encode` writes the
+violations as a `buf.validate.Violations`, which an error carries as a detail.
+
+A rule the module has no check for stops your build, with a message that names it. That holds
+today for CEL rules, for the predefined rules of an extension and for `pattern`.
+
 ### More examples
 
 [examples/](examples) holds twelve projects, each a Zig project you can copy (decision 41). They
@@ -415,6 +460,11 @@ with `zig build test`, and serves its service with `zig build serve` for curl an
   suite](https://github.com/protocolbuffers/protobuf/tree/main/conformance) in binary and JSON,
   for proto3, proto2 and edition 2023. 5707 cases pass, and
   `conformance/protobuf_known_failing.txt` lists each of the 35 that fail, with its reason.
+- `tools/protovalidate_conformance_check.sh` runs [protovalidate's conformance
+  harness](https://github.com/bufbuild/protovalidate/blob/main/docs/conformance.md) v1.2.2, with
+  strict messages and strict errors. 1818 of its 2872 cases pass. Each of the other 1054 is
+  listed in `conformance/protovalidate_known_failing.yaml` under its reason: a CEL rule, a
+  predefined rule or a `pattern`, which the library does not check yet.
 - `tools/coverage_check.sh` converts every protobuf type with connect-zig and with Go's runtime,
   between binary and JSON both ways, and requires the same message.
 - `tools/interop_languages_check.sh` calls the server from [clients in Go, TypeScript, Python
@@ -444,7 +494,9 @@ missing required field (decision 23).
 
 Not yet done:
 
-- a stream that waits for an event of the program once its request ended (colibri issue 130).
+- a stream that waits for an event of the program once its request ended (colibri issue 130);
+- in `protovalidate`: CEL rules and the predefined rules of an extension, `pattern`, and a server
+  interceptor that validates each request (docs/design.md §8 steps 33 to 35).
 
 ## Contributing
 
@@ -461,6 +513,7 @@ tools/generate_check.sh   # buf generate still writes each gen/
 tools/interop_check.sh    # buf curl, curl and OpenTelemetry's SDK against the example server
 tools/coverage_check.sh   # every protobuf type against Go's runtime
 tools/conformance_check.sh  # the connectrpc conformance suite against the server and client
+tools/protovalidate_conformance_check.sh  # protovalidate's conformance harness
 tools/interop_languages_check.sh  # Go, TypeScript, Python and Rust clients against the server
 tools/interop_servers_check.sh    # the client against Go, TypeScript, Python and Rust servers
 tools/perf_check.sh       # instructions of each benchmark operation against the baseline

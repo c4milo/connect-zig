@@ -94,7 +94,8 @@ confirm a test fails. Report `CAUGHT` or `NOT CAUGHT` per mutation in the commit
   magic-numbers, global-state, static-alignment, defer-order, undefined-fill, unreleased-acquire and
   denied-words, all from pepegrillo. The rules read `conformance/` as they read `examples/`, and
   each `gen/` as generated code; `conformance/proto` holds connectrpc's copy and
-  protobuf's test protos, which denied-words skips. `zig build test` also requires `.githooks/pre-push` to equal pepegrillo's
+  protobuf's test protos, which denied-words skips, as it skips protovalidate's schemas in
+  `src/protovalidate/proto` and `conformance/protovalidate`. `zig build test` also requires `.githooks/pre-push` to equal pepegrillo's
   hook (`zig build hook-check`).
 - Hooks: `zig build hooks` once after cloning points `core.hooksPath` at `.githooks`, whose
   pre-push hook runs the commit linter that `zig build install-commit-lint` installs. They read each `gen/` as they read hand-written code
@@ -126,7 +127,9 @@ confirm a test fails. Report `CAUGHT` or `NOT CAUGHT` per mutation in the commit
   `tools/gen` holds the checks' generated code, from `tools/proto` (decision 41).
   `tools/generate_check.sh` regenerates each `gen/` with `buf generate` and fails on a difference;
   `--write` rewrites it. It needs buf, or `BUF` naming it. It builds the plugin alone, with
-  `zig build plugin`, so generated code that no longer compiles does not stop it.
+  `zig build plugin`, so generated code that no longer compiles does not stop it. The root's
+  `buf.yaml` is the buf workspace of protovalidate's schemas alone: `src/protovalidate/proto`,
+  and `conformance/protovalidate/proto`, which imports it. Every other buf module stands alone.
 - Interop: `tools/interop_check.sh` calls the socket server with `buf curl` in Connect, gRPC and
   gRPC-Web, over h2 and h3, with curl over h11 and h2, and with OpenTelemetry's Go SDK, which
   exports spans to the OTLP receiver and reads them back (decision 40), all over TLS with the
@@ -155,6 +158,19 @@ confirm a test fails. Report `CAUGHT` or `NOT CAUGHT` per mutation in the commit
   unless `PROTOBUF_CONFORMANCE` names a runner; the package holds one for x86-64 Linux and for
   macOS. A case that fails on purpose, or that does not pass yet, goes in
   `conformance/protobuf_known_failing.txt` under its reason.
+- protovalidate: `zig build test-protovalidate` runs the `protovalidate` module's tests, and
+  `zig build test-plugin` the tests of the tables the plugin writes (decision 47).
+  `src/protovalidate/proto` holds validate.proto and the descriptor.proto it imports, as their
+  releases wrote them, and `src/protovalidate/gen` their generated code, which the build gives
+  as the modules `buf_validate_validate` and `google_protobuf_descriptor`.
+  `tools/protovalidate_conformance_check.sh` runs protovalidate's conformance harness v1.2.2
+  against `zig build protovalidate-executor`, with strict messages and strict errors. It builds
+  the harness with go from protovalidate's repository at the release's commit, unless
+  `PROTOVALIDATE_CONFORMANCE` names one, and requires the schemas of this tree to be that
+  commit's. `conformance/protovalidate/gen` holds the suite's generated code, which
+  `build/protovalidate.zig` reads module by module from each file's header. A case that fails on
+  purpose goes in `conformance/protovalidate_known_failing.yaml` under its reason. It needs git
+  and go.
 - Interop across languages: `tools/interop_languages_check.sh [client...]` runs the clients of
   `interop/` (Go, TypeScript, Python, and Rust's tonic and connect-rust) against the interop
   server of `tools/interop_server/`, which `zig build run-interop-server -- [port]` starts;
