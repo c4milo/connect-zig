@@ -66,6 +66,7 @@ test {
     _ = @import("cel/cel_token.zig");
     _ = @import("cel/cel_literal.zig");
     _ = @import("cel/cel_parse.zig");
+    _ = @import("cel/cel_tree_test.zig");
     _ = @import("cel/cel_type.zig");
     _ = @import("cel/cel_number.zig");
     _ = @import("cel/cel_select.zig");

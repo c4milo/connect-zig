@@ -37,8 +37,23 @@ pub const Token = struct {
     }
 };
 
-/// Each operator and bracket, the longest first, so "<=" is read before "<".
-const marks = [_][]const u8{ "&&", "||", "<=", ">=", "==", "!=", "(", ")", "[", "]", "{", "}", ".", ",", "?", ":", "+", "-", "*", "/", "%", "!", "<", ">" };
+/// The octets of an operator of two characters, such as "<=".
+const pair_len = 2;
+
+/// The length of the operator or the bracket that `rest` starts with, or 0 when it starts
+/// none. An operator of two characters is read before its first one alone: "<=" before "<".
+/// The reader runs in the compiler, where a switch costs less than a search of a list.
+fn mark_len(rest: []const u8) usize {
+    const second: u8 = if (rest.len > 1) rest[1] else 0;
+    return switch (rest[0]) {
+        '&' => if (second == '&') pair_len else 0,
+        '|' => if (second == '|') pair_len else 0,
+        '=' => if (second == '=') pair_len else 0,
+        '<', '>', '!' => if (second == '=') pair_len else 1,
+        '(', ')', '[', ']', '{', '}', '.', ',', '?', ':', '+', '-', '*', '/', '%' => 1,
+        else => 0,
+    };
+}
 
 pub const Tokens = struct {
     text: []const u8,
@@ -63,26 +78,34 @@ pub const Tokens = struct {
     /// WHITESPACE and COMMENT: "//" to the end of its line.
     fn skip_space(tokens: *Tokens) void {
         for (0..tokens.text.len + 1) |_| {
-            const rest = tokens.text[tokens.at..];
-            if (std.mem.startsWith(u8, rest, "//")) {
-                tokens.at += std.mem.indexOfScalar(u8, rest, '\n') orelse rest.len;
-            } else if (rest.len != 0 and std.mem.indexOfScalar(u8, " \t\r\n\x0c", rest[0]) != null) {
-                tokens.at += 1;
-            } else return;
+            if (tokens.at == tokens.text.len) return;
+            switch (tokens.text[tokens.at]) {
+                ' ', '\t', '\r', '\n', '\x0c' => tokens.at += 1,
+                '/' => {
+                    const rest = tokens.text[tokens.at..];
+                    if (rest.len == 1 or rest[1] != '/') return;
+                    tokens.at += std.mem.indexOfScalar(u8, rest, '\n') orelse rest.len;
+                },
+                else => return,
+            }
         }
     }
 };
 
 fn read(rest: []const u8) Token {
     const first = rest[0];
-    if (string_start(rest)) |start| return read_string(rest, start);
+    switch (first) {
+        '"', '\'' => return read_string(rest, 0),
+        // A string's prefix, or the first letter of a name.
+        'r', 'R', 'b', 'B' => if (string_start(rest)) |start| return read_string(rest, start),
+        else => {},
+    }
     if (std.ascii.isAlphabetic(first) or first == '_') return .{ .kind = .identifier, .text = rest[0..word_len(rest)] };
     if (std.ascii.isDigit(first)) return read_number(rest);
     // FLOAT_LIT may start at its ".": ".5".
     if (first == '.' and rest.len > 1 and std.ascii.isDigit(rest[1])) return read_number(rest);
-    for (marks) |each| {
-        if (std.mem.startsWith(u8, rest, each)) return .{ .kind = .punctuation, .text = rest[0..each.len] };
-    }
+    const len = mark_len(rest);
+    if (len != 0) return .{ .kind = .punctuation, .text = rest[0..len] };
     return .{ .kind = .invalid, .text = rest[0..1] };
 }
 
@@ -93,36 +116,62 @@ fn word_len(rest: []const u8) usize {
     return rest.len;
 }
 
-/// Where a string literal's opening quote lies, after its prefix: "r" for a raw string, "b" for
-/// bytes, or both, in either order and case. Null when `rest` starts no string.
+/// Where a string literal's opening quote lies, after its prefix: "r" or "R" for a raw string,
+/// "b" or "B" before it for bytes ("BYTES_LIT ::= [bB] STRING_LIT", "STRING_LIT ::= [rR]? ...").
+/// Null when `rest` starts no string.
 fn string_start(rest: []const u8) ?usize {
-    for (0..constants.cel_string_prefix_len_max + 1) |index| {
-        if (index == rest.len) return null;
-        if (rest[index] == '"' or rest[index] == '\'') return index;
-        if (std.mem.indexOfScalar(u8, "rRbB", rest[index]) == null) return null;
-    }
+    var index: usize = 0;
+    if (index < rest.len and (rest[index] == 'b' or rest[index] == 'B')) index += 1;
+    if (index < rest.len and (rest[index] == 'r' or rest[index] == 'R')) index += 1;
+    if (index < rest.len and (rest[index] == '"' or rest[index] == '\'')) return index;
     return null;
 }
 
-/// A string literal: its prefix, its quote, and the text up to the same quote. A backslash
-/// takes the octet after it, but in a raw string. A literal with no closing quote is invalid.
+/// The quotes that open and close a string of many lines.
+pub const triple_len = 3;
+
+/// Whether `rest` starts with three of the quote it starts with.
+pub fn opens_triple(rest: []const u8) bool {
+    return rest.len >= triple_len and rest[1] == rest[0] and rest[triple_len - 1] == rest[0];
+}
+
+/// A string literal: its prefix, its quotes, and the text up to the same quotes. A backslash
+/// takes the octet after it, but in a raw string. A literal with no closing quote is invalid,
+/// and so is one in single quotes that holds a line end ("STRING_LIT": `~( " | \r | \n )*`).
 fn read_string(rest: []const u8, start: usize) Token {
     const prefix = rest[0..start];
     const raw = std.mem.indexOfAny(u8, prefix, "rR") != null;
     const kind: Kind = if (std.mem.indexOfAny(u8, prefix, "bB") != null) .bytes else .string;
+    const end = string_end(rest, start, raw) orelse return .{ .kind = .invalid, .text = rest };
+    return .{ .kind = kind, .text = rest[0..end] };
+}
+
+/// Where the string ends whose opening quote lies at `start`: after its closing quotes. Null
+/// for a string that does not close.
+fn string_end(rest: []const u8, start: usize, raw: bool) ?usize {
     const quote = rest[start];
-    var index = start + 1;
+    const triple = opens_triple(rest[start..]);
+    const quotes: usize = if (triple) triple_len else 1;
+    var index = start + quotes;
     for (0..rest.len) |_| {
-        if (index >= rest.len) break;
-        if (rest[index] == quote) return .{ .kind = kind, .text = rest[0 .. index + 1] };
-        index += if (rest[index] == '\\' and !raw) constants.cel_escape_len_min else 1;
+        if (index >= rest.len) return null;
+        const octet = rest[index];
+        if (closes(rest[index..], quote, triple)) return index + quotes;
+        if (!triple and (octet == '\n' or octet == '\r')) return null;
+        index += if (octet == '\\' and !raw) constants.cel_escape_len_min else 1;
     }
-    return .{ .kind = .invalid, .text = rest };
+    return null;
+}
+
+/// Whether `rest` starts with the quotes that close a string opened by `quote`.
+fn closes(rest: []const u8, quote: u8, triple: bool) bool {
+    return rest[0] == quote and (!triple or opens_triple(rest));
 }
 
 /// INT_LIT, UINT_LIT or FLOAT_LIT.
 fn read_number(rest: []const u8) Token {
-    if (std.mem.startsWith(u8, rest, "0x") or std.mem.startsWith(u8, rest, "0X")) {
+    // "INT_LIT ::= -? DIGIT+ | -? 0x HEXDIGIT+": the prefix is written in lower case.
+    if (std.mem.startsWith(u8, rest, "0x")) {
         const prefix_len = "0x".len;
         const len = prefix_len + run_len(rest[prefix_len..], std.ascii.isHex);
         return with_suffix(rest, len, .int);
@@ -193,16 +242,38 @@ test "a number is an int, a uint with its suffix, or a double with a fraction or
     try expect_tokens("1.size", "int:1 punctuation:. identifier:size");
     try expect_tokens("2e", "int:2 identifier:e");
     try expect_tokens("1.5u", "double:1.5 identifier:u");
+    // "INT_LIT": the prefix of a hexadecimal number is "0x", in lower case.
+    try expect_tokens("0X1F", "int:0 identifier:X1F");
+    try expect_tokens("0x", "int:0x");
 }
 
 test "a string keeps its quotes, and a backslash takes the next octet but in a raw string" {
     try expect_tokens("'a' \"b\"", "string:'a' string:\"b\"");
     try expect_tokens("'it\\'s'", "string:'it\\'s'");
     try expect_tokens("r'a\\' b'x'", "string:r'a\\' bytes:b'x'");
-    try expect_tokens("rb'x' Br\"y\"", "bytes:rb'x' bytes:Br\"y\"");
+    // "BYTES_LIT ::= [bB] STRING_LIT": the "b" comes before the "r".
+    try expect_tokens("br'x' Br\"y\" B'z'", "bytes:br'x' bytes:Br\"y\" bytes:B'z'");
+    try expect_tokens("rb'x' Rb'y'", "identifier:rb string:'x' identifier:Rb string:'y'");
     try expect_tokens("'a\"b'", "string:'a\"b'");
     try expect_tokens("'open", "invalid:'open");
     try expect_tokens("'open\\'", "invalid:'open\\'");
     // A name that starts with a prefix's letter is a name.
     try expect_tokens("rb + b", "identifier:rb punctuation:+ identifier:b");
+    try expect_tokens("b", "identifier:b");
+    try expect_tokens("br", "identifier:br");
+}
+
+test "a string in three quotes holds line ends and single quotes, and one in single quotes holds no line end" {
+    try expect_tokens("'''a'b\nc'''", "string:'''a'b\nc'''");
+    try expect_tokens("\"\"\"a\"\"b\"\"\" x", "string:\"\"\"a\"\"b\"\"\" identifier:x");
+    try expect_tokens("''''''", "string:''''''");
+    try expect_tokens("br'''\\'''", "bytes:br'''\\'''");
+    // An escaped quote closes nothing.
+    try expect_tokens("'''a\\'''b'''", "string:'''a\\'''b'''");
+    try expect_tokens("'''open''", "invalid:'''open''");
+    // "STRING_LIT": a string in single quotes ends before a line end.
+    try expect_tokens("'a\nb'", "invalid:'a\nb'");
+    try expect_tokens("\"a\rb\"", "invalid:\"a\rb\"");
+    // Two quotes and no third are an empty string.
+    try expect_tokens("'' x", "string:'' identifier:x");
 }

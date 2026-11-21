@@ -79,21 +79,62 @@ pub const BinaryOp = enum {
     }
 };
 
+/// One octet of a string or of a bytes literal as the tree's text writes it.
+pub const Written = struct {
+    octets: [written_len_max]u8,
+    len: usize,
+
+    pub fn text(written: *const Written) []const u8 {
+        return written.octets[0..written.len];
+    }
+};
+/// The octets of the longest form: "\xff".
+const written_len_max = 4;
+const hexadecimal_digits = "0123456789abcdef";
+const nibble_bits = 4;
+const nibble_mask = 0xf;
+
+/// How the tree's text writes `octet` of a string, or of a bytes literal. A string keeps each
+/// octet but a backslash, a single quote and the line ends, which it escapes. A bytes literal
+/// keeps printable ASCII and writes each other octet as "\x" and two digits, so the text is
+/// ASCII whatever the octets are.
+pub fn written_of(octet: u8, comptime of_bytes: bool) Written {
+    const escaped: ?u8 = switch (octet) {
+        '\\', '\'' => octet,
+        '\n' => 'n',
+        '\r' => 'r',
+        '\t' => 't',
+        else => null,
+    };
+    if (escaped) |letter| return .{ .octets = .{ '\\', letter, 0, 0 }, .len = "\\n".len };
+    if (!of_bytes or std.ascii.isPrint(octet)) return .{ .octets = .{ octet, 0, 0, 0 }, .len = 1 };
+    return .{ .octets = .{ '\\', 'x', hexadecimal_digits[octet >> nibble_bits], hexadecimal_digits[octet & nibble_mask] }, .len = written_len_max };
+}
+
 /// The tree as text with every part in brackets, which shows how the parser grouped it:
-/// "(a < (b + 1))". A test compares it.
+/// "(a < (b + 1))". The text is an expression that reads as the same tree: a string and a
+/// bytes literal are written with their escapes, and a double with its exponent. A test
+/// compares it with the text `cel_tree.zig` writes of the same expression.
 pub fn render(comptime node: *const Node) []const u8 {
     comptime {
         return switch (node.*) {
             .int, .uint, .double, .boolean, .string, .bytes, .null, .name => render_leaf(node),
             .select => |select| render(select.of) ++ "." ++ select.field,
             .index => |index| render(index.of) ++ "[" ++ render(index.at) ++ "]",
-            .unary => |unary| "(" ++ unary.op.text() ++ render(unary.of) ++ ")",
+            .unary => |unary| "(" ++ unary.op.text() ++ render_operand(unary) ++ ")",
             .binary => |binary| "(" ++ render(binary.left) ++ " " ++ binary.op.text() ++ " " ++ render(binary.right) ++ ")",
             .conditional => |conditional| "(" ++ render(conditional.condition) ++ " ? " ++ render(conditional.then) ++ " : " ++ render(conditional.otherwise) ++ ")",
             .call => |call| render_target(call.target) ++ call.name ++ "(" ++ render_list(call.arguments) ++ ")",
             .list => |elements| "[" ++ render_list(elements) ++ "]",
         };
     }
+}
+
+/// A "-" before an integer literal is the literal's sign, so an int that a "-" negates is
+/// written in brackets: "(-(5))" is a negation, and "-5" is a number.
+fn render_operand(comptime unary: Node.Unary) []const u8 {
+    if (unary.op == .negate and unary.of.* == .int) return "(" ++ render(unary.of) ++ ")";
+    return render(unary.of);
 }
 
 /// A call's target and the "." after it, or nothing for a call with none.
@@ -107,14 +148,25 @@ fn render_leaf(comptime node: *const Node) []const u8 {
     return switch (node.*) {
         .int => |value| std.fmt.comptimePrint("{d}", .{value}),
         .uint => |value| std.fmt.comptimePrint("{d}u", .{value}),
-        .double => |value| std.fmt.comptimePrint("{d}", .{value}),
+        .double => |value| std.fmt.comptimePrint("{e}", .{value}),
         .boolean => |value| if (value) "true" else "false",
-        .string => |value| "'" ++ value ++ "'",
-        .bytes => |value| "b'" ++ value ++ "'",
+        .string => |value| "'" ++ render_octets(value, false) ++ "'",
+        .bytes => |value| "b'" ++ render_octets(value, true) ++ "'",
         .null => "null",
         .name => |name| name,
         else => unreachable,
     };
+}
+
+fn render_octets(comptime octets: []const u8, comptime of_bytes: bool) []const u8 {
+    comptime {
+        var text: []const u8 = "";
+        for (octets) |octet| {
+            const written = written_of(octet, of_bytes);
+            text = text ++ written.text();
+        }
+        return text;
+    }
 }
 
 fn render_list(comptime nodes: []const Node) []const u8 {
@@ -123,4 +175,23 @@ fn render_list(comptime nodes: []const Node) []const u8 {
         for (nodes, 0..) |*node, index| text = text ++ (if (index == 0) "" else ", ") ++ render(node);
         return text;
     }
+}
+
+const testing = std.testing;
+
+test "an octet of a literal is written so that it reads back as itself" {
+    try testing.expectEqualStrings("a", written_of('a', false).text());
+    try testing.expectEqualStrings("\\\\", written_of('\\', false).text());
+    try testing.expectEqualStrings("\\'", written_of('\'', true).text());
+    try testing.expectEqualStrings("\\n", written_of('\n', false).text());
+    try testing.expectEqualStrings("\\r", written_of('\r', true).text());
+    try testing.expectEqualStrings("\\t", written_of('\t', false).text());
+    // A string keeps an octet that is no ASCII, and a bytes literal writes its number.
+    try testing.expectEqualStrings("\xe9", written_of('\xe9', false).text());
+    try testing.expectEqualStrings("\\xe9", written_of('\xe9', true).text());
+    try testing.expectEqualStrings("\\x00", written_of(0, true).text());
+    try testing.expectEqualStrings("\\x7f", written_of('\x7f', true).text());
+    try testing.expectEqualStrings("\x00", written_of(0, false).text());
+    try testing.expectEqualStrings("~", written_of('~', true).text());
+    try testing.expectEqualStrings(" ", written_of(' ', true).text());
 }

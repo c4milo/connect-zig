@@ -2,19 +2,24 @@
 //! each escape sequence read (CEL language definition, "Syntax" and "String and Bytes Values").
 const std = @import("std");
 const constants = @import("../constants.zig");
+const token_file = @import("cel_token.zig");
 
 pub const Error = error{Literal};
 
 /// An INT_LIT's magnitude: decimal, or hexadecimal after "0x".
 pub fn magnitude(text: []const u8) Error!u64 {
-    const hexadecimal = std.mem.startsWith(u8, text, "0x") or std.mem.startsWith(u8, text, "0X");
+    const hexadecimal = std.mem.startsWith(u8, text, "0x");
     const digits = if (hexadecimal) text["0x".len..] else text;
     if (digits.len == 0) return error.Literal;
     return std.fmt.parseInt(u64, digits, if (hexadecimal) constants.hexadecimal_base else constants.decimal_base) catch error.Literal;
 }
 
+/// A FLOAT_LIT's value. A literal past the greatest double has no value: the nearest one is an
+/// infinity, which no literal states.
 pub fn double(text: []const u8) Error!f64 {
-    return std.fmt.parseFloat(f64, text) catch error.Literal;
+    const value = std.fmt.parseFloat(f64, text) catch return error.Literal;
+    if (!std.math.isFinite(value)) return error.Literal;
+    return value;
 }
 
 /// The octets a string or bytes literal states, written into `out`, which holds at least the
@@ -26,7 +31,9 @@ pub fn unescape(text: []const u8, out: []u8) Error![]const u8 {
     const prefix = text[0..quote_at];
     const raw = std.mem.indexOfAny(u8, prefix, "rR") != null;
     const octets = std.mem.indexOfAny(u8, prefix, "bB") != null;
-    const body = text[quote_at + 1 .. text.len - 1];
+    // A string of many lines opens and closes with three quotes.
+    const quotes: usize = if (token_file.opens_triple(text[quote_at..]) and text.len >= quote_at + token_file.triple_len + token_file.triple_len) token_file.triple_len else 1;
+    const body = text[quote_at + quotes .. text.len - quotes];
     if (raw) {
         @memcpy(out[0..body.len], body);
         return out[0..body.len];
@@ -84,8 +91,9 @@ fn write_escape(escape: Escape, octets: bool, out: []u8) usize {
         out[0] = @truncate(escape.value);
         return 1;
     }
+    if (std.unicode.utf8Encode(escape.value, out)) |len| return len else |_| {}
     // A code point no UTF-8 holds, such as a surrogate, reads as U+FFFD.
-    return std.unicode.utf8Encode(escape.value, out) catch std.unicode.utf8Encode(std.unicode.replacement_character, out) catch unreachable;
+    return std.unicode.utf8Encode(std.unicode.replacement_character, out) catch unreachable;
 }
 
 const testing = std.testing;
@@ -102,6 +110,11 @@ test "a number's text gives its value, in decimal or after 0x in hexadecimal" {
     try testing.expectError(error.Literal, magnitude("18446744073709551616"));
     try testing.expectError(error.Literal, magnitude("0x"));
     try testing.expectEqual(@as(f64, 1500), try double("1.5e3"));
+    try testing.expectError(error.Literal, magnitude("0X1F"));
+    // A double past the greatest one has no value, and one below the least is 0.
+    try testing.expectEqual(std.math.floatMax(f64), try double("1.7976931348623157e308"));
+    try testing.expectError(error.Literal, double("1e309"));
+    try testing.expectEqual(@as(f64, 0), try double("1e-999"));
 }
 
 test "a string's escapes read as the characters they state" {
@@ -119,7 +132,12 @@ test "a string's escapes read as the characters they state" {
 test "a bytes literal's numbered escape is one octet, and a raw literal keeps its backslashes" {
     try expect_octets("\xe9\x00\xff", "b'\\xe9\\000\\377'");
     try expect_octets("\\d+\\.", "r'\\d+\\.'");
-    try expect_octets("\\x41", "rb'\\x41'");
+    try expect_octets("\\x41", "br'\\x41'");
+    // A string of many lines keeps its line ends and its single quotes, and reads its escapes.
+    try expect_octets("a'b\nc", "'''a'b\nc'''");
+    try expect_octets("\xe9", "b\"\"\"\\xe9\"\"\"");
+    try expect_octets("", "''''''");
+    try expect_octets("\\n", "r'''\\n'''");
     var buffer: [constants.refusal_message_len_max]u8 = undefined;
     for ([_][]const u8{ "'\\q'", "'\\x4'", "'\\u12'", "b'\\u0041'", "'\\'", "'\\8'", "'\\xzz'" }) |text| {
         try testing.expectError(error.Literal, unescape(text, &buffer));
