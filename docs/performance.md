@@ -158,7 +158,9 @@ failed (the owner's ruling of 2026-11-09). A new fast path joins this list the s
 ## The compiler's time
 
 `protovalidate` compiles each CEL rule of a schema while the compiler builds the program (decision
-47), so a rule costs the compiler time, and a schema of thousands of rules costs it seconds. Zig
+47), so a rule costs the compiler time, and a schema of thousands of rules costs it seconds.
+pepegrillo's `performance_zig_comptime.md`, which `zig build guide` installs, holds the items
+that belong to Zig; this section holds connect-zig's numbers and checks. Zig
 0.16 runs comptime code in an interpreter. One step of it costs microseconds, where the same step
 of a built program costs under a nanosecond. Each number below is from Zig 0.16.0 in Debug, on a
 4-core 2.1 GHz Xeon.
