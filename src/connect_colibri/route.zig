@@ -254,7 +254,7 @@ fn serve_streaming(comptime spec: RouteSpec, comptime handler: anytype, app: any
         const whole_len = dispatch.whole_envelopes_len(piece, state.limit) catch |failure|
             return stop_reading(I, app, state, body, connect.server.failure_of(failure));
         var messages = connect.server.Messages.init(&call.reply.accepted, piece[0..whole_len], &scratch_of(spec, handler, state, .request), &codings_of(app).decoders);
-        if (dispatch.each_message(spec.method, handler, app, call, &state.handler_state, &messages)) |failure| return stop_reading(I, app, state, body, failure);
+        if (dispatch.each_message(spec.method, handler, I, app, call, &state.handler_state, &messages)) |failure| return stop_reading(I, app, state, body, failure);
         // colibri gives the cut envelope's octets again, joined with the next piece.
         state.kept = piece.len - whole_len;
         body.keep(state.kept);
@@ -284,6 +284,7 @@ fn serve_request(comptime spec: RouteSpec, comptime handler: anytype, app: anyty
         .failure => |failure| return stop(I, app, state, failure),
         .message => {},
     }
+    if (I.on_message(app, call, spec.method.Request, &request.message)) |refusal| return stop(I, app, state, refusal);
     var ctx: context_file.Context = .{ .call = call };
     if (handler.on_request(app, &ctx, &state.handler_state, &request)) |failure| return stop(I, app, state, failure);
 }

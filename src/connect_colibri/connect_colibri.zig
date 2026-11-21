@@ -71,4 +71,5 @@ test {
     _ = @import("pull_test.zig");
     _ = @import("values_test.zig");
     _ = @import("context_test.zig");
+    _ = @import("message_hook_test.zig");
 }

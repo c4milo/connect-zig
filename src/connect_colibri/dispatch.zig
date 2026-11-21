@@ -14,11 +14,14 @@
 //!
 //! - `on_call(app, *Context, *const AnyRequest, *AnyResponse) ?connect.RpcError`, which runs
 //!   before the handler and refuses the call when it returns an error;
+//! - `on_message(app, *Context, comptime T: type, *const T) ?connect.RpcError`, which runs with
+//!   each request message once it is decoded, before the handler takes it, and ends the call
+//!   when it returns an error (decision 47);
 //! - `on_finish(app, *Context, *AnyResponse, ?connect.RpcError) ?connect.RpcError`, which runs
 //!   after the handler and returns the outcome the client reads.
 //!
-//! `on_call` runs in the order the list names the interceptors, and `on_finish` in the reverse,
-//! so the first interceptor wraps the others.
+//! `on_call` and `on_message` run in the order the list names the interceptors, and `on_finish`
+//! in the reverse, so the first interceptor wraps the others.
 const std = @import("std");
 const assert = std.debug.assert;
 const connect = @import("connect");
@@ -36,6 +39,16 @@ const ResponseStream = context_file.ResponseStream;
 
 pub fn Interceptors(comptime list: []const type) type {
     return struct {
+        /// Whether an interceptor of the list declares `on_message`. A route whose list
+        /// declares none makes no call for a message.
+        pub const reads_messages = declares_on_message(list);
+
+        /// Runs each interceptor's `on_message` with one request message, and returns the
+        /// first error.
+        pub fn on_message(app: anytype, call: *Call, comptime T: type, message: *const T) ?connect.RpcError {
+            return check_message(list, app, call, T, message);
+        }
+
         pub fn on_call(app: anytype, call: *Call) ?connect.RpcError {
             var ctx: Context = .{ .call = call };
             const request: AnyRequest = .{ .call = call };
@@ -59,6 +72,24 @@ pub fn Interceptors(comptime list: []const type) type {
             return outcome;
         }
     };
+}
+
+fn declares_on_message(comptime list: []const type) bool {
+    for (list) |Interceptor| {
+        if (@hasDecl(Interceptor, "on_message")) return true;
+    }
+    return false;
+}
+
+fn check_message(comptime list: []const type, app: anytype, call: *Call, comptime T: type, message: *const T) ?connect.RpcError {
+    if (comptime !declares_on_message(list)) return null;
+    var ctx: Context = .{ .call = call };
+    inline for (list) |Interceptor| {
+        if (comptime @hasDecl(Interceptor, "on_message")) {
+            if (Interceptor.on_message(app, &ctx, T, message)) |refusal| return refusal;
+        }
+    }
+    return null;
 }
 
 /// Whether `handler` is a type that takes messages as they arrive.
@@ -105,12 +136,12 @@ pub fn whole(comptime method: connect.Method, comptime handler: anytype, comptim
     switch (comptime method.stream_type) {
         .unary, .client_stream => {
             var response: Response(method.Response) = .{ .any = .{ .call = call } };
-            const failure = invoke(method, handler, app, call, messages, &response);
+            const failure = invoke(method, handler, I, app, call, messages, &response);
             return respond_one(method.Response, I, app, call, failure, &response.message);
         },
         .server_stream, .bidi_stream => {
             var stream: ResponseStream(method.Response) = .{ .any = .{ .call = call } };
-            const failure = invoke(method, handler, app, call, messages, &stream);
+            const failure = invoke(method, handler, I, app, call, messages, &stream);
             return call_file.finish(call, I.on_finish(app, call, failure));
         },
     }
@@ -118,18 +149,34 @@ pub fn whole(comptime method: connect.Method, comptime handler: anytype, comptim
 
 /// Calls a function handler with the request as its stream type takes it: a `Request` of one
 /// message, or a `RequestStream`. `response` is the `*Response` or the `*ResponseStream` the
-/// handler writes to.
-fn invoke(comptime method: connect.Method, comptime handler: anytype, app: anytype, call: *Call, messages: *connect.server.Messages, response: anytype) ?connect.RpcError {
+/// handler writes to. The interceptors' `on_message` reads each message first: the one message
+/// here, and a stream's as the handler asks for each.
+fn invoke(comptime method: connect.Method, comptime handler: anytype, comptime I: type, app: anytype, call: *Call, messages: *connect.server.Messages, response: anytype) ?connect.RpcError {
     var ctx: Context = .{ .call = call };
     if (comptime method.stream_type == .unary or method.stream_type == .server_stream) {
         var request: Request(method.Request) = .{ .message = .{}, .any = .{ .call = call } };
         return switch (call_file.read_one(method.Request, call, messages, &request.message)) {
             .failure => |failure| failure,
-            .message => handler(app, &ctx, &request, response),
+            .message => I.on_message(app, call, method.Request, &request.message) orelse handler(app, &ctx, &request, response),
         };
     }
-    var stream: RequestStream(method.Request) = .{ .messages = messages, .any = .{ .call = call } };
+    var stream: RequestStream(method.Request) = .{ .messages = messages, .any = .{ .call = call }, .hook = stream_hook(I, method.Request, app) };
     return handler(app, &ctx, &stream, response) orelse stream.failure;
+}
+
+/// The interceptors' `on_message` as a `RequestStream` calls it, or null when none declares
+/// one. A handler names `RequestStream(T)`, which names no `App`, so the stream keeps the
+/// program's `App` as a pointer of no type and this function gives it its type again.
+fn stream_hook(comptime I: type, comptime T: type, app: anytype) ?RequestStream(T).Hook {
+    if (comptime !I.reads_messages) return null;
+    const AppPointer = @TypeOf(app);
+    const typed = struct {
+        fn on_message(untyped: *anyopaque, call: *Call, message: *const T) ?connect.RpcError {
+            const typed_app: AppPointer = @ptrCast(@alignCast(untyped));
+            return I.on_message(typed_app, call, T, message);
+        }
+    };
+    return .{ .app = app, .on_message = typed.on_message };
 }
 
 /// Ends a call answered with one message. The interceptors see the outcome before the message
@@ -156,13 +203,14 @@ pub fn whole_envelopes_len(bytes: []const u8, payload_len_max: usize) connect.en
     unreachable;
 }
 
-/// Passes each whole message of `bytes` to a type handler's `on_message`, and returns the error
-/// that ends the call, if any.
-pub fn each_message(comptime method: connect.Method, comptime handler: type, app: anytype, call: *Call, state: *HandlerState(handler), messages: *connect.server.Messages) ?connect.RpcError {
+/// Passes each whole message of `bytes` to the interceptors' `on_message` and then to a type
+/// handler's, and returns the error that ends the call, if any.
+pub fn each_message(comptime method: connect.Method, comptime handler: type, comptime I: type, app: anytype, call: *Call, state: *HandlerState(handler), messages: *connect.server.Messages) ?connect.RpcError {
     for (0..constants.messages_per_read_max) |_| {
         const message = messages.next(method.Request) catch |failure| return connect.server.failure_of(failure);
         const request: Request(method.Request) = .{ .message = message orelse return null, .any = .{ .call = call } };
         call.received += 1;
+        if (I.on_message(app, call, method.Request, &request.message)) |refusal| return refusal;
         var ctx: Context = .{ .call = call };
         const failure = if (comptime method.stream_type == .bidi_stream) bidi: {
             var stream: ResponseStream(method.Response) = .{ .any = .{ .call = call } };

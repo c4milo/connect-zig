@@ -123,22 +123,36 @@ pub fn Request(comptime T: type) type {
 }
 
 /// A request of a stream of messages, which a function handler of a client or bidirectional
-/// stream reads whole. A message that does not decode ends the stream, and the call then fails
-/// with `failure`.
+/// stream reads whole. A message that does not decode, or that an interceptor's `on_message`
+/// refuses, ends the stream, and the call then fails with `failure`.
 pub fn RequestStream(comptime T: type) type {
     return struct {
         messages: *connect.server.Messages,
         any: AnyRequest,
         failure: ?connect.RpcError = null,
+        /// The interceptors' `on_message`, which the route sets when one declares it
+        /// (`dispatch.zig`, decision 47).
+        hook: ?Hook = null,
 
-        /// The next message, or null at the stream's end.
+        /// What reads each message before the handler: the route's interceptors, with the
+        /// program's `App` as a pointer of no type, since a handler's stream names no `App`.
+        pub const Hook = struct {
+            app: *anyopaque,
+            on_message: *const fn (app: *anyopaque, call: *Call, message: *const T) ?connect.RpcError,
+        };
+
+        /// The next message, or null at the stream's end and after a failure.
         pub fn next(stream: *@This()) ?T {
-            const message = stream.messages.next(T) catch |failure| {
+            // A stream that failed gives no message more: the call ends with its failure.
+            if (stream.failure != null) return null;
+            const message = (stream.messages.next(T) catch |failure| {
                 stream.failure = connect.server.failure_of(failure);
                 return null;
-            };
-            if (message != null) stream.any.call.received += 1;
-            return message;
+            }) orelse return null;
+            stream.any.call.received += 1;
+            const hook = stream.hook orelse return message;
+            stream.failure = hook.on_message(hook.app, stream.any.call, &message) orelse return message;
+            return null;
         }
 
         pub fn header(stream: *const @This(), name: []const u8) ?[]const u8 {
