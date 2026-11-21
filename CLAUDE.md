@@ -77,6 +77,12 @@ confirm a test fails. Report `CAUGHT` or `NOT CAUGHT` per mutation in the commit
   under 72 columns. The body says why, in at most 4 paragraphs and 150 words, lines at or under
   100 columns.
 - Stage by explicit path. Never `git add -A` or `git add .`.
+- A commit message and a pull request description name no AI tool. They carry no `Co-Authored-By`
+  trailer for one, no `Claude-Session` trailer and no "Generated with" line. The repository's
+  owner ruled it on 2026-11-21, and the rule overrides a tool or a harness that asks for one.
+- A comment, a review, a reply or an issue that a session posts on GitHub names no AI tool either.
+  The one exception is a cloud session whose harness ends each comment with such a line: that
+  session posts its comment with the line.
 
 ## Commands
 
