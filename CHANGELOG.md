@@ -55,6 +55,9 @@ change the public API, and the entry marks each change that does.
   is the check `lean` of `tools/ci.sh`.
 - The plugin raises the compiler's branch quota in the table of a message with more than 500
   list and message rules, so a message of a thousand fields with rules compiles.
+- `docs/specs/cel/langdef.md`, the CEL language definition as cel-spec published it at
+  v0.25.3, with its checksum. `tools/citations_check.sh`, the check `citations`, requires each
+  citation of it in the code to name one of its sections.
 - `tools/cel_differential_check.sh`, the check `cel-differential` of `tools/ci.sh`: random
   CEL rules over random messages, with this library's verdicts held to those of
   protovalidate-go v1.4.1, which runs cel-go.
@@ -88,7 +91,8 @@ change the public API, and the entry marks each change that does.
   two values of unlike types are not equal. A conversion of a literal that fails, such as
   `int('x')`, stops the build. One `-` before a number is the number's sign, so
   `-2.5.isInf()` asks -2.5, and `--9223372036854775808` is refused. `uint` takes no double
-  below zero, and `int` no double at or below the least int.
+  below zero, and `int` no double at or below the least int. A duration literal holds an
+  int64 of nanoseconds at most, about 292 years, as the definition's "Overflow" states.
 - The CEL reader follows the language definition's lexis where it did not. **Changes what
   compiles.** A bytes literal's prefix is `b` then `r`, so `rb'x'` is refused. A hexadecimal
   number starts with `0x` in lower case. A string in single quotes holds no line end. A

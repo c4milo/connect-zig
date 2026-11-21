@@ -1,5 +1,5 @@
 //! The type of each part of an expression, which the compiler finds while it reads a message's
-//! table (CEL language definition, "Type Checking"). A part with no type gives its problem as
+//! table (CEL language definition, "Gradual Type Checking"). A part with no type gives its problem as
 //! a value, so `rules_error` reports it. Under `dyn` a mistake of types is not a problem: the
 //! part gets the type `Failing`, and fails when it runs.
 const std = @import("std");

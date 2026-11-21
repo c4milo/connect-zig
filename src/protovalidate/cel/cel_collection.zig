@@ -1,7 +1,7 @@
 //! What an expression does with lists and maps: a list literal, an index, `in`, `size`, and the
-//! macros `all`, `exists` and `exists_one` (CEL language definition, "Macros" and "List of
-//! Standard Definitions"). Each has its type, which the compiler finds, and the code it unfolds
-//! into.
+//! macros `all`, `exists` and `exists_one` (CEL language definition, "Macros", "List
+//! Operators" and "Map Operators"). Each has its type, which the compiler finds, and the code
+//! it unfolds into.
 const std = @import("std");
 const proto = @import("protobuf");
 const node_file = @import("cel_node.zig");

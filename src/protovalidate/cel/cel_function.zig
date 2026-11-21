@@ -1,5 +1,5 @@
-//! CEL's functions over values (CEL language definition, "List of Standard Definitions"): the
-//! conversions and the functions of strings. Each has a result type for the operand types it
+//! CEL's functions over values (CEL language definition, "Types and Conversions", "String
+//! Functions" and "Bytes Functions"): the conversions and the functions of strings. Each has a result type for the operand types it
 //! takes, and the code that gives its result. A function called on a target, `x.size()`, takes
 //! the target as its first operand.
 const std = @import("std");
@@ -121,9 +121,11 @@ fn to_uint(value: anytype) Error!u64 {
     };
 }
 
-/// The whole part of a double as an `I`, when the double is in the range cel-go converts,
-/// which protovalidate's libraries run: a uint takes no double below zero, so -0.5 fails
-/// where its whole part is 0, and an int takes no double at or below its least value.
+/// The whole part of a double as an `I`: "rounds toward zero, errors if out of range" (CEL
+/// language definition, "Types and Conversions"). An int takes no double at or below its
+/// least value: "Double to int conversions are limited to (minInt, maxInt) non-inclusive"
+/// ("Overflow"). The definition does not say whether -0.5 is in a uint's range. cel-go takes
+/// no double below zero, and this module follows it.
 fn whole(comptime I: type, value: f64) Error!I {
     if (std.math.isNan(value)) return error.Unevaluable;
     // The type's least value is a power of two, which a double holds, and the first value

@@ -508,8 +508,14 @@ value as `rule` and the rule message as `rules`. A value is a scalar, a wrapper 
 A rule the module has no check for stops your build, with a message that names it. That holds
 today for `pattern`, for CEL's `matches`, for a predefined rule whose value is a message that
 is no wrapper, and for the parts of CEL the module does not read yet: arithmetic on a
-timestamp or a duration, `timestamp(string)`, and `map`, `filter`, `string(number)` and `+`
-of two strings, which build a value that needs room.
+timestamp or a duration, `timestamp(string)`, `type`, a map's key as a selection, `m.key`,
+and `map`, `filter`, `string(number)` and `+` of two strings, which build a value that needs
+room.
+
+The CEL rules follow the [CEL language definition](docs/specs/cel/langdef.md), which the tree
+holds as cel-spec published it, and each rule in the code cites its section.
+[docs/specs/README.md](docs/specs/README.md) lists the six places where the definition is
+silent or gives two readings, and the module follows cel-go.
 
 An expression has the verdict that protovalidate-go gives it, which runs cel-go: `==` takes
 two values of one type, a conversion of a literal that fails, such as `int('x')`, stops your

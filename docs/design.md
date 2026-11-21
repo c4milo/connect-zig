@@ -22,6 +22,10 @@ Each rule in the code cites the document that states it:
   <https://github.com/bufbuild/protovalidate>, whose comments state each rule and whose
   `(buf.validate.predefined).cel` options define it. The code cites a rule by its message and
   its field: "validate.proto, StringRules.min_len".
+- For the CEL rules of `protovalidate`: the CEL language definition, `doc/langdef.md` of
+  <https://github.com/google/cel-spec> at v0.25.3, which `docs/specs/cel/langdef.md` holds as
+  published. The code cites a rule by its section: `CEL language definition, "Equality"`.
+  `docs/specs/README.md` lists where the code follows cel-go and not the definition.
 
 ## 2. Rules
 
@@ -1564,6 +1568,23 @@ ran on Linux x86-64 with Zig 0.16.0.
     2822, total: 2872)`. `zig build test-protovalidate -Drelease --fuzz=300K` found no
     failure. `tools/perf_check.sh` printed no operation past its baseline.
 
+- **CEL: the language definition in the tree** (step 34, decision 47 as amended). The owner
+  asked whether the CEL rules were written against the specification, and for the
+  specification in the tree, cited as the code is written.
+  - The reader and the Lean model were written from the definition, from a copy outside the
+    tree. `docs/specs/cel/langdef.md` holds it now, as cel-spec published it at v0.25.3, with
+    its checksum. `tools/citations_check.sh` printed `44 citations of the CEL language
+    definition name a section of it`. Three citations named a section the definition lacks,
+    and each names its section now.
+  - Each section the module follows was read against the code. The definition states two
+    rules that the code did not follow, and the differential check had found the first:
+    "Type-checking asserts that arguments to equality operators must be the same type"
+    ("Equality"), and "Duration values are limited to a single int64 value" ("Overflow"). A
+    duration literal past 2,562,047 hours is refused now, as protovalidate-go refuses it.
+  - Six places follow cel-go where the definition is silent or gives two readings, and
+    `docs/specs/README.md` lists them.
+  - Mutations of the duration's range: 3, each `CAUGHT`.
+
 ### What a later step owes
 
 - A stream that waits for an event of the program once its request ended (colibri issue 130).
@@ -1586,7 +1607,8 @@ ran on Linux x86-64 with Zig 0.16.0.
   `TooManyItems` (decision 47). A program that needs longer lists needs a set in storage it
   passes. No step holds that yet.
 - For `protovalidate`, the parts of CEL that no rule of the conformance suite uses and the
-  module does not read yet: `timestamp(string)`, sums and differences of timestamps and
+  module does not read yet: a selection of a map's key, `m.key`, `type`, `duration` of a text
+  that is no literal, `timestamp(string)`, sums and differences of timestamps and
   durations, the accessors of a timestamp such as `getFullYear`, `map` over a field,
   `filter`, `string` of a number, and `+` of two strings. Each stops the build with a message
   that names it.

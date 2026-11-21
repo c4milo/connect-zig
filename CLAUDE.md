@@ -15,6 +15,11 @@ It follows the conventions of the libraries it builds on: colibri, stdx and pepe
 - `docs/decisions.md`: numbered decisions, each with what it beat.
 - `docs/performance.md`, before a change to a hot path: the instruments, the admission rule and
   the pitfalls, beside pepegrillo's method, which `zig build guide` installs to `zig-out/docs`.
+- `docs/specs/`, before a change to the code that cites one of its files: each specification
+  as its publisher wrote it, with its checksum. `docs/specs/cel/langdef.md` is the CEL language
+  definition, which the CEL rules of `protovalidate` follow. Read the section, and cite it in
+  the code that a new rule adds. `docs/specs/README.md` lists where the code follows cel-go
+  and not the definition.
 
 If you are about to do something a document rejected, say so and stop. Do not reverse it in
 code. The same holds for colibri's and stdx's `docs/decisions.md`.
@@ -36,7 +41,8 @@ code. The same holds for colibri's and stdx's `docs/decisions.md`.
 6. **Every spec rule cited, in the code.** A check that exists because a spec demands it names
    the spec and the section in a comment on the line that does the checking: the Connect
    protocol, gRPC's HTTP/2 and gRPC-Web documents, the protobuf encoding guide, the proto3
-   JSON mapping, and protovalidate's `validate.proto` (design §1).
+   JSON mapping, protovalidate's `validate.proto`, and the CEL language definition in
+   `docs/specs/cel/langdef.md` (design §1).
 
 ## The public API is written first
 
@@ -186,6 +192,10 @@ confirm a test fails. Report `CAUGHT` or `NOT CAUGHT` per mutation in the commit
   `tools/lean_check.sh` runs the step, and installs that release for x86-64 Linux, pinned by
   SHA-256, when no lake is on the path and `LAKE` names none. `spec/README.md` says what
   the model holds and what it proves.
+- Citations: `tools/citations_check.sh` requires each file of `docs/specs` to have the checksum
+  of `docs/specs/SHA256SUMS`, and each citation `CEL language definition, "<section>"` in the
+  code to name a heading of `docs/specs/cel/langdef.md`. It is the check `citations` of
+  `tools/ci.sh`, and needs python3.
 - CEL differential: `tools/cel_differential_check.sh [seed...]` writes a schema of random CEL
   rules and a file of random messages for each seed, 1 when none is given
   (`tools/cel_differential/generate.py`). It builds `zig build cel-differential-runner

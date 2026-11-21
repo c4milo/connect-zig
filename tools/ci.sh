@@ -12,7 +12,7 @@
 # `--list` as a job of its own, so each shows apart in GitHub.
 set -eu
 cd "$(dirname "$0")/.."
-checks="format commits test release package bench costs bench-compare fullstack perf generated interop interop-languages interop-servers coverage line-coverage conformance protobuf-conformance protovalidate-conformance cel-differential compile-time lean"
+checks="format citations commits test release package bench costs bench-compare fullstack perf generated interop interop-languages interop-servers coverage line-coverage conformance protobuf-conformance protovalidate-conformance cel-differential compile-time lean"
 only=""
 case "${1:-}" in
     --list)
@@ -81,6 +81,9 @@ draw_charts() {
 check() {
     case "$1" in
         format) zig fmt --check build.zig build src tools examples bench conformance ;;
+        # The specifications of docs/specs as their publishers wrote them, and each citation of
+        # one in the code (docs/specs/README.md).
+        citations) tools/citations_check.sh ;;
         # The commit messages of the change: origin/main..HEAD, or COMMIT_RANGE as CI sets it.
         commits) zig build install-commit-lint && zig-out/bin/commit_lint --range "${COMMIT_RANGE:-origin/main..HEAD}" ;;
         # The lint, every module's tests, the examples and the hook check.

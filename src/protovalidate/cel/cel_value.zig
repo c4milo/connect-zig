@@ -10,9 +10,9 @@ const Timestamp = proto.wkt.Timestamp;
 const Duration = proto.wkt.Duration;
 
 /// Whether `==` and `!=` take a `L` and a `R`: two values of one type, or a wrapper with null
-/// or with the type it wraps. Two numbers of different types are not of one type: "_==_ :
-/// (A, A) -> bool" (CEL language definition, "List of Standard Definitions"), which cel-go's
-/// type checker holds an expression to.
+/// or with the type it wraps. Two numbers of different types are not of one type:
+/// "Type-checking asserts that arguments to equality operators must be the same type" (CEL
+/// language definition, "Equality"), and "A == A -> bool" ("Comparison Operators").
 pub fn equatable(comptime L: type, comptime R: type) bool {
     if (type_file.is_number(L) and type_file.is_number(R)) return L == R;
     if (@typeInfo(L) == .optional) return R == Null or equatable(@typeInfo(L).optional.child, R);
@@ -22,8 +22,10 @@ pub fn equatable(comptime L: type, comptime R: type) bool {
 }
 
 /// Whether a `L` and a `R` may be equal as an expression runs, which `dyn` leaves to the run:
-/// two values that `==` takes, and two numbers of any numeric types ("numeric values are
-/// compared across types", CEL language definition, "Equality"). Any other pair is not equal.
+/// "if at least one argument is dynamically typed, the type-checker considers all arguments
+/// dynamic and defers type-agreement checks to the interpreter" (CEL language definition,
+/// "Equality"). Two values that `==` takes may be equal, and two numbers of any numeric types
+/// ("Numbers"). Any other pair is not equal: the section's last arm is `false`.
 pub fn equal_as_they_run(comptime L: type, comptime R: type) bool {
     if (type_file.is_number(L) and type_file.is_number(R)) return true;
     if (@typeInfo(L) == .optional) return R == Null or equal_as_they_run(@typeInfo(L).optional.child, R);
@@ -31,7 +33,11 @@ pub fn equal_as_they_run(comptime L: type, comptime R: type) bool {
     return equatable(L, R);
 }
 
-/// Whether `<`, `<=`, `>` and `>=` take a `L` and a `R`.
+/// Whether `<`, `<=`, `>` and `>=` take a `L` and a `R`: two values of one ordered type (CEL
+/// language definition, "Ordering" and "Comparison Operators"), and two numbers of any numeric
+/// types. The definition orders numbers of two types as an expression runs. protovalidate's
+/// CEL environment declares those overloads for the checker too (cel-go's
+/// `CrossTypeNumericComparisons`), so `1 < 2u` is typed.
 pub fn ordered(comptime L: type, comptime R: type) bool {
     if (type_file.is_number(L) and type_file.is_number(R)) return true;
     if (L != R) return false;

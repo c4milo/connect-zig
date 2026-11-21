@@ -733,12 +733,18 @@ first. Cite an entry by number in code and commits ("decision 6").
         - A conversion of a literal that fails, such as `int('x')` and `bool('k')`, stops
           the build: cel-go computes such a conversion once, before the expression runs.
         - `uint` takes no double below zero, and `int` no double at or below the least int.
+        - A duration literal holds an int64 of nanoseconds at most.
         - A macro reads a list literal, and the compiler reads a signed `duration('-3s')`.
           Both stopped the build with a compiler error before.
         Beaten: the conformance suite alone, whose cases hold few expressions and found none
         of the six. One difference stays: behind `dyn` this module compiles some expressions
         that cel-go's checker refuses, since it marks a part as dynamic where cel-go gives
         the part a type.
+      - The tree holds the CEL language definition as cel-spec published it, in
+        `docs/specs/cel/langdef.md`, and each CEL rule in the code cites its section.
+        `docs/specs/README.md` lists where the definition is silent or gives two readings and
+        the module follows cel-go. Beaten: a link to the definition, which changes under the
+        code that cites it.
       - A Lean model in `spec/lean/` states the lexis and the grammar a second time, from the
         language definition and production by production, where the Zig reads every level of
         operators in one loop. Its vectors are replayed against the Zig grammar. The model
