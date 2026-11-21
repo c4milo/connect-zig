@@ -92,10 +92,39 @@ pub fn write(out: *Out, full: []const u8, message: pb.DescriptorProto, entries: 
         try out.print("pub const {s}: validate.Rules = .{{}};\n", .{constants.rules_declaration});
         return;
     }
-    try out.print("pub const {s}: validate.Rules = .{{\n{s}", .{ constants.rules_declaration, writer.text.items });
+    const calls = std.mem.count(u8, writer.text.items, ".of(");
+    if (calls > constants.table_calls_unraised_max) {
+        try write_raised(out, &writer, calls, depth);
+    } else {
+        try out.print("pub const {s}: validate.Rules = .{{\n{s}", .{ constants.rules_declaration, writer.text.items });
+        try out.indent(depth);
+        try out.print("}};\n", .{});
+    }
+    try write_numbers(out, writer.numbers.items, depth);
+}
+
+/// Writes a table whose literal makes many calls, such as one of a message with hundreds of
+/// rules: a block that raises the compiler's branch quota, then gives the literal. The quota
+/// is a number of `RuleNumber`, as each of the table's numbers above 1 is.
+fn write_raised(out: *Out, writer: *Writer, calls: usize, depth: usize) Error!void {
+    const quota = constants.branches_default + constants.branches_per_call * calls;
+    try writer.numbers.append(out.arena, .{ .name = constants.branches_name, .text = try std.fmt.allocPrint(out.arena, "{d}", .{quota}) });
+    try out.print("pub const {s}: validate.Rules = table: {{\n", .{constants.rules_declaration});
+    try out.indent(depth + 1);
+    try out.print("@setEvalBranchQuota(@This().{s}.{s});\n", .{ constants.rule_number_container, try names.identifier(out.arena, constants.branches_name) });
+    try out.indent(depth + 1);
+    try out.print("break :table .{{\n", .{});
+    // Each line of the literal lies one level deeper inside the block. A string literal holds
+    // no line end, so each line end of the text ends a line of code.
+    var lines = std.mem.splitScalar(u8, writer.text.items, '\n');
+    while (lines.next()) |line| {
+        if (line.len == 0) continue;
+        try out.print("    {s}\n", .{line});
+    }
+    try out.indent(depth + 1);
+    try out.print("}};\n", .{});
     try out.indent(depth);
     try out.print("}};\n", .{});
-    try write_numbers(out, writer.numbers.items, depth);
 }
 
 /// A field, a nested message or a nested enum named as a declaration the generator adds would

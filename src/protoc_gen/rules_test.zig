@@ -223,6 +223,48 @@ test "a predefined rule of an extension is written with the entry of the field t
     try expect_absent(undeclared, ".predefined");
 }
 
+/// A message of `count` repeated fields, each with a rule of its list and a CEL rule: two
+/// `.of(` calls of the table's literal for each field.
+fn many_rules(arena: std.mem.Allocator, count: usize) !pb.DescriptorProto {
+    const validate = @import("buf_validate_validate");
+    const list_rules: validate.RepeatedRules = .{ .min_items = 1 };
+    const fields = try arena.alloc(pb.FieldDescriptorProto, count);
+    for (fields, 1..) |*each, number| {
+        each.* = field(try std.fmt.allocPrint(arena, "f{d}", .{number}), @intCast(number), .int32, .repeated);
+        each.options = .{ .rules = .{ .type = .{ .repeated = .of(&list_rules) }, .cel_expression = .of(&.{"this.size() < 9"}) } };
+    }
+    return .{ .name = "Many", .field = .of(fields) };
+}
+
+test "a table whose literal makes many calls raises the compiler's branch quota" {
+    var arena_state = std.heap.ArenaAllocator.init(testing.allocator);
+    defer arena_state.deinit();
+    const arena = arena_state.allocator();
+    const constants = @import("constants.zig");
+    const calls_per_field = 2;
+    const unraised = constants.table_calls_unraised_max / calls_per_field;
+    // The most calls a table makes as a plain literal.
+    const plain = try generated(arena, &.{try many_rules(arena, unraised)});
+    try expect_contains(plain, "    pub const protovalidate: validate.Rules = .{\n        .fields = &.{\n            .{ .number = @intFromEnum(@This().FieldNumber.f1), ");
+    try expect_absent(plain, "@setEvalBranchQuota");
+    try expect_absent(plain, ".branches");
+
+    // One field more: a block raises the quota by the calls it makes, then gives the literal,
+    // one level deeper.
+    const raised = try generated(arena, &.{try many_rules(arena, unraised + 1)});
+    try expect_contains(raised,
+        \\    pub const protovalidate: validate.Rules = table: {
+        \\        @setEvalBranchQuota(@This().RuleNumber.@".branches");
+        \\        break :table .{
+        \\            .fields = &.{
+        \\                .{ .number = @intFromEnum(@This().FieldNumber.f1), .rules = .{ .type = .{ .repeated = .of(&.{ .min_items = 1 }) }, .cel_expression = .of(&.{"this.size() < 9"}) } },
+        \\
+    );
+    try expect_contains(raised, "                .{ .number = @intFromEnum(@This().FieldNumber.f251), .rules = .{ .type = .{ .repeated = .of(&.{ .min_items = 1 }) }, .cel_expression = .of(&.{\"this.size() < 9\"}) } },\n            },\n        };\n    };\n\n    pub const RuleNumber = struct {\n");
+    const quota = constants.branches_default + constants.branches_per_call * (unraised + 1) * calls_per_field;
+    try expect_contains(raised, try std.fmt.allocPrint(arena, "        pub const @\".branches\" = {d};\n    }};\n", .{quota}));
+}
+
 test "a field or a nested type named as a declaration of the table is refused" {
     var arena_state = std.heap.ArenaAllocator.init(testing.allocator);
     defer arena_state.deinit();
