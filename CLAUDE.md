@@ -80,9 +80,10 @@ confirm a test fails. Report `CAUGHT` or `NOT CAUGHT` per mutation in the commit
 - A commit message and a pull request description name no AI tool. They carry no `Co-Authored-By`
   trailer for one, no `Claude-Session` trailer and no "Generated with" line. The repository's
   owner ruled it on 2026-11-21, and the rule overrides a tool or a harness that asks for one.
-- Post no comment, review or reply on GitHub unless the owner tells you to post it. A cloud session
-  ends each comment that it posts with a line that names its tool, so the owner decides when one
-  is posted. Otherwise write the text in the session for the owner to post.
+- A comment, a review, a reply or an issue that a session posts on GitHub names no AI tool either.
+  Where a harness ends each comment with such a line and the session cannot leave it out, the
+  session writes the text for the owner to post, and posts it with that line only when the owner
+  says so.
 
 ## Commands
 
