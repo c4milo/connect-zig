@@ -550,7 +550,7 @@ with `zig build test`, and serves its service with `zig build serve` for curl an
   strict messages and strict errors. 2822 of its 2872 cases pass. Each of the other 50 is
   listed in `conformance/protovalidate_known_failing.yaml` under its reason: a `pattern`, or
   an expression that calls `matches`, which wait for stdx's regular expressions.
-- `tools/lean_check.sh` builds a [Lean model](spec/lean/README.md) of the CEL syntax, written
+- `tools/lean_check.sh` builds a [Lean model](spec/README.md) of the CEL syntax, written
   from the CEL language definition, and requires the vector file beside the Zig grammar to be
   what the model gives. A unit test reads each of the 6,647 expressions with the grammar the
   compiler runs, and requires the model's tree or its refusal. No theorem is proved yet.

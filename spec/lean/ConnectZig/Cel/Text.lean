@@ -1,4 +1,4 @@
-import Cel.Grammar
+import ConnectZig.Cel.Grammar
 
 /-!
 # The text of a tree
@@ -7,7 +7,7 @@ A tree as an expression with each part in brackets, which reads back as the same
 grammar writes the tree it reads of an expression in this form (`cel_tree.write`, with each
 double as its text), and a test requires the two texts to be equal.
 -/
-namespace Cel
+namespace ConnectZig.Cel
 
 /-- An operator of two operands as an expression writes it. -/
 def BinaryOp.text : BinaryOp → String
@@ -63,4 +63,4 @@ def writeList : List Expr → Octets
 
 end
 
-end Cel
+end ConnectZig.Cel

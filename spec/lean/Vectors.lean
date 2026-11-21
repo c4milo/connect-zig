@@ -1,11 +1,11 @@
-import Cel
+import ConnectZig
 
 /-!
 # Vectors of the CEL model
 
 Writes, or checks, `cel_vectors.txt` beside the Zig grammar: expressions, each with the text of
 the tree the model reads of it, or "!" for a text that is no expression. A Zig unit test
-requires the Zig grammar to read each expression as the model does (spec/lean/README.md).
+requires the Zig grammar to read each expression as the model does (spec/README.md).
 
     lake exe vectors (--write | --check) <src/protovalidate/cel directory>
 
@@ -15,7 +15,7 @@ picks, trees that the same generator builds, and literals that state each rule o
 Before it writes or checks, the program requires the model to read each tree's text back as
 the tree.
 -/
-open Cel
+open ConnectZig.Cel
 
 /-- An octet in a vector file: itself when it is printable ASCII but "%", and "%" with two
 hexadecimal digits when it is any other octet, so a line holds no tab and no line end. -/
@@ -140,7 +140,7 @@ def expressions : List Octets :=
 /-- The lines of the vector file. -/
 def lines : List String :=
   "# expression, a tab, and the text of its tree or \"!\" for a text that is no expression. An octet that is not printable \
-    ASCII, and \"%\", is \"%\" and two hexadecimal digits. From spec/lean/Cel, by spec/lean/Vectors.lean; do not edit." ::
+    ASCII, and \"%\", is \"%\" and two hexadecimal digits. From spec/lean/ConnectZig/Cel, by spec/lean/Vectors.lean; do not edit." ::
     expressions.map line
 
 /-- The trees whose text the model does not read back as the tree: none, or the model is

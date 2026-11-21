@@ -8,7 +8,7 @@ productions `IDENT`, `INT_LIT`, `UINT_LIT`, `FLOAT_LIT`, `STRING_LIT`, `BYTES_LI
 `lex` gives the tokens of an expression, or `none` for an expression that holds an octet or a
 literal that the lexis does not state.
 -/
-namespace Cel
+namespace ConnectZig.Cel
 
 /-- An expression's text, and the octets of a string. -/
 abbrev Octets := List UInt8
@@ -233,4 +233,4 @@ def lexFrom : Nat → Octets → Option (List Token)
 /-- The tokens of an expression. -/
 def lex (text : Octets) : Option (List Token) := lexFrom (text.length + 1) text
 
-end Cel
+end ConnectZig.Cel

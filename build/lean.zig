@@ -1,6 +1,6 @@
 //! `zig build lean [-- write]`: pepegrillo's lake runner over the Lean model in spec/lean/, then
 //! the check that the vector file the Zig tests replay is what the model gives
-//! (spec/lean/README.md). It is not part of `zig build test`: it needs lake, from a Lean
+//! (spec/README.md). It is not part of `zig build test`: it needs lake, from a Lean
 //! release, which `tools/lean_check.sh` installs.
 const std = @import("std");
 

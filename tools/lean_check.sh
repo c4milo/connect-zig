@@ -1,6 +1,6 @@
 #!/bin/sh
 # Builds the Lean model of spec/lean/ with `zig build lean`, which also requires the committed
-# vector file beside the Zig grammar to be what the model gives (spec/lean/README.md).
+# vector file beside the Zig grammar to be what the model gives (spec/README.md).
 # `zig build lean -- write` rewrites that file.
 #
 # It needs lake. With none on the path, and no LAKE naming one, it installs the Lean release

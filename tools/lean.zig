@@ -1,4 +1,4 @@
-//! connect-zig's Lean model (spec/lean/README.md), built by pepegrillo's lake runner. After the
+//! connect-zig's Lean model (spec/README.md), built by pepegrillo's lake runner. After the
 //! model builds, the vector file it gives is checked against the committed one beside the Zig
 //! grammar, which a unit test of `protovalidate` replays.
 //!

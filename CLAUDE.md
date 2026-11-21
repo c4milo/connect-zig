@@ -176,12 +176,14 @@ confirm a test fails. Report `CAUGHT` or `NOT CAUGHT` per mutation in the commit
   `build/protovalidate.zig` reads module by module from each file's header. A case that fails on
   purpose goes in `conformance/protovalidate_known_failing.yaml` under its reason. It needs git
   and go.
-- Lean: `zig build lean` builds the Lean model of `spec/lean/` with lake, through pepegrillo's
+- Models: `spec/lean/` holds the Lean models, one Lake package whose library is `ConnectZig`,
+  and `spec/tla/<model>/` is where a TLA+ model goes, as in every project on pepegrillo.
+  `zig build lean` builds the Lean package with lake, through pepegrillo's
   `lean` tool, and requires `src/protovalidate/cel/cel_vectors.txt` to be what the model gives;
   `zig build lean -- write` rewrites it. A unit test of `protovalidate` replays the file against
   the Zig grammar, with no Lean needed. `spec/lean/lean-toolchain` pins the release.
   `tools/lean_check.sh` runs the step, and installs that release for x86-64 Linux, pinned by
-  SHA-256, when no lake is on the path and `LAKE` names none. `spec/lean/README.md` says what
+  SHA-256, when no lake is on the path and `LAKE` names none. `spec/README.md` says what
   the model holds and what it proves.
 - Fuzzer: `zig build test-<module> -Drelease --fuzz=<runs>` runs a module's fuzz properties
   under Zig's fuzzer; Zig 0.16.0's test runner compiles in fuzz mode in ReleaseSafe alone.

@@ -1,4 +1,4 @@
-# expression, a tab, and the text of its tree or "!" for a text that is no expression. An octet that is not printable ASCII, and "%", is "%" and two hexadecimal digits. From spec/lean/Cel, by spec/lean/Vectors.lean; do not edit.
+# expression, a tab, and the text of its tree or "!" for a text that is no expression. An octet that is not printable ASCII, and "%", is "%" and two hexadecimal digits. From spec/lean/ConnectZig/Cel, by spec/lean/Vectors.lean; do not edit.
 	!
  	!
 a // a comment	a

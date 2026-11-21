@@ -1,4 +1,4 @@
-import Cel.Lexis
+import ConnectZig.Cel.Lexis
 
 /-!
 # The grammar of CEL
@@ -23,7 +23,7 @@ A number's sign is part of its literal ("INT_LIT ::= -? DIGIT+", "FLOAT_LIT ::= 
 model reads the last "-" of a run before a number as that sign. An int then holds its sign,
 and a double is a negation of its text, which states the same number.
 -/
-namespace Cel
+namespace ConnectZig.Cel
 
 /-- An operator of two operands. -/
 inductive BinaryOp where
@@ -390,4 +390,4 @@ def parse (text : Octets) : Option Expr :=
     | _ => none
   | none => none
 
-end Cel
+end ConnectZig.Cel

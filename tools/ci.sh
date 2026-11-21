@@ -125,7 +125,7 @@ check() {
         # protovalidate's conformance harness, against the rules the library checks (decision 47).
         protovalidate-conformance) tools/protovalidate_conformance_check.sh ;;
         # The Lean model of the CEL syntax, and the vectors a unit test replays against the Zig
-        # grammar (spec/lean/README.md).
+        # grammar (spec/README.md).
         lean) tools/lean_check.sh ;;
         *)
             echo "no check named $1" >&2

@@ -719,7 +719,7 @@ first. Cite an entry by number in code and commits ("decision 6").
       - A Lean model in `spec/lean/` states the lexis and the grammar a second time, from the
         language definition and production by production, where the Zig reads every level of
         operators in one loop. Its vectors are replayed against the Zig grammar. The model
-        proves no theorem yet (spec/lean/README.md).
+        proves no theorem yet (spec/README.md).
       - A schema of thousands of rules compiles in time that grows with them. The compiler
         reads each token once, keeps one tree for each expression's text, and finds a field's
         entry by a search of a descriptor whose numbers rise. The plugin raises the

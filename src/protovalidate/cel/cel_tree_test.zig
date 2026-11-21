@@ -8,7 +8,7 @@
 //!   test` runs it over its corpus, and `zig build test-protovalidate -Drelease --fuzz=<runs>`
 //!   under Zig's fuzzer.
 //! - The vectors of the Lean model, `cel_vectors.txt`, name the tree of each expression, which
-//!   this grammar must give (spec/lean/README.md).
+//!   this grammar must give (spec/README.md).
 const std = @import("std");
 const testing = std.testing;
 const constants = @import("../constants.zig");

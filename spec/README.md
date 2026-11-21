@@ -1,19 +1,22 @@
-# The Lean model
+# The models
 
-This folder holds a Lean 4 model of the CEL syntax that `protovalidate` reads: its lexis, its
-grammar and the text of a tree. The Zig grammar in `src/protovalidate/cel/` is checked against
-it.
+`lean/` holds connect-zig's models in Lean 4, one Lake package whose library is `ConnectZig`.
+`tla/` is where a TLA+ model goes, one folder for each model, as in the projects connect-zig
+builds on. There is none yet: no part of this tree has steps that interleave.
+
+The one model so far states the CEL syntax that `protovalidate` reads: its lexis, its grammar
+and the text of a tree. The Zig grammar in `src/protovalidate/cel/` is checked against it.
 
 ## What the model is
 
-- `Cel/Lexis.lean`: the tokens of an expression, from the CEL language definition, "Syntax":
-  `IDENT`, `INT_LIT`, `UINT_LIT`, `FLOAT_LIT`, `STRING_LIT`, `BYTES_LIT`, `ESCAPE`, `WHITESPACE`
-  and `COMMENT`.
-- `Cel/Grammar.lean`: the grammar, one function for each production, from `Expr` down to
-  `Primary`. It also states which doubles and which ints a literal holds.
-- `Cel/Text.lean`: a tree as an expression with each part in brackets, which reads back as the
-  same tree.
-- `Vectors.lean`: the program that writes `src/protovalidate/cel/cel_vectors.txt`.
+- `lean/ConnectZig/Cel/Lexis.lean`: the tokens of an expression, from the CEL language
+  definition, "Syntax": `IDENT`, `INT_LIT`, `UINT_LIT`, `FLOAT_LIT`, `STRING_LIT`, `BYTES_LIT`,
+  `ESCAPE`, `WHITESPACE` and `COMMENT`.
+- `lean/ConnectZig/Cel/Grammar.lean`: the grammar, one function for each production, from
+  `Expr` down to `Primary`. It also states which doubles and which ints a literal holds.
+- `lean/ConnectZig/Cel/Text.lean`: a tree as an expression with each part in brackets, which
+  reads back as the same tree.
+- `lean/Vectors.lean`: the program that writes `src/protovalidate/cel/cel_vectors.txt`.
 
 The model follows the language definition, production by production. The Zig grammar reads
 the same language another way: one loop for every level of binary operators, and one token
@@ -60,4 +63,4 @@ depends on its text alone, and a tree's text reads back as the tree.
 - `tools/lean_check.sh` runs the first command, and installs the pinned Lean release when no
   `lake` is on the path. `tools/ci.sh` runs it as the check `lean`.
 
-`lean-toolchain` pins the release: Lean 4.34.0.
+`lean/lean-toolchain` pins the release: Lean 4.34.0.
