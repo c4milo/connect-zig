@@ -81,9 +81,8 @@ confirm a test fails. Report `CAUGHT` or `NOT CAUGHT` per mutation in the commit
   trailer for one, no `Claude-Session` trailer and no "Generated with" line. The repository's
   owner ruled it on 2026-11-21, and the rule overrides a tool or a harness that asks for one.
 - A comment, a review, a reply or an issue that a session posts on GitHub names no AI tool either.
-  Where a harness ends each comment with such a line and the session cannot leave it out, the
-  session writes the text for the owner to post, and posts it with that line only when the owner
-  says so.
+  The one exception is a cloud session whose harness ends each comment with such a line: that
+  session posts its comment with the line.
 
 ## Commands
 
