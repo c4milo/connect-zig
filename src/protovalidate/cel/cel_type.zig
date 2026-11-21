@@ -6,10 +6,13 @@
 //! - string is `[]const u8`, and bytes is `Bytes`, which keeps the two apart;
 //! - null is `Null`, and a wrapper field that may be unset is an optional of its scalar;
 //! - google.protobuf.Timestamp and Duration are their generated types, by value;
-//! - any other message is a pointer to it.
+//! - any other message is a pointer to it, or the message itself where the pointer would not
+//!   last: an element that an index takes out of a list or a map;
+//! - a list and a map are views of a repeated field (`cel_list.zig`).
 const std = @import("std");
 const proto = @import("protobuf");
 const shape = @import("../shape.zig");
+const constants = @import("../constants.zig");
 
 pub const Bytes = struct { octets: []const u8 };
 pub const Null = struct {};
@@ -24,11 +27,24 @@ pub const Error = error{
     Unevaluable,
     /// The expression reads `now`, and the caller passed no time.
     TimeMissing,
+    /// A repeated field's octets do not decode: `decode` never read the message.
+    Malformed,
+    /// The expression read more elements of lists and maps than `constants.cel_steps_max`.
+    TooManyItems,
 };
 
-/// What an expression reads beside its variables.
+/// What an expression reads beside its variables, and how many elements of lists and maps it
+/// may still read. A macro inside a macro reads a list once for each element of another, so
+/// the count bounds an expression's work whatever a message holds.
 pub const Env = struct {
     now: ?proto.wkt.Timestamp = null,
+    steps: usize = constants.cel_steps_max,
+
+    /// Counts one element read.
+    pub fn spend(env: *Env) Error!void {
+        if (env.steps == 0) return error.TooManyItems;
+        env.steps -= 1;
+    }
 };
 
 /// The names an expression may read and the type of each one's value. `this` is the first.
@@ -66,14 +82,24 @@ pub const Typed = union(enum) {
     }
 };
 
-pub fn is_message(comptime T: type) bool {
+/// The message type of a message value: a pointer to it, or the message itself. Null for any
+/// other type, and for a timestamp and a duration, which are values of their own.
+pub fn MessageOf(comptime T: type) ?type {
     switch (@typeInfo(T)) {
         .pointer => |pointer| {
-            if (pointer.size != .one) return false;
-            return @typeInfo(pointer.child) == .@"struct" and @hasDecl(pointer.child, "protobuf");
+            if (pointer.size != .one) return null;
+            return if (is_generated(pointer.child)) pointer.child else null;
         },
-        else => return false,
+        else => return if (is_generated(T) and T != proto.wkt.Timestamp and T != proto.wkt.Duration) T else null,
     }
+}
+
+fn is_generated(comptime M: type) bool {
+    return @typeInfo(M) == .@"struct" and @hasDecl(M, "protobuf") and @TypeOf(M.protobuf) == proto.Descriptor;
+}
+
+pub fn is_message(comptime T: type) bool {
+    return MessageOf(T) != null;
 }
 
 pub fn is_number(comptime T: type) bool {
@@ -82,7 +108,9 @@ pub fn is_number(comptime T: type) bool {
 
 /// The type's name as CEL's messages state it.
 pub fn name_of(comptime T: type) []const u8 {
-    if (comptime is_message(T)) return @typeInfo(T).pointer.child.protobuf.full_name;
+    if (comptime MessageOf(T)) |M| return M.protobuf.full_name;
+    if (comptime @typeInfo(T) == .@"struct" and @hasDecl(T, "cel_name")) return T.cel_name;
+    if (comptime @typeInfo(T) == .array) return "list(" ++ comptime name_of(@typeInfo(T).array.child) ++ ")";
     if (comptime @typeInfo(T) == .optional) return "wrapper(" ++ comptime name_of(@typeInfo(T).optional.child) ++ ")";
     return switch (T) {
         i64 => "int",
@@ -139,7 +167,7 @@ fn from_message(comptime M: type, value: *const M) OfMessage(M) {
 /// The value of a field that is not set: its type's default (CEL language definition, "Field
 /// Selection").
 pub fn default_of(comptime T: type) T {
-    if (comptime is_message(T)) {
+    if (comptime @typeInfo(T) == .pointer and is_message(T)) {
         const M = @typeInfo(T).pointer.child;
         const Default = struct {
             const instance: M = .{};
@@ -166,7 +194,8 @@ const Inner = struct {
 
 test "each kind's value reads as its CEL type" {
     try testing.expect(Of(.int32, i32) == i64 and Of(.sfixed64, i64) == i64 and Of(.@"enum", Color) == i64);
-    try testing.expect(Of(.uint32, u32) == u64 and Of(.fixed64, u64) == u64);
+    try testing.expect(Of(.uint32, u32) == u64 and Of(.fixed64, u64) == u64 and Of(.fixed32, u32) == u64 and Of(.uint64, u64) == u64);
+    try testing.expect(Of(.sint32, i32) == i64 and Of(.sint64, i64) == i64 and Of(.sfixed32, i32) == i64 and Of(.int64, i64) == i64);
     try testing.expect(Of(.float, f32) == f64 and Of(.double, f64) == f64 and Of(.bool, bool) == bool);
     try testing.expect(Of(.string, []const u8) == []const u8 and Of(.bytes, []const u8) == Bytes);
     try testing.expect(Of(.message, Inner) == *const Inner);
@@ -184,6 +213,7 @@ test "each kind's value reads as its CEL type" {
 
 test "an unset field reads as its type's default, and a type has CEL's name" {
     try testing.expectEqual(@as(i64, 0), default_of(i64));
+    try testing.expectEqual(false, default_of(bool));
     try testing.expectEqualStrings("", default_of([]const u8));
     try testing.expectEqualStrings("", default_of(Bytes).octets);
     try testing.expectEqual(@as(i32, 0), default_of(*const Inner).count);
@@ -192,7 +222,10 @@ test "an unset field reads as its type's default, and a type has CEL's name" {
     try testing.expectEqualStrings("t.Inner", name_of(*const Inner));
     try testing.expectEqualStrings("wrapper(string)", name_of(?[]const u8));
     try testing.expectEqualStrings("google.protobuf.Timestamp", name_of(proto.wkt.Timestamp));
-    try testing.expect(is_message(*const Inner) and !is_message(i64) and !is_message([]const u8));
+    try testing.expect(is_message(*const Inner) and is_message(Inner) and !is_message(i64) and !is_message([]const u8));
+    try testing.expect(!is_message(proto.wkt.Timestamp) and !is_message(proto.wkt.Duration) and !is_message(Bytes) and !is_message(Null));
+    try testing.expectEqualStrings("t.Inner", name_of(Inner));
+    try testing.expectEqualStrings("list(int)", name_of([2]i64));
     try testing.expect(is_number(u64) and !is_number(bool));
 }
 

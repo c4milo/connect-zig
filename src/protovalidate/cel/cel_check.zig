@@ -10,6 +10,7 @@ const select_file = @import("cel_select.zig");
 const function = @import("cel_function.zig");
 const value_file = @import("cel_value.zig");
 const time = @import("cel_time.zig");
+const collection = @import("cel_collection.zig");
 const Node = node_file.Node;
 const BinaryOp = node_file.BinaryOp;
 const Scope = type_file.Scope;
@@ -36,14 +37,15 @@ pub fn type_of(comptime node: *const Node, comptime scope: Scope) Typed {
             .binary => |binary| of_binary(binary, scope),
             .conditional => |conditional| of_conditional(conditional, scope),
             .call => |call| of_call(call, scope),
-            .index, .list => .{ .problem = "the module reads no list and no map in an expression yet" },
+            .index => |index| collection.of_index(index, scope),
+            .list => |elements| collection.of_list(elements, scope),
         };
     }
 }
 
 /// A mistake of types: the build's problem, or, in a part that came through `dyn`, a part
 /// that fails when it runs.
-fn mistake(comptime dynamic: bool, comptime problem: []const u8) Typed {
+pub fn mistake(comptime dynamic: bool, comptime problem: []const u8) Typed {
     if (dynamic) return .{ .ok = .{ .type = Failing, .dynamic = true } };
     return .{ .problem = problem };
 }
@@ -62,13 +64,12 @@ fn of_select(comptime select: Node.Select, comptime scope: Scope) Typed {
     };
     const T = target.type;
     if (T == Failing) return .{ .ok = target };
-    if (!type_file.is_message(T)) return mistake(target.dynamic, "type `" ++ type_file.name_of(T) ++ "` has no field `" ++ select.field ++ "`");
-    const M = @typeInfo(T).pointer.child;
+    const M = type_file.MessageOf(T) orelse return mistake(target.dynamic, "type `" ++ type_file.name_of(T) ++ "` has no field `" ++ select.field ++ "`");
     const field = select_file.field_of(M, select.field) orelse {
         return mistake(target.dynamic, "undefined field `" ++ select.field ++ "` of " ++ M.protobuf.full_name);
     };
     const F = select_file.Type(M, field) orelse {
-        return .{ .problem = M.protobuf.full_name ++ "." ++ select.field ++ ": the module reads no repeated field, map or field of the message's own type in an expression yet" };
+        return .{ .problem = M.protobuf.full_name ++ "." ++ select.field ++ ": the module reads no field of the message's own type in an expression" };
     };
     return .{ .ok = .{ .type = F, .dynamic = target.dynamic } };
 }
@@ -108,7 +109,8 @@ pub fn Overload(comptime op: BinaryOp, comptime L: type, comptime R: type) ?type
         .less, .less_or_equal, .greater, .greater_or_equal => bool_when(value_file.ordered(L, R)),
         .add, .subtract, .multiply, .divide => arithmetic(L, R, .with_double),
         .modulo => arithmetic(L, R, .integers),
-        .in, .@"and", .@"or" => null,
+        .in => collection.In(L, R),
+        .@"and", .@"or" => null,
     };
 }
 
@@ -165,10 +167,12 @@ fn of_call(comptime call: Node.Call, comptime scope: Scope) Typed {
     if (std.mem.eql(u8, call.name, "dyn") and operands.len == 1) return of_dyn(&operands[0], scope);
     if (std.mem.eql(u8, call.name, "duration") and operands.len == 1) return of_duration(&operands[0]);
     if (std.mem.eql(u8, call.name, "matches")) return .{ .problem = "`matches` waits for stdx's regular expressions (docs/design.md §8 step 35)" };
+    if (collection.of_macro(call, scope)) |typed| return typed;
     const taken = switch (of_operands(operands, scope)) {
         .types => |taken| taken,
         .stopped => |typed| return typed,
     };
+    if (taken.types.len == 1 and collection.is_size(call, taken.types[0])) return .{ .ok = .{ .type = i64, .dynamic = taken.dynamic } };
     if (function.Result(call.name, taken.types)) |R| return .{ .ok = .{ .type = R, .dynamic = taken.dynamic } };
     return mistake(taken.dynamic, "found no matching overload for `" ++ call.name ++ "` applied to (" ++ taken.names ++ ")");
 }
@@ -206,8 +210,7 @@ fn of_has(comptime operands: []const Node, comptime scope: Scope) Typed {
         .problem => |problem| return .{ .problem = problem },
     };
     if (target.type == Failing) return .{ .ok = target };
-    if (!type_file.is_message(target.type)) return mistake(target.dynamic, "type `" ++ type_file.name_of(target.type) ++ "` has no field `" ++ select.field ++ "`");
-    const M = @typeInfo(target.type).pointer.child;
+    const M = type_file.MessageOf(target.type) orelse return mistake(target.dynamic, "type `" ++ type_file.name_of(target.type) ++ "` has no field `" ++ select.field ++ "`");
     if (select_file.field_of(M, select.field) == null) return mistake(target.dynamic, "undefined field `" ++ select.field ++ "` of " ++ M.protobuf.full_name);
     return .{ .ok = .{ .type = bool, .dynamic = target.dynamic } };
 }

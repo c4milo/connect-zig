@@ -9,6 +9,8 @@ const table = @import("../table.zig");
 const walk_file = @import("../walk.zig");
 const program = @import("cel_program.zig");
 const type_file = @import("cel_type.zig");
+const list_file = @import("cel_list.zig");
+const shape = @import("../shape.zig");
 const Walk = walk_file.Walk;
 const Path = walk_file.Path;
 const Site = walk_file.Site;
@@ -38,6 +40,13 @@ fn rules_of(comptime rules: anytype) []const Rule {
         }
         return list;
     }
+}
+
+/// The CEL type of a whole repeated field or map `F`, which is `this` for the field's own CEL
+/// rules. Null for a map the module does not read.
+pub fn Whole(comptime F: type) ?type {
+    if (!shape.is_map(F)) return list_file.List(F);
+    return if (list_file.map_is_read(F)) list_file.Map(F) else null;
 }
 
 /// Whether `rules` state a CEL rule.
@@ -94,7 +103,8 @@ fn broken(comptime rule: Rule, this: anytype, walk: *const Walk) Fault!?[]const 
     const scope: Scope = comptime .{ .types = &.{@TypeOf(this)} };
     // An expression that `dyn` let through with a mistake of types fails each time it runs.
     if (comptime program.Type(rule.expression, scope) == type_file.Failing) return error.Unevaluable;
-    const result = try program.run(rule.expression, scope, .{this}, &.{ .now = walk.options.now });
+    var env: type_file.Env = .{ .now = walk.options.now };
+    const result = try program.run(rule.expression, scope, .{this}, &env);
     if (comptime @TypeOf(result) == bool) {
         if (result) return null;
         // protovalidate's libraries state this text for a rule with no message.

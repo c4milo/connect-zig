@@ -6,22 +6,26 @@ const shape = @import("../shape.zig");
 const field_file = @import("../field.zig");
 const message_file = @import("../message.zig");
 const type_file = @import("cel_type.zig");
+const list_file = @import("cel_list.zig");
 
 /// The field of `M` that an expression names: its name in the .proto file.
 pub fn field_of(comptime M: type, comptime name: []const u8) ?proto.Field {
     return message_file.field_of_name(M, name);
 }
 
-/// The CEL type of `field` of `M`, or null for a field the module does not read: a repeated
-/// field, a map, and a field of the message's own type.
+/// The CEL type of `field` of `M`, or null for a field the module does not read: a field of
+/// the message's own type, and a map whose values are of it.
 pub fn Type(comptime M: type, comptime field: proto.Field) ?type {
     const kind = shape.of(M, field);
-    if (kind == .repeated or kind == .map or shape.is_lazy(shape.Holder(M, field))) return null;
+    const F = shape.Holder(M, field);
+    if (kind == .repeated) return list_file.List(F);
+    if (kind == .map) return if (list_file.map_is_read(F)) list_file.Map(F) else null;
+    if (shape.is_lazy(F)) return null;
     const V = shape.Value(M, field);
     const T = type_file.Of(field.kind, V);
     // A wrapper that is not set is null (CEL language definition, "Protocol Buffer Data
     // Conversion").
-    if (kind != .plain and shape.wrapper_kind(V) != null) return ?T;
+    if (shape.wrapper_kind(V) != null) return ?T;
     return T;
 }
 
@@ -32,7 +36,9 @@ pub fn read(comptime M: type, comptime field: proto.Field, message: *const M) Ty
         .plain => &@field(message, field.name),
         .optional => if (@field(message, field.name)) |*set| set else return absent(T),
         .member => field_file.member_of(M, field, message) orelse return absent(T),
-        .lazy, .repeated, .map => comptime unreachable,
+        // A list and a map are views of the field where it lies.
+        .repeated, .map => return .{ .field = &@field(message, field.name) },
+        .lazy => comptime unreachable,
     };
     return type_file.from(field.kind, V, value);
 }
@@ -87,7 +93,7 @@ test "a field's type follows its kind and how the message holds it" {
     try testing.expect(comptime Type(Sample, named("at")).? == proto.wkt.Timestamp);
     try testing.expect(comptime Type(Sample, named("count")).? == i64);
     try testing.expect(comptime Type(Sample, named("boxed")).? == ?bool);
-    try testing.expect(comptime Type(Sample, named("list")) == null);
+    try testing.expect(comptime Type(Sample, named("list")).? == list_file.List(proto.Repeated(f32, .float)));
     try testing.expect(comptime Type(Sample, named("again")) == null);
     try testing.expect(comptime field_of(Sample, "missing") == null);
 }

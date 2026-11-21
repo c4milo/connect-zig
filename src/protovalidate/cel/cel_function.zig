@@ -6,6 +6,7 @@ const std = @import("std");
 const proto = @import("protobuf");
 const constants = @import("../constants.zig");
 const type_file = @import("cel_type.zig");
+const library = @import("cel_library.zig");
 const Bytes = type_file.Bytes;
 const Error = type_file.Error;
 const Timestamp = proto.wkt.Timestamp;
@@ -48,7 +49,8 @@ pub fn Result(comptime name: []const u8, comptime operands: []const type) ?type 
     for (overloads) |overload| {
         if (std.mem.eql(u8, overload.name, name) and same_types(overload.operands, operands)) return overload.result;
     }
-    return null;
+    // protovalidate's own functions, each of which gives a bool.
+    return if (library.holds(name, operands)) bool else null;
 }
 
 fn same_types(comptime left: []const type, comptime right: []const type) bool {
@@ -61,6 +63,7 @@ fn same_types(comptime left: []const type, comptime right: []const type) bool {
 
 /// The result of `name` for `operands`, a tuple of the types `Result` took.
 pub fn run(comptime name: []const u8, comptime R: type, operands: anytype) Error!R {
+    if (comptime library.holds(name, &types_of(@TypeOf(operands)))) return library.run(name, operands);
     const first = operands[0];
     if (comptime named(name, "size")) return size(first);
     if (comptime named(name, "int")) return to_int(first);
@@ -77,6 +80,14 @@ pub fn run(comptime name: []const u8, comptime R: type, operands: anytype) Error
 
 fn named(comptime name: []const u8, comptime other: []const u8) bool {
     return std.mem.eql(u8, name, other);
+}
+
+/// The types of a tuple's values.
+fn types_of(comptime Operands: type) [@typeInfo(Operands).@"struct".fields.len]type {
+    const fields = @typeInfo(Operands).@"struct".fields;
+    var types = [_]type{void} ** fields.len;
+    for (fields, 0..) |field, index| types[index] = field.type;
+    return types;
 }
 
 fn octets_of(value: anytype) []const u8 {
@@ -156,12 +167,6 @@ const testing = std.testing;
 
 fn call(comptime name: []const u8, operands: anytype) Error!Result(name, &types_of(@TypeOf(operands))).? {
     return run(name, comptime Result(name, &types_of(@TypeOf(operands))).?, operands);
-}
-
-fn types_of(comptime Operands: type) [@typeInfo(Operands).@"struct".fields.len]type {
-    var types: [@typeInfo(Operands).@"struct".fields.len]type = undefined;
-    for (@typeInfo(Operands).@"struct".fields, 0..) |field, index| types[index] = field.type;
-    return types;
 }
 
 fn str(comptime literal: []const u8) []const u8 {

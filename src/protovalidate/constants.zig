@@ -86,3 +86,7 @@ pub const seconds_per_hour = 3_600;
 /// The most seconds of a google.protobuf.Duration, either side of zero: about 10,000 years
 /// (google/protobuf/duration.proto).
 pub const duration_seconds_max = 315_576_000_000;
+/// CEL: the elements of lists and maps one expression reads, at most. A macro inside a macro
+/// reads one list once for each element of another, as `repeated.unique` compares each pair,
+/// so the limit is the pairs of `compared_items_max` elements.
+pub const cel_steps_max = compared_items_max * compared_items_max;
