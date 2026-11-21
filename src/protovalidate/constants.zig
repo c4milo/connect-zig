@@ -7,6 +7,13 @@ pub const path_depth_max = 100;
 /// The octets of a report that holds about 16 violations of fields one message deep: a
 /// violation takes 184 octets and each element of its field's path 96.
 pub const report_bytes_default = 4096;
+/// The octets of the `buf.validate.Violations` an interceptor's error carries by default. gRPC
+/// writes an error's details in base64 in its trailers, and gRPC-Web writes those twice, so a
+/// transport that keeps 16 KiB for a call's trailers holds this detail with room for the rest.
+pub const detail_bytes_default = 2048;
+/// The octets of the message of an interceptor's error, at most: the first violation's field
+/// and what it broke. A longer text gives way to the violation's own message.
+pub const refusal_message_len_max = 256;
 /// The backward branches the compiler may take for each rule of a field while it reads a
 /// message's table: it compares the octets of names to find the rule's descriptor, and writes
 /// the rule's value into its message. The compiler counts the branches of one function's

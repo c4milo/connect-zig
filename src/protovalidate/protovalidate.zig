@@ -22,6 +22,7 @@ const files = struct {
     pub const table = @import("table.zig");
     pub const validate = @import("validate.zig");
     pub const check = @import("check.zig");
+    pub const interceptor = @import("interceptor.zig");
 };
 
 /// The table a generated message declares as `pub const protovalidate`.
@@ -40,9 +41,17 @@ pub const validate = files.validate.validate;
 /// What stops a type's rules from being checked, which `validate` stops the build with.
 pub const rules_error = files.check.rules_error;
 
+/// A server's interceptor that validates each request message, for the `connect` module the
+/// program builds with (design §8 step 33).
+pub const Interceptor = files.interceptor.Interceptor;
+pub const InterceptorOptions = files.interceptor.InterceptorOptions;
+/// What the error of a refused message points to, which the route table's `.Values` holds.
+pub const InterceptorRoom = files.interceptor.InterceptorRoom;
+
 test "the root exports the names a program calls" {
     try @import("public_names").expect(@This(), &.{
-        "constants", "Rules", "validate", "Options", "Report", "Violation", "Error", "rules_error",
+        "constants",   "Rules",              "validate",        "Options", "Report", "Violation", "Error", "rules_error",
+        "Interceptor", "InterceptorOptions", "InterceptorRoom",
     });
 }
 
@@ -51,6 +60,9 @@ test {
     _ = files.table;
     _ = files.validate;
     _ = files.check;
+    _ = files.interceptor;
+    _ = @import("refusal_text.zig");
+    _ = @import("interceptor_test.zig");
     _ = @import("shape.zig");
     _ = @import("text.zig");
     _ = @import("rule_number.zig");
