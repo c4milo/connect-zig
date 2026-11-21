@@ -1386,6 +1386,26 @@ ran on Linux x86-64 with Zig 0.16.0.
   - The step changes one thing a program may see: `RequestStream(T).next` gives no message
     after its stream failed. Before, `next` read the body again when a handler asked after a
     failure.
+- **CEL, parts a to c** (step 34, decision 47 as amended). Run on a Xeon at 2.1 GHz, x86-64
+  Linux.
+  - A spike came first: 200 lines that parse an expression at comptime, type it from a
+    message's fields and unfold it, in Zig 0.16. The owner then ruled for the comptime
+    compiler in the module, in place of functions the plugin writes.
+  - `zig build test-protovalidate` printed 148 of 148 tests passed, 65 of them the compiler's,
+    in `src/protovalidate/cel/`. `zig build test` passed.
+  - `tools/protovalidate_conformance_check.sh` printed `PASS (failed: 0, skipped: 258, passed:
+    2614, total: 2872)`. Part a moved 130 cases off the list, part b 22, and part c 644: the
+    seven `library/*` suites, 635 cases, pass whole. The 258 listed cases are 244 of predefined
+    rules and 14 of patterns.
+  - Mutations of part a, 167: a test caught 127, and the compiler stopped 40, where the tests'
+    own expressions no longer compiled. Of part b, 39 of 39 CAUGHT, and of part c, 17 of 17.
+  - The first runs found 15 mutations with no test: bytes of one length, an unsigned kind, a
+    bool's default, a variable named `now`, arithmetic on strings, `dyn` through a call and
+    through a negation, a double that is not a number, a wrong left side of `&&`, a rule's path
+    under `repeated.items` and `map.keys`, a list's and a map's own rule, and three counts of
+    the elements read. Each has a test now. Two checks no input reached are gone.
+  - The commit `b6f90a1` has a subject of 74 columns, 2 past the limit, and `zig build
+    lint-commits` refuses it. A rewrite of a pushed commit needs the owner's word.
 - **Ubuntu 26.04** (`fa83b86`, decision 44 as amended on 2026-11-20). CI's
   [run 191](https://github.com/c4milo/connect-zig/actions/runs/44673102412), the first on
   `ubuntu-26.04` and `ubuntu-26.04-arm`. Every job passed. Over TLS on arm64, connect-zig held

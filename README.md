@@ -454,8 +454,37 @@ one. A message type with no rule costs its call no instruction. The interceptor 
 `connect` module as a parameter, because `protovalidate` imports none.
 [examples/validate](examples/validate) serves a service behind it.
 
+A schema's own rules are CEL expressions, in `cel` and `cel_expression`:
+
+```proto
+message Booking {
+  option (buf.validate.message).cel = {
+    id: "booking.ordered"
+    message: "check_in must be before check_out"
+    expression: "this.check_in < this.check_out"
+  };
+  google.protobuf.Timestamp check_in = 1;
+  google.protobuf.Timestamp check_out = 2;
+  repeated string guests = 3 [(buf.validate.field).cel_expression = "this.all(g, g.size() > 0)"];
+}
+```
+
+The module compiles each expression when your program compiles, from the text the table holds
+(decision 47). It reads the expression, gives each part a type from the message's fields, and
+unfolds it into plain code, so no interpreter and no expression's tree exist at run time. It
+reads CEL's operators, conditionals, field selection, `has`, `dyn`, lists and maps with `in`,
+`size`, an index and the macros `all`, `exists` and `exists_one`, the conversions, the string
+functions, and protovalidate's own functions, such as `isEmail` and `isIpPrefix`.
+
+- An expression that does not parse, names a field its message lacks, or calls a function with
+  the wrong types stops your build, with a message that names the expression.
+- An expression that fails as it runs, such as by a division by zero, ends `validate` with
+  `error.Unevaluable`: the rule gave no verdict.
+- An expression reads at most `constants.cel_steps_max` elements of lists and maps, so a macro
+  inside a macro cannot make a small message cost much.
+
 A rule the module has no check for stops your build, with a message that names it. That holds
-today for CEL rules, for the predefined rules of an extension and for `pattern`.
+today for the predefined rules of an extension, for `pattern`, and for CEL's `matches`.
 
 ### More examples
 
@@ -486,9 +515,9 @@ with `zig build test`, and serves its service with `zig build serve` for curl an
   `conformance/protobuf_known_failing.txt` lists each of the 35 that fail, with its reason.
 - `tools/protovalidate_conformance_check.sh` runs [protovalidate's conformance
   harness](https://github.com/bufbuild/protovalidate/blob/main/docs/conformance.md) v1.2.2, with
-  strict messages and strict errors. 1818 of its 2872 cases pass. Each of the other 1054 is
-  listed in `conformance/protovalidate_known_failing.yaml` under its reason: a CEL rule, a
-  predefined rule or a `pattern`, which the library does not check yet.
+  strict messages and strict errors. 2614 of its 2872 cases pass. Each of the other 258 is
+  listed in `conformance/protovalidate_known_failing.yaml` under its reason: a predefined rule
+  of an extension or a `pattern`, which the library does not check yet.
 - `tools/coverage_check.sh` converts every protobuf type with connect-zig and with Go's runtime,
   between binary and JSON both ways, and requires the same message.
 - `tools/interop_languages_check.sh` calls the server from [clients in Go, TypeScript, Python
@@ -519,7 +548,7 @@ missing required field (decision 23).
 Not yet done:
 
 - a stream that waits for an event of the program once its request ended (colibri issue 130);
-- in `protovalidate`: CEL rules and the predefined rules of an extension, and `pattern`
+- in `protovalidate`: the predefined rules of an extension, and `pattern` with CEL's `matches`
   (docs/design.md §8 steps 34 and 35).
 
 ## Contributing

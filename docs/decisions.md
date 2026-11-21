@@ -698,7 +698,14 @@ first. Cite an entry by number in code and commits ("decision 6").
       - An expression that fails at run time, such as a division by zero, ends `validate` with
         `Unevaluable`. The message is not valid and not refused: the rule gave no verdict.
       - The module compiles the CEL it has a use for, and grows by use. A function or a macro
-        it does not hold stops the build with a message that names it.
+        it does not hold stops the build with a message that names it. `map` and `filter` build
+        a list, which needs room the module does not have, so they stop the build too.
+      - A list and a map are views of a repeated field, read one element at a time and never
+        copied. One expression reads at most `cel_steps_max` elements, the pairs of
+        `compared_items_max`, so a macro inside a macro has a bound whatever a message holds.
+        Past it `validate` ends with `TooManyItems`.
+      - `&&`, `||`, `all` and `exists` absorb a side or an element that fails when another one
+        decides the result, as CEL states them.
       - The plugin still reads the predefined rules of an extension, since only its request
         holds an extension's descriptor. It writes each one's value into the table.
     - The table holds the generated types of `validate.proto` itself, such as
