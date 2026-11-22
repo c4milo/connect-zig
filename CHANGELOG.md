@@ -53,6 +53,9 @@ change the public API, and the entry marks each change that does.
 - A Lean model of the CEL syntax in `spec/lean/`, and `zig build lean`, which requires the
   vectors a unit test replays to be what the model gives. `tools/lean_check.sh` runs it, and
   is the check `lean` of `tools/ci.sh`.
+- CEL's `filter(x, p)`, `map(x, t)` and `map(x, p, t)` on any list or map, such as
+  `this.items.filter(i, i.price > 0).size() > 0`. The list they give is computed as it is read,
+  so it needs no memory. Before, only `map` of a list literal compiled.
 - The plugin raises the compiler's branch quota in the table of a message with more than 500
   list and message rules, so a message of a thousand fields with rules compiles.
 - `docs/specs/cel/langdef.md`, the CEL language definition as cel-spec published it at

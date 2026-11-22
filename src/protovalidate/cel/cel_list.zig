@@ -85,7 +85,7 @@ pub fn ElementOf(comptime T: type) type {
     return T.Element;
 }
 
-fn IteratorOf(comptime T: type) type {
+pub fn IteratorOf(comptime T: type) type {
     if (@typeInfo(T) == .array) return ArrayIterator(T);
     return T.Iterator;
 }
@@ -236,7 +236,7 @@ pub fn list_holds(list: anytype, value: anytype, env: *Env) Error!bool {
 pub fn count(collection: anytype, env: *Env) Error!i64 {
     const C = @TypeOf(collection);
     if (comptime @typeInfo(C) == .array) return @typeInfo(C).array.len;
-    if (comptime is_list(C)) {
+    if (comptime may_be_stored(C)) {
         if (collection.stored()) |items| return @intCast(items.len);
     }
     var total: i64 = 0;
@@ -249,6 +249,12 @@ pub fn count(collection: anytype, env: *Env) Error!i64 {
         total += 1;
     }
     unreachable;
+}
+
+/// Whether `T` is a list of a repeated field, whose elements may lie in a slice. A literal's
+/// array and a lazy list hold no slice.
+fn may_be_stored(comptime T: type) bool {
+    return @typeInfo(T) == .@"struct" and @hasDecl(T, "stored");
 }
 
 /// Whether an entry after the iterator's place holds `key`.
@@ -266,7 +272,7 @@ pub fn key_again(comptime M: type, after: M.Iterator, key: M.Key, env: *Env) Err
 pub fn at(list: anytype, index: i64, env: *Env) Error!Taken(ElementOf(@TypeOf(list))) {
     const L = @TypeOf(list);
     // A stored list is indexed in place: one element read.
-    if (comptime @typeInfo(L) != .array) {
+    if (comptime may_be_stored(L)) {
         if (list.stored()) |items| {
             if (index < 0 or index >= items.len) return error.Unevaluable;
             try env.spend();

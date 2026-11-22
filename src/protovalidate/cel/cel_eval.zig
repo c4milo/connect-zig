@@ -135,7 +135,7 @@ inline fn eval_call(comptime call: Node.Call, comptime R: type, comptime scope: 
         // The pattern is a literal, which `check.type_of` required.
         .matches => return pattern_file.matches(operands[1].string, try eval(&operands[0], scope, values, env)),
         .format => return format_file.eval_format(call, scope, values, env),
-        .map => return collection.eval_map(call, R, scope, values, env),
+        .map, .filter => return collection.eval_derived(call, R, scope, values, env),
         .all, .exists, .exists_one => if (comptime collection.is_macro(call)) return collection.eval_macro(call, scope, values, env),
         else => {},
     }

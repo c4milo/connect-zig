@@ -191,9 +191,39 @@ test "a mistake with a list or a map is a problem of the build" {
     // A macro reads its target: a call of its name with no target is a call of a function.
     try expect_problem("all(this.numbers, true)", "found no matching overload for `all` applied to (list(int), bool)");
     try expect_problem("this.numbers.all(n, m > 0)", "undeclared reference to `m`");
-    try expect_problem("this.numbers.map(n, n * 2).size() > 0", "the macro `map` builds a list, which the module holds no room for");
-    try expect_problem("this.numbers.filter(n, n > 2).size() > 0", "the macro `filter` builds a list, which the module holds no room for");
+    try expect_problem("this.numbers.filter(n, n)", "the macro `filter` takes a bool for each element, not a int");
+    try expect_problem("this.numbers.map(n, n, n)", "the macro `map` takes a bool for each element, not a int");
+    try expect_problem("this.pick.filter(n, true)", "the macro `filter` reads a list or a map, not a int");
+    try expect_problem("this.numbers.map(n)", "the macro `map` takes a name and an expression");
+    try expect_problem("this.numbers.filter(n, n > 0, n)", "the macro `filter` takes a name and an expression");
+    try expect_problem("this.numbers.filter(n, m > 0)", "undeclared reference to `m`");
     try expect_problem("[1, 'a']", "a list literal holds a int and a string");
     try expect_problem("[]", "an empty list literal has no type");
     try expect_problem("this.pick.size()", "found no matching overload for `size` applied to (int)");
+}
+
+test "filter and map give a list that each read computes" {
+    const message: Message = .{
+        .numbers = .of(&.{ 1, 5, 2, 8 }),
+        .names = .of(&.{ "ada", "", "bob" }),
+        .items = .of(&.{ .{ .a = 3 }, .{ .a = 9 } }),
+        .counts = .of(&.{ .{ .key = "x", .value = 1 }, .{ .key = "y", .value = 7 }, .{ .key = "x", .value = 2 } }),
+        .pick = 2,
+    };
+    try expect_true("this.numbers.filter(n, n > 2).size() == 2 && this.numbers.filter(n, n > 2)[1] == 8", &message);
+    try expect_true("this.numbers.map(n, n * 2).all(n, n % 2 == 0) && 16 in this.numbers.map(n, n * 2)", &message);
+    try expect_true("!(5 in this.numbers.map(n, n * 2)) && this.numbers.map(n, n > 2, n * 10)[0] == 50", &message);
+    try expect_true("this.numbers.map(n, n > 2, n * 10).size() == 2 && this.names.filter(s, s != '').size() == 2", &message);
+    try expect_true("this.items.map(i, i.a).exists_one(a, a == 9) && this.items.filter(i, i.a > 5).map(i, i.a)[0] == 9", &message);
+    // A predicate reads the expression's other names, and a map gives each key once.
+    try expect_true("this.numbers.filter(n, n > this.pick).size() == 2", &message);
+    try expect_true("this.counts.filter(k, k != '').size() == 2 && this.counts.filter(k, this.counts[k] > 1).size() == 2", &message);
+    try expect_true("this.counts.map(k, this.counts[k]).all(v, v == 2 || v == 7)", &message);
+    try expect_true("this.numbers.filter(n, n > 100).size() == 0 && !this.numbers.filter(n, n > 100).exists(n, true)", &message);
+    // A literal's `map` keeps its length, and its `filter` is computed as it is read.
+    try expect_true("[1, 2, 3].filter(n, n != 2).size() == 2 && [1, 2].map(n, n + 1)[1] == 3", &message);
+    // A failure inside the list fails the read, and an index past its end fails.
+    try testing.expectError(error.Unevaluable, run("this.numbers.map(n, 10 / (n - 5)).size() > 0", &message));
+    try testing.expectError(error.Unevaluable, run("this.numbers.filter(n, 10 / (n - 5) > 0).size() > 0", &message));
+    try testing.expectError(error.Unevaluable, run("this.numbers.filter(n, n > 2)[2] == 0", &message));
 }

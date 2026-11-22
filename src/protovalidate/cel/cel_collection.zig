@@ -1,7 +1,7 @@
 //! What an expression does with lists and maps: a list literal, an index, `in`, `size`, and the
-//! macros `all`, `exists` and `exists_one` (CEL language definition, "Macros", "List
-//! Operators" and "Map Operators"). Each has its type, which the compiler finds, and the code
-//! it unfolds into.
+//! macros `all`, `exists`, `exists_one`, `filter` and `map` (CEL language definition, "Macros",
+//! "List Operators" and "Map Operators"). Each has its type, which the compiler finds, and the
+//! code it unfolds into.
 const std = @import("std");
 const proto = @import("protobuf");
 const node_file = @import("cel_node.zig");
@@ -10,6 +10,7 @@ const list_file = @import("cel_list.zig");
 const value_file = @import("cel_value.zig");
 const check = @import("cel_check.zig");
 const evaluation = @import("cel_eval.zig");
+const lazy = @import("cel_lazy_list.zig");
 const Node = node_file.Node;
 const Scope = type_file.Scope;
 const Typed = type_file.Typed;
@@ -19,7 +20,7 @@ const Failing = type_file.Failing;
 
 /// The type a macro's variable takes over a `T`: a list's element, or a map's key. Null when
 /// `T` is neither.
-fn Variable(comptime T: type) ?type {
+pub fn Variable(comptime T: type) ?type {
     if (list_file.is_map(T)) return T.Key;
     if (list_file.is_list(T)) return list_file.ElementOf(T);
     return null;
@@ -121,10 +122,10 @@ pub fn is_macro(comptime call: Node.Call) bool {
 }
 
 /// The type of a macro, or null when `call` is no macro: `target.all(x, p)`, `exists` and
-/// `exists_one`, where `x` names each element of a list or each key of a map in `p`.
+/// `exists_one`, where `x` names each element of a list or each key of a map in `p`, and
+/// `filter` and `map`, which give a list.
 pub fn of_macro(comptime call: Node.Call, comptime scope: Scope) ?Typed {
-    if (call.function == .map) return of_map(call, scope);
-    if (call.function == .filter) return .{ .problem = no_room("filter") };
+    if (call.function == .map or call.function == .filter) return of_derived(call, scope);
     if (!is_macro(call)) return null;
     if (call.arguments.len != macro_arguments or call.arguments[0] != .name) return .{ .problem = "the macro `" ++ call.name ++ "` takes a name and an expression" };
     const target = switch (check.type_of(call.target.?, scope)) {
@@ -145,31 +146,76 @@ pub fn of_macro(comptime call: Node.Call, comptime scope: Scope) ?Typed {
     return .{ .ok = .{ .type = bool, .dynamic = target.dynamic or body.dynamic } };
 }
 
-fn no_room(comptime macro: []const u8) []const u8 {
-    return "the macro `" ++ macro ++ "` builds a list, which the module holds no room for";
+/// Whether `call` has a macro's arguments: a name and an expression, or for `map` also a name
+/// and two expressions, `map(x, p, t)`.
+fn takes_macro_arguments(comptime call: Node.Call) bool {
+    const three = call.function == .map and call.arguments.len == macro_arguments + 1;
+    if (call.arguments.len != macro_arguments and !three) return false;
+    return call.target != null and call.arguments[0] == .name;
 }
 
-/// `list.map(x, t)` over a list whose length the compiler knows: a list literal, or the list
-/// of a predefined rule's value. The result is a list of that length. A repeated field has no
-/// such length, so its `map` has no room.
-fn of_map(comptime call: Node.Call, comptime scope: Scope) Typed {
-    if (call.target == null or call.arguments.len != macro_arguments or call.arguments[0] != .name) return .{ .problem = no_room("map") };
+/// `filter(x, p)`, `map(x, t)` and `map(x, p, t)` on a list or a map. `map(x, t)` of a list
+/// whose length the compiler knows, a list literal or a predefined rule's list, is a list of
+/// that length. Any other gives a lazy list, which computes each element as it is read.
+fn of_derived(comptime call: Node.Call, comptime scope: Scope) Typed {
+    if (!takes_macro_arguments(call)) return .{ .problem = "the macro `" ++ call.name ++ "` takes a name and an expression" };
     const target = switch (check.type_of(call.target.?, scope)) {
         .ok => |ok| ok,
         .problem => |problem| return .{ .problem = problem },
     };
     if (target.type == Failing) return .{ .ok = target };
-    if (@typeInfo(target.type) != .array) return .{ .problem = no_room("map") };
-    const array = @typeInfo(target.type).array;
-    const body = switch (check.type_of(&call.arguments[1], scope.with(call.arguments[0].name, array.child))) {
+    if (Variable(target.type) == null) {
+        return check.mistake(target.dynamic, "the macro `" ++ call.name ++ "` reads a list or a map, not a " ++ type_file.name_of(target.type));
+    }
+    return of_steps(call, target, scope);
+}
+
+/// The list that `call`'s predicate and transform make of `target`.
+fn of_steps(comptime call: Node.Call, comptime target: Typed.Ok, comptime scope: Scope) Typed {
+    const V = Variable(target.type).?;
+    const inner = scope.with(call.arguments[0].name, V);
+    const predicate: ?*const Node = if (call.function == .filter or call.arguments.len > macro_arguments) &call.arguments[1] else null;
+    const kept = switch (if (predicate) |node| of_predicate(call, node, inner) else Typed.of(bool)) {
         .ok => |ok| ok,
         .problem => |problem| return .{ .problem = problem },
     };
-    if (body.type == Failing) return .{ .ok = body };
-    return .{ .ok = .{ .type = [array.len]body.type, .dynamic = target.dynamic or body.dynamic } };
+    if (kept.type == Failing) return .{ .ok = kept };
+    const transform: ?*const Node = if (call.function == .map) &call.arguments[call.arguments.len - 1] else null;
+    const element = switch (if (transform) |node| check.type_of(node, inner) else Typed.of(V)) {
+        .ok => |ok| ok,
+        .problem => |problem| return .{ .problem = problem },
+    };
+    if (element.type == Failing) return .{ .ok = element };
+    const steps: lazy.Steps = .{ .variable = call.arguments[0].name, .predicate = predicate, .transform = transform };
+    return .{ .ok = .{ .type = Derived(target.type, steps, element.type, scope), .dynamic = target.dynamic or kept.dynamic or element.dynamic } };
 }
 
-pub fn eval_map(comptime call: Node.Call, comptime R: type, comptime scope: Scope, values: anytype, env: *Env) Error!R {
+/// The list `steps` make of a `Source`: an array of the source's length for `map(x, t)` of an
+/// array, and a lazy list for any other.
+fn Derived(comptime Source: type, comptime steps: lazy.Steps, comptime Element: type, comptime scope: Scope) type {
+    if (@typeInfo(Source) == .array and steps.predicate == null) return [@typeInfo(Source).array.len]Element;
+    return lazy.LazyList(Source, steps, scope);
+}
+
+/// The type of a predicate of `filter` or `map`: a bool, a part that fails as it runs, or the
+/// problem of another type.
+fn of_predicate(comptime call: Node.Call, comptime predicate: *const Node, comptime inner: Scope) Typed {
+    const typed = switch (check.type_of(predicate, inner)) {
+        .ok => |ok| ok,
+        .problem => |problem| return .{ .problem = problem },
+    };
+    if (typed.type == bool or typed.type == Failing) return .{ .ok = typed };
+    return check.mistake(typed.dynamic, "the macro `" ++ call.name ++ "` takes a bool for each element, not a " ++ type_file.name_of(typed.type));
+}
+
+/// `filter` and `map`: a list of the length the compiler knows, or a lazy list of the target's
+/// value and the values of the expression's names.
+pub fn eval_derived(comptime call: Node.Call, comptime R: type, comptime scope: Scope, values: anytype, env: *Env) Error!R {
+    if (comptime @typeInfo(R) == .array) return eval_map(call, R, scope, values, env);
+    return .{ .source = try evaluation.eval(call.target.?, scope, values, env), .values = values };
+}
+
+fn eval_map(comptime call: Node.Call, comptime R: type, comptime scope: Scope, values: anytype, env: *Env) Error!R {
     const source = try evaluation.eval(call.target.?, scope, values, env);
     const array = @typeInfo(R).array;
     const inner = comptime scope.with(call.arguments[0].name, @typeInfo(@TypeOf(source)).array.child);

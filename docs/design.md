@@ -1709,6 +1709,18 @@ ran on Linux x86-64 with Zig 0.16.0.
     group named as a message, a scalar's kind left in lower case, and a quoted part kept
     quoted. Each was `CAUGHT`.
 
+- **`filter` and `map` as lazy lists** (decision 47, amended 2026-11-22). `filter(x, p)`,
+  `map(x, t)` and `map(x, p, t)` take any list or map, and give a list that computes each
+  element as it is read: `cel_lazy_list.zig`. The list holds no element, so it needs no room.
+  `size`, `in`, an index and the macros read it as any other list.
+  - The differential check generates `filter` and `map` over repeated fields, a map and a
+    literal, under `size`, an index, `in` and the macros. Seeds 11 to 14, 21 to 28, 31 and 32
+    agreed with protovalidate-go on each of their 112,000 verdicts.
+  - Mutations against `zig build test-protovalidate`, 7: a predicate that leaves no element
+    out, a predicate that fails and leaves its element out, a map key read once for each
+    entry, a predicate of int typed, `filter` with three arguments, a stored list read element
+    by element, and `map(x, p, t)` without its predicate. Each was `CAUGHT`.
+
 ### Work not done yet
 
 - A stream that waits for an event of the program once its request ended (colibri issue 130).
@@ -1730,9 +1742,8 @@ ran on Linux x86-64 with Zig 0.16.0.
 - For `protovalidate`, the parts of CEL that no rule of the conformance suite uses and the
   module does not read yet: a selection of a map's key, `m.key`, `type`, `duration` of a text
   that is no literal, `timestamp(string)`, sums and differences of timestamps and
-  durations, the accessors of a timestamp such as `getFullYear`, `map` over a field,
-  `filter`, `string` of a number, and `+` of two strings. Each stops the build with a message
-  that names it.
+  durations, the accessors of a timestamp such as `getFullYear`, `string` of a number, and `+`
+  of two strings. Each stops the build with a message that names it.
 - For `protovalidate`, the tree of each CEL expression in the table. The compiler takes
   4.1 ms to read a rule's text, and 0.04 ms to read the same tree as a Zig literal. The plugin
   would run the grammar of `cel_grammar.zig` as a program and write each tree beside its

@@ -76,7 +76,7 @@ class Generator:
         leaves = ["this.i", "this.j", "this.leaf.count", str(self.pick(INTS)), str(self.pick(INTS))] + self.variables["int"]
         if depth <= 0 or self.rng.random() < 0.4:
             return self.pick(leaves)
-        kind = self.rng.randrange(12)
+        kind = self.rng.randrange(13)
         if kind < 4:
             return f"({self.int(depth - 1)} {self.pick(['+', '-', '*', '/', '%'])} {self.int(depth - 1)})"
         if kind == 4:
@@ -93,7 +93,32 @@ class Generator:
             return f"this.msi[{self.string(0)}]"
         if kind == 10:
             return f"({self.bool(depth - 1)} ? {self.int(depth - 1)} : {self.int(depth - 1)})"
+        if kind == 11:
+            return self.derived_int(depth)
         return self.pick(leaves)
+
+    def derived(self, depth):
+        """A list that `filter` or `map` gives, the type of its elements, and whether its order
+        is the source's: a list made from a map follows the map, which has no order."""
+        name = self.variable()
+        collection, kind = self.pick([("this.rs", "string"), ("this.ri", "int"), ("this.msi", "string"), ("[3, 1, 2]", "int")])
+        self.variables[kind].append(name)
+        shape = self.rng.randrange(3)
+        if shape == 0:
+            text, element = f"{collection}.filter({name}, {self.bool(depth - 1)})", kind
+        elif shape == 1:
+            text, element = f"{collection}.map({name}, {self.int(depth - 1)})", "int"
+        else:
+            text, element = f"{collection}.map({name}, {self.bool(depth - 1)}, {self.int(depth - 1)})", "int"
+        self.variables[kind].pop()
+        return text, element, collection != "this.msi"
+
+    def derived_int(self, depth):
+        """The size of a list that `filter` or `map` gives, or an int at an index of one."""
+        text, element, ordered = self.derived(depth)
+        if element == "int" and ordered and self.rng.random() < 0.5:
+            return f"{text}[{self.pick([0, 1])}]"
+        return f"{text}.size()"
 
     def uint(self, depth):
         leaves = ["this.u", "this.v", f"{self.pick(UINTS)}u"]
@@ -127,8 +152,10 @@ class Generator:
     def macro(self, depth):
         name = self.variable()
         macro = self.pick(["all", "exists", "exists_one"])
-        source = self.rng.randrange(4)
-        if source == 0:
+        source = self.rng.randrange(5)
+        if source == 4:
+            collection, kind, _ = self.derived(depth - 1)
+        elif source == 0:
             collection, kind = "this.rs", "string"
         elif source == 1:
             collection, kind = "this.ri", "int"
@@ -178,6 +205,9 @@ class Generator:
                 return f"{self.string(depth - 1)}.matches({self.literal(self.pick(PATTERNS))})"
             return f"{self.string(depth - 1)}.{self.pick(['startsWith', 'endsWith', 'contains'])}({self.string(depth - 1)})"
         if kind == 10:
+            if self.rng.random() < 0.25:
+                collection, kind, _ = self.derived(depth - 1)
+                return f"{self.string(0) if kind == 'string' else self.int(0)} in {collection}"
             return self.pick([f"{self.string(depth - 1)} in this.rs", f"{self.int(depth - 1)} in this.ri", f"{self.string(depth - 1)} in this.msi", f"{self.int(depth - 1)} in [1, 2, 3]"])
         if kind == 11:
             return self.macro(depth)

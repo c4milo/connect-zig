@@ -699,7 +699,8 @@ first. Cite an entry by number in code and commits ("decision 6").
         `Unevaluable`. The message is not valid and not refused: the rule gave no verdict.
       - The module compiles the CEL it has a use for, and grows by use. A function or a macro
         it does not hold stops the build with a message that names it. `map` and `filter` build
-        a list, which needs room the module does not have, so they stop the build too.
+        a list, which needs room the module does not have, so they stop the build too. The
+        amendment of 2026-11-22 below gives them a list that is computed as it is read.
       - A list and a map are views of a repeated field, read one element at a time and never
         copied. One expression reads at most `cel_steps_max` elements, the pairs of
         `compared_items_max`, so a macro inside a macro has a bound whatever a message holds.
@@ -861,6 +862,20 @@ first. Cite an entry by number in code and commits ("decision 6").
       - Beaten: a buffer on the stack for each rule, which bounds a message by a constant and
         costs a fill on each call; and a public scratch passed to `validate`, which every
         program would size.
+    - CEL's `filter(x, p)`, `map(x, t)` and `map(x, p, t)` give a lazy list. Amended on
+      2026-11-22:
+      - The list holds its source and the values of the expression's names. Each read of an
+        element takes the source's next element, or a map's next key, and runs the predicate and
+        the transform on it. So the list needs no room, and its length has no bound but the
+        expression's count of steps.
+      - `size`, `in`, an index and the macros read it as any other list. Each read runs the
+        expressions again, so a rule that reads one list twice computes it twice.
+      - A key that two entries of a map hold is read once. A failure of the predicate or the
+        transform fails the read, as it fails the macro in CEL.
+      - `map(x, t)` of a list literal or of a predefined rule's list keeps the array it gave
+        before, whose length the compiler knows.
+      - Beaten: a list in the free part of the report's storage, which copies each element and
+        bounds the list by the room; and a buffer on the stack, which bounds it by a constant.
     - protovalidate's conformance harness v1.2.2 runs against `zig build
       protovalidate-executor`. The harness sends each case as an Any beside a
       `FileDescriptorSet`. The library has no dynamic message, so the executor holds the
