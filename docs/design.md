@@ -1631,6 +1631,28 @@ ran on Linux x86-64 with Zig 0.16.0.
     fastest in all six. Validation alone, protovalidate-buffa was faster in two: the valid
     `Medium`, 177 ns to 190, and the valid `Rules`, 20 ns to 71.
 
+- **Step 35, patterns** (decision 47 as amended). `pattern` of a string and of bytes, and CEL's
+  `matches`, run on stdx's `regex` at commit 85d3fe7, pinned as `stdx_regex`.
+  - `tools/protovalidate_conformance_check.sh` printed `PASS (failed: 0, skipped: 36, passed:
+    2836, total: 2872)`. The 14 cases of `pattern` left the known-failing list. The 36 cases of
+    predefined rules that call `matches` stay: their messages call `format` too, which the
+    module does not read ("What a later step owes").
+  - `tools/cel_differential_check.sh 1 2 3 4 5 6 7 8`, whose generator now writes `matches`
+    with 15 RE2 patterns, printed no difference from protovalidate-go v1.4.1 for any seed.
+  - The benchmark's `Medium` name takes a pattern now. `validate medium valid` took 9,685
+    instructions, where it took 3,295: the search of a 12-octet name takes about 6,400, most of
+    it the DFA's states, which each search builds again. stdx's matcher alone took about 4,800
+    there, but about 375 an octet as the text grows, so the module keeps the searcher.
+  - `tools/validate_compare_check.sh` on this tree's Xeon: all five gave each message the same
+    verdict, `string.pattern` included. Decode with validation of the valid `Medium` took
+    1,112 ns, protovalidate-buffa's 1,193 and protovalidate-go's 12,797. Validation alone took
+    847 ns to protovalidate-buffa's 397.
+  - Mutations against `zig build test-protovalidate`, 12: each pattern rule's answer inverted,
+    its rule taken off the handled list, a bytes value that is not UTF-8 taken, the bytes
+    rule's message, a search's answer inverted, a refused pattern of each type and of
+    `matches` taken, a `matches` with no literal taken, `matches` of the empty text, and its
+    overload removed. Each was `CAUGHT`.
+
 ### What a later step owes
 
 - A stream that waits for an event of the program once its request ended (colibri issue 130).
@@ -1639,16 +1661,17 @@ ran on Linux x86-64 with Zig 0.16.0.
 - For `oidc`, a measurement before any change: a client sends one token with each call, and
   the verifier checks its signature each time. If that cost shows in a server's profile, a
   verifier may keep the last tokens it took.
-- For `protovalidate`, what step 35 needs of stdx's regular expression module:
-  - RE2's syntax, as CEL's `matches` takes it. The suite's patterns hold a flag group, anchors,
-    classes, a hex escape range and Perl classes: `(?i)^[a-z0-9]+$`, `^[\x00-\x7F]+$` and
-    `\* \\ \w`.
-  - A search: `matches` is true when any part of the text matches, so a pattern states its
-    own anchors.
-  - Time linear in the text, no allocator, and a pattern that is comptime data in generated
-    code, with the size of what a match needs known at comptime.
-  - `bytes.pattern` reads its value as UTF-8, and a value that is not UTF-8 is a run-time
-    error, not a violation.
+- For `protovalidate`, CEL's `format`, as in ``'not a valid path: `%s`'.format([this])``. The
+  messages of 36 predefined rules of protovalidate's suite take it, and those cases stay on
+  the known-failing list. A formatted message is text no rule holds, so the walk would write
+  it into the report's storage.
+- For `protovalidate`, one pin of stdx. `stdx_regex` pins the commit that brought `regex`
+  beside the stdx that colibri pins (decision 47). The two become one when a colibri release
+  pins a stdx that holds `regex`.
+- For `protovalidate`, a pattern's search keeps no DFA from one call to the next, so it builds
+  its states again each time: about 6,400 instructions for the benchmark's name of 12 octets.
+  A DFA that the compiler builds whole from a pattern the build knows would cost about the
+  octets read. stdx's session has the numbers; the module changes when stdx offers it.
 - For `protovalidate`, a `unique` list longer than `compared_items_max` fails with
   `TooManyItems` (decision 47). A program that needs longer lists needs a set in storage it
   passes. No step holds that yet.

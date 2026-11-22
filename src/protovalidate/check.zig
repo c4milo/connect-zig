@@ -20,6 +20,7 @@ const rule_string = @import("rule_string.zig");
 const rule_bytes = @import("rule_bytes.zig");
 const rule_time = @import("rule_time.zig");
 const rule_field_mask = @import("rule_field_mask.zig");
+const pattern_file = @import("pattern.zig");
 const cel_rule = @import("cel/cel_rule.zig");
 const cel_type = @import("cel/cel_type.zig");
 
@@ -151,6 +152,9 @@ fn of_value(comptime V: type, comptime kind: proto.Kind, comptime rules: pb.Fiel
     if (rules.type) |typed| {
         if (!fits(typed, V, kind)) return where ++ ": mismatched rule type and field type: " ++ @tagName(typed) ++ " rules on a field of another type";
         if (of_typed(typed)) |rule| return where ++ ": the rule " ++ @tagName(typed) ++ "." ++ rule ++ " has no check";
+        if (pattern_of(typed)) |pattern| {
+            if (pattern_file.problem_of(pattern)) |problem| return where ++ ": " ++ problem;
+        }
     }
     return of_message(V, visited);
 }
@@ -176,6 +180,15 @@ fn of_typed(comptime typed: Typed) ?[]const u8 {
         // `of_list` and `of_map` read these, with the rules of their elements.
         .repeated, .map => null,
         inline else => |rules, tag| unhandled(@TypeOf(rules), rules, handled_by(tag)),
+    };
+}
+
+/// The pattern of `typed`'s `pattern` rule, which stdx must read, or null.
+fn pattern_of(comptime typed: Typed) ?[]const u8 {
+    return switch (typed) {
+        .string => |rules| rules.pattern,
+        .bytes => |rules| rules.pattern,
+        else => null,
     };
 }
 
@@ -279,7 +292,9 @@ test "rules of another type than the field's are a mismatch" {
 }
 
 test "a rule with no check, a CEL rule and a rule the plugin could not write each stop the type" {
-    try expect_problem(Message([]const u8, .string, field_rules(.{ .type = .{ .string = .{ .pattern = "a" } } })), "t.Message.val: the rule string.pattern has no check");
+    try expect_problem(Message([]const u8, .string, field_rules(.{ .type = .{ .string = .{ .pattern = "\\p{Greek}" } } })), "t.Message.val: stdx's regular expressions refuse the pattern `\\p{Greek}`: UnsupportedProperty");
+    try expect_problem(Message([]const u8, .bytes, field_rules(.{ .type = .{ .bytes = .{ .pattern = "(" } } })), "t.Message.val: stdx's regular expressions refuse the pattern `(`");
+    try testing.expect(comptime rules_error(Message([]const u8, .string, field_rules(.{ .type = .{ .string = .{ .pattern = "^a+$" } } }))) == null);
     try expect_problem(Message(i32, .int32, field_rules(.{ .cel_expression = .of(&.{"this > "}) })), "t.Message.val: `this > `: the expression ends early");
     try expect_problem(Message(i32, .int32, field_rules(.{ .cel = .of(&.{.{ .id = "a", .expression = "this.size() > 0" }}) })), "found no matching overload for `size` applied to (int)");
     try expect_problem(Message(i32, .int32, .{ .message = .{ .cel_expression = .of(&.{"this.missing > 0"}) } }), "t.Message: `this.missing > 0`: undefined field `missing` of t.Message");

@@ -141,7 +141,7 @@ pub const Medium = struct {
         .message = .{ .cel = .of(&.{ .{ .id = "medium.confirm", .message = "confirm must equal password", .expression = "this.confirm == this.password" }, .{ .id = "medium.pro_quota", .message = "a pro plan needs a quota of 1000 or more", .expression = "this.plan != 2 || this.quota >= 1000u" } }) },
         .fields = &.{
             .{ .number = @intFromEnum(@This().FieldNumber.id), .rules = .{ .type = .{ .string = .{ .well_known = .{ .uuid = true } } } } },
-            .{ .number = @intFromEnum(@This().FieldNumber.name), .rules = .{ .type = .{ .string = .{ .min_len = 1, .max_len = @This().RuleNumber.@"name.string.max_len" } } } },
+            .{ .number = @intFromEnum(@This().FieldNumber.name), .rules = .{ .type = .{ .string = .{ .min_len = 1, .max_len = @This().RuleNumber.@"name.string.max_len", .pattern = "^[A-Z][a-z]+( [A-Z][a-z]+)*$" } } } },
             .{ .number = @intFromEnum(@This().FieldNumber.email), .rules = .{ .type = .{ .string = .{ .well_known = .{ .email = true } } } } },
             .{ .number = @intFromEnum(@This().FieldNumber.website), .rules = .{ .type = .{ .string = .{ .well_known = .{ .uri = true } } } } },
             .{ .number = @intFromEnum(@This().FieldNumber.host), .rules = .{ .type = .{ .string = .{ .well_known = .{ .hostname = true } } } } },

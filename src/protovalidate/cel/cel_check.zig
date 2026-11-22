@@ -11,6 +11,7 @@ const function = @import("cel_function.zig");
 const value_file = @import("cel_value.zig");
 const time = @import("cel_time.zig");
 const collection = @import("cel_collection.zig");
+const pattern_file = @import("../pattern.zig");
 const Node = node_file.Node;
 const BinaryOp = node_file.BinaryOp;
 const Scope = type_file.Scope;
@@ -181,7 +182,7 @@ fn of_call(comptime call: Node.Call, comptime scope: Scope) Typed {
         .has => return of_has(operands, scope),
         .dyn => if (operands.len == 1) return of_dyn(&operands[0], scope),
         .duration => if (operands.len == 1) return of_duration(&operands[0]),
-        .matches => return .{ .problem = "`matches` waits for stdx's regular expressions (docs/design.md §8 step 35)" },
+        .matches => if (pattern_problem(operands)) |problem| return .{ .problem = problem },
         else => {},
     }
     if (collection.of_macro(call, scope)) |typed| return typed;
@@ -195,6 +196,20 @@ fn of_call(comptime call: Node.Call, comptime scope: Scope) Typed {
     };
     if (converts_no_literal(call, operands, R)) return .{ .problem = "the conversion `" ++ call.name ++ "` fails for its literal" };
     return .{ .ok = .{ .type = R, .dynamic = taken.dynamic } };
+}
+
+/// What stops the pattern of `matches` from compiling, or null: it is no string literal, or stdx
+/// refuses it. The compiler reads each pattern into a program once (design §8 step 35), where
+/// cel-go reads a pattern each time the expression runs. A call of another shape is left to the
+/// overloads, which refuse it.
+fn pattern_problem(comptime operands: []const Node) ?[]const u8 {
+    // `matches` reads two operands: the text and the pattern.
+    const text_and_pattern = 2;
+    if (operands.len != text_and_pattern) return null;
+    return switch (operands[1]) {
+        .string => |pattern| pattern_file.problem_of(pattern),
+        else => "the pattern of `matches` is no string literal, and this module reads each pattern as it compiles",
+    };
 }
 
 /// Whether `call` is a conversion of a literal that fails. cel-go computes such a conversion

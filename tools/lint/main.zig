@@ -139,6 +139,10 @@ pub const undefined_fill = rules.undefined_fill.Rule(.{
     // A copy of colibri's examples/link.zig, kept as colibri wrote it.
     .allowed = &.{
         .{ .path = "examples/harness/src/link.zig", .variable = "events" },
+        // A pattern's search memory, which stdx's searcher clears where it reads, and the
+        // storage that `compile` fills, which runs at compile time alone.
+        .{ .path = "src/protovalidate/pattern.zig", .variable = "memory" },
+        .{ .path = "src/protovalidate/pattern.zig", .variable = "storage" },
     },
 });
 

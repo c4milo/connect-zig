@@ -14,6 +14,14 @@
             .url = "git+https://github.com/c4milo/stdx?ref=v0.1.2#f45a045ebbec749fbeb71ec15e1ddf44a4bd9cc8",
             .hash = "stdx-0.1.2-BD60tuXUQAAyprHFaqXL_exr5vj7MAu3uZt8lFUmz8Ol",
         },
+        // The regular expressions of `protovalidate`'s `pattern` and CEL's `matches`, from the
+        // commit that brought stdx's `regex` module (decision 47 as amended for step 35). Only
+        // `regex` is taken from it. It exports no symbol, so it links beside the stdx above,
+        // which colibri pins too.
+        .stdx_regex = .{
+            .url = "git+https://github.com/c4milo/stdx#85d3fe756c243761df9da1d066b4051447442027",
+            .hash = "stdx-0.2.0-BD60tu4FRwCOk5t3F0Id-wV-CnheGr9GRNrduqij1I9m",
+        },
         // Developer tooling only, never linked into the library (decision 15). Lazy, and requested
         // only when connect-zig is the root build.
         .pepegrillo = .{

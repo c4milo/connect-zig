@@ -18,9 +18,9 @@ change the public API, and the entry marks each change that does.
   `(buf.validate.oneof)` and `(buf.validate.field)` options as a table, `pub const
   protovalidate`, beside its descriptor. `protovalidate.validate` reads the table at compile
   time, so no rule is parsed at run time, and writes each violation into a `Report` over storage
-  the program passes. It checks `required`, `ignore`, oneofs and every standard rule but
-  `pattern`: numbers, bool, enum, string with each well-known form, bytes, repeated fields, maps,
-  Any, Duration, Timestamp and FieldMask.
+  the program passes. It checks `required`, `ignore`, oneofs and every standard rule: numbers,
+  bool, enum, string with each well-known form, bytes, repeated fields, maps, Any, Duration,
+  Timestamp and FieldMask.
 - The package exports `protovalidate`, and the generated code of validate.proto and of
   descriptor.proto as `buf_validate_validate` and `google_protobuf_descriptor`.
 - A message with no rule, in itself or in a message it holds, keeps the code it had.
@@ -71,9 +71,14 @@ change the public API, and the entry marks each change that does.
   rules against the build of the same schema with none, held to `bench/compile_time.txt`.
   Unit tests hold the compiler's reading and typing of an expression to a count of branches,
   and `tools/branch_budget.py` finds a new count.
-- Not yet: `pattern` and CEL's `matches`, arithmetic on a timestamp or a duration, and
-  `timestamp(string)`. A message with such a rule stops the build, with a message that names
-  the rule.
+- `pattern` of a string and of bytes, and CEL's `matches`, on stdx's regular expressions:
+  RE2's syntax, in time linear in the text (design §8 step 35). The compiler reads each
+  pattern once. The pattern of `matches` is a string literal, and a pattern stdx refuses is a
+  problem of the rules. `bytes.pattern` of octets that are not UTF-8 fails with `Unevaluable`.
+- connect-zig pins stdx a second time, as `stdx_regex`, at the commit that brought `regex`,
+  and takes that module alone from it (decision 47).
+- Not yet: CEL's `format`, arithmetic on a timestamp or a duration, and `timestamp(string)`. A
+  message with such a rule stops the build, with a message that names the rule.
 
 ### Changed
 

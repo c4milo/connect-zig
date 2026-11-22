@@ -44,7 +44,7 @@ message Medium {
   };
 
   string id = 1 [(buf.validate.field).string.uuid = true];
-  string name = 2 [(buf.validate.field).string = {min_len: 1, max_len: 64}];
+  string name = 2 [(buf.validate.field).string = {min_len: 1, max_len: 64, pattern: "^[A-Z][a-z]+( [A-Z][a-z]+)*$"}];
   string email = 3 [(buf.validate.field).string.email = true];
   string website = 4 [(buf.validate.field).string.uri = true];
   string host = 5 [(buf.validate.field).string.hostname = true];

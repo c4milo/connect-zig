@@ -214,3 +214,19 @@ test "a bytes field's well-known forms are lengths: 4 or 16 octets, and never no
     try expect_message(Text, .bytes, comptime octets(.{ .well_known = .{ .uuid = true } }), "a", "must be a valid UUID");
     try expect_message(Text, .bytes, comptime octets(.{ .well_known = .{ .ipv4 = true } }), "", "value is empty, which is not a valid IPv4 address");
 }
+
+test "a string's and a bytes field's pattern match any part, and bytes that are not UTF-8 fail" {
+    const words = comptime string(.{ .pattern = "(?i)^[a-z0-9]+$", .prefix = "a" });
+    try expect(Text, .string, words, "aBc123", "");
+    try expect(Text, .string, words, "a bc", "string.pattern");
+    try expect(Text, .string, words, "b c", "string.pattern string.prefix");
+    try expect(Text, .string, comptime string(.{ .pattern = "b" }), "abc", "");
+    try expect_message(Text, .string, comptime string(.{ .pattern = "^b" }), "abc", "does not match regex pattern `^b`");
+    try expect(?proto.wkt.StringValue, .message, words, .{ .value = "a!" }, "string.pattern");
+    const ascii = comptime octets(.{ .pattern = "^[\\x00-\\x7F]+$" });
+    try expect(Text, .bytes, ascii, "plain", "");
+    try expect(Text, .bytes, ascii, "caf\u{e9}", "bytes.pattern");
+    try expect(Text, .bytes, ascii, "", "bytes.pattern");
+    try expect_message(Text, .bytes, ascii, "", "must match regex pattern `^[\\x00-\\x7F]+$`");
+    try testing.expectError(error.Unevaluable, expect(Text, .bytes, ascii, "\xe1\x84", ""));
+}

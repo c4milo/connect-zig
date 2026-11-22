@@ -9,20 +9,21 @@ const rule_scalar = @import("rule_scalar.zig");
 const format_name = @import("format_name.zig");
 const format_ip = @import("format_ip.zig");
 const format_uri = @import("format_uri.zig");
+const pattern_file = @import("pattern.zig");
 const Walk = walk_file.Walk;
 const Path = walk_file.Path;
 const Site = walk_file.Site;
 const Fault = walk_file.Fault;
 const Broken = walk_file.Broken;
 
-/// The rules this file checks, by their names in validate.proto. `pattern` waits for stdx's
-/// regular expressions (docs/design.md §8 step 35). `strict` is read with `well_known_regex`.
+/// The rules this file checks, by their names in validate.proto. `strict` is read with
+/// `well_known_regex`.
 pub const handled = [_][]const u8{
     "const",               "len",                 "min_len",      "max_len",     "len_bytes",   "min_bytes",     "max_bytes", "prefix",
     "suffix",              "contains",            "not_contains", "in",          "not_in",      "email",         "hostname",  "ip",
     "ipv4",                "ipv6",                "uri",          "uri_ref",     "address",     "uuid",          "tuuid",     "ip_with_prefixlen",
     "ipv4_with_prefixlen", "ipv6_with_prefixlen", "ip_prefix",    "ipv4_prefix", "ipv6_prefix", "host_and_port", "ulid",      "protobuf_fqn",
-    "protobuf_dot_fqn",    "well_known_regex",    "strict",       "example",
+    "protobuf_dot_fqn",    "well_known_regex",    "strict",       "example",     "pattern",
 };
 
 fn broken(comptime site: Site, comptime rule: []const u8, comptime id: []const u8, comptime message: []const u8) Broken {
@@ -36,6 +37,10 @@ pub fn check(comptime rules: pb.StringRules, comptime site: Site, value: []const
     }
     try check_characters(rules, site, value, walk, path);
     try check_octets(rules, site, value.len, walk, path);
+    // validate.proto, string.pattern: "!this.matches(rules.pattern)".
+    if (comptime rules.pattern) |pattern| {
+        if (!pattern_file.matches(pattern, value)) try walk_file.violate(walk, path, comptime broken(site, "pattern", "pattern", "does not match regex pattern `" ++ pattern ++ "`"), site.for_key);
+    }
     try check_parts(rules, site, value, walk, path);
     // validate.proto, string.in: "!(this in getField(rules, 'in'))".
     if (comptime rules.in.items.len != 0) {

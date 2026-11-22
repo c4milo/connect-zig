@@ -159,6 +159,14 @@ test "functions convert and read strings" {
     try testing.expectError(error.Unevaluable, run("int(this.name) == 0", &sample));
 }
 
+test "matches finds a pattern in any part of a string, as a function and on a target" {
+    try expect_true("this.name.matches('ob') && matches(this.name, '^foo') && this.name.matches('(?i)^FOO[a-z]+$')", &sample);
+    try expect_false("this.name.matches('^bar') || matches(this.name, 'baz')", &sample);
+    try expect_true("'a/b'.matches('^([^/.][^/]?|[^/][^/.]|[^/]{3,})(/([^/.][^/]?|[^/][^/.]|[^/]{3,}))*$')", &sample);
+    try expect_false("'a/..'.matches('^([^/.][^/]?|[^/][^/.]|[^/]{3,})(/([^/.][^/]?|[^/][^/.]|[^/]{3,}))*$')", &sample);
+    try testing.expectError(error.Unevaluable, run("string(this.data).matches('a')", &sample));
+}
+
 test "protovalidate's functions check a string's form" {
     const address: Message = .{ .name = "10.0.0.0/8", .a = 4, .on = true };
     try expect_true("this.name.isIpPrefix() && this.name.isIpPrefix(this.a) && this.name.isIpPrefix(this.on) && this.name.isIpPrefix(this.a, this.on)", &address);
@@ -233,7 +241,9 @@ test "an expression that does not parse or does not type is a problem of the bui
     try expect_problem("has(this.a.b)", "type `int` has no field `b`");
     try expect_problem("duration(this.name)", "`duration` takes a string literal");
     try expect_problem("duration('ten')", "`ten` is no duration");
-    try expect_problem("this.name.matches('a')", "`matches` waits for stdx's regular expressions (docs/design.md §8 step 35)");
+    try expect_problem("this.name.matches(this.name)", "the pattern of `matches` is no string literal, and this module reads each pattern as it compiles");
+    try expect_problem("this.name.matches('(')", "stdx's regular expressions refuse the pattern `(`: MissingParenthesis");
+    try expect_problem("this.a.matches('a')", "found no matching overload for `matches` applied to (int, string)");
     try expect_problem("unknown(this.a)", "found no matching overload for `unknown` applied to (int)");
     // A name the module holds no function for, with the operands of a function it holds.
     try expect_problem("this.name.nothing()", "found no matching overload for `nothing` applied to (string)");

@@ -4,8 +4,8 @@
 # a case here passes, so the step that makes one pass removes its line.
 
 predefined_rules:
-  # A predefined rule whose expression calls `matches`, which waits for stdx's regular
-  # expressions (docs/design.md §8 step 35).
+  # A predefined rule whose message comes from CEL's `format`, which the module does not read
+  # yet (docs/design.md, "What a later step owes"). Its `matches` runs.
   - proto/2023/bytes/invalid
   - proto/2023/bytes/valid
   - proto/2023/repeated/wrapped/bytes/invalid
@@ -42,25 +42,3 @@ predefined_rules:
   - proto3/wrapped/bytes/valid
   - proto3/wrapped/string/invalid
   - proto3/wrapped/string/valid
-standard_rules/bytes:
-  # `pattern`, which waits for stdx's regular expressions (docs/design.md §8 step 35).
-  - pattern/invalid
-  - pattern/invalid/empty
-  - pattern/invalid/not_utf8
-  - pattern/valid
-standard_rules/map:
-  # `pattern`, which waits for stdx's regular expressions (docs/design.md §8 step 35).
-  - keys/pattern/invalid
-  - keys/pattern/valid
-  - values/pattern/invalid
-  - values/pattern/valid
-standard_rules/repeated:
-  # `pattern`, which waits for stdx's regular expressions (docs/design.md §8 step 35).
-  - items/pattern/invalid
-  - items/pattern/valid
-standard_rules/string:
-  # `pattern`, which waits for stdx's regular expressions (docs/design.md §8 step 35).
-  - pattern/escapes/invalid
-  - pattern/escapes/valid
-  - pattern/invalid
-  - pattern/valid

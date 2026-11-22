@@ -38,7 +38,9 @@ fn overloads_of(comptime function: Function) []const Overload {
         .string => &.{ .{ .operands = &.{text}, .result = text }, .{ .operands = &.{Bytes}, .result = text } },
         .bytes => &.{ .{ .operands = &.{text}, .result = Bytes }, .{ .operands = &.{Bytes}, .result = Bytes } },
         .bool => &.{ .{ .operands = &.{bool}, .result = bool }, .{ .operands = &.{text}, .result = bool } },
-        .startsWith, .endsWith, .contains => &.{.{ .operands = &.{ text, text }, .result = bool }},
+        // CEL language definition, "String Functions": `matches(string, string) -> bool`, and
+        // the same of a target.
+        .startsWith, .endsWith, .contains, .matches => &.{.{ .operands = &.{ text, text }, .result = bool }},
         else => &.{},
     };
 }

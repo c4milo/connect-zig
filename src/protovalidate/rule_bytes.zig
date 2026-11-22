@@ -6,15 +6,15 @@ const constants = @import("constants.zig");
 const text = @import("text.zig");
 const walk_file = @import("walk.zig");
 const rule_scalar = @import("rule_scalar.zig");
+const pattern_file = @import("pattern.zig");
 const Walk = walk_file.Walk;
 const Path = walk_file.Path;
 const Site = walk_file.Site;
 const Fault = walk_file.Fault;
 const Broken = walk_file.Broken;
 
-/// The rules this file checks, by their names in validate.proto. `pattern` waits for stdx's
-/// regular expressions (docs/design.md §8 step 35).
-pub const handled = [_][]const u8{ "const", "len", "min_len", "max_len", "prefix", "suffix", "contains", "in", "not_in", "ip", "ipv4", "ipv6", "uuid", "example" };
+/// The rules this file checks, by their names in validate.proto.
+pub const handled = [_][]const u8{ "const", "len", "min_len", "max_len", "pattern", "prefix", "suffix", "contains", "in", "not_in", "ip", "ipv4", "ipv6", "uuid", "example" };
 
 fn broken(comptime site: Site, comptime rule: []const u8, comptime id: []const u8, comptime message: []const u8) Broken {
     return walk_file.rule_broken(pb.BytesRules, "bytes", site, rule, id, message);
@@ -26,6 +26,7 @@ pub fn check(comptime rules: pb.BytesRules, comptime site: Site, value: []const 
         if (!std.mem.eql(u8, value, wanted)) try walk_file.violate(walk, path, comptime broken(site, "const", "const", "must be " ++ text.hex(wanted)), site.for_key);
     }
     try check_len(rules, site, value.len, walk, path);
+    try check_pattern(rules, site, value, walk, path);
     try check_parts(rules, site, value, walk, path);
     // validate.proto, bytes.in: "getField(rules, 'in').size() > 0 && !(this in getField(rules,
     // 'in'))".
@@ -51,6 +52,16 @@ fn check_len(comptime rules: pb.BytesRules, comptime site: Site, len: usize, wal
     // validate.proto, bytes.max_len: "uint(this.size()) > rules.max_len".
     if (comptime rules.max_len) |most| {
         if (len > most) try walk_file.violate(walk, path, comptime broken(site, "max_len", "max_len", "must be at most " ++ text.of(most) ++ " bytes"), site.for_key);
+    }
+}
+
+/// validate.proto, bytes.pattern: "!string(this).matches(rules.pattern)". `string` of octets
+/// that are not UTF-8 fails as the rule runs (CEL language definition, "Types and
+/// Conversions"), so such a value is no violation: the rule cannot judge it.
+fn check_pattern(comptime rules: pb.BytesRules, comptime site: Site, value: []const u8, walk: *Walk, path: *const Path) Fault!void {
+    if (comptime rules.pattern) |pattern| {
+        if (!std.unicode.utf8ValidateSlice(value)) return error.Unevaluable;
+        if (!pattern_file.matches(pattern, value)) try walk_file.violate(walk, path, comptime broken(site, "pattern", "pattern", "must match regex pattern `" ++ pattern ++ "`"), site.for_key);
     }
 }
 

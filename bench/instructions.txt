@@ -1,10 +1,10 @@
 # Instructions of one run of each benchmark operation, x86-64-v3, from tools/perf_check.sh.
-decode and validate medium invalid|5895
-decode and validate medium valid|6609
-decode and validate rules invalid|2675
-decode and validate rules valid|3195
-decode and validate small invalid|784
-decode and validate small valid|686
+decode and validate medium invalid|9565
+decode and validate medium valid|12993
+decode and validate rules invalid|2685
+decode and validate rules valid|3217
+decode and validate small invalid|787
+decode and validate small valid|688
 deep JSON decode|48551
 deep JSON decode+walk|64388
 deep JSON encode|23876
@@ -55,12 +55,12 @@ tree JSON encode|47880
 tree binary decode|41575
 tree binary decode+walk|76165
 tree binary encode|43336
-validate medium invalid|3224
-validate medium valid|3295
-validate rules invalid|1225
-validate rules valid|1475
-validate small invalid|541
-validate small valid|348
+validate medium invalid|6899
+validate medium valid|9685
+validate rules invalid|1237
+validate rules valid|1498
+validate small invalid|542
+validate small valid|349
 varints JSON decode|9225
 varints JSON decode+walk|9250
 varints JSON encode|4032

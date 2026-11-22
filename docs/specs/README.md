@@ -46,6 +46,15 @@ the module takes cel-go's answer, and the code says so where it does:
   "Comparison Operators" declares no such overload for the checker. protovalidate's CEL
   environment declares them, with cel-go's `CrossTypeNumericComparisons` (`cel_value.zig`).
 
+Two places differ from cel-go in the regular expressions of `matches`, which follow RE2 and
+stdx's `regex` (decision 47):
+
+- An octet that is not UTF-8. RE2 and stdx match no such octet. Go's regexp, which cel-go
+  runs, reads it as U+FFFD. A string field of proto3 holds no such octet, since its decode
+  refuses one.
+- A form that stdx refuses: `\p{...}`, `\C`, and `(?i)` over a letter past ASCII. Such a
+  pattern stops the build, as a pattern that is no literal does.
+
 One place follows neither. Behind `dyn` the module marks each part that came through `dyn` as
 dynamic, where "Gradual Type Checking" and cel-go give the result of a function its declared
 type. So the module compiles `dyn(x).size() == 'a'`, which cel-go refuses (decision 47).

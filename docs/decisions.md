@@ -829,9 +829,26 @@ first. Cite an entry by number in code and commits ("decision 6").
         pointer with the `App` behind an untyped pointer: one indirect call for each message,
         and only when an interceptor declares `on_message`. Beaten: an `App` type parameter on
         `RequestStream`, which changes every such handler's signature.
-    - `pattern` and CEL's `matches` take RE2's syntax. They wait for a regular expression
-      module in stdx, which the owner chose on 2026-11-21 (design §8 step 35). Until then a
-      rule with a pattern stops the build.
+    - `pattern` and CEL's `matches` take RE2's syntax, on stdx's `regex` module, which the
+      owner chose on 2026-11-21. Amended the same day for design §8 step 35:
+      - The compiler reads each pattern into a program once. A pattern that stdx refuses is a
+        problem of the rules, which `rules_error` reports.
+      - The pattern of CEL's `matches` is a string literal, for the same reason. cel-go reads a
+        pattern each time the expression runs, so it takes a pattern from a field too. No rule
+        of protovalidate's suite does that.
+      - `bytes.pattern` of octets that are not UTF-8 fails as it runs, as `string(this)` fails
+        in validate.proto's expression.
+      - Each search runs stdx's `Searcher` in memory on the stack, with a DFA cache of
+        `pattern_cache_words`. The library keeps no memory between calls, so each search
+        builds its DFA's states again.
+      - stdx's `regex` came in a release that colibri does not pin yet. So `build.zig.zon`
+        pins that commit a second time, as `stdx_regex`, and takes `regex` alone from it. A
+        second copy of stdx's `json` would export the same kernel symbols twice, and `regex`
+        exports none. The two pins become one when colibri moves to a stdx that holds
+        `regex`.
+      - Beaten: one pin moved to the new stdx, whose `json` and colibri's would collide at
+        the link; waiting for a colibri release; and a matcher alone, which costs less on a
+        text of under about 18 octets and about 375 instructions an octet past it.
     - protovalidate's conformance harness v1.2.2 runs against `zig build
       protovalidate-executor`. The harness sends each case as an Any beside a
       `FileDescriptorSet`. The library has no dynamic message, so the executor holds the

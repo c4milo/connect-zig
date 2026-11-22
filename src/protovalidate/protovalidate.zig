@@ -81,6 +81,7 @@ test {
     _ = @import("cel_reader.zig");
     _ = @import("octet_class.zig");
     _ = @import("octet_search.zig");
+    _ = @import("pattern.zig");
     _ = @import("cel/cel_library.zig");
     _ = @import("cel/cel_list.zig");
     _ = @import("cel/cel_predefined_test.zig");

@@ -87,3 +87,7 @@ pub const seconds_per_hour = 3_600;
 /// reads one list once for each element of another, as `repeated.unique` compares each pair,
 /// so the limit is the pairs of `compared_items_max` elements.
 pub const cel_steps_max = compared_items_max * compared_items_max;
+/// The words of a pattern's DFA cache, in the memory of one search with stdx's `regex.Searcher`
+/// (design §8 step 35). A cache too small for a pattern's DFA costs speed and no answer: the
+/// search then runs stdx's matcher, whose time stays linear in the text.
+pub const pattern_cache_words = 512;

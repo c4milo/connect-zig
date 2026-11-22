@@ -29,6 +29,10 @@ FIELDS = """  string s = 1;
 """
 
 STRINGS = ["", "a", "b", "ab", "x1", "foo@example.com", "example.com", "1.2.3.4", "::1", "héllo", "https://a.example/b", "10", "-7", "true", "k"]
+# RE2 patterns that Go's regexp and stdx's regex both read, and that match texts of STRINGS in
+# different ways: anchors, classes, ASCII's case folding, repetition, alternation and `.` over
+# a character of two octets.
+PATTERNS = ["^a", "b$", "^[a-z]+$", "(?i)^A", "\\d+", "^\\w+@\\w+\\.com$", "x|1", "^(ab)*$", "[^a-z]", "^.{2,5}$", "é", "^$", "\\.", "^[0-9a-f:.]+$", "^-?[0-9]+$"]
 INTS = [0, 1, -1, 2, 3, 7, 10, 100, -100, 2**31 - 1, -(2**31)]
 LONGS = INTS + [2**62, -(2**62), 2**63 - 1, -(2**63)]
 UINTS = [0, 1, 2, 5, 100, 2**32 - 1]
@@ -50,7 +54,9 @@ class Generator:
         return self.rng.choice(choices)
 
     def literal_string(self):
-        text = self.pick(STRINGS)
+        return self.literal(self.pick(STRINGS))
+
+    def literal(self, text):
         return "'" + text.replace("\\", "\\\\").replace("'", "\\'") + "'"
 
     def string(self, depth):
@@ -167,6 +173,9 @@ class Generator:
         if kind == 8:
             return f"({self.bool(depth - 1)} ? {self.bool(depth - 1)} : {self.bool(depth - 1)})"
         if kind == 9:
+            # `matches` takes a literal pattern, which this library reads as it compiles.
+            if self.rng.random() < 0.3:
+                return f"{self.string(depth - 1)}.matches({self.literal(self.pick(PATTERNS))})"
             return f"{self.string(depth - 1)}.{self.pick(['startsWith', 'endsWith', 'contains'])}({self.string(depth - 1)})"
         if kind == 10:
             return self.pick([f"{self.string(depth - 1)} in this.rs", f"{self.int(depth - 1)} in this.ri", f"{self.string(depth - 1)} in this.msi", f"{self.int(depth - 1)} in [1, 2, 3]"])

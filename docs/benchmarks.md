@@ -156,7 +156,8 @@ typical request of an API: a standard rule of each kind, among them `uuid`, `ema
 `hostname`, `ip`, a repeated field with `unique`, a map, a required message, bytes and a
 duration, and two CEL rules of the message. `Rules` holds CEL rules alone, over lists, a map
 and two fields. `bench/validate/cases` holds a valid and an invalid message of each as JSON, and
-`buf convert` encodes them. The schema holds no `pattern`, which connect-zig does not read yet.
+`buf convert` encodes them. Since step 35, `Medium`'s name takes a `pattern`, which its invalid
+message breaks. Run 201 below ran before that.
 
 Each program keeps one validator for every call, as a server does, and times as
 bench/measure.zig does: the median of 11 batches of about 20 ms. It times two things for each

@@ -512,12 +512,15 @@ table of the message that sets it. An expression reads the field as `this`, the 
 value as `rule` and the rule message as `rules`. A value is a scalar, a wrapper such as
 `google.protobuf.Int64Value`, or a list of them.
 
+`pattern` and CEL's `matches` take RE2's syntax, on stdx's regular expressions. The compiler
+reads each pattern once, so the pattern of `matches` is a string literal, and a pattern stdx
+refuses, such as one with `\p{...}`, stops your build.
+
 A rule the module has no check for stops your build, with a message that names it. That holds
-today for `pattern`, for CEL's `matches`, for a predefined rule whose value is a message that
-is no wrapper, and for the parts of CEL the module does not read yet: arithmetic on a
-timestamp or a duration, `timestamp(string)`, `type`, a map's key as a selection, `m.key`,
-and `map`, `filter`, `string(number)` and `+` of two strings, which build a value that needs
-room.
+today for a predefined rule whose value is a message that is no wrapper, and for the parts of
+CEL the module does not read yet: arithmetic on a timestamp or a duration,
+`timestamp(string)`, `type`, a map's key as a selection, `m.key`, and `map`, `filter`,
+`format`, `string(number)` and `+` of two strings, which build a value that needs room.
 
 The CEL rules follow the [CEL language definition](docs/specs/cel/langdef.md), which the tree
 holds as cel-spec published it, and each rule in the code cites its section.
@@ -567,9 +570,9 @@ with `zig build test`, and serves its service with `zig build serve` for curl an
   `conformance/protobuf_known_failing.txt` lists each of the 35 that fail, with its reason.
 - `tools/protovalidate_conformance_check.sh` runs [protovalidate's conformance
   harness](https://github.com/bufbuild/protovalidate/blob/main/docs/conformance.md) v1.2.2, with
-  strict messages and strict errors. 2822 of its 2872 cases pass. Each of the other 50 is
-  listed in `conformance/protovalidate_known_failing.yaml` under its reason: a `pattern`, or
-  an expression that calls `matches`, which wait for stdx's regular expressions.
+  strict messages and strict errors. 2836 of its 2872 cases pass. Each of the other 36 is
+  listed in `conformance/protovalidate_known_failing.yaml` under its reason: a predefined
+  rule whose message comes from CEL's `format`.
 - `tools/lean_check.sh` builds a [Lean model](spec/README.md) of the CEL syntax, written
   from the CEL language definition, and requires the vector file beside the Zig grammar to be
   what the model gives. A unit test reads each of the 6,655 expressions with the grammar the
@@ -618,8 +621,8 @@ missing required field (decision 23).
 Not yet done:
 
 - a stream that waits for an event of the program once its request ended (colibri issue 130);
-- in `protovalidate`: `pattern` and CEL's `matches`, which wait for stdx's regular expressions
-  (docs/design.md §8 step 35).
+- in `protovalidate`: CEL's `format`, which the messages of 36 predefined rules of
+  protovalidate's suite take (docs/design.md, "What a later step owes").
 
 ## Contributing
 
