@@ -936,6 +936,14 @@ first. Cite an entry by number in code and commits ("decision 6").
         and `==` of two lists. 29 turn the type check off, which a rule always has.
       - The same day the owner asked for the largest of those parts: map literals, `[]` and
         `==` of two lists. The module builds them, `==` of two maps too, and 1,142 pass.
+      - The owner then asked for a list or a map literal of two element types, such as
+        `[1, 'a']`, which cel-go types `list(dyn)`. The compiler knows each element's type, so
+        such a literal is a Zig tuple (`cel_mixed.zig`). Its size, `in`, `==`, `type`, `%s` of
+        `format`, an index the build knows, and `all`, `exists` and `exists_one` unfold for
+        each element, and a macro reads its variable as behind `dyn`. An index the build does
+        not know, and `filter` and `map` of such a literal, give no one type, and stop the
+        build. 1,174 pass. Beaten: a union of CEL's types for each element, whose every read
+        is a switch at run time, where the build knows each element's type.
       - Its first run found four differences, and each follows cel-go now: a double compares
         with an integer as the integer made a double; a side of `&&` or `||` behind `dyn` that
         holds no bool fails and is absorbed; a list takes a uint and a whole double as its

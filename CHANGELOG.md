@@ -8,6 +8,16 @@ are in [docs/decisions.md](docs/decisions.md), and the steps and their measureme
 connect-zig follows [Semantic Versioning](https://semver.org/). Before 1.0, a minor version may
 change the public API, and the entry marks each change that does.
 
+## Unreleased
+
+### Added
+
+- `protovalidate` reads a CEL list or map literal of two element types, such as `[1, 'a']` and
+  `{'k': 1, 2: 'v'}`, as cel-go does: its size, `in`, `==`, `type`, `%s` of `format`, an index
+  your build knows, and `all`, `exists` and `exists_one`. An index your build does not know,
+  and `filter` and `map` of such a literal, stop your build, because their result has no one
+  type. cel-spec's conformance suite passes 1,174 tests, where it passed 1,142.
+
 ## v0.3.0 (2026-11-22)
 
 It builds on colibri v0.19.0 and on stdx v0.1.2, the tag colibri pins, with Zig 0.16.0.

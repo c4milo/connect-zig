@@ -173,10 +173,12 @@ given back as it runs.
 `filter` and `map` work on any list or map. The list they give is computed as you read it,
 so it takes no memory, and reading it twice computes it twice.
 
-A list literal, `[1, 2]`, and a map literal, `{'a': 1, 'b': 2}`, hold elements of one type,
-and a map's keys are ints, uints, bools or strings. `[]` and `{}` are a list and a map of any
-type. `==` compares two lists element by element, and two maps key by key, so
-`this.labels == {'env': 'prod'}` reads.
+A list literal, `[1, 2]`, and a map literal, `{'a': 1, 'b': 2}`, may hold elements of two
+types, such as `[1, 'a']`, and a map's keys are ints, uints, bools or strings. `[]` and `{}`
+are a list and a map of any type. `==` compares two lists element by element, and two maps key
+by key, so `this.labels == {'env': 'prod'}` reads. An index into a list of two element types
+takes a place your build knows, such as `[1, 'a'][0]`, and `filter` and `map` take no such
+list, because their result would have no one type.
 
 ## How it follows CEL
 
@@ -231,10 +233,10 @@ measured.
 - `tools/cel_conformance_check.sh` runs [cel-spec's conformance
   suite](https://github.com/google/cel-spec/tree/v0.25.3/tests/simple) v0.25.3 over the code a
   rule's expression compiles into: each of its 1,819 tests that declare no variables and build
-  no message. 1,142 pass. 645 test an extension that protovalidate does not turn on, or a part
+  no message. 1,174 pass. 614 test an extension that protovalidate does not turn on, or a part
   of the language this library does not build, such as a message literal; `known.txt` beside the
-  script gives the reason for each. Its first run found four differences, which
-  [decision 47](decisions.md) lists.
+  script gives the reason for each. 28 turn the type check off, which a rule always has. Its
+  first run found four differences, which [decision 47](decisions.md) lists.
 - `tools/compile_time_check.sh` holds what a schema's CEL rules cost the compiler to a
   baseline, and unit tests hold the compiler's reading and typing of an expression to a count
   of branches.

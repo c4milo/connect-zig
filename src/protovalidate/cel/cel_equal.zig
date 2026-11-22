@@ -9,6 +9,7 @@ const type_file = @import("cel_type.zig");
 const value_file = @import("cel_value.zig");
 const list_file = @import("cel_list.zig");
 const text_file = @import("cel_text.zig");
+const mixed = @import("cel_mixed.zig");
 const Env = type_file.Env;
 const Error = type_file.Error;
 const NoElement = type_file.NoElement;
@@ -22,7 +23,9 @@ pub fn equatable(comptime L: type, comptime R: type) bool {
     if (value_file.equatable(L, R)) return true;
     if (list_file.is_list(L) and list_file.is_list(R)) return elements_equatable(list_file.ElementOf(L), list_file.ElementOf(R));
     if (list_file.is_map(L) and list_file.is_map(R)) return elements_equatable(L.Key, R.Key) and elements_equatable(L.Value, R.Value);
-    return false;
+    // A list or a map of elements of two types is a `list(dyn)` or a `map(dyn, dyn)`: it takes
+    // any list or any map (`cel_mixed.zig`).
+    return (mixed.is_mixed(L) or mixed.is_mixed(R)) and mixed.compares(L, R);
 }
 
 fn elements_equatable(comptime L: type, comptime R: type) bool {
@@ -33,6 +36,7 @@ fn elements_equatable(comptime L: type, comptime R: type) bool {
 /// compared as they run, or two values `cel_value.zig` says may be equal.
 pub fn equal_as_they_run(comptime L: type, comptime R: type) bool {
     if (value_file.equal_as_they_run(L, R)) return true;
+    if (mixed.is_mixed(L) or mixed.is_mixed(R)) return mixed.compares(L, R);
     return (list_file.is_list(L) and list_file.is_list(R)) or (list_file.is_map(L) and list_file.is_map(R));
 }
 
@@ -41,6 +45,7 @@ pub fn equal_as_they_run(comptime L: type, comptime R: type) bool {
 pub fn equal(left: anytype, right: anytype, env: *Env) Error!bool {
     const L = @TypeOf(left);
     const R = @TypeOf(right);
+    if (comptime mixed.is_mixed(L) or mixed.is_mixed(R)) return mixed.equal(left, right, env);
     if (comptime list_file.is_list(L) and list_file.is_list(R)) return equal_lists(left, right, env);
     if (comptime list_file.is_map(L) and list_file.is_map(R)) return equal_maps(left, right, env);
     if (comptime !value_file.equal_as_they_run(L, R)) return false;

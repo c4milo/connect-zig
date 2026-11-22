@@ -8,6 +8,7 @@ const node_file = @import("cel_node.zig");
 const type_file = @import("cel_type.zig");
 const check = @import("cel_check.zig");
 const evaluation = @import("cel_eval.zig");
+const mixed = @import("cel_mixed.zig");
 const list_file = @import("cel_list.zig");
 const timestamp_file = @import("cel_timestamp.zig");
 const duration_file = @import("cel_duration.zig");
@@ -148,6 +149,12 @@ fn takes_time(comptime T: type) bool {
 }
 
 fn takes_list(comptime T: type) bool {
+    if (mixed.is_mixed_list(T)) {
+        for (T.element_types) |Element| {
+            if (!takes(.s, Element)) return false;
+        }
+        return true;
+    }
     if (!list_file.is_list(T)) return false;
     return takes(.s, list_file.ElementOf(T));
 }
@@ -219,6 +226,7 @@ fn write_double(value: f64, env: *Env) Error!void {
 /// "The value is formatted as if each element was formatted as `"%s".format([element])`,
 /// joined together with `, ` and enclosed with `[` and `]`."
 fn write_list(list: anytype, env: *Env) Error!void {
+    if (comptime mixed.is_mixed_list(@TypeOf(list))) return write_mixed_list(list, env);
     try put(env, "[");
     var elements = list_file.iterate(list);
     var first = true;
@@ -226,6 +234,16 @@ fn write_list(list: anytype, env: *Env) Error!void {
         const element = try elements.next(env) orelse break;
         if (!first) try put(env, ", ");
         first = false;
+        try write_string(element, env);
+    }
+    try put(env, "]");
+}
+
+/// `write_list` of a list whose elements are of two types or more, each written as its own type.
+fn write_mixed_list(list: anytype, env: *Env) Error!void {
+    try put(env, "[");
+    inline for (list.items, 0..) |element, place| {
+        if (place != 0) try put(env, ", ");
         try write_string(element, env);
     }
     try put(env, "]");

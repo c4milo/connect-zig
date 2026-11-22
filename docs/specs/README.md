@@ -79,6 +79,10 @@ the module takes cel-go's answer, and the code says so where it does:
   (`cel_number.zig`).
 - A list's index behind `dyn`. "List Operators" gives `list(A)[int] -> A`. cel-go also takes a
   uint and a double with no fraction (`cel_collection.zig`).
+- A list or a map literal of two element types. "Aggregate Values" types a list `list(A)` "for
+  the homogeneous type `A`" and uses `dyn` "for heterogeneous values", and "Gradual Type
+  Checking" gives `dyn([1, 3.14, "foo"])` such a type. cel-go types `[1, 'a']` itself
+  `list(dyn)`, as cel-spec's conformance suite expects (`cel_mixed.zig`).
 - `%%` in the text of `format`. The strings extension names no such conversion. cel-go writes
   one `%`, as cel-spec's conformance suite expects (`cel_format.zig`).
 

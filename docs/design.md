@@ -1975,6 +1975,33 @@ ran on Linux x86-64 with Zig 0.16.0.
     baseline of 4.12, and 4.35, +5.7%, on the next. Its schema holds no pattern, and its runs
     earlier the same day gave 3.87 to 4.26, so the first run measured the machine's load.
 
+- **Literals of two element types** (decision 47). A list literal such as `[1, 'a']`, or a map
+  literal whose keys or values are of two types, is a `MixedList` or a `MixedMap`
+  (`cel_mixed.zig`): a tuple of each element's type, typed `list(dyn)` or `map(dyn, dyn)` as
+  cel-go types it. Its size, `in`, `==`, `type`, `%s` of `format`, an index the build knows,
+  and `all`, `exists` and `exists_one` unfold for each element. A macro types its expression
+  once for each element's type, with the variable read as behind `dyn` (`Scope.with_dynamic`).
+  An index the build does not know gives no one type, and stops the build, unless a map's
+  values are of one type; so do `filter` and `map`.
+  - `tools/cel_conformance_check.sh` printed `pass 1174 known 614 unchecked 28 refused 0 wrong
+    0 skipped 688`. `%s` of a map is the one new line of `known.txt`.
+  - `tools/protovalidate_conformance_check.sh` printed `PASS (failed: 0, skipped: 0, passed:
+    2872, total: 2872)`, `tools/cel_differential_check.sh 13 14` agreed on each of its 16,000
+    verdicts, and `tools/perf_check.sh` passed.
+  - `tools/compile_time_check.sh` printed a ratio of 4.75 on its first run, +15.3% over its
+    baseline of 4.12. Run in turns with the tree before the change, it printed 4.49 and 4.46,
+    where that tree printed 4.40 and 4.51, so the first run measured the machine's load.
+  - Mutations against `zig build test-protovalidate`, 31: one type for each list, two equal
+    keys taken, keys never equal, a size one too large, `in` true for any value, `in` and an
+    index with no step, `==` of two maps refused, two lengths taken as equal, a longer list
+    taken as equal, no count of keys, the values of a key not compared, keys of two types taken
+    as equal, no index by the values' one type, a place past the end, the first key for each
+    constant, a missing key's index read as the first value, the variable not behind `dyn`, no
+    absorbing value, a failure dropped, `all` inverted, `exists_one` of two matches, an
+    expression that gives no bool read as false, the `dyn` flag lost in the checker and in the
+    scope, `%s` that takes no mixed list or writes no comma, `type` of a list as a map, a key
+    of any type, no constant keys, and a literal of two types read as one. Each was `CAUGHT`.
+
 ### Work not done yet
 
 - A stream that waits for an event of the program once its request ended (colibri issue 130).
@@ -2009,8 +2036,8 @@ ran on Linux x86-64 with Zig 0.16.0.
   `exists` and `exists_one` do ("A map's entry in a macro"). Their expressions still search
   the map for each key.
 - For `protovalidate`, the parts of CEL that cel-spec's conformance suite tests and the module
-  does not build: a message literal, a list or a map literal of two element types, a field's
-  name in backquotes, which cel-go reads and the language definition does not hold, `timestamp`
+  does not build: a message literal, an index the build does not know of a list or a map
+  literal of two element types, `%s` of `format` of a map, a field's name in backquotes, which cel-go reads and the language definition does not hold, `timestamp`
   of an int, and the strings extension's functions but `format`. No rule of protovalidate's suite needs one. `tools/cel_conformance/known.txt`
   names each test.
 - For `protovalidate`, cel-go's typing behind `dyn`. cel-go gives the result of a function on

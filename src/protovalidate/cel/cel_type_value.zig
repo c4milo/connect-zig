@@ -6,6 +6,7 @@ const std = @import("std");
 const proto = @import("protobuf");
 const node_file = @import("cel_node.zig");
 const type_file = @import("cel_type.zig");
+const mixed = @import("cel_mixed.zig");
 const list_file = @import("cel_list.zig");
 const select_file = @import("cel_select.zig");
 const constants = @import("../constants.zig");
@@ -30,8 +31,8 @@ const builtin_names = [_][]const u8{ "int", "uint", "double", "bool", "string", 
 /// set has the type it wraps, and one that is not set is null, which `of` reads as it runs.
 pub fn name_of(comptime T: type) []const u8 {
     if (comptime type_file.MessageOf(T)) |M| return M.protobuf.full_name;
-    if (comptime list_file.is_map(T)) return "map";
-    if (comptime list_file.is_list(T)) return "list";
+    if (comptime list_file.is_map(T) or mixed.is_mixed_map(T)) return "map";
+    if (comptime list_file.is_list(T) or mixed.is_mixed_list(T)) return "list";
     return switch (T) {
         i64 => "int",
         u64 => "uint",

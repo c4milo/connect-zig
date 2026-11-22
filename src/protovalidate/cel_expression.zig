@@ -10,6 +10,7 @@ const files = struct {
     const program = @import("cel/cel_program.zig");
     const types = @import("cel/cel_type.zig");
     const list = @import("cel/cel_list.zig");
+    const mixed = @import("cel/cel_mixed.zig");
     const type_value = @import("cel/cel_type_value.zig");
 };
 
@@ -33,7 +34,10 @@ pub const run = files.program.run;
 pub const is_list = files.list.is_list;
 pub const is_map = files.list.is_map;
 pub const iterate = files.list.iterate;
+/// Whether a type is a list or a map literal whose elements are of two types or more, a tuple.
+pub const is_mixed_list = files.mixed.is_mixed_list;
+pub const is_mixed_map = files.mixed.is_mixed_map;
 
 test "the expression's root exports the names the checks call" {
-    try @import("public_names").expect(@This(), &.{ "Scope", "Env", "Text", "Error", "Bytes", "Null", "TypeValue", "problem_of", "Type", "run", "is_list", "is_map", "iterate" });
+    try @import("public_names").expect(@This(), &.{ "Scope", "Env", "Text", "Error", "Bytes", "Null", "TypeValue", "problem_of", "Type", "run", "is_list", "is_map", "iterate", "is_mixed_list", "is_mixed_map" });
 }

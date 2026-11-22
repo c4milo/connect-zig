@@ -65,6 +65,10 @@ test "s writes each type as its text states" {
     try expect_text("'%%%s%% and %%'.format([this.count])", &sample, "%-26% and %");
     try expect_text("'%%'.format([])", &sample, "%");
     try expect_text("'%s'.format([['a', 'b']])", &sample, "[a, b]");
+    // A list of elements of two types writes each as its own type.
+    try expect_text("'%s'.format([[1, 'a', 2.5, null]])", &sample, "[1, a, 2.5, null]");
+    try expect_text("'%s'.format([dyn([6, 4.2, 'x'])])", &sample, "[6, 4.2, x]");
+    try expect_text("'%s'.format([[this.name, [1u, true]]])", &sample, "[ada, [1, true]]");
     try expect_text("'no conversion'.format([])", &sample, "no conversion");
 }
 

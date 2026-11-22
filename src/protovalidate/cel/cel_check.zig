@@ -62,8 +62,8 @@ pub fn mistake(comptime dynamic: bool, comptime problem: []const u8) Typed {
 }
 
 fn of_name(comptime name: []const u8, comptime scope: Scope) Typed {
-    // A macro's variable over `[]` is of no type the checker knows, as behind `dyn`.
-    if (scope.index_of(name)) |index| return .{ .ok = .{ .type = scope.types[index], .dynamic = scope.types[index] == type_file.NoElement } };
+    // A macro's variable over `[]`, or over elements of two types, is read as behind `dyn`.
+    if (scope.index_of(name)) |index| return .{ .ok = .{ .type = scope.types[index], .dynamic = scope.types[index] == type_file.NoElement or scope.is_dynamic(index) } };
     // validate.proto, Rule.expression: `now` is the time of the validation.
     if (std.mem.eql(u8, name, "now")) return .of(Timestamp);
     if (type_value.named(name) != null) return .of(TypeValue);

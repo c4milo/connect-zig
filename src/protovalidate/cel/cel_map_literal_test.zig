@@ -107,10 +107,8 @@ test "two maps are equal when they hold the same keys with equal values" {
     try expect_true("dyn({1: 2}) == {1u: 2u} && dyn({'a': 1}) != {1: 1} && dyn({}) != {1: 1} && dyn({}) == {}", &sample);
 }
 
-test "a map literal's keys and values are each of one type" {
+test "a map literal's key is an int, a uint, a bool or a string" {
     try expect_problem("{1.5: 2}", "a map's key is an int, a uint, a bool or a string, not a double");
-    try expect_problem("{1: 2, 'a': 3}", "a map literal holds a int key and a string key");
-    try expect_problem("{1: 2, 3: 'a'}", "a map literal holds a int value and a string value");
     try expect_problem("{1: 2} == {'a': 2}", "found no matching overload for `==` applied to (map(int, int), map(string, int))");
     try expect_problem("{1: 2}['a']", "found no matching overload for `[]` applied to (map(int, int), string)");
 }

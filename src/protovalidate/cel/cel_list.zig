@@ -9,6 +9,7 @@ const shape = @import("../shape.zig");
 const type_file = @import("cel_type.zig");
 const value_file = @import("cel_value.zig");
 const equal_file = @import("cel_equal.zig");
+const mixed = @import("cel_mixed.zig");
 const text_file = @import("cel_text.zig");
 const Env = type_file.Env;
 const Error = type_file.Error;
@@ -279,6 +280,8 @@ pub fn list_holds(list: anytype, value: anytype, env: *Env) Error!bool {
 pub inline fn count(collection: anytype, env: *Env) Error!i64 {
     const C = @TypeOf(collection);
     if (comptime @typeInfo(C) == .array) return @typeInfo(C).array.len;
+    // A mixed list's length is known, and a mixed map's keys are distinct.
+    if (comptime mixed.is_mixed(C)) return C.len;
     if (comptime may_be_stored(C)) {
         if (collection.stored()) |items| return @intCast(items.len);
     }

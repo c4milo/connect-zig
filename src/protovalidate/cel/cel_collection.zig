@@ -13,6 +13,7 @@ const check = @import("cel_check.zig");
 const evaluation = @import("cel_eval.zig");
 const lazy = @import("cel_lazy_list.zig");
 const entry_file = @import("cel_entry.zig");
+const mixed = @import("cel_mixed.zig");
 const text_file = @import("cel_text.zig");
 const Node = node_file.Node;
 const Scope = type_file.Scope;
@@ -29,26 +30,28 @@ pub fn Variable(comptime T: type) ?type {
     return null;
 }
 
-/// A list literal: its elements are of one type.
+/// A list literal: an array of its elements' one type, or a tuple of elements of two types or
+/// more (`cel_mixed.zig`).
 pub fn of_list(comptime elements: []const Node, comptime scope: Scope) Typed {
     if (elements.len == 0) return .of([0]type_file.NoElement);
     var dynamic = false;
-    var Element: ?type = null;
-    for (elements) |*element| {
+    var types = [_]type{void} ** elements.len;
+    for (elements, 0..) |*element, place| {
         const typed = switch (check.type_of(element, scope)) {
             .ok => |ok| ok,
             .problem => |problem| return .{ .problem = problem },
         };
         if (typed.type == Failing) return .{ .ok = typed };
         dynamic = dynamic or typed.dynamic;
-        const First = Element orelse typed.type;
-        if (typed.type != First) return .{ .problem = "a list literal holds a " ++ type_file.name_of(First) ++ " and a " ++ type_file.name_of(typed.type) };
-        Element = First;
+        types[place] = typed.type;
     }
-    return .{ .ok = .{ .type = [elements.len]Element.?, .dynamic = dynamic } };
+    const fixed = types;
+    const T = if (mixed.one_type(&fixed)) |Element| [elements.len]Element else mixed.MixedList(&fixed);
+    return .{ .ok = .{ .type = T, .dynamic = dynamic } };
 }
 
 pub fn eval_list(comptime elements: []const Node, comptime R: type, comptime scope: Scope, values: anytype, env: *Env) Error!R {
+    if (comptime mixed.is_mixed_list(R)) return mixed.eval_list(elements, R, scope, values, env);
     var taken: std.meta.Tuple(&([_]type{@typeInfo(R).array.child} ** elements.len)) = undefined;
     inline for (elements, 0..) |*element, index| taken[index] = try evaluation.eval(element, scope, values, env);
     return taken;
@@ -68,6 +71,7 @@ pub fn of_index(comptime index: Node.Index, comptime scope: Scope) Typed {
     if (target.type == Failing or at.type == Failing) return .{ .ok = .{ .type = Failing, .dynamic = dynamic } };
     // An index of `[]` is of no type the checker knows, as behind `dyn`.
     if (Indexed(target.type, at.type)) |R| return .{ .ok = .{ .type = R, .dynamic = dynamic or R == type_file.NoElement } };
+    if (mixed.is_mixed(target.type)) return mixed.of_index(index, target, at);
     if (at.dynamic and list_file.is_list(target.type) and (at.type == u64 or at.type == f64)) {
         return .{ .ok = .{ .type = list_file.Taken(list_file.ElementOf(target.type)), .dynamic = true } };
     }
@@ -87,6 +91,7 @@ pub fn eval_index(comptime index: Node.Index, comptime R: type, comptime scope: 
     }
     const target = try evaluation.eval(index.of, scope, values, env);
     const at = try evaluation.eval(index.at, scope, values, env);
+    if (comptime mixed.is_mixed(@TypeOf(target))) return mixed.eval_index(index, R, target, at, env);
     if (comptime !list_file.is_map(@TypeOf(target))) return list_file.at(target, try list_index(at), env);
     // "map[key]": a key the map does not hold fails the run.
     return try target.get(at, env) orelse error.Unevaluable;
@@ -128,17 +133,19 @@ pub fn has_key(map: anytype, comptime key: []const u8, env: *Env) Error!bool {
 
 /// `value in list` and `key in map`.
 pub fn In(comptime L: type, comptime R: type) ?type {
-    const V = Variable(R) orelse return null;
+    // An element of a mixed list or a key of a mixed map is read as behind `dyn`.
+    const V = Variable(R) orelse return if (mixed.is_mixed(R)) bool else null;
     // `[]` holds no element, so `in` takes any value with it.
     return if (V == type_file.NoElement or equal_file.equatable(L, V)) bool else null;
 }
 
 /// Whether `T` is a list or a map.
 pub fn is_collection(comptime T: type) bool {
-    return Variable(T) != null;
+    return Variable(T) != null or mixed.is_mixed(T);
 }
 
 pub fn holds(collection: anytype, value: anytype, env: *Env) Error!bool {
+    if (comptime mixed.is_mixed(@TypeOf(collection))) return mixed.holds(collection, value, env);
     // Behind `dyn` a value may be of a type no element has: it is no element then.
     if (comptime !equal_file.equal_as_they_run(Variable(@TypeOf(collection)).?, @TypeOf(value))) return false;
     if (comptime !list_file.is_map(@TypeOf(collection))) return list_file.list_holds(collection, value, env);
@@ -152,7 +159,7 @@ pub fn holds(collection: anytype, value: anytype, env: *Env) Error!bool {
 
 /// Whether `call` is `size` of a list or of a map, whose type the caller found.
 pub fn is_size(comptime call: Node.Call, comptime operand: type) bool {
-    return call.function == .size and Variable(operand) != null;
+    return call.function == .size and is_collection(operand);
 }
 
 /// A macro's arguments: its variable's name, and its expression.
@@ -180,6 +187,7 @@ pub fn of_macro(comptime call: Node.Call, comptime scope: Scope) ?Typed {
     };
     if (target.type == Failing) return .{ .ok = target };
     const V = Variable(target.type) orelse {
+        if (mixed.is_mixed(target.type)) return mixed.of_macro(call, target, scope);
         return check.mistake(target.dynamic, "the macro `" ++ call.name ++ "` reads a list or a map, not a " ++ type_file.name_of(target.type));
     };
     const body = switch (check.type_of(&call.arguments[1], scope.with(call.arguments[0].name, V))) {
@@ -211,6 +219,7 @@ fn of_derived(comptime call: Node.Call, comptime scope: Scope) Typed {
     };
     if (target.type == Failing) return .{ .ok = target };
     if (Variable(target.type) == null) {
+        if (mixed.is_mixed(target.type)) return .{ .problem = "the macro `" ++ call.name ++ "` reads no `" ++ target.type.cel_name ++ "`, whose elements are of two types" };
         return check.mistake(target.dynamic, "the macro `" ++ call.name ++ "` reads a list or a map, not a " ++ type_file.name_of(target.type));
     }
     return of_steps(call, target, scope);
@@ -278,6 +287,7 @@ fn eval_map(comptime call: Node.Call, comptime R: type, comptime scope: Scope, v
 pub fn eval_macro(comptime call: Node.Call, comptime scope: Scope, values: anytype, env: *Env) Error!bool {
     const collection = try evaluation.eval(call.target.?, scope, values, env);
     const C = @TypeOf(collection);
+    if (comptime mixed.is_mixed(C)) return mixed.eval_macro(call, collection, scope, values, env);
     const bound = comptime entry_file.bound_name(call, C);
     const variable = comptime scope.with(call.arguments[0].name, Variable(C).?);
     const inner = comptime if (bound) |name| variable.with(name, list_file.Taken(C.Value)) else variable;

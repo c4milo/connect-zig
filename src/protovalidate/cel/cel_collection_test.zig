@@ -209,7 +209,6 @@ test "a mistake with a list or a map is a problem of the build" {
     try expect_problem("this.numbers.map(n)", "the macro `map` takes a name and an expression");
     try expect_problem("this.numbers.filter(n, n > 0, n)", "the macro `filter` takes a name and an expression");
     try expect_problem("this.numbers.filter(n, m > 0)", "undeclared reference to `m`");
-    try expect_problem("[1, 'a']", "a list literal holds a int and a string");
     try expect_problem("this.pick.size()", "found no matching overload for `size` applied to (int)");
 }
 

@@ -94,6 +94,8 @@ pub const Text = struct {
 pub const Scope = struct {
     names: []const []const u8 = &.{"this"},
     types: []const type,
+    /// For each name up to its length, whether the checker reads it as behind `dyn`.
+    dynamic: []const bool = &.{},
 
     pub fn index_of(comptime scope: Scope, comptime name: []const u8) ?usize {
         // A macro's variable hides a name before it, so the last one wins.
@@ -106,7 +108,20 @@ pub const Scope = struct {
     }
 
     pub fn with(comptime scope: Scope, comptime name: []const u8, comptime T: type) Scope {
-        return .{ .names = scope.names ++ [_][]const u8{name}, .types = scope.types ++ [_]type{T} };
+        return .{ .names = scope.names ++ [_][]const u8{name}, .types = scope.types ++ [_]type{T}, .dynamic = scope.dynamic };
+    }
+
+    /// `with` of a name the checker reads as behind `dyn`: a macro's variable over a list or a
+    /// map whose elements are of two types or more (`cel_mixed.zig`), as cel-go types an
+    /// element of a `list(dyn)` (CEL language definition, "Gradual Type Checking").
+    pub fn with_dynamic(comptime scope: Scope, comptime name: []const u8, comptime T: type) Scope {
+        const earlier = [_]bool{false} ** (scope.names.len - scope.dynamic.len);
+        return .{ .names = scope.names ++ [_][]const u8{name}, .types = scope.types ++ [_]type{T}, .dynamic = scope.dynamic ++ earlier ++ [_]bool{true} };
+    }
+
+    /// Whether the name at `index` is read as behind `dyn`.
+    pub fn is_dynamic(comptime scope: Scope, comptime index: usize) bool {
+        return index < scope.dynamic.len and scope.dynamic[index];
     }
 };
 
