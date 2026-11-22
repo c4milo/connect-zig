@@ -2072,7 +2072,10 @@ ran on Linux x86-64 with Zig 0.16.0.
   profile shows the rest spread thin: each macro's iterator and its steps, each rule's `Env`,
   and each result that an expression stores and reads back. Three changes moved the count by
   3 instructions or none: `eval_side` inline and `eval_as` inline, which LLVM inlines already,
-  and the time copied only into a rule whose text names `now`, which counted 577.
+  and the time copied only into a rule whose text names `now`, which counted 577. With no step
+  for a macro inside no other macro, nor for a list's index, it counted 539, and timed 67.1 ns to
+  the tree's 67.8 in turns, within their spread, so the tree does not hold that change either.
+  `bench-validate --counters` reads the cycles and the branch misses a time waits on.
 - For `protovalidate`, `filter` and `map` over a map that bind each entry's value, as `all`,
   `exists` and `exists_one` do ("A map's entry in a macro"). Their expressions still search
   the map for each key.

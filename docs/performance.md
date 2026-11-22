@@ -37,6 +37,13 @@ paid for.
   short text and into `docs/benchmarks.md`, which holds the method and every table.
 - **The smoke run.** `zig build bench -- --quick` runs every operation on every message in a few
   short batches. CI's `bench` job runs it, so a broken operation fails before anyone times it.
+- **Cycles and branch misses are a filter too.** `zig build bench-validate -- --counters <dir>`
+  counts each validation's cycles, instructions, branches and branch misses for one call, through
+  Linux's hardware counters (`bench/counters.zig`). `tools/validate_compare_check.sh` prints the
+  table last, and CI's `validate-compare` job lets the process count its own events. A host with
+  no counters, as a virtual machine with no counters is, prints a line that says so. A count
+  shows where a time goes that the instruction count does not explain, and orders candidates
+  as a time does.
 - **A profile shows where the cost goes, and is never a measurement.** Run callgrind on
   `zig-out/bin/bench --instructions`, then read it with `callgrind_annotate`, by function and by
   line. A change takes its price from the counts, never from a profile.
@@ -277,6 +284,7 @@ Three checks hold the cost:
 | `tools/bench_check.sh` printed no row of the small message but its JSON decode+walk, from CI's run 141 to run 159. | `zig build bench` runs two programs into one file, and Zig 0.16's `File.writer` writes a file from its start, so `bench-call`'s table overwrote the codec table's first lines. | Each program writes standard output with `writerStreaming`, and `tools/bench_check.sh` fails when a message or a routed call lacks a row. |
 | A schema of 2,300 CEL rules built in 27.7 s, and in 19.7 s with the same rules. | The reader compared each identifier's text with 21 words, and a function under the typing raised the compiler's branch quota, so the compiler kept no answer and typed each part again for each question. | The compiler's time: an enum names each word once, and a constant's value raises the quota. |
 | A message of 2,000 fields stopped building once the quota was raised elsewhere. | `message.check` loops over the fields at comptime under its own quota, which a function it called had raised before. | A function that loops over a message's fields raises its own quota. `tools/wide` has 1,200 fields, more than the default quota. |
+| Valid `Rules` took 20% fewer instructions, 722 to 580, and 4% less time on an EPYC 7763, 77.5 ns to 74.1. A change of 7% fewer instructions, to 539, timed 67.1 ns to 67.8 in turns, within its rounds' spread of 63 to 76. | The instructions it removed were not the ones its time waits on. | Before an instruction change to a validation, read its cycles and branch misses with `--counters` on CI. |
 | `duration('-3s')` stopped the build with a compiler error, and each test of the duration's reader passed. | The tests ran the reader as a program. At comptime a slice of known bounds is a pointer to an array, so `var rest = if (signed) text[1..] else text` took an array's type, which no shorter rest fits. | A function the compiler runs has a test that runs it at comptime, and a variable that holds slices of several lengths states `[]const u8`. |
 
 A pitfall that belongs to Zig and not to connect-zig moves to pepegrillo's
@@ -294,6 +302,7 @@ zig build costs                  # time the costs table on this machine
 tools/bench_check.sh             # time connect-zig beside Go's and Rust's runtimes, compare octets
 tools/fullstack_check.sh         # load the OTLP sink and the Collector over TLS and h2, on Linux
 tools/fullstack_check.sh production  # the production model alone
+zig build bench-validate -- --counters <dir>   # cycles and branch misses of each validation, on Linux
 tools/compile_time_check.sh      # what a schema's CEL rules cost the compiler, against its baseline
 tools/compile_time_check.sh --write   # record a new ratio, in the commit that pays for it
 python3 tools/branch_budget.py src/protovalidate/cel/cel_parse.zig read_branches_max   # the least budget that builds

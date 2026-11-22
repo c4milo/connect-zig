@@ -93,6 +93,11 @@ jobs:
       - name: Install valgrind
         if: matrix.check == 'perf'
         run: sudo apt-get update -q && sudo apt-get install -y -q valgrind
+      # bench-validate --counters counts its own cycles and branch misses through perf_event_open,
+      # which the kernel allows a process only below this level.
+      - name: Let a process count its own events
+        if: matrix.check == 'validate-compare'
+        run: sudo sysctl -w kernel.perf_event_paranoid=1
       # The full-stack check's load generator, as colibri's judge installs it (decision 44).
       - name: Install h2load
         if: matrix.check == 'fullstack'

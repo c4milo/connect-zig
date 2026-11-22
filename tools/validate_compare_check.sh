@@ -13,7 +13,9 @@
 # `buf convert` encodes. Each program validates each message, prints its verdict, "valid" or
 # "invalid:" and the rule ids of the violations in order, and times one call as
 # bench/measure.zig does. The script fails when two verdicts of one message differ, and prints
-# one table of every time. `--quick` passes on to every program.
+# one table of every time. `--quick` passes on to every program. Last it prints what each of
+# connect-zig's calls takes on the CPU, `bench-validate --counters`: cycles, instructions,
+# branches and branch misses, where the host's kernel lets a process count its own events.
 #
 # It needs buf, go, node with npm, and cargo, or BUF, GO, NPM and CARGO naming them.
 # prost-protovalidate's build runs protoc: PROTOC names one, or the script downloads the release
@@ -78,6 +80,7 @@ for file in bench/validate/cases/*.json; do
 done
 
 zig build bench-validate -- ${quick} "${cases}" >"${work}/zig.md"
+zig build bench-validate -- --counters "${cases}" >"${work}/zig_counters.md"
 (cd bench/validate/go && "${go}" build -o "${work}/validate-go" .)
 "${work}/validate-go" ${quick} "${cases}" >"${work}/go.md"
 # npm installs the packages in a copy of the program, so the tree holds no node_modules.
@@ -136,3 +139,7 @@ if wrong:
     sys.exit(1)
 print(f"Each of the {len(programs)} implementations gave each of the {len(cases)} messages the same verdict.")
 PYTHON
+echo
+echo "connect-zig's counts of one call (bench/counters.zig):"
+echo
+cat "${work}/zig_counters.md"

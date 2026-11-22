@@ -16,6 +16,11 @@
 //! "valid", or "invalid:" and the rule ids of the violations in order. `--only` runs one case,
 //! as "rules valid", for a profile of it.
 //!
+//! `--counters` reads the same directory, and counts what each thing it times takes on the CPU,
+//! through Linux's hardware counters (`counters.zig`): cycles, instructions, branches and branch
+//! misses for one call, over `counter_runs` calls. A host with no counters gets a line that says
+//! so, and the program ends with no failure.
+//!
 //! `--instructions` times nothing and reads no file. It decodes each case's JSON, which the
 //! program holds, encodes it, and under callgrind collects `instruction_iterations` runs of
 //! each thing it times, dumped as "validate <case>" and "decode and validate <case>", which
@@ -29,6 +34,7 @@ const codec = @import("codec");
 const schema = @import("bench_validate_v1");
 const measure = @import("measure.zig");
 const constants = @import("constants.zig");
+const counters = @import("counters.zig");
 
 const full: measure.Settings = .{ .runs = constants.full_runs, .batch_ns = constants.full_batch_ns };
 const quick: measure.Settings = .{ .runs = constants.quick_runs, .batch_ns = constants.quick_batch_ns };
@@ -47,6 +53,8 @@ const cases = [_]Case{
 
 /// The runs of each thing `--instructions` counts. tools/perf_check.sh divides by the same.
 pub const instruction_iterations = 16;
+/// The calls of each thing `--counters` counts: about 10 ms of the slowest case.
+const counter_runs = 100_000;
 /// The octets of one JSON token of a case, at most.
 const token_len = 1024;
 
@@ -82,6 +90,7 @@ const Options = struct {
     directory: ?[]const u8 = null,
     only: ?[]const u8 = null,
     instructions: bool = false,
+    counters: bool = false,
 };
 
 pub fn main(init: std.process.Init) !void {
@@ -95,11 +104,12 @@ pub fn main(init: std.process.Init) !void {
         return;
     }
     const folder = options.directory orelse {
-        std.debug.print("usage: bench-validate [--quick] [--only <case>] <directory> | --instructions\n", .{});
+        std.debug.print("usage: bench-validate [--quick | --counters] [--only <case>] <directory> | --instructions\n", .{});
         return error.Usage;
     };
     var stdout = std.Io.File.stdout().writerStreaming(init.io, &state.output);
     const writer = &stdout.interface;
+    if (options.counters) return count_cases(init.io, state, options, folder, writer);
     try writer.writeAll("| case | verdict | validate ns/op | decode and validate ns/op |\n| --- | --- | ---: | ---: |\n");
     inline for (cases) |case| {
         if (options.only == null or std.mem.eql(u8, options.only.?, case.name)) {
@@ -119,6 +129,8 @@ fn parse(args: std.process.Args) !Options {
             options.settings = quick;
         } else if (std.mem.eql(u8, argument, "--instructions")) {
             options.instructions = true;
+        } else if (std.mem.eql(u8, argument, "--counters")) {
+            options.counters = true;
         } else if (std.mem.eql(u8, argument, "--only")) {
             options.only = arguments.next() orelse return error.Usage;
         } else options.directory = argument;
@@ -230,4 +242,49 @@ fn collect(comptime label: []const u8, runner: anytype) !void {
     callgrind.toggleCollect();
     // callgrind reads the label up to its zero octet.
     callgrind.dumpStatsAt(@ptrCast(label ++ "\x00"));
+}
+
+/// `--counters`: the table of what each case's two operations take on the CPU, or a line that
+/// says the host has no counters.
+fn count_cases(io: std.Io, state: *State, options: Options, folder: []const u8, writer: *std.Io.Writer) !void {
+    var refusal: []const u8 = "the host is not Linux";
+    const opened = if (comptime counters.available) counters.Counters.open(&refusal) else error.Unavailable;
+    const counted = opened catch {
+        try writer.print("No hardware counters on this host: {s}.\n", .{refusal});
+        return writer.flush();
+    };
+    try writer.writeAll("| case | operation | cycles | instructions | instructions a cycle | branches | branch misses |\n");
+    try writer.writeAll("| --- | --- | ---: | ---: | ---: | ---: | ---: |\n");
+    inline for (cases) |case| {
+        if (options.only == null or std.mem.eql(u8, options.only.?, case.name)) {
+            const path = try std.fmt.bufPrint(&state.path, "{s}/{s}.binpb", .{ folder, case.stem });
+            const bytes = try std.Io.Dir.cwd().readFile(io, path, &state.message);
+            if (bytes.len == state.message.len) return error.MessageTooLarge;
+            const message = try proto.decode_into(case.Message, bytes, &state.storage);
+            const runner: Runner(case.Message) = .{ .message = &message, .storage = &state.report_storage, .options = .{ .cpu_features = state.cpu_features } };
+            try write_counts(writer, case.name, "validate", &counted, runner);
+            // `message` is done with: the decodes write their elements where it stood.
+            const both: BothRunner(case.Message) = .{ .bytes = bytes, .storage = &state.report_storage, .elements = &state.storage, .options = .{ .cpu_features = state.cpu_features } };
+            try write_counts(writer, case.name, "decode and validate", &counted, both);
+        }
+    }
+    try writer.flush();
+}
+
+/// One row: the counts of `counter_runs` calls of `runner`, after one that warms it, for one call.
+fn write_counts(writer: *std.Io.Writer, name: []const u8, operation: []const u8, counted: *const counters.Counters, runner: anytype) !void {
+    try runner.run(1);
+    counted.start();
+    try runner.run(counter_runs);
+    const counts = counted.stop();
+    const runs: f64 = @floatFromInt(counter_runs);
+    const per_call = struct {
+        fn of(count: u64, calls: f64) f64 {
+            return @as(f64, @floatFromInt(count)) / calls;
+        }
+    }.of;
+    const cycles = per_call(counts[counters.cycles], runs);
+    const instructions = per_call(counts[counters.instructions], runs);
+    const ratio = if (cycles == 0) 0 else instructions / cycles;
+    try writer.print("| {s} | {s} | {d:.1} | {d:.1} | {d:.2} | {d:.1} | {d:.2} |\n", .{ name, operation, cycles, instructions, ratio, per_call(counts[counters.branches], runs), per_call(counts[counters.branch_misses], runs) });
 }

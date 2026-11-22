@@ -159,7 +159,10 @@ confirm a test fails. Report `CAUGHT` or `NOT CAUGHT` per mutation in the commit
   protovalidate-go (`bench/validate/go`), protovalidate-es on Node.js (`bench/validate/node`),
   and protovalidate-buffa and prost-protovalidate (`bench/validate/rust`) on the schema of
   `bench/validate/proto` and the messages of `bench/validate/cases`. It fails when two give one
-  message different verdicts. `tools/validate_chart.py` draws the chart of `docs/benchmarks.md` from its
+  message different verdicts. Last it prints `zig build bench-validate -- --counters <dir>`: each
+  validation's cycles, instructions, branches and branch misses, through Linux's hardware
+  counters (`bench/counters.zig`), where the kernel lets a process count its own events.
+  `tools/validate_chart.py` draws the chart of `docs/benchmarks.md` from its
   output, and `tools/ci.sh` runs it as `validate-compare`. `tools/generate_check.sh` holds
   `bench/validate/gen`; `bench/validate/go/buf.gen.yaml` says how the Go code is written. It
   needs buf, go, node with npm and cargo; prost-protovalidate's build runs protoc, which
