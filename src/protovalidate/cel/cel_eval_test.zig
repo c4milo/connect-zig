@@ -2,6 +2,8 @@
 //! expression gives, fails with, or is refused for.
 const std = @import("std");
 const testing = std.testing;
+/// The build target's CPU features, which `matches` searches with in the tests.
+const testing_cpu_features = @import("codec").Features.target();
 const proto = @import("protobuf");
 const program = @import("cel_program.zig");
 const type_file = @import("cel_type.zig");
@@ -51,7 +53,7 @@ const scope: Scope = .{ .types = &.{*const Message} };
 
 /// The value `text` gives for `message`, with no time.
 fn run(comptime text: []const u8, message: *const Message) Error!program.Type(text, scope) {
-    var env: Env = .{};
+    var env: Env = .{ .cpu_features = &testing_cpu_features };
     return program.run(text, scope, .{message}, &env);
 }
 
@@ -191,7 +193,7 @@ test "a duration and a timestamp compare, and now is the time the caller passes"
     try expect_true("int(this.at) >= 1049587200 && int(this.at) <= 1080432000", &timed);
     try testing.expectError(error.TimeMissing, run("this.at < now", &timed));
     try testing.expectError(error.TimeMissing, run("now == now", &timed));
-    var later: Env = .{ .now = .{ .seconds = 1_049_587_301 } };
+    var later: Env = .{ .cpu_features = &testing_cpu_features, .now = .{ .seconds = 1_049_587_301 } };
     try testing.expect(try program.run("this.at < now && now == now && !(now < this.at)", scope, .{&timed}, &later));
     try testing.expect(!try program.run("this.at > now", scope, .{&timed}, &later));
     // A check that reads no time needs none.
@@ -269,7 +271,7 @@ test "an expression that does not parse or does not type is a problem of the bui
 
 test "this may be a scalar, as a field's rule has it" {
     const of_int: Scope = .{ .types = &.{i64} };
-    var env: Env = .{};
+    var env: Env = .{ .cpu_features = &testing_cpu_features };
     try testing.expect(try program.run("this > 42", of_int, .{@as(i64, 43)}, &env));
     try testing.expect(!try program.run("this > 42", of_int, .{@as(i64, 42)}, &env));
     try testing.expect(try program.run("this % 2u == 0u", .{ .types = &.{u64} }, .{@as(u64, 4)}, &env));

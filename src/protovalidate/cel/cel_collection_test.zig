@@ -2,6 +2,8 @@
 //! values, with `size`, `in`, an index and the macros.
 const std = @import("std");
 const testing = std.testing;
+/// The build target's CPU features, which `matches` searches with in the tests.
+const testing_cpu_features = @import("codec").Features.target();
 const proto = @import("protobuf");
 const constants = @import("../constants.zig");
 const program = @import("cel_program.zig");
@@ -52,7 +54,7 @@ const Message = struct {
 const scope: Scope = .{ .types = &.{*const Message} };
 
 fn run(comptime text: []const u8, message: *const Message) Error!program.Type(text, scope) {
-    var env: Env = .{};
+    var env: Env = .{ .cpu_features = &testing_cpu_features };
     return program.run(text, scope, .{message}, &env);
 }
 

@@ -1813,6 +1813,30 @@ ran on Linux x86-64 with Zig 0.16.0.
     +93.07%, and one searcher for every pattern, which `zig build test-protovalidate` failed.
     Each was `CAUGHT`.
 
+- **The CPU's features in a search** (decision 47, amended 2026-11-22). The pin moved from
+  stdx's `652513d` to `a32eae9`, whose CI passed. Its `Searcher.init` takes one
+  `SearcherOptions`, and its `codec.Features` names SSSE3 too, with which a search of a set of
+  literals takes Teddy on a CPU with no AVX2. stdx wrote its history again from `regex`'s first
+  commit, so `652513d` holds the tree of `85f532c`. `protovalidate` imports that stdx's `codec`, and names its
+  `Features` with no name of its own: `Options.cpu_features` takes it with no default,
+  `Env.cpu_features` points at it, and `Interceptor` reads the App's `cpu_features`. The
+  validate example depends on stdx at the same commit, so its `codec.Features` is that type.
+  - `tools/perf_check.sh` builds for x86-64-v3 and counts with `codec.Features.target()`:
+    validate medium valid 3,572 instructions, +1.45%; rules valid 1,418, +1.14%; small valid 352,
+    +1.15%. Counted with `codec.Features.none()`, the rows were the same: the texts are short, so the
+    AVX2 path costs no instruction more, and the cost is the features carried and compared. A
+    first form, with `std.meta.eql` and the features copied into each `Env`, cost +2.2% to
+    +3.5%.
+  - `tools/protovalidate_conformance_check.sh` printed `PASS (failed: 0, skipped: 0, passed:
+    2872, total: 2872)`, `tools/cel_conformance_check.sh` `pass 1045 known 742 unchecked 29
+    refused 0 wrong 0 skipped 688`, and `tools/cel_differential_check.sh 1 2 3` agreed on each
+    of its 24,000 verdicts.
+  - Mutations against `zig build test-protovalidate`, 9: a searcher made ready once whatever
+    the features, made ready with no feature, never marked ready, found by its slice and not
+    its octets, `string.pattern`, `bytes.pattern` and `matches` each with no feature, the
+    interceptor that ignores the App's features, and an App's features of any type. Each was
+    `CAUGHT`.
+
 - **cel-spec's conformance suite** (decision 47, amended 2026-11-22).
   `tools/cel_conformance_check.sh` clones cel-spec at v0.25.3 and runs its 1,819 tests that
   declare no variables and build no message over `src/protovalidate/cel_expression.zig`, the

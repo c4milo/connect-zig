@@ -2,6 +2,8 @@
 //! or a well-known type's full name (CEL language definition, "Type Values").
 const std = @import("std");
 const testing = std.testing;
+/// The build target's CPU features, which `matches` searches with in the tests.
+const testing_cpu_features = @import("codec").Features.target();
 const proto = @import("protobuf");
 const program = @import("cel_program.zig");
 const type_file = @import("cel_type.zig");
@@ -40,7 +42,7 @@ const Message = struct {
 const scope: Scope = .{ .types = &.{*const Message} };
 
 fn expect_true(comptime text: []const u8, message: *const Message) !void {
-    var env: Env = .{};
+    var env: Env = .{ .cpu_features = &testing_cpu_features };
     try testing.expect(try program.run(text, scope, .{message}, &env));
 }
 

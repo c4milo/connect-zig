@@ -19,7 +19,7 @@ pub fn main(init: std.process.Init) !void {
     const state = try init.arena.allocator().create(State);
     var report: protovalidate.Report = .init(&state.report_storage);
     const message: schema.All = .{};
-    protovalidate.validate(schema.All, &message, .{}, &report) catch |failure| switch (failure) {
+    protovalidate.validate(schema.All, &message, .{ .cpu_features = .detect() }, &report) catch |failure| switch (failure) {
         error.Invalid => {},
         else => return failure,
     };

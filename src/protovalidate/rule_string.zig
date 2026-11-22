@@ -39,7 +39,7 @@ pub fn check(comptime rules: pb.StringRules, comptime site: Site, value: []const
     try check_octets(rules, site, value.len, walk, path);
     // validate.proto, string.pattern: "!this.matches(rules.pattern)".
     if (comptime rules.pattern) |pattern| {
-        if (!pattern_file.matches(pattern, value)) try walk_file.violate(walk, path, comptime broken(site, "pattern", "pattern", "does not match regex pattern `" ++ pattern ++ "`"), site.for_key);
+        if (!pattern_file.matches(pattern, value, walk.options.cpu_features)) try walk_file.violate(walk, path, comptime broken(site, "pattern", "pattern", "does not match regex pattern `" ++ pattern ++ "`"), site.for_key);
     }
     try check_parts(rules, site, value, walk, path);
     // validate.proto, string.in: "!(this in getField(rules, 'in'))".

@@ -3,6 +3,8 @@
 //! Conversions").
 const std = @import("std");
 const testing = std.testing;
+/// The build target's CPU features, which `matches` searches with in the tests.
+const testing_cpu_features = @import("codec").Features.target();
 const proto = @import("protobuf");
 const program = @import("cel_program.zig");
 const type_file = @import("cel_type.zig");
@@ -34,7 +36,7 @@ const room_len = 64;
 /// written once the value is known.
 fn run(comptime text: []const u8, message: *const Message, room: *[room_len]u8, written: *usize) !program.Type(text, scope) {
     var held: Text = .{ .room = room };
-    var env: Env = .{ .text = &held };
+    var env: Env = .{ .cpu_features = &testing_cpu_features, .text = &held };
     const value = try program.run(text, scope, .{message}, &env);
     written.* = held.len;
     return value;
@@ -93,7 +95,7 @@ test "text past the room fails the expression" {
     var written: usize = 0;
     const long: Message = .{ .name = "a" ** room_len };
     try testing.expectError(error.ReportFull, run("this.name + '!' == ''", &long, &room, &written));
-    var none: Env = .{};
+    var none: Env = .{ .cpu_features = &testing_cpu_features };
     try testing.expectError(error.ReportFull, program.run("string(this.count) == ''", scope, .{&sample}, &none));
 }
 

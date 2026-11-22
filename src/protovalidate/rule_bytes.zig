@@ -61,7 +61,7 @@ fn check_len(comptime rules: pb.BytesRules, comptime site: Site, len: usize, wal
 fn check_pattern(comptime rules: pb.BytesRules, comptime site: Site, value: []const u8, walk: *Walk, path: *const Path) Fault!void {
     if (comptime rules.pattern) |pattern| {
         if (!std.unicode.utf8ValidateSlice(value)) return error.Unevaluable;
-        if (!pattern_file.matches(pattern, value)) try walk_file.violate(walk, path, comptime broken(site, "pattern", "pattern", "must match regex pattern `" ++ pattern ++ "`"), site.for_key);
+        if (!pattern_file.matches(pattern, value, walk.options.cpu_features)) try walk_file.violate(walk, path, comptime broken(site, "pattern", "pattern", "must match regex pattern `" ++ pattern ++ "`"), site.for_key);
     }
 }
 

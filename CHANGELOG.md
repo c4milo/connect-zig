@@ -108,6 +108,14 @@ change the public API, and the entry marks each change that does.
 - The README is a quarter of its length. `docs/guide.md` holds the full walkthrough,
   `docs/protovalidate.md` the guide to validation, `docs/testing.md` every check with its
   command, and `docs/benchmarks.md` every chart.
+- A rule's regular expression searches with the CPU features your program passes.
+  **Changes a program's call.** `protovalidate.Options` takes `.cpu_features`, stdx's
+  `codec.Features`, with no default. Name stdx in your `build.zig.zon` at the commit connect-zig
+  pins as `stdx_regex`, call `codec.Features.detect()` once as the program starts, and pass the
+  value, as in `.{ .cpu_features = cpu_features }`. An `App` behind
+  `protovalidate.Interceptor` holds it in a field `cpu_features`, and one with no such field
+  stops the build. On a CPU with AVX2, a search reads 32 octets a step. A validation costs about
+  1% more instructions, the features carried and compared.
 - connect-zig builds on colibri v0.19.0. **Changes a program's setup.** A program that serves TLS
   on `colibri.Server` passes room for its TLS sessions: a field
   `tls_buffer: [server.Config.tls_buffer_len(n)]u8`, where `n` is the TCP connections over TLS

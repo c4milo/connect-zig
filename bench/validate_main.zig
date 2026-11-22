@@ -25,6 +25,7 @@
 const std = @import("std");
 const proto = @import("protobuf");
 const protovalidate = @import("protovalidate");
+const codec = @import("codec");
 const schema = @import("bench_validate_v1");
 const measure = @import("measure.zig");
 const constants = @import("constants.zig");
@@ -71,6 +72,8 @@ const State = struct {
     ids: [violations_max][]const u8,
     path: [constants.path_len]u8,
     output: [constants.output_len]u8 align(constants.buffer_align),
+    /// The CPU features each validation's regular expressions search with, which `main` sets.
+    cpu_features: codec.Features,
 };
 
 /// What the command line asks for.
@@ -84,6 +87,9 @@ const Options = struct {
 pub fn main(init: std.process.Init) !void {
     const state = try init.arena.allocator().create(State);
     const options = try parse(init.minimal.args);
+    // The count takes the build target's features, x86-64-v3's for tools/perf_check.sh, so every
+    // machine counts the same paths. A timed run detects the CPU once, as a program does.
+    state.cpu_features = if (options.instructions) .target() else .detect();
     if (options.instructions) {
         inline for (cases) |case| try count_case(state, case);
         return;
@@ -127,9 +133,9 @@ fn run_case(io: std.Io, state: *State, settings: measure.Settings, folder: []con
     if (bytes.len == state.message.len) return error.MessageTooLarge;
     const message = try proto.decode_into(case.Message, bytes, &state.storage);
     const verdict = try verdict_of(case.Message, state, &message);
-    const runner: Runner(case.Message) = .{ .message = &message, .storage = &state.report_storage };
+    const runner: Runner(case.Message) = .{ .message = &message, .storage = &state.report_storage, .options = .{ .cpu_features = state.cpu_features } };
     const validate_ns = try measure.median_ns(io, settings, runner);
-    const both: BothRunner(case.Message) = .{ .bytes = bytes, .storage = &state.report_storage, .elements = &state.storage };
+    const both: BothRunner(case.Message) = .{ .bytes = bytes, .storage = &state.report_storage, .elements = &state.storage, .options = .{ .cpu_features = state.cpu_features } };
     const both_ns = try measure.median_ns(io, settings, both);
     try writer.print("| {s} | {s} | {d:.1} | {d:.1} |\n", .{ case.name, verdict, validate_ns, both_ns });
     try writer.flush();
@@ -141,6 +147,7 @@ fn BothRunner(comptime M: type) type {
         bytes: []const u8,
         storage: []align(@alignOf(protovalidate.Violation)) u8,
         elements: []u8,
+        options: protovalidate.Options,
 
         pub fn run(runner: @This(), n: u64) !void {
             for (0..n) |_| {
@@ -148,7 +155,7 @@ fn BothRunner(comptime M: type) type {
                 std.mem.doNotOptimizeAway(&bytes);
                 const message = try proto.decode_into(M, bytes, runner.elements);
                 var report: protovalidate.Report = .init(runner.storage);
-                const result = protovalidate.validate(M, &message, .{}, &report);
+                const result = protovalidate.validate(M, &message, runner.options, &report);
                 std.mem.doNotOptimizeAway(&report);
                 result catch |failure| if (failure != error.Invalid) return failure;
             }
@@ -161,11 +168,12 @@ fn Runner(comptime M: type) type {
     return struct {
         message: *const M,
         storage: []align(@alignOf(protovalidate.Violation)) u8,
+        options: protovalidate.Options,
 
         pub fn run(runner: @This(), n: u64) !void {
             for (0..n) |_| {
                 var report: protovalidate.Report = .init(runner.storage);
-                const result = protovalidate.validate(M, runner.message, .{}, &report);
+                const result = protovalidate.validate(M, runner.message, runner.options, &report);
                 std.mem.doNotOptimizeAway(&report);
                 result catch |failure| if (failure != error.Invalid) return failure;
             }
@@ -176,7 +184,7 @@ fn Runner(comptime M: type) type {
 /// "valid", or "invalid:" and the rule id of each violation, in order, with commas between them.
 fn verdict_of(comptime M: type, state: *State, message: *const M) ![]const u8 {
     var report: protovalidate.Report = .init(&state.report_storage);
-    protovalidate.validate(M, message, .{}, &report) catch |failure| switch (failure) {
+    protovalidate.validate(M, message, .{ .cpu_features = state.cpu_features }, &report) catch |failure| switch (failure) {
         error.Invalid => {},
         else => return failure,
     };
@@ -207,10 +215,10 @@ fn count_case(state: *State, comptime case: Case) !void {
     const decoded = try proto.decode_json(case.Message, json, &state.transcoded, &state.tokens);
     const bytes = try proto.encode(case.Message, &decoded, &state.message);
     const message = try proto.decode_into(case.Message, bytes, &state.storage);
-    const runner: Runner(case.Message) = .{ .message = &message, .storage = &state.report_storage };
+    const runner: Runner(case.Message) = .{ .message = &message, .storage = &state.report_storage, .options = .{ .cpu_features = state.cpu_features } };
     try collect("validate " ++ case.name, runner);
     // `message` is done with: the decodes write their elements where it stood.
-    const both: BothRunner(case.Message) = .{ .bytes = bytes, .storage = &state.report_storage, .elements = &state.storage };
+    const both: BothRunner(case.Message) = .{ .bytes = bytes, .storage = &state.report_storage, .elements = &state.storage, .options = .{ .cpu_features = state.cpu_features } };
     try collect("decode and validate " ++ case.name, both);
 }
 

@@ -3,12 +3,15 @@
 const server = @import("server");
 const rpc = @import("connect_colibri");
 const signup = @import("signup");
+const codec = @import("codec");
 const service = @import("signup_service");
 const constants = @import("constants.zig");
 
-/// What the routes read: the signup service's room.
+/// What the routes read: the signup service's room, and the CPU features, stdx's type, which
+/// `protovalidate.Interceptor` reads by this name. The program detects them once as it starts.
 pub const App = struct {
     signup: service.Room = .{},
+    cpu_features: codec.Features,
 };
 
 fn on_error(_: *App, _: *server.RequestContext, _: *const server.Request, _: anyerror, response: *server.Response) void {

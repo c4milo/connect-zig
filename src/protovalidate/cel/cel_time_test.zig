@@ -4,6 +4,8 @@
 //! Functions" and "Timezones").
 const std = @import("std");
 const testing = std.testing;
+/// The build target's CPU features, which `matches` searches with in the tests.
+const testing_cpu_features = @import("codec").Features.target();
 const proto = @import("protobuf");
 const program = @import("cel_program.zig");
 const type_file = @import("cel_type.zig");
@@ -34,7 +36,7 @@ fn run(comptime text: []const u8, message: *const Message) !program.Type(text, s
     var room: [room_len]u8 = undefined;
     var held: Text = .{ .room = &room };
     // 2023-12-25T00:00:00Z.
-    var env: Env = .{ .now = .{ .seconds = christmas }, .text = &held };
+    var env: Env = .{ .cpu_features = &testing_cpu_features, .now = .{ .seconds = christmas }, .text = &held };
     return program.run(text, scope, .{message}, &env);
 }
 

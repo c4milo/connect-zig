@@ -9,6 +9,7 @@
 const std = @import("std");
 const proto = @import("protobuf");
 const protovalidate = @import("protovalidate");
+const codec = @import("codec");
 const harness = @import("harness");
 const cases = @import("cases");
 const constants = @import("constants.zig");
@@ -20,6 +21,8 @@ const State = struct {
     report_storage: [constants.executor_report_bytes]u8 align(@alignOf(protovalidate.Violation)),
     in_buffer: [constants.executor_io_buffer_len]u8,
     out_buffer: [constants.executor_io_buffer_len]u8,
+    /// The CPU features each rule's regular expressions search with, detected once.
+    cpu_features: codec.Features,
 };
 
 const Result = @typeInfo(@FieldType(harness.TestResult, "result")).optional.child;
@@ -29,6 +32,7 @@ pub const Error = error{ RequestTooLarge, TooManyCases };
 
 pub fn main(init: std.process.Init) !void {
     const state = try init.arena.allocator().create(State);
+    state.cpu_features = .detect();
     var stdin = std.Io.File.stdin().reader(init.io, &state.in_buffer);
     const len = try stdin.interface.readSliceShort(&state.request_bytes);
     if (len == state.request_bytes.len) return error.RequestTooLarge;
@@ -104,7 +108,7 @@ fn check(comptime T: type, state: *State, value: []const u8, now: proto.wkt.Time
     if (comptime protovalidate.rules_error(T)) |problem| return .{ .compilation_error = problem };
     const message = proto.decode(T, value) catch |failure| return .{ .unexpected_error = @errorName(failure) };
     var report: protovalidate.Report = .init(&state.report_storage);
-    protovalidate.validate(T, &message, .{ .now = now }, &report) catch |failure| switch (failure) {
+    protovalidate.validate(T, &message, .{ .cpu_features = state.cpu_features, .now = now }, &report) catch |failure| switch (failure) {
         error.Invalid => return .{ .validation_error = .{ .violations = .of(report.violations()) } },
         else => return .{ .runtime_error = @errorName(failure) },
     };

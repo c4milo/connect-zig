@@ -125,7 +125,7 @@ fn verdict(comptime rule: Rule, comptime scope: Scope, values: anytype, walk: *c
     if (comptime program.Type(rule.expression, scope) == type_file.Failing) return error.Unevaluable;
     // A rule that does not format holds no text at all, so it stores nothing for one.
     var text: if (formats(rule)) type_file.Text else void = if (comptime formats(rule)) .{ .room = report_file.room(walk.report), .full = &walk.report.truncated } else {};
-    var env: type_file.Env = .{ .now = walk.options.now, .text = if (comptime formats(rule)) &text else null };
+    var env: type_file.Env = .{ .cpu_features = &walk.options.cpu_features, .now = walk.options.now, .text = if (comptime formats(rule)) &text else null };
     const result = try program.run(rule.expression, scope, values, &env);
     if (comptime @TypeOf(result) == bool) {
         if (result) return null;

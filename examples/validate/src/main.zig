@@ -57,7 +57,7 @@ const State = struct {
 
 pub fn main(init: std.process.Init) !void {
     const state = try init.arena.allocator().create(State);
-    state.app = .{};
+    state.app = .{ .cpu_features = .detect() };
     try state.rounds.init(&state.app);
     defer state.rounds.deinit();
     try round(state, .{ .h11 = false, .h3 = false }, .h2);

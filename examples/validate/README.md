@@ -64,5 +64,10 @@ It fails with 400 and `invalid_argument`. The message is "email: must be a valid
 - Give a generated file that holds rules the module `protovalidate`: its header names it.
 - Declare the interceptor's room in your route table's `.Values`, and list the interceptor in
   the route options, as [src/service/service.zig](src/service/service.zig) does.
+- Name stdx in your `build.zig.zon` at the commit connect-zig pins as `stdx_regex`, as
+  [build.zig.zon](build.zig.zon) does, and pass it connect-zig's options.
+- Give your `App` a field `cpu_features: codec.Features`, stdx's type, and set it once as your
+  program starts, from `codec.Features.detect()`, as [src/main.zig](src/main.zig) does. A rule's
+  regular expression searches with those CPU features.
 - A rule that reads the time, such as `timestamp.lt_now`, takes it from a field
   `protovalidate_now` of your `App`, which your program writes from its clock.

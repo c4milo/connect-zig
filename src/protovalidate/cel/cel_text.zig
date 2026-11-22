@@ -244,6 +244,8 @@ pub fn free(env: *Env, written: usize) void {
 }
 
 const testing = std.testing;
+/// The build target's CPU features, which `matches` searches with in the tests.
+const testing_cpu_features = @import("codec").Features.target();
 
 fn expect_double(value: f64, expected: []const u8) !void {
     var room: [scientific_len_max]u8 = undefined;
@@ -275,7 +277,7 @@ test "a double is written as Go's FormatFloat writes it with 'g' and the fewest 
 test "a text that ends where the room's next octet goes grows in place" {
     var room: [scientific_len_max]u8 = undefined;
     var text: Text = .{ .room = &room };
-    var env: Env = .{ .text = &text };
+    var env: Env = .{ .cpu_features = &testing_cpu_features, .text = &text };
     const ab = try join("a", "b", &env);
     const abc = try join(ab, "c", &env);
     try testing.expectEqualStrings("abc", abc);
@@ -288,6 +290,6 @@ test "a text that ends where the room's next octet goes grows in place" {
     try testing.expectEqualStrings("x", try join("", "x", &env));
     try testing.expectEqualStrings("x", try join("x", "", &env));
     try testing.expectEqual(@as(usize, "abc".len + "abd".len), text.len);
-    var none: Env = .{};
+    var none: Env = .{ .cpu_features = &testing_cpu_features };
     try testing.expectError(error.ReportFull, join("a", "b", &none));
 }

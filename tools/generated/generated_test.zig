@@ -93,13 +93,13 @@ test "a message of 1,200 fields is checked against the rules of each field" {
     var report: protovalidate.Report = .init(&storage);
     const leaf: wide.Leaf = .{ .name = "end" };
     const valid: wide.Wide = .{ .f1 = 1, .f2 = "ab", .f299 = .of(&.{ 1, 0 }), .f597 = 1, .f598 = "last text", .f600 = leaf };
-    try protovalidate.validate(wide.Wide, &valid, .{}, &report);
+    try protovalidate.validate(wide.Wide, &valid, .{ .cpu_features = .target() }, &report);
     try testing.expectEqual(@as(usize, 0), report.violations().len);
 
     // The first field breaks its expression and the message's, and the last three fields break
     // their rules: a string that is refused, an element past its limit, and an empty name.
     const invalid: wide.Wide = .{ .f1 = past_expression, .f598 = "x", .f599 = .of(&.{past_items_limit}), .f600 = .{} };
-    try testing.expectError(error.Invalid, protovalidate.validate(wide.Wide, &invalid, .{}, &report));
+    try testing.expectError(error.Invalid, protovalidate.validate(wide.Wide, &invalid, .{ .cpu_features = .target() }, &report));
     const expected = [_][]const u8{ "wide.ends", "this < 1001", "string.not_in", "int32.lt", "string.min_len" };
     try testing.expectEqual(expected.len, report.violations().len);
     for (expected) |id| {
@@ -129,11 +129,11 @@ test "a message of 1,100 repeated and map fields round-trips and is checked agai
     try testing.expect(comptime protovalidate.rules_error(wide.Lists) == null);
     var storage: [protovalidate.constants.report_bytes_default]u8 align(@alignOf(protovalidate.Violation)) = undefined;
     var report: protovalidate.Report = .init(&storage);
-    try protovalidate.validate(wide.Lists, &back, .{}, &report);
+    try protovalidate.validate(wide.Lists, &back, .{ .cpu_features = .target() }, &report);
     // The first list has more items than its rule allows, and the message in the last list breaks
     // its own rule.
     const invalid: wide.Lists = .{ .f1 = .of(&past_max_items), .f1099 = .of(&.{.{}}) };
-    try testing.expectError(error.Invalid, protovalidate.validate(wide.Lists, &invalid, .{}, &report));
+    try testing.expectError(error.Invalid, protovalidate.validate(wide.Lists, &invalid, .{ .cpu_features = .target() }, &report));
     try testing.expectEqual(@as(usize, 2), report.violations().len);
     try testing.expectEqualStrings("repeated.max_items", report.violations()[0].rule_id.?);
     try testing.expectEqualStrings("string.min_len", report.violations()[1].rule_id.?);

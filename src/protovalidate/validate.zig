@@ -20,7 +20,7 @@ pub fn validate(comptime T: type, message: *const T, options: Options, report: *
     comptime if (check_file.rules_error(T)) |problem| @compileError("protovalidate: " ++ problem);
     if (comptime !table.has_rules(T)) return;
     const before = report.count;
-    var walk: walk_file.Walk = .{ .report = report, .options = options };
+    var walk: walk_file.Walk = .{ .report = report, .options = &options };
     message_file.check(T, message, &walk, null) catch |fault| switch (fault) {
         error.ReportFull => {
             assert(report.truncated);

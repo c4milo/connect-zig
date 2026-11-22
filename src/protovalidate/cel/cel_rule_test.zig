@@ -1,6 +1,7 @@
 //! Tests of the CEL rules through `validate`: the violation each one reports, with its field,
 //! its rule's path, its id and its message, and what a rule that cannot run ends with.
 const std = @import("std");
+const codec = @import("codec");
 const testing = std.testing;
 const proto = @import("protobuf");
 const pb = @import("buf_validate_validate");
@@ -9,6 +10,7 @@ const constants = @import("../constants.zig");
 const report_file = @import("../report.zig");
 const validate_file = @import("../validate.zig");
 const walk_test = @import("../validate_test.zig");
+const pattern = @import("../pattern.zig");
 const Rules = table.Rules;
 const Checked = walk_test.Checked;
 
@@ -147,6 +149,9 @@ const Dynamic = struct {
     pub const protovalidate: Rules = .{ .message = .{ .cel = .of(&.{.{ .id = "dyn", .expression = "dyn(this).b == 'foo'" }}) } };
 };
 
+/// The options of a check with the build target's CPU features and no time.
+const target_options: validate_file.Options = .{ .cpu_features = .target() };
+
 fn outcome(comptime T: type, message: *const T, options: validate_file.Options) validate_file.Error!void {
     var storage: [constants.report_bytes_default]u8 align(report_file.storage_alignment) = undefined;
     var report: report_file.Report = .init(&storage);
@@ -154,19 +159,19 @@ fn outcome(comptime T: type, message: *const T, options: validate_file.Options) 
 }
 
 test "an expression that fails as it runs ends validate with Unevaluable" {
-    try outcome(Dividing, &.{ .value = 6, .div = 3 }, .{});
-    try testing.expectError(error.Invalid, outcome(Dividing, &.{ .value = 7, .div = 3 }, .{}));
-    try testing.expectError(error.Unevaluable, outcome(Dividing, &.{ .value = 7, .div = 0 }, .{}));
-    try testing.expectError(error.Unevaluable, outcome(Dynamic, &.{ .a = 1 }, .{}));
+    try outcome(Dividing, &.{ .value = 6, .div = 3 }, target_options);
+    try testing.expectError(error.Invalid, outcome(Dividing, &.{ .value = 7, .div = 3 }, target_options));
+    try testing.expectError(error.Unevaluable, outcome(Dividing, &.{ .value = 7, .div = 0 }, target_options));
+    try testing.expectError(error.Unevaluable, outcome(Dynamic, &.{ .a = 1 }, target_options));
 }
 
 test "a rule that reads now takes the caller's time, and fails without it" {
     const then: Dividing = .{ .div = 1, .at = .{ .seconds = 5 } };
-    try testing.expectError(error.TimeMissing, outcome(Dividing, &then, .{}));
-    try outcome(Dividing, &then, .{ .now = .{ .seconds = 6 } });
-    try testing.expectError(error.Invalid, outcome(Dividing, &then, .{ .now = .{ .seconds = 5 } }));
+    try testing.expectError(error.TimeMissing, outcome(Dividing, &then, target_options));
+    try outcome(Dividing, &then, .{ .cpu_features = .target(), .now = .{ .seconds = 6 } });
+    try testing.expectError(error.Invalid, outcome(Dividing, &then, .{ .cpu_features = .target(), .now = .{ .seconds = 5 } }));
     // A timestamp that is not set has no value for the rule.
-    try outcome(Dividing, &.{ .div = 1 }, .{});
+    try outcome(Dividing, &.{ .div = 1 }, target_options);
 }
 
 const PairsEntry = struct {
@@ -230,4 +235,22 @@ test "a map's own CEL rule reads the whole map, and a key's and a value's rule e
     try testing.expectEqual(@as(?bool, null), valued[0].for_key);
     // A list with no element is read by its own rule too: it has no presence to skip it by.
     try walk_test.expect_one(try checked.of(Lists, &.{}), "numbers", "cel[0]", "sized");
+}
+
+const name_pattern = "^[a-z]+( [a-z]+)*$";
+
+const Matched = struct {
+    name: []const u8 = "",
+    pub const FieldNumber = enum(u29) { name = 1 };
+    pub const protobuf: proto.Descriptor = .{ .full_name = "t.Matched", .fields = &.{proto.field_of(FieldNumber.name, .string, .{})} };
+    pub const protovalidate: Rules = .{ .message = .{ .cel = .of(&.{.{ .id = "words", .expression = "this.name.matches('" ++ name_pattern ++ "')" }}) } };
+};
+
+test "matches searches with the CPU features of validate's options" {
+    const sets = [_]codec.Features{ codec.Features.none(), codec.Features.target(), codec.Features.detect() };
+    for (sets) |set| {
+        try outcome(Matched, &.{ .name = "ada lovelace" }, .{ .cpu_features = set });
+        try testing.expect(std.meta.eql(pattern.kept_cpu_features(name_pattern), @as(?codec.Features, set)));
+        try testing.expectError(error.Invalid, outcome(Matched, &.{ .name = "Ada" }, .{ .cpu_features = set }));
+    }
 }

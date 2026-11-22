@@ -1,6 +1,7 @@
 //! Tests of each type's rules through `validate`: a value at each side of what a rule states,
 //! and the id of the rule it breaks.
 const std = @import("std");
+const codec = @import("codec");
 const testing = std.testing;
 const proto = @import("protobuf");
 const pb = @import("buf_validate_validate");
@@ -8,6 +9,7 @@ const support = @import("rule_test_support.zig");
 const constants = @import("constants.zig");
 const report_file = @import("report.zig");
 const validate_file = @import("validate.zig");
+const pattern = @import("pattern.zig");
 const expect = support.expect;
 const expect_message = support.expect_message;
 
@@ -234,6 +236,18 @@ test "a string's and a bytes field's pattern match any part, and bytes that are 
     try testing.expectError(error.Unevaluable, expect(Text, .bytes, ascii, "\xe1\x84", ""));
 }
 
+test "a string's and a bytes field's pattern search with the CPU features of the options" {
+    const sets = [_]codec.Features{ codec.Features.none(), codec.Features.target(), codec.Features.detect() };
+    const word = "^[a-z]+[0-9]*$";
+    const octet = "^[a-f]+$";
+    for (sets) |set| {
+        try support.expect_at(Text, .string, comptime string(.{ .pattern = word }), "abc12", .{ .cpu_features = set }, "");
+        try testing.expect(std.meta.eql(pattern.kept_cpu_features(word), @as(?codec.Features, set)));
+        try support.expect_at(Text, .bytes, comptime octets(.{ .pattern = octet }), "cafe", .{ .cpu_features = set }, "");
+        try testing.expect(std.meta.eql(pattern.kept_cpu_features(octet), @as(?codec.Features, set)));
+    }
+}
+
 test "two CEL rules that format each keep their own message" {
     const rules: pb.FieldRules = comptime .{ .cel = .of(&.{
         .{ .id = "first", .expression = "'first: `%s`'.format([this])" },
@@ -243,7 +257,7 @@ test "two CEL rules that format each keep their own message" {
     var storage: [constants.report_bytes_default]u8 align(report_file.storage_alignment) = undefined;
     var report: report_file.Report = .init(&storage);
     const message: T = .{ .val = "abc" };
-    try testing.expectError(error.Invalid, validate_file.validate(T, &message, .{}, &report));
+    try testing.expectError(error.Invalid, validate_file.validate(T, &message, .{ .cpu_features = .target() }, &report));
     const list = report.violations();
     try testing.expectEqual(@as(usize, 2), list.len);
     try testing.expectEqualStrings("first: `abc`", list[0].message.?);
@@ -260,7 +274,7 @@ test "a formatted message with no room in the report ends validate as a full rep
     // A value longer than the whole storage, so `format` itself finds no room.
     const long = "a" ** storage.len;
     const message: T = .{ .val = long };
-    try testing.expectError(error.Invalid, validate_file.validate(T, &message, .{}, &report));
+    try testing.expectError(error.Invalid, validate_file.validate(T, &message, .{ .cpu_features = .target() }, &report));
     try testing.expect(report.truncated);
     try testing.expectEqual(@as(usize, 0), report.violations().len);
 }
@@ -271,7 +285,7 @@ test "a CEL rule's message may join text, which the report keeps" {
     var storage: [constants.report_bytes_default]u8 align(report_file.storage_alignment) = undefined;
     var report: report_file.Report = .init(&storage);
     const message: T = .{ .val = "abcd" };
-    try testing.expectError(error.Invalid, validate_file.validate(T, &message, .{}, &report));
+    try testing.expectError(error.Invalid, validate_file.validate(T, &message, .{ .cpu_features = .target() }, &report));
     try testing.expectEqualStrings("too long: abcd (4)", report.violations()[0].message.?);
     try expect(Text, .string, rules, "ab", "");
 }

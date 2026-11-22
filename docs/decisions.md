@@ -849,6 +849,27 @@ first. Cite an entry by number in code and commits ("decision 6").
         zero storage the binary does not hold. The medium message's checks took 64% fewer
         instructions. Beaten: a fresh searcher for each check, 1 to 3 µs each, and a cache the
         caller passes to `validate`, which every program would size for each pattern.
+      - A search takes the CPU features the program passes. Amended on 2026-11-22, ruled by the
+        owner:
+        - `Options.cpu_features` holds stdx's `codec.Features`, of the stdx that `regex` comes
+          from. The module names no type of its own for it: the program depends on stdx at the
+          commit that `build.zig.zon` pins as `stdx_regex`, with connect-zig's options, so its
+          `codec` is the module that `protovalidate` imports, as colibri's decision 162 has a
+          program name chapulin. The field has no default, as stdx's
+          `SearcherOptions.features` and colibri's `tls.Cpu` have none. A program calls
+          `codec.Features.detect()` once as it starts.
+        - `Interceptor` reads the features from the App's field `cpu_features`, one field that
+          each module of the program reads. An App with no such field stops the build.
+        - A kept searcher is made ready again when a check passes other features, so each check
+          searches with its caller's. Each check compares 12 octets to know. One pattern's text
+          has one searcher on a thread, wherever a rule or an expression names it.
+        - Beaten: the build target's features inside the library, as the module's codecs of
+          stdx 0.1.2 take them, which never reach AVX2 in a program built for the baseline CPU;
+          a probe in the library, which colibri and stdx leave to the program; a default; a
+          name of the module's own for stdx's type, which the owner refused, since the program
+          detects with stdx and holds stdx's type; a field of the App for each module; and the
+          features of a thread's first check kept for each later check, which would search with
+          features its caller did not pass.
       - stdx's `regex` came in a release that colibri does not pin yet. So `build.zig.zon`
         pins that commit a second time, as `stdx_regex`, and takes `regex` alone from it. A
         second copy of stdx's `json` would export the same kernel symbols twice, and `regex`

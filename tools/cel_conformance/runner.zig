@@ -10,10 +10,14 @@
 const std = @import("std");
 const proto = @import("protobuf");
 const cel = @import("cel_expression");
+const codec = @import("codec");
 const cases = @import("cases");
 
 /// The suite's expressions read no names.
 const scope: cel.Scope = .{ .names = &.{}, .types = &.{} };
+/// The build target's CPU features, which `matches` searches with. The answers are the same
+/// with any features.
+const features: codec.Features = .target();
 /// The room an expression writes its text into, and the room of one value's JSON.
 const room_len = 65_536;
 const value_text_len_max = 65_536;
@@ -45,7 +49,7 @@ fn run_case(comptime text: []const u8, room: []u8, value_text: []u8, out: *std.I
         return out.writeAll("}");
     } else {
         var written: cel.Text = .{ .room = room };
-        var env: cel.Env = .{ .text = &written };
+        var env: cel.Env = .{ .cpu_features = &features, .text = &written };
         const value = cel.run(text, scope, .{}, &env) catch |failure| return out.print("{{\"error\":\"{s}\"}}", .{@errorName(failure)});
         // A list is read as it is written, and a read may fail: the value is written whole
         // before any of it goes out.

@@ -298,6 +298,8 @@ pub fn at(list: anytype, index: i64, env: *Env) Error!Taken(ElementOf(@TypeOf(li
 }
 
 const testing = std.testing;
+/// The build target's CPU features, which `matches` searches with in the tests.
+const testing_cpu_features = @import("codec").Features.target();
 
 const Pair = struct {
     key: i32 = 0,
@@ -318,7 +320,7 @@ test "each element read counts against the expression's limit" {
     const literal = [_]i64{ 1, 1 };
     // Two elements and the end are three reads, of a list and of a literal alike.
     const reads = 3;
-    var env: Env = .{ .steps = reads };
+    var env: Env = .{ .cpu_features = &testing_cpu_features, .steps = reads };
     var elements = iterate(list);
     for (0..reads) |_| _ = try elements.next(&env);
     try testing.expectEqual(@as(usize, 0), env.steps);
@@ -349,12 +351,12 @@ test "a stored map's key that two entries hold gives the last entry's value, and
     const Pairs = proto.Repeated(Pair, .message);
     const pairs: Pairs = .of(&.{ .{ .key = 1, .value = 10 }, .{ .key = 2, .value = 20 }, .{ .key = 1, .value = 30 } });
     const map: Map(Pairs) = .{ .field = &pairs };
-    var env: Env = .{};
+    var env: Env = .{ .cpu_features = &testing_cpu_features };
     try testing.expectEqual(@as(?i64, 30), try map.get(@as(i64, 1), &env));
     try testing.expectEqual(@as(?i64, 20), try map.get(@as(i64, 2), &env));
     try testing.expectEqual(@as(?i64, null), try map.get(@as(i64, 3), &env));
     // The last entry holds the key, so the lookup reads it alone and stops.
-    var one: Env = .{ .steps = 1 };
+    var one: Env = .{ .cpu_features = &testing_cpu_features, .steps = 1 };
     try testing.expectEqual(@as(?i64, 30), try map.get(@as(i64, 1), &one));
     var keys = iterate(map);
     for ([_]i64{ 1, 2, 1 }) |expected| try testing.expectEqual(@as(?i64, expected), try keys.next(&env));

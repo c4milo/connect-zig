@@ -165,7 +165,7 @@ inline fn eval_call(comptime call: Node.Call, comptime R: type, comptime scope: 
         .timestamp => return eval_time(proto.wkt.Timestamp, operands, scope, values, env),
         .type => return type_value.of(try eval(&operands[0], scope, values, env)),
         // The pattern is a literal, which `check.type_of` required.
-        .matches => return pattern_file.matches(operands[1].string, try eval(&operands[0], scope, values, env)),
+        .matches => return pattern_file.matches(operands[1].string, try eval(&operands[0], scope, values, env), env.cpu_features.*),
         .format => return format_file.eval_format(call, scope, values, env),
         .string => if (comptime operands.len == 1 and text_file.converts(Result(&operands[0], scope))) return text_file.to_string(try eval(&operands[0], scope, values, env), env),
         .map, .filter => return collection.eval_derived(call, R, scope, values, env),

@@ -60,18 +60,18 @@ test "a timestamp's const and bounds compare times, with no clock" {
 test "a timestamp's lt_now, gt_now and within compare with the time the caller passes" {
     const now: Timestamp = .{ .seconds = 100 };
     const past: pb.FieldRules = comptime .{ .type = .{ .timestamp = .{ .less_than = .{ .lt_now = true } } } };
-    try expect_at(?Timestamp, .message, past, .{ .seconds = 99 }, .{ .now = now }, "");
-    try expect_at(?Timestamp, .message, past, .{ .seconds = 100 }, .{ .now = now }, "");
-    try expect_at(?Timestamp, .message, past, .{ .seconds = 100, .nanos = 1 }, .{ .now = now }, "timestamp.lt_now");
+    try expect_at(?Timestamp, .message, past, .{ .seconds = 99 }, .{ .cpu_features = .target(), .now = now }, "");
+    try expect_at(?Timestamp, .message, past, .{ .seconds = 100 }, .{ .cpu_features = .target(), .now = now }, "");
+    try expect_at(?Timestamp, .message, past, .{ .seconds = 100, .nanos = 1 }, .{ .cpu_features = .target(), .now = now }, "timestamp.lt_now");
     const future: pb.FieldRules = comptime .{ .type = .{ .timestamp = .{ .greater_than = .{ .gt_now = true } } } };
-    try expect_at(?Timestamp, .message, future, .{ .seconds = 101 }, .{ .now = now }, "");
-    try expect_at(?Timestamp, .message, future, .{ .seconds = 100 }, .{ .now = now }, "");
-    try expect_at(?Timestamp, .message, future, .{ .seconds = 99, .nanos = 999_999_999 }, .{ .now = now }, "timestamp.gt_now");
+    try expect_at(?Timestamp, .message, future, .{ .seconds = 101 }, .{ .cpu_features = .target(), .now = now }, "");
+    try expect_at(?Timestamp, .message, future, .{ .seconds = 100 }, .{ .cpu_features = .target(), .now = now }, "");
+    try expect_at(?Timestamp, .message, future, .{ .seconds = 99, .nanos = 999_999_999 }, .{ .cpu_features = .target(), .now = now }, "timestamp.gt_now");
     const near: pb.FieldRules = comptime .{ .type = .{ .timestamp = .{ .within = .{ .seconds = 5 } } } };
-    try expect_at(?Timestamp, .message, near, .{ .seconds = 95 }, .{ .now = now }, "");
-    try expect_at(?Timestamp, .message, near, .{ .seconds = 105 }, .{ .now = now }, "");
-    try expect_at(?Timestamp, .message, near, .{ .seconds = 94, .nanos = 999_999_999 }, .{ .now = now }, "timestamp.within");
-    try expect_at(?Timestamp, .message, near, .{ .seconds = 105, .nanos = 1 }, .{ .now = now }, "timestamp.within");
+    try expect_at(?Timestamp, .message, near, .{ .seconds = 95 }, .{ .cpu_features = .target(), .now = now }, "");
+    try expect_at(?Timestamp, .message, near, .{ .seconds = 105 }, .{ .cpu_features = .target(), .now = now }, "");
+    try expect_at(?Timestamp, .message, near, .{ .seconds = 94, .nanos = 999_999_999 }, .{ .cpu_features = .target(), .now = now }, "timestamp.within");
+    try expect_at(?Timestamp, .message, near, .{ .seconds = 105, .nanos = 1 }, .{ .cpu_features = .target(), .now = now }, "timestamp.within");
     // A rule that reads the time fails without it, and a message with no such rule does not.
     try testing.expectError(error.TimeMissing, expect(?Timestamp, .message, past, .{ .seconds = 1 }, ""));
     try testing.expectError(error.TimeMissing, expect(?Timestamp, .message, future, .{ .seconds = 1 }, ""));

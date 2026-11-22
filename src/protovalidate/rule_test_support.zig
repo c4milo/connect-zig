@@ -26,7 +26,7 @@ const ids_len_max = 1024;
 /// Requires `value` to break the rules whose ids `expected` lists, joined with spaces, in the
 /// order the walk reports them: "" for a value that passes.
 pub fn expect(comptime Field: type, comptime kind: proto.Kind, comptime rules: pb.FieldRules, value: Field, expected: []const u8) !void {
-    return expect_at(Field, kind, rules, value, .{}, expected);
+    return expect_at(Field, kind, rules, value, .{ .cpu_features = .target() }, expected);
 }
 
 pub fn expect_at(comptime Field: type, comptime kind: proto.Kind, comptime rules: pb.FieldRules, value: Field, options: walk_file.Options, expected: []const u8) !void {
@@ -50,7 +50,7 @@ pub fn expect_message(comptime Field: type, comptime kind: proto.Kind, comptime 
     var storage: [constants.report_bytes_default]u8 align(report_file.storage_alignment) = undefined;
     var report: report_file.Report = .init(&storage);
     const message: T = .{ .val = value };
-    try testing.expectError(error.Invalid, validate_file.validate(T, &message, .{}, &report));
+    try testing.expectError(error.Invalid, validate_file.validate(T, &message, .{ .cpu_features = .target() }, &report));
     try testing.expectEqual(@as(usize, 1), report.violations().len);
     try testing.expectEqualStrings(expected, report.violations()[0].message.?);
 }

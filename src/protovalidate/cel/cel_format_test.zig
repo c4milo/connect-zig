@@ -2,6 +2,8 @@
 //! conversion, the cases the text states, and the problems that stop the build.
 const std = @import("std");
 const testing = std.testing;
+/// The build target's CPU features, which `matches` searches with in the tests.
+const testing_cpu_features = @import("codec").Features.target();
 const proto = @import("protobuf");
 const program = @import("cel_program.zig");
 const type_file = @import("cel_type.zig");
@@ -36,7 +38,7 @@ const text_len_max = 256;
 fn expect_text(comptime text: []const u8, message: *const Message, expected: []const u8) !void {
     var room: [text_len_max]u8 = undefined;
     var written: Text = .{ .room = &room };
-    var env: Env = .{ .text = &written };
+    var env: Env = .{ .cpu_features = &testing_cpu_features, .text = &written };
     try testing.expectEqualStrings(expected, try program.run(text, scope, .{message}, &env));
 }
 
@@ -93,12 +95,12 @@ test "a text past the room fails with ReportFull" {
     // "ada!" takes 4 octets: a room of 4 holds it, and a room of 3 does not.
     var room: [4]u8 = undefined;
     var whole: Text = .{ .room = &room };
-    var fits: Env = .{ .text = &whole };
+    var fits: Env = .{ .cpu_features = &testing_cpu_features, .text = &whole };
     try testing.expectEqualStrings("ada!", try program.run("'%s!'.format([this.name])", scope, .{&sample}, &fits));
     var part: Text = .{ .room = room[0..3] };
-    var short: Env = .{ .text = &part };
+    var short: Env = .{ .cpu_features = &testing_cpu_features, .text = &part };
     try testing.expectError(error.ReportFull, program.run("'%s!'.format([this.name])", scope, .{&sample}, &short));
-    var none: Env = .{};
+    var none: Env = .{ .cpu_features = &testing_cpu_features };
     try testing.expectError(error.ReportFull, program.run("'%d'.format([this.count])", scope, .{&sample}, &none));
 }
 

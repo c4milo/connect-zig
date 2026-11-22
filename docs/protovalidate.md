@@ -29,10 +29,14 @@ nothing: your program passes the report's storage.
 
 ```zig
 const protovalidate = @import("protovalidate");
+const codec = @import("codec");
+
+// Once, as the program starts: the CPU features a rule's regular expression may use.
+const cpu_features: codec.Features = .detect();
 
 var storage: [protovalidate.constants.report_bytes_default]u8 align(@alignOf(protovalidate.Violation)) = undefined;
 var report: protovalidate.Report = .init(&storage);
-protovalidate.validate(User, &user, .{}, &report) catch |failure| switch (failure) {
+protovalidate.validate(User, &user, .{ .cpu_features = cpu_features }, &report) catch |failure| switch (failure) {
     // Each violation is a `buf.validate.Violation`: the field's path, the rule's path, the
     // rule's id, such as "string.email", and a message.
     error.Invalid => for (report.violations()) |violation| {
@@ -46,8 +50,15 @@ Import it as `connect_zig.module("protovalidate")`, and give a generated file th
 the same module: its header names it. A message with no rule keeps the code it had. `validate`
 checks `required`, `ignore`, a oneof's `required`, a message's `oneof` rules and each type's
 standard rules, and walks nested messages, repeated fields and maps. A rule that reads the time,
-such as `timestamp.lt_now`, takes it from `.{ .now = ... }`. `report.encode` writes the
-violations as a `buf.validate.Violations`, which an error carries as a detail.
+such as `timestamp.lt_now`, takes it from `.{ .now = ... }`. A rule's regular expression
+searches with the CPU features in `.cpu_features`, stdx's `codec.Features`. The module probes no
+CPU, so your program calls `codec.Features.detect()` once as it starts. `codec` is stdx's: name
+stdx in your `build.zig.zon` at the commit connect-zig pins as `stdx_regex`, and pass it
+connect-zig's options, so its `codec` is the module protovalidate imports.
+`codec.Features.target()` names what the build target guarantees, and `codec.Features.none()`
+keeps each search on its plain path.
+`report.encode` writes the violations as a `buf.validate.Violations`, which an error carries as
+a detail.
 
 ## Validate each request
 
@@ -72,7 +83,10 @@ The route table names `Values` as its `.Values`. A message that breaks a rule en
 `invalid_argument`. The error's message names the first violation, such as "email: must be a
 valid email address (and 1 more)", and its detail is a `buf.validate.Violations` that holds each
 one. A message type with no rule costs its call no instruction. The interceptor takes the
-`connect` module as a parameter, because `protovalidate` imports none.
+`connect` module as a parameter, because `protovalidate` imports none. It reads the CPU features
+from a field `cpu_features: codec.Features` of your `App`, which your
+program sets once as it starts, and the time from a field `protovalidate_now`. An `App` with no
+`cpu_features` stops the build.
 [examples/validate](../examples/validate) serves a service behind it.
 
 ## CEL rules

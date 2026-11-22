@@ -1,6 +1,7 @@
 //! Tests of `Interceptor` over a stand-in for the `connect` module: what its `on_message`
 //! answers for a message that passes, that breaks a rule, and that cannot be checked.
 const std = @import("std");
+const codec = @import("codec");
 const assert = std.debug.assert;
 const testing = std.testing;
 const proto = @import("protobuf");
@@ -9,6 +10,7 @@ const constants = @import("constants.zig");
 const interceptor = @import("interceptor.zig");
 const support = @import("rule_test_support.zig");
 const walk_test = @import("validate_test.zig");
+const pattern = @import("pattern.zig");
 
 /// The names of `connect` the interceptor reads: an error, its code and its detail.
 const stand_in = struct {
@@ -46,7 +48,8 @@ fn Fixture(comptime options: interceptor.InterceptorOptions) type {
 }
 
 const Plain = Fixture(.{});
-const no_time = struct {};
+/// An App with the CPU features every App holds, and no time.
+const no_time = struct { cpu_features: codec.Features = .target() };
 
 /// The rule ids of the violations an error's detail holds, joined with spaces.
 fn expect_detail(failure: stand_in.RpcError, expected: []const u8) !void {
@@ -142,7 +145,7 @@ test "a rule that reads the time takes it from the App, and fails closed without
     try testing.expectEqual(@as(usize, 0), failure.details.len);
     // The App's time decides: a timestamp at it passes, and one after it does not
     // (validate.proto, timestamp.lt_now: "this > now").
-    const Clock = struct { protovalidate_now: proto.wkt.Timestamp };
+    const Clock = struct { cpu_features: codec.Features = .target(), protovalidate_now: proto.wkt.Timestamp };
     try testing.expectEqual(@as(?stand_in.RpcError, null), fixture.check(&Clock{ .protovalidate_now = .{ .seconds = second } }, Timed, &message));
     const late = fixture.check(&Clock{ .protovalidate_now = .{ .seconds = second - 1 } }, Timed, &message).?;
     try testing.expectEqual(stand_in.Code.invalid_argument, late.code);
@@ -159,6 +162,26 @@ test "a list too long to compare is refused with resource_exhausted" {
     try testing.expectEqual(stand_in.Code.resource_exhausted, failure.code);
     // A list of the most items the module compares passes.
     try testing.expectEqual(@as(?stand_in.RpcError, null), fixture.check(&no_time{}, Unique, &.{ .val = .of(items[0..constants.compared_items_max]) }));
+}
+
+const capitalized = "^[A-Z][a-z]+$";
+const Capitalized = support.One([]const u8, .string, .{ .type = .{ .string = .{ .pattern = capitalized } } });
+
+test "a rule's regular expression searches with the App's CPU features" {
+    var fixture: Plain = .{};
+    const sets = [_]codec.Features{ codec.Features.none(), codec.Features.target(), codec.Features.detect() };
+    for (sets) |set| {
+        const app: no_time = .{ .cpu_features = set };
+        try testing.expectEqual(@as(?stand_in.RpcError, null), fixture.check(&app, Capitalized, &.{ .val = "Ada" }));
+        try testing.expect(std.meta.eql(pattern.kept_cpu_features(capitalized), @as(?codec.Features, set)));
+        try testing.expectEqual(stand_in.Code.invalid_argument, fixture.check(&app, Capitalized, &.{ .val = "ada" }).?.code);
+    }
+}
+
+test "the program's App needs its CPU features, of the module's type" {
+    try testing.expect(interceptor.app_error(no_time) == null);
+    try testing.expect(interceptor.app_error(struct {}) != null);
+    try testing.expect(interceptor.app_error(struct { cpu_features: u8 = 0 }) != null);
 }
 
 test "the route table's values need the interceptor's room, of the interceptor's options" {

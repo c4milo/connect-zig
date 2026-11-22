@@ -12,6 +12,7 @@
 const std = @import("std");
 const proto = @import("protobuf");
 const protovalidate = @import("protovalidate");
+const codec = @import("codec");
 const rules = @import("schema");
 
 /// The most rules one schema of the check holds.
@@ -35,6 +36,8 @@ const State = struct {
     message: [message_len_max]u8,
     report_storage: [report_len]u8 align(@alignOf(protovalidate.Violation)),
     out_buffer: [io_buffer_len]u8,
+    /// The CPU features each rule's regular expressions search with, detected once.
+    cpu_features: codec.Features,
 };
 
 pub const Error = error{ Usage, MessagesTooLarge, MessageTooLarge, WrongDigits };
@@ -56,6 +59,7 @@ const types_len = count: {
 
 pub fn main(init: std.process.Init) !void {
     const state = try init.arena.allocator().create(State);
+    state.cpu_features = .detect();
     var args = init.minimal.args.iterate();
     _ = args.next();
     const path = args.next() orelse return error.Usage;
@@ -102,7 +106,7 @@ fn octets_of(line: []const u8, out: []u8) Error![]const u8 {
 fn verdict(comptime T: type, state: *State, encoded: []const u8, out: *std.Io.Writer) !void {
     const message = proto.decode(T, encoded) catch |failure| return out.print("undecoded:{t}\n", .{failure});
     var report: protovalidate.Report = .init(&state.report_storage);
-    protovalidate.validate(T, &message, .{}, &report) catch |failure| switch (failure) {
+    protovalidate.validate(T, &message, .{ .cpu_features = state.cpu_features }, &report) catch |failure| switch (failure) {
         error.Invalid => return out.print("invalid:{s}\n", .{report.violations()[0].message orelse ""}),
         else => return out.writeAll("fails\n"),
     };

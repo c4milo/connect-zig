@@ -214,6 +214,8 @@ pub const route_options: rpc.RouteOptions = .{ .interceptors = &.{Validate} };
 
 - A message that breaks a rule ends its call with `invalid_argument`, and a detail that lists
   each violation.
+- Your `App` holds the CPU features, in a field `cpu_features` that your program sets once as it
+  starts, from stdx's `codec.Features.detect()`.
 - The rules, CEL included, compile with your program. No rule is parsed and no expression is
   interpreted at run time.
 - It passes all 2872 cases of protovalidate's conformance suite. It decodes and validates 13

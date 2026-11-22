@@ -112,7 +112,7 @@ pub const Checked = struct {
     /// The violations of `message`, or none when it passes.
     pub fn of(checked: *Checked, comptime T: type, message: *const T) ![]const pb.Violation {
         checked.report = .init(&checked.storage);
-        validate(T, message, .{}, &checked.report) catch |failure| switch (failure) {
+        validate(T, message, .{ .cpu_features = .target() }, &checked.report) catch |failure| switch (failure) {
             error.Invalid => return checked.report.violations(),
             else => return failure,
         };
@@ -312,20 +312,20 @@ test "a report with no room ends the walk as Invalid and says it is truncated" {
     var report: Report = .init(&storage);
     var message = valid();
     message.items = .of(&.{ -1, -2, -3 });
-    try testing.expectError(error.Invalid, validate(Outer, &message, .{}, &report));
+    try testing.expectError(error.Invalid, validate(Outer, &message, .{ .cpu_features = .target() }, &report));
     try testing.expectEqual(@as(usize, 1), report.violations().len);
     try testing.expect(report.truncated);
     // A report with no room at all still refuses the message.
     var none: Report = .init(storage[0..0]);
-    try testing.expectError(error.Invalid, validate(Outer, &message, .{}, &none));
+    try testing.expectError(error.Invalid, validate(Outer, &message, .{ .cpu_features = .target() }, &none));
     try testing.expect(none.truncated);
     // A second message's violations follow the first's, and a valid one adds none.
     var roomy: [constants.report_bytes_default]u8 align(report_file.storage_alignment) = undefined;
     var both: Report = .init(&roomy);
-    try testing.expectError(error.Invalid, validate(Outer, &message, .{}, &both));
+    try testing.expectError(error.Invalid, validate(Outer, &message, .{ .cpu_features = .target() }, &both));
     const first = both.violations().len;
     const fine = valid();
-    try validate(Outer, &fine, .{}, &both);
+    try validate(Outer, &fine, .{ .cpu_features = .target() }, &both);
     try testing.expectEqual(first, both.violations().len);
 }
 

@@ -10,6 +10,7 @@
 //!   last: an element that an index takes out of a list or a map;
 //! - a list and a map are views of a repeated field (`cel_list.zig`).
 const std = @import("std");
+const codec = @import("codec");
 const proto = @import("protobuf");
 const shape = @import("../shape.zig");
 const constants = @import("../constants.zig");
@@ -39,6 +40,9 @@ pub const Error = error{
 /// may still read. A macro inside a macro reads a list once for each element of another, so
 /// the count bounds an expression's work whatever a message holds.
 pub const Env = struct {
+    /// The CPU features `matches` searches with: the walk's `Options.cpu_features`, which an
+    /// expression reads through a pointer, so a rule copies none of them.
+    cpu_features: *const codec.Features,
     now: ?proto.wkt.Timestamp = null,
     steps: usize = constants.cel_steps_max,
     /// Where `format` writes its text, which only a rule whose expression formats is given

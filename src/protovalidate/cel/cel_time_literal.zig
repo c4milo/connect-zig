@@ -8,6 +8,7 @@ const constants = @import("../constants.zig");
 const timestamp_file = @import("cel_timestamp.zig");
 const duration_file = @import("cel_duration.zig");
 const type_file = @import("cel_type.zig");
+const codec = @import("codec");
 const text_file = @import("cel_text.zig");
 
 /// The longest text of `string` of a constant: a double in scientific form, or a timestamp of
@@ -22,7 +23,9 @@ pub fn Text(comptime operand: anytype) type {
             @setEvalBranchQuota(constants.cel_branches_per_octet * text_len_max);
             var room: [text_len_max]u8 = undefined;
             var written: type_file.Text = .{ .room = &room };
-            var env: type_file.Env = .{ .text = &written };
+            // A literal's text calls no `matches`, so it searches with no feature.
+            const features: codec.Features = .none();
+            var env: type_file.Env = .{ .cpu_features = &features, .text = &written };
             const text = text_file.to_string(operand, &env) catch unreachable;
             const copy = text[0..text.len].*;
             break :text &copy;

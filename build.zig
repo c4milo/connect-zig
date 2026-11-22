@@ -200,8 +200,10 @@ fn protovalidate_module(b: *std.Build, protobuf: *std.Build.Module, public_names
             .{ .name = "buf_validate_validate", .module = rules },
             .{ .name = "google_protobuf_descriptor", .module = descriptor },
             .{ .name = "public_names", .module = public_names },
-            // `pattern` and CEL's `matches` (design §8 step 35).
+            // `pattern` and CEL's `matches` (design §8 step 35), and the CPU features a program
+            // passes them, stdx's `codec.Features` of the same pin.
             .{ .name = "regex", .module = stdx_regex.module("regex") },
+            .{ .name = "codec", .module = stdx_regex.module("codec") },
         },
     });
 }
