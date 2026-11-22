@@ -114,14 +114,31 @@ inline fn eval_binary(comptime node: *const Node, comptime scope: Scope, values:
     return switch (comptime binary.op) {
         .equal => if (alike) try equal_file.equal(left, right, env) else false,
         .not_equal => if (alike) !try equal_file.equal(left, right, env) else true,
-        // A double that is not a number stands in no order, so each comparison is false.
+        .less, .less_or_equal, .greater, .greater_or_equal => compare(binary.op, left, right),
+        .add, .subtract, .multiply, .divide, .modulo => arithmetic(binary.op, left, right, env),
+        .in => collection.holds(right, left, env),
+        .@"and", .@"or" => comptime unreachable,
+    };
+}
+
+/// `<`, `<=`, `>` and `>=`. Two ints, or two uints, compare as the machine compares them, with
+/// no order made of them first. A double that is not a number stands in no order, so each
+/// comparison of one is false.
+inline fn compare(comptime op: node_file.BinaryOp, left: anytype, right: anytype) bool {
+    const L = @TypeOf(left);
+    if (comptime (L == i64 or L == u64) and L == @TypeOf(right)) return switch (op) {
+        .less => left < right,
+        .less_or_equal => left <= right,
+        .greater => left > right,
+        .greater_or_equal => left >= right,
+        else => comptime unreachable,
+    };
+    return switch (op) {
         .less => value_file.order(left, right) == .lt,
         .greater => value_file.order(left, right) == .gt,
         .less_or_equal => if (value_file.order(left, right)) |order| order != .gt else false,
         .greater_or_equal => if (value_file.order(left, right)) |order| order != .lt else false,
-        .add, .subtract, .multiply, .divide, .modulo => arithmetic(binary.op, left, right, env),
-        .in => collection.holds(right, left, env),
-        .@"and", .@"or" => comptime unreachable,
+        else => comptime unreachable,
     };
 }
 

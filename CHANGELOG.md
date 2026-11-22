@@ -165,6 +165,8 @@ change the public API, and the entry marks each change that does.
   searches no entry. Such a macro reads each key once, at its last entry. CEL's `size` of a
   short ASCII string counts its octets. The benchmark's valid `Rules` takes 18% fewer
   instructions.
+- CEL reads a stored list's element, size and index inline, and compares two ints or two uints
+  directly. The benchmark's valid `Rules` takes 38% fewer instructions again, 722.
 - `tools/perf_check.sh` also counts `protovalidate` on the six messages of the validation
   benchmark, `bench-validate --instructions`, against `bench/instructions.txt`.
 - `pattern` and CEL's `matches` keep one stdx searcher for each pattern and thread, made ready

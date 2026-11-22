@@ -1940,6 +1940,24 @@ ran on Linux x86-64 with Zig 0.16.0.
     `tools/perf_check.sh` counted each validation as before. `tools/compile_time_check.sh`
     printed a ratio of 3.87, -6.2% from its baseline of 4.12.
 
+- **Stored lists read inline** (decision 37). In the valid `Rules`, the six rules together took
+  about 190 instructions more than the sum of each alone. With all six in one function, the
+  compiler stopped inlining a stored list's `Iterator.next`, `count` and `at`, and made each a
+  call. Each now reads a stored list inline and a view in a call of its own: the fast path
+  first, as docs/performance.md asks. `<`, `<=`, `>` and `>=` of two ints, or of two uints, now
+  compare the two values, where they made a `?std.math.Order` of them first.
+  - `tools/perf_check.sh`: validate rules valid took 722 instructions, where it took 1,169,
+    and rules invalid 872, where it took 1,118. Decode and validate rules valid took 2,441,
+    where it took 2,878. Each of the four fast paths, switched off, failed the check, and
+    docs/performance.md lists by how much.
+  - `tools/protovalidate_conformance_check.sh` printed `PASS (failed: 0, skipped: 0, passed:
+    2872, total: 2872)`, `tools/cel_conformance_check.sh` the counts it printed before, and
+    `tools/cel_differential_check.sh 9 10` agreed on each of its 16,000 verdicts.
+    `tools/compile_time_check.sh` printed a ratio of 4.23, +2.6% over its baseline of 4.12.
+  - Mutations against `zig build test-protovalidate`, 6: each of the four comparisons of two
+    ints with its neighbour, the first stored element read for each, and a stored list's size
+    one too large. Each was `CAUGHT`.
+
 ### Work not done yet
 
 - A stream that waits for an event of the program once its request ended (colibri issue 130).
@@ -1966,10 +1984,9 @@ ran on Linux x86-64 with Zig 0.16.0.
   text, and a table written by hand would keep its text alone. It changes what a generated
   file holds, and a tree that differs from its text needs a check, so the owner rules first.
 - For `protovalidate`, the valid `Rules` of the validation benchmark, which protovalidate-buffa
-  validates in 24.1 ns to connect-zig's 69.0 in run 228. Counted under callgrind, its six rules
-  take about 190 instructions more together than the sum of each alone, and the reason is not
-  known yet. A profile shows the rest spread over each rule's start, its verdict and the calls
-  between them.
+  validated in 24.1 ns to connect-zig's 69.0 in run 228. "Stored lists read inline" took its
+  count from 1,169 instructions to 722. A profile shows the rest spread thin: each macro's
+  iterator, each rule's `Env`, and the calls between the parts of each expression.
 - For `protovalidate`, `filter` and `map` over a map that bind each entry's value, as `all`,
   `exists` and `exists_one` do ("A map's entry in a macro"). Their expressions still search
   the map for each key.

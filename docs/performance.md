@@ -170,6 +170,10 @@ failed (the owner's ruling of 2026-11-09). A new fast path joins this list the s
 | A pattern's searcher kept on its thread, made ready once | `pattern.zig`, `Searcher` | decode and validate medium valid +93.07%, medium invalid +55.62% |
 | A map's entry value bound beside its key in a macro whose expression reads the map at the key | `cel_entry.zig`, `bound_name` and `place_of` | validate rules valid +15.23%, rules invalid +10.64%, decode and validate rules valid +6.18% |
 | A short ASCII string's size read from its length | `cel_function.zig`, `size` | validate rules valid +5.65%, decode and validate rules valid +2.29%, validate rules invalid +2.06% |
+| A stored list's element read inline, a view's in a call of its own | `cel_list.zig`, `List.Iterator.next` | validate rules valid +22.58%, decode and validate rules valid +6.68%, validate rules invalid +5.28% |
+| A stored list's size inline, a read list's in a call of its own | `cel_list.zig`, `count` | validate rules valid +11.36%, rules invalid +9.06%, decode and validate rules invalid +3.41% |
+| A stored list's index inline, a read list's in a call of its own | `cel_list.zig`, `at` | validate rules valid +3.19%, rules invalid +2.98% |
+| Two ints, or two uints, compared with no order made first | `cel_eval.zig`, `compare` | validate rules valid +14.54%, rules invalid +6.19%, decode and validate rules valid +4.30% |
 
 ## The compiler's time
 

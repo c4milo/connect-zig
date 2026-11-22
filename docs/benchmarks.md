@@ -251,5 +251,6 @@ The nanoseconds of one validation of a message decoded before:
 protovalidate-buffa validates two messages faster: the valid `Medium`, 237.5 ns to 250.7, and
 the valid `Rules`, 24.1 ns to 69.0. Its plugin writes Rust code for each rule, as connect-zig's
 compiler does. In the valid `Rules`, connect-zig's map index no longer searches the map
-(docs/design.md, "A map's entry in a macro"). A profile shows what is left spread over the start
-and the verdict of each of its six rules ("Work not done yet").
+(docs/design.md, "A map's entry in a macro"). Since run 228, a stored list is read inline, and
+`validate rules valid` takes 722 instructions, where it took 1,169 (docs/design.md, "Stored
+lists read inline").

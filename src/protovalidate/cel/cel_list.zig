@@ -28,14 +28,19 @@ pub fn List(comptime F: type) type {
             stored: ?[]const F.Element,
             place: usize = 0,
 
-            /// The next element. A message is a pointer that lasts until the next call.
-            pub fn next(it: *Iterator, env: *Env) Error!?Element {
+            /// The next element. A message is a pointer that lasts until the next call. A
+            /// stored element is read inline, and a view's in a call of its own.
+            pub inline fn next(it: *Iterator, env: *Env) Error!?Element {
                 try env.spend();
                 if (it.stored) |items| {
                     if (it.place == items.len) return null;
-                    defer it.place += 1;
-                    return type_file.from(F.kind, F.Element, &items[it.place]);
+                    it.place += 1;
+                    return type_file.from(F.kind, F.Element, &items[it.place - 1]);
                 }
+                return it.next_viewed();
+            }
+
+            fn next_viewed(it: *Iterator) Error!?Element {
                 const item = (it.inner.next() catch return error.Malformed) orelse return null;
                 const element: *const F.Element = if (comptime @TypeOf(item) == *const F.Element) item else &item;
                 return type_file.from(F.kind, F.Element, element);
@@ -271,12 +276,18 @@ pub fn list_holds(list: anytype, value: anytype, env: *Env) Error!bool {
 /// `size(list)` and `size(map)`'s count of entries. A map's entry whose key a later entry
 /// holds is not counted. A list literal's length and a stored list's are known, so neither
 /// reads an element.
-pub fn count(collection: anytype, env: *Env) Error!i64 {
+pub inline fn count(collection: anytype, env: *Env) Error!i64 {
     const C = @TypeOf(collection);
     if (comptime @typeInfo(C) == .array) return @typeInfo(C).array.len;
     if (comptime may_be_stored(C)) {
         if (collection.stored()) |items| return @intCast(items.len);
     }
+    return count_read(collection, env);
+}
+
+/// `count` of a list or a map whose length is known once its elements are read.
+fn count_read(collection: anytype, env: *Env) Error!i64 {
+    const C = @TypeOf(collection);
     var total: i64 = 0;
     var elements = if (comptime is_map(@TypeOf(collection))) collection.iterator() else iterate(collection);
     for (0..proto.constants.limits.elements_max) |_| {
@@ -304,7 +315,7 @@ pub fn key_again(comptime M: type, after: M.Iterator, key: M.Key, env: *Env) Err
 
 /// `list[index]`: the element at `index`, counted from 0. An index outside the list fails: no
 /// element stands at it, nor at an index under 0.
-pub fn at(list: anytype, index: i64, env: *Env) Error!Taken(ElementOf(@TypeOf(list))) {
+pub inline fn at(list: anytype, index: i64, env: *Env) Error!Taken(ElementOf(@TypeOf(list))) {
     const L = @TypeOf(list);
     // A stored list is indexed in place: one element read.
     if (comptime may_be_stored(L)) {
@@ -314,6 +325,12 @@ pub fn at(list: anytype, index: i64, env: *Env) Error!Taken(ElementOf(@TypeOf(li
             return take(ElementOf(L), list.element_at(@intCast(index)));
         }
     }
+    return at_read(list, index, env);
+}
+
+/// `at` of a list whose elements are read up to the index.
+fn at_read(list: anytype, index: i64, env: *Env) Error!Taken(ElementOf(@TypeOf(list))) {
+    const L = @TypeOf(list);
     var elements = iterate(list);
     var place: i64 = 0;
     for (0..proto.constants.limits.elements_max) |_| {
