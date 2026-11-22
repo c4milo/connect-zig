@@ -88,8 +88,8 @@ stdx's `regex` (decision 47):
 - An octet that is not UTF-8. RE2 and stdx match no such octet. Go's regexp, which cel-go
   runs, reads it as U+FFFD. A string field of proto3 holds no such octet, since its decode
   refuses one.
-- A form that stdx refuses: `\p{...}`, `\C`, and `(?i)` over a letter past ASCII. Such a
-  pattern stops the build, as a pattern that is no literal does.
+- A form that stdx refuses: `\C` and `\Q...\E`. Such a pattern stops the build, as a pattern
+  that is no literal does.
 
 Two places follow the specification and not cel-go:
 
