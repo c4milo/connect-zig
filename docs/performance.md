@@ -166,6 +166,7 @@ failed (the owner's ruling of 2026-11-09). A new fast path joins this list the s
 | A string's characters counted only until `min_len` or `max_len` is settled | `rule_string.zig`, `has_characters` | validate small valid +80.17%, medium valid +59.76%, medium invalid +32.72% |
 | An octet found eight at a time in a string shorter than a vector | `octet_search.zig`, `index_of` | validate medium valid +21.40%, medium invalid +13.46%, small invalid +6.84% |
 | Hexadecimal digits and a hostname label's octets looked up in a table | `format_name.zig`, `all_hexadecimal` and `is_label` | validate small valid +20.11%, medium valid +7.80%, medium invalid +2.82% |
+| A stored list's and map's elements walked in their slice, and a stored map's key looked up from its last entry back | `cel_list.zig`, `Iterator`, `KeyIterator` and `stored_value_at` | validate rules valid +12.41%, rules invalid +6.11%, decode and validate rules valid +5.91% |
 
 ## The compiler's time
 

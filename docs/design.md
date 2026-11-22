@@ -1677,6 +1677,16 @@ ran on Linux x86-64 with Zig 0.16.0.
     it lies, a room that ignores the violations written, a text with no room that does not
     mark the report, and a rule's text given no mark. Each was `CAUGHT`.
 
+- **Stored lists and maps in CEL** (decision 37). A list's and a map's iterator read the
+  elements that `decode_into` stored from their slice, and build no iterator of the octets. A
+  stored map's lookup starts at its last entry, whose value counts, and stops at the key. The
+  benchmark's `validate rules valid` fell from 1,498 instructions to 1,402. Its time was spread
+  over each element's steps: the map lookup itself took about 270 of the 1,498.
+  - Mutations against `zig build test-protovalidate`, 3: a stored map's first entry of a key
+    counted, a lookup that reads every entry, and an iterator that does not move. Each was
+    `CAUGHT`. With the slice walk and the lookup switched off, the judge failed:
+    docs/performance.md's table holds its numbers.
+
 ### Work not done yet
 
 - A stream that waits for an event of the program once its request ended (colibri issue 130).
@@ -1706,10 +1716,11 @@ ran on Linux x86-64 with Zig 0.16.0.
   would run the grammar of `cel_grammar.zig` as a program and write each tree beside its
   text, and a table written by hand would keep its text alone. It changes what a generated
   file holds, and a tree that differs from its text needs a check, so the owner rules first.
-- For `protovalidate`, a CEL index of a map, `this[k]`, without a pass over the entries for
-  each key. A macro over a map gives each key with its value, so an expression that indexes
-  the map by the macro's variable could read the value the macro holds. The validation
-  benchmark's `Rules` messages measure it.
+- For `protovalidate`, a CEL index of a map, `this[k]`, without a search of the entries for
+  each key. A stored map's search now starts at its last entry and stops at the key, so `all`
+  over a map of n keys reads about n²/2 entries, where it read n². A macro over a map gives
+  each key with its value, so an expression that indexes the map by the macro's variable could
+  read the value the macro holds, once the macro knows no later entry repeats the key.
 - For `protovalidate`, cel-go's typing behind `dyn`. cel-go gives the result of a function on
   a dynamic value a type, and refuses `dyn(x).size() == 'a'`. This module marks the result as
   dynamic and compiles the expression. The differential check writes no such rule yet.

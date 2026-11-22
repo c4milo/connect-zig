@@ -126,6 +126,8 @@ change the public API, and the entry marks each change that does.
   `hostname`, looks each octet up in a table, and finds a separator eight octets at a time.
   `min_len` and `max_len` count a string's characters only until the count settles the rule.
   docs/performance.md lists what each costs when it is switched off.
+- CEL reads a repeated field or a map that `decode_into` stored from its slice, and a stored
+  map's lookup stops at the key, from its last entry back.
 - `tools/perf_check.sh` also counts `protovalidate` on the six messages of the validation
   benchmark, `bench-validate --instructions`, against `bench/instructions.txt`.
 

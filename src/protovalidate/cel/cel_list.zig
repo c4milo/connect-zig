@@ -22,10 +22,18 @@ pub fn List(comptime F: type) type {
 
         pub const Iterator = struct {
             inner: F.Iterator,
+            /// The stored elements, which the iterator reads in place, or null.
+            stored: ?[]const F.Element,
+            place: usize = 0,
 
             /// The next element. A message is a pointer that lasts until the next call.
             pub fn next(it: *Iterator, env: *Env) Error!?Element {
                 try env.spend();
+                if (it.stored) |items| {
+                    if (it.place == items.len) return null;
+                    defer it.place += 1;
+                    return type_file.from(F.kind, F.Element, &items[it.place]);
+                }
                 const item = (it.inner.next() catch return error.Malformed) orelse return null;
                 const element: *const F.Element = if (comptime @TypeOf(item) == *const F.Element) item else &item;
                 return type_file.from(F.kind, F.Element, element);
@@ -33,14 +41,15 @@ pub fn List(comptime F: type) type {
         };
 
         pub fn iterator(list: Self) Iterator {
-            return .{ .inner = list.field.iterator() };
+            // A stored field's iterator reads the slice alone, and builds no view's iterator.
+            if (list.stored()) |items| return .{ .inner = undefined, .stored = items };
+            return .{ .inner = list.field.iterator(), .stored = null };
         }
 
         /// The elements a decode with storage read the field into, or null when they lie in
         /// the field's view of the octets (decision 37). A list `of` elements is stored too.
         pub fn stored(list: Self) ?[]const F.Element {
-            if (list.field.items.len != 0 or list.field.view.bytes.len == 0) return list.field.items;
-            return null;
+            return stored_of(F, list.field);
         }
 
         /// The stored element at `place`, as an iterator gives it.
@@ -113,7 +122,8 @@ pub fn Map(comptime F: type) type {
         pub const Iterator = KeyIterator(F);
 
         pub fn iterator(map: Self) Iterator {
-            return .{ .inner = map.field.iterator() };
+            if (stored_of(F, map.field)) |entries| return .{ .inner = undefined, .stored = entries };
+            return .{ .inner = map.field.iterator(), .stored = null };
         }
 
         /// The value of `key`, from the last entry that holds it, or null.
@@ -149,19 +159,36 @@ fn value_of(comptime F: type, entry: *const F.Element) ValueOf(F) {
     return type_file.from(kind, HeldOf(F), set);
 }
 
+/// The elements of a repeated field that a decode with storage read into a slice, or null when
+/// they lie in the field's view of the octets (decision 37).
+fn stored_of(comptime F: type, field: *const F) ?[]const F.Element {
+    if (field.items.len != 0 or field.view.bytes.len == 0) return field.items;
+    return null;
+}
+
 fn KeyIterator(comptime F: type) type {
     return struct {
         inner: F.Iterator,
+        /// The stored entries, which the iterator reads in place, or null.
+        stored: ?[]const F.Element,
+        place: usize = 0,
 
         pub fn next(it: *@This(), env: *Env) Error!?KeyOf(F) {
             try env.spend();
+            if (it.stored) |entries| {
+                if (it.place == entries.len) return null;
+                defer it.place += 1;
+                return key_of(F, &entries[it.place]);
+            }
             const entry = (it.inner.next() catch return error.Malformed) orelse return null;
             return key_of(F, entry);
         }
     };
 }
 
+/// The value of `key` in the map field `field`: the last entry's that holds it.
 fn value_at(comptime F: type, field: *const F, key: anytype, env: *Env) Error!?Taken(ValueOf(F)) {
+    if (stored_of(F, field)) |entries| return stored_value_at(F, entries, key, env);
     var found: ?Taken(ValueOf(F)) = null;
     var entries = field.iterator();
     for (0..proto.constants.limits.elements_max) |_| {
@@ -170,6 +197,17 @@ fn value_at(comptime F: type, field: *const F, key: anytype, env: *Env) Error!?T
         if (value_file.equal(key_of(F, entry), key)) found = take(ValueOf(F), value_of(F, entry));
     }
     unreachable;
+}
+
+/// `value_at` over stored entries: from the last one back, so the first entry that holds `key`
+/// is the one that counts, and the search stops there.
+fn stored_value_at(comptime F: type, entries: []const F.Element, key: anytype, env: *Env) Error!?Taken(ValueOf(F)) {
+    for (0..entries.len) |back| {
+        try env.spend();
+        const entry = &entries[entries.len - 1 - back];
+        if (value_file.equal(key_of(F, entry), key)) return take(ValueOf(F), value_of(F, entry));
+    }
+    return null;
 }
 
 pub fn is_map(comptime T: type) bool {
@@ -287,10 +325,26 @@ test "each element read counts against the expression's limit" {
     env.steps = reads;
     try testing.expectEqual(@as(i64, 1), try count(map, &env));
     try testing.expectEqual(@as(usize, 0), env.steps);
-    // One entry and the end are two reads of a lookup.
+    // A stored map's lookup reads from the last entry back and stops at the key: one read.
     env.steps = reads;
     try testing.expectEqual(@as(?i64, 1), try map.get(@as(i64, 1), &env));
-    try testing.expectEqual(@as(usize, 1), env.steps);
+    try testing.expectEqual(@as(usize, reads - 1), env.steps);
+}
+
+test "a stored map's key that two entries hold gives the last entry's value, and a missing one none" {
+    const Pairs = proto.Repeated(Pair, .message);
+    const pairs: Pairs = .of(&.{ .{ .key = 1, .value = 10 }, .{ .key = 2, .value = 20 }, .{ .key = 1, .value = 30 } });
+    const map: Map(Pairs) = .{ .field = &pairs };
+    var env: Env = .{};
+    try testing.expectEqual(@as(?i64, 30), try map.get(@as(i64, 1), &env));
+    try testing.expectEqual(@as(?i64, 20), try map.get(@as(i64, 2), &env));
+    try testing.expectEqual(@as(?i64, null), try map.get(@as(i64, 3), &env));
+    // The last entry holds the key, so the lookup reads it alone and stops.
+    var one: Env = .{ .steps = 1 };
+    try testing.expectEqual(@as(?i64, 30), try map.get(@as(i64, 1), &one));
+    var keys = iterate(map);
+    for ([_]i64{ 1, 2, 1 }) |expected| try testing.expectEqual(@as(?i64, expected), try keys.next(&env));
+    try testing.expectEqual(@as(?i64, null), try keys.next(&env));
 }
 
 test "a list and a map are told apart, and a message that an index takes is a copy" {
