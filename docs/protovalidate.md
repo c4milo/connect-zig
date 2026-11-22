@@ -202,11 +202,11 @@ map fields: `tools/wide` has one with 1,100.
 
 One decode of a request message and one validation of it against the rules of
 its schema, beside protovalidate-go, protovalidate-es on Node.js, protovalidate-buffa and
-prost-protovalidate. From CI's [run 223](https://github.com/c4milo/connect-zig/actions/runs/45024786708), on an AMD EPYC 9V74 core: connect-zig is 13 to
-48 times as fast as protovalidate-go, and the fastest of the five in all six cases. [benchmarks.md](benchmarks.md), "Validation", holds the tables and says how it is
+prost-protovalidate. From CI's [run 228](https://github.com/c4milo/connect-zig/actions/runs/45045883369), on an Intel Xeon 6975P-C core: connect-zig is 14 to
+57 times as fast as protovalidate-go, and the fastest of the five in all six cases. [benchmarks.md](benchmarks.md), "Validation", holds the tables and says how it is
 measured.
 
-![Bars of the speed of a decode with a validation through connect-zig, protovalidate-buffa, prost-protovalidate and protovalidate-es, in multiples of protovalidate-go's, on x86-64: connect-zig is 13 to 48 times as fast as protovalidate-go and the fastest in 6 of 6 cases](images/validate-vs-go.svg)
+![Bars of the speed of a decode with a validation through connect-zig, protovalidate-buffa, prost-protovalidate and protovalidate-es, in multiples of protovalidate-go's, on x86-64: connect-zig is 14 to 57 times as fast as protovalidate-go and the fastest in 6 of 6 cases](images/validate-vs-go.svg)
 
 ## How it is checked
 

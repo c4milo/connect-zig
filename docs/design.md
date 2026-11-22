@@ -1634,7 +1634,10 @@ ran on Linux x86-64 with Zig 0.16.0.
     after `Medium`'s name took a `pattern` and each thread kept its searchers: 13 to 48 times
     as fast as protovalidate-go, on an AMD EPYC 9V74. Validation alone, connect-zig took the
     valid `Medium`, 305 ns to 314, and protovalidate-buffa kept the valid `Rules`, 31 ns to
-    93.
+    93. Run 228, at 7e60c8c, after the map change, drew it again on an Intel Xeon 6975P-C: 14
+    to 57 times as fast as protovalidate-go, and the fastest in all six. Validation alone,
+    protovalidate-buffa was faster in the valid `Medium`, 237.5 ns to 250.7, and in the valid
+    `Rules`, 24.1 ns to 69.0.
 
 - **Step 35, patterns** (decision 47 as amended). `pattern` of a string and of bytes, and CEL's
   `matches`, run on stdx's `regex` at commit 85d3fe7, pinned as `stdx_regex`.
@@ -1962,6 +1965,11 @@ ran on Linux x86-64 with Zig 0.16.0.
   would run the grammar of `cel_grammar.zig` as a program and write each tree beside its
   text, and a table written by hand would keep its text alone. It changes what a generated
   file holds, and a tree that differs from its text needs a check, so the owner rules first.
+- For `protovalidate`, the valid `Rules` of the validation benchmark, which protovalidate-buffa
+  validates in 24.1 ns to connect-zig's 69.0 in run 228. Counted under callgrind, its six rules
+  take about 190 instructions more together than the sum of each alone, and the reason is not
+  known yet. A profile shows the rest spread over each rule's start, its verdict and the calls
+  between them.
 - For `protovalidate`, `filter` and `map` over a map that bind each entry's value, as `all`,
   `exists` and `exists_one` do ("A map's entry in a macro"). Their expressions still search
   the map for each key.
