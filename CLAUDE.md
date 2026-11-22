@@ -284,8 +284,10 @@ confirm a test fails. Report `CAUGHT` or `NOT CAUGHT` per mutation in the commit
 - CI: `tools/ci.sh` runs every check and writes a report; `--only <check>` runs one and `--list`
   names them. `.github/workflows/main.yml` runs each check of `--list` as a job of its own on each
   push and pull request. A new check joins `tools/ci.sh`, never the workflow file. `test`,
-  `bench-compare` and `fullstack` run a second time on an arm64 runner: `test` because an aarch64
-  Linux link can fail where x86-64's passes, and the other two for the arm64 charts.
+  `bench-compare`, `fullstack` and `validate-compare` run a second time on an arm64 runner:
+  `test` because an aarch64 Linux link can fail where x86-64's passes, the next two for the arm64
+  charts, and `validate-compare` for its hardware counters, which GitHub's x86-64 runners do not
+  expose.
   `fullstack` and `bench-compare` draw the charts of `docs/benchmarks.md` and the README into
   `ci-charts/`, which CI keeps with the run as `charts-<check>-<arch>`. To update them, copy a
   chosen run's charts to `docs/images` (decision 44).

@@ -40,8 +40,10 @@ paid for.
 - **Cycles and branch misses are a filter too.** `zig build bench-validate -- --counters <dir>`
   counts each validation's cycles, instructions, branches and branch misses for one call, through
   Linux's hardware counters (`bench/counters.zig`). `tools/validate_compare_check.sh` prints the
-  table last, and CI's `validate-compare` job lets the process count its own events. A host with
-  no counters, as a virtual machine with no counters is, prints a line that says so. A count
+  table last, and CI's `validate-compare` job lets the process count its own events. GitHub's
+  x86-64 runners expose no counters: run 240's printed `NOENT` on an Intel Xeon 6973P-C. So the
+  job runs on arm64 too, whose runners give them. A host with no counters prints a line that
+  says so. A count
   shows where a time goes that the instruction count does not explain, and orders candidates
   as a time does.
 - **A profile shows where the cost goes, and is never a measurement.** Run callgrind on
