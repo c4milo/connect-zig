@@ -1637,7 +1637,10 @@ ran on Linux x86-64 with Zig 0.16.0.
     93. Run 228, at 7e60c8c, after the map change, drew it again on an Intel Xeon 6975P-C: 14
     to 57 times as fast as protovalidate-go, and the fastest in all six. Validation alone,
     protovalidate-buffa was faster in the valid `Medium`, 237.5 ns to 250.7, and in the valid
-    `Rules`, 24.1 ns to 69.0.
+    `Rules`, 24.1 ns to 69.0. Run 231, at 4c471a9, v0.3.0, after the stored lists read inline,
+    drew it again on an AMD EPYC 7763: 13 to 58 times as fast, and the fastest in all six.
+    Validation alone, connect-zig took the valid `Medium`, 397.1 ns to 405.6, and
+    protovalidate-buffa kept the valid `Rules`, 39.2 ns to 77.5.
 
 - **Step 35, patterns** (decision 47 as amended). `pattern` of a string and of bytes, and CEL's
   `matches`, run on stdx's `regex` at commit 85d3fe7, pinned as `stdx_regex`.
@@ -1999,7 +2002,8 @@ ran on Linux x86-64 with Zig 0.16.0.
   file holds, and a tree that differs from its text needs a check, so the owner rules first.
 - For `protovalidate`, the valid `Rules` of the validation benchmark, which protovalidate-buffa
   validated in 24.1 ns to connect-zig's 69.0 in run 228. "Stored lists read inline" took its
-  count from 1,169 instructions to 722. A profile shows the rest spread thin: each macro's
+  count from 1,169 instructions to 722, and in run 231 it took 77.5 ns to protovalidate-buffa's
+  39.2, on another machine. A profile shows the rest spread thin: each macro's
   iterator, each rule's `Env`, and the calls between the parts of each expression.
 - For `protovalidate`, `filter` and `map` over a map that bind each entry's value, as `all`,
   `exists` and `exists_one` do ("A map's entry in a macro"). Their expressions still search
