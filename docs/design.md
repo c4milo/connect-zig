@@ -1927,6 +1927,16 @@ ran on Linux x86-64 with Zig 0.16.0.
     two values of a key not compared, and the text a map literal's value writes not kept. Each
     was `CAUGHT`.
 
+- **Named groups in a pattern** (decision 47). The `stdx_regex` pin, and the validate
+  example's stdx, moved from `a32eae9` to `d925231`, whose CI passed (stdx's run 45035200923).
+  stdx's `compile` reads `(?P<name>re)` and `(?<name>re)` as RE2 does, checks the name as Go's
+  regexp does, and keeps no name when its caller gives no storage, as `pattern.zig` gives none.
+  At `a32eae9` the test of a named group stopped the build with `UnsupportedGroupName`.
+  - `tools/protovalidate_conformance_check.sh` printed `PASS (failed: 0, skipped: 0, passed:
+    2872, total: 2872)`, `tools/cel_conformance_check.sh` the counts it printed before, and
+    `tools/perf_check.sh` counted each validation as before. `tools/compile_time_check.sh`
+    printed a ratio of 3.87, -6.2% from its baseline of 4.12.
+
 ### Work not done yet
 
 - A stream that waits for an event of the program once its request ended (colibri issue 130).

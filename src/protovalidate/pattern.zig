@@ -139,6 +139,17 @@ test "a short text and a long one get RE2's answers" {
     try testing.expect(matches("king$", "Ada Lovelace Byron king", testing_cpu_features));
 }
 
+test "a named group, as RE2 writes it, is a group" {
+    const date = "^(?P<year>[0-9]{4})-(?<month>[0-9]{2})$";
+    try testing.expect(comptime problem_of(date) == null);
+    try testing.expect(matches(date, "2026-11", testing_cpu_features));
+    try testing.expect(!matches(date, "2026-1", testing_cpu_features));
+    try testing.expect(matches("(?P<word>[a-z]+)+!", "ab!", testing_cpu_features));
+    // A group's name is a word, as Go's regexp checks it.
+    try testing.expect(comptime problem_of("(?P<>a)") != null);
+    try testing.expect(comptime problem_of("(?P<a-b>a)") != null);
+}
+
 test "an octet that is not UTF-8 matches nothing" {
     try testing.expect(!matches("^.$", "\xff", testing_cpu_features));
     try testing.expect(matches("a", "\xffa", testing_cpu_features));

@@ -19,8 +19,8 @@
         // from it. The symbols it exports, its AVX2 searches', no other stdx module defines, so
         // it links beside the stdx above, which colibri pins too.
         .stdx_regex = .{
-            .url = "git+https://github.com/c4milo/stdx#a32eae926e623cb41fa90a11dda3dd347deb4c73",
-            .hash = "stdx-0.2.0-BD60toCGSQD_y-TzuJJ6uJLy3JIK_p_B50TQGQWzWKLZ",
+            .url = "git+https://github.com/c4milo/stdx#d92523191721fcb795bfcf63dd25984434888c76",
+            .hash = "stdx-0.2.0-BD60tue7SQAGvJhLpqUP_YP-4HiuyUjvVsOzpz5Zw3Bv",
         },
         // Developer tooling only, never linked into the library (decision 15). Lazy, and requested
         // only when connect-zig is the root build.
