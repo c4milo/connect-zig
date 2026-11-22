@@ -117,7 +117,7 @@ pub const static_alignment = rules.static_alignment.Rule(.{
 /// CLAUDE.md, Conventions: every Markdown file renders on GitHub as written.
 pub const markdown = rules.markdown.Rule(.{
     // docs/specs holds each specification as its publisher wrote it (docs/specs/README.md).
-    .scope = .{ .extensions = &.{".md"}, .exclude_paths = &.{"docs/specs/cel/langdef.md"} },
+    .scope = .{ .extensions = &.{".md"}, .exclude_paths = &.{ "docs/specs/cel/langdef.md", "docs/specs/cel/strings.md" } },
     .pseudo_list_item = true,
     .code_span_pipe = true,
     .fence_language = true,
@@ -162,7 +162,7 @@ pub const denied_words = rules.denied_words.Rule(.{
     // name a field with one of the words (decision 47).
     .scope = .{
         .extensions = &.{ lint.paths.zig_extension, ".md", ".sh", ".yml", ".proto" },
-        .exclude_paths = &.{ "tools/lint/main.zig", "docs/specs/cel/langdef.md" },
+        .exclude_paths = &.{ "tools/lint/main.zig", "docs/specs/cel/langdef.md", "docs/specs/cel/strings.md" },
         .exclude_directories = &.{ "conformance/proto", "examples/otlp/proto/opentelemetry", "src/protovalidate/proto", "conformance/protovalidate/proto", "conformance/protovalidate/gen" },
     },
     .words = &.{ "TODO", "FIXME", "XXX", "HACK" },

@@ -5,6 +5,9 @@ const testing = std.testing;
 const proto = @import("protobuf");
 const pb = @import("buf_validate_validate");
 const support = @import("rule_test_support.zig");
+const constants = @import("constants.zig");
+const report_file = @import("report.zig");
+const validate_file = @import("validate.zig");
 const expect = support.expect;
 const expect_message = support.expect_message;
 
@@ -229,4 +232,35 @@ test "a string's and a bytes field's pattern match any part, and bytes that are 
     try expect(Text, .bytes, ascii, "", "bytes.pattern");
     try expect_message(Text, .bytes, ascii, "", "must match regex pattern `^[\\x00-\\x7F]+$`");
     try testing.expectError(error.Unevaluable, expect(Text, .bytes, ascii, "\xe1\x84", ""));
+}
+
+test "two CEL rules that format each keep their own message" {
+    const rules: pb.FieldRules = comptime .{ .cel = .of(&.{
+        .{ .id = "first", .expression = "'first: `%s`'.format([this])" },
+        .{ .id = "second", .expression = "this.size() > 2 ? 'second: %d'.format([this.size()]) : ''" },
+    }) };
+    const T = support.One(Text, .string, rules);
+    var storage: [constants.report_bytes_default]u8 align(report_file.storage_alignment) = undefined;
+    var report: report_file.Report = .init(&storage);
+    const message: T = .{ .val = "abc" };
+    try testing.expectError(error.Invalid, validate_file.validate(T, &message, .{}, &report));
+    const list = report.violations();
+    try testing.expectEqual(@as(usize, 2), list.len);
+    try testing.expectEqualStrings("first: `abc`", list[0].message.?);
+    try testing.expectEqualStrings("second: 3", list[1].message.?);
+    try expect(Text, .string, rules, "ab", "first");
+}
+
+test "a formatted message with no room in the report ends validate as a full report does" {
+    const rules: pb.FieldRules = comptime .{ .cel = .of(&.{.{ .id = "long", .expression = "'too long: %s'.format([this])" }}) };
+    const T = support.One(Text, .string, rules);
+    // Room for one violation and its path, and no octet of a text.
+    var storage: [@sizeOf(report_file.Violation) + @sizeOf(report_file.Element)]u8 align(report_file.storage_alignment) = undefined;
+    var report: report_file.Report = .init(&storage);
+    // A value longer than the whole storage, so `format` itself finds no room.
+    const long = "a" ** storage.len;
+    const message: T = .{ .val = long };
+    try testing.expectError(error.Invalid, validate_file.validate(T, &message, .{}, &report));
+    try testing.expect(report.truncated);
+    try testing.expectEqual(@as(usize, 0), report.violations().len);
 }

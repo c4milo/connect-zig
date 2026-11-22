@@ -849,6 +849,18 @@ first. Cite an entry by number in code and commits ("decision 6").
       - Beaten: one pin moved to the new stdx, whose `json` and colibri's would collide at
         the link; waiting for a colibri release; and a matcher alone, which costs less on a
         text of under about 18 octets and about 375 instructions an octet past it.
+    - CEL's `format` follows the CEL strings extension (`docs/specs/cel/strings.md`). Amended
+      on 2026-11-22:
+      - The text is a string literal and the list a list literal, so the compiler reads the
+        text once and types each value alone. The values may differ in type.
+      - It reads `%s`, `%d`, `%x` and `%X`, which protovalidate's schemas use. `%f`, `%e`, `%o`,
+        `%b` and a precision stop the build.
+      - The run writes the text into the free part of the report's storage, and the violation
+        keeps it at the storage's end. A text with no room ends `validate` as a full report
+        does. So the library holds no buffer of its own.
+      - Beaten: a buffer on the stack for each rule, which bounds a message by a constant and
+        costs a fill on each call; and a public scratch passed to `validate`, which every
+        program would size.
     - protovalidate's conformance harness v1.2.2 runs against `zig build
       protovalidate-executor`. The harness sends each case as an Any beside a
       `FileDescriptorSet`. The library has no dynamic message, so the executor holds the

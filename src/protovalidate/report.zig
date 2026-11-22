@@ -1,8 +1,9 @@
 //! `Report`: the violations `validate` found, in storage the caller owns (decision 47).
 //!
 //! The storage holds each `buf.validate.Violation` from its start. From its end it holds what a
-//! violation points to: the elements of its field's path. A violation's rule path, its rule id
-//! and a standard rule's message are comptime data, which take no storage.
+//! violation points to: the elements of its field's path, and the text of a CEL rule's message
+//! that `format` wrote. A violation's rule path, its rule id and a standard rule's message are
+//! comptime data, which take no storage.
 //!
 //! `add` and `Path` are what the module's own files call. A program calls `Report`'s methods.
 const std = @import("std");
@@ -97,15 +98,37 @@ pub const Entry = struct {
 /// Writes one violation of the field at `path`, or of the message itself when `path` is null.
 /// Returns false, and marks the report truncated, when the storage has no room for it.
 pub fn add(report: *Report, path: ?*const Path, entry: Entry) bool {
+    return place(report, path, entry, false);
+}
+
+/// `add`, for a message whose text may lie in `room`: the text moves to the storage's end,
+/// where the next violation's room does not reach it.
+pub fn add_text(report: *Report, path: ?*const Path, entry: Entry) bool {
+    return place(report, path, entry, true);
+}
+
+/// The free storage: where a CEL rule's `format` writes its text before `add_text` keeps it.
+/// `place` moves the text before it writes the violation over the room's start.
+pub fn room(report: *Report) []u8 {
+    const front_len = report.count * @sizeOf(Violation);
+    const end = report.storage.len - report.tail_len;
+    if (front_len >= end) return &.{};
+    return report.storage[front_len..end];
+}
+
+fn place(report: *Report, path: ?*const Path, entry: Entry, comptime keeps_text: bool) bool {
     assert(entry.rule_id.len != 0);
     const depth = if (path) |leaf| leaf.depth() else 0;
     const front_len = (report.count + 1) * @sizeOf(Violation);
     const elements_len = depth * @sizeOf(Element);
-    const tail_len = std.mem.alignForward(usize, report.tail_len + elements_len, storage_alignment);
+    const text_len = if (keeps_text) entry.message.len else 0;
+    const tail_len = std.mem.alignForward(usize, report.tail_len + text_len + elements_len, storage_alignment);
     if (front_len + tail_len > report.storage.len) {
         report.truncated = true;
         return false;
     }
+    // The text goes just below the tail before it, and may move up over where it lay.
+    const message = if (keeps_text) keep_text(report, entry.message) else entry.message;
     const start = report.storage.len - tail_len;
     const elements: []Element = @as([*]Element, @ptrCast(@alignCast(report.storage.ptr + start)))[0..depth];
     var step = path;
@@ -119,12 +142,21 @@ pub fn add(report: *Report, path: ?*const Path, entry: Entry) bool {
         .field = if (depth == 0) null else .{ .elements = .of(elements) },
         .rule = entry.rule,
         .rule_id = entry.rule_id,
-        .message = entry.message,
+        .message = message,
         .for_key = if (entry.for_key) true else null,
     };
     report.count += 1;
     report.tail_len = tail_len;
     return true;
+}
+
+/// Moves `message` to just below the storage's tail, which `place` has room for, and gives it
+/// where it lies now.
+fn keep_text(report: *Report, message: []const u8) []const u8 {
+    const end = report.storage.len - report.tail_len;
+    const text = report.storage[end - message.len .. end];
+    @memmove(text, message);
+    return text;
 }
 
 const testing = std.testing;
@@ -172,6 +204,38 @@ test "a full report refuses a violation, keeps the ones it holds and says it is 
     report.clear();
     try testing.expectEqual(@as(usize, 0), report.violations().len);
     try testing.expect(!report.truncated);
+}
+
+test "a text written in the room moves to the tail, where the next room does not reach it" {
+    var storage: [constants.report_bytes_default]u8 align(storage_alignment) = undefined;
+    var report: Report = .init(&storage);
+    const field = step_named("name", null);
+    const first = room(&report);
+    @memcpy(first[0.."first".len], "first");
+    try testing.expect(add_text(&report, &field, .{ .rule_id = "a", .message = first[0.."first".len] }));
+    // The next room starts at the next violation, over where the first text lay.
+    const second = room(&report);
+    @memset(second, 0);
+    @memcpy(second[0.."second".len], "second");
+    try testing.expect(add_text(&report, null, .{ .rule_id = "b", .message = second[0.."second".len] }));
+    const list = report.violations();
+    try testing.expectEqualStrings("first", list[0].message.?);
+    try testing.expectEqualStrings("second", list[1].message.?);
+    try testing.expectEqualStrings("name", list[0].field.?.elements.items[0].field_name.?);
+    // A text of comptime data is kept the same way.
+    try testing.expect(add_text(&report, null, .{ .rule_id = "c", .message = "third" }));
+    try testing.expectEqualStrings("third", report.violations()[2].message.?);
+}
+
+test "a text with no room left marks the report truncated" {
+    // Room for one violation and no octet more.
+    var storage: [@sizeOf(Violation)]u8 align(storage_alignment) = undefined;
+    var report: Report = .init(&storage);
+    try testing.expectEqual(@as(usize, @sizeOf(Violation)), room(&report).len);
+    try testing.expect(!add_text(&report, null, .{ .rule_id = "a", .message = "x" }));
+    try testing.expect(report.truncated);
+    try testing.expect(add(&report, null, .{ .rule_id = "a", .message = "x" }));
+    try testing.expectEqual(@as(usize, 0), room(&report).len);
 }
 
 test "a report encodes as buf.validate.Violations" {

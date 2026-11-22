@@ -12,6 +12,7 @@ const value_file = @import("cel_value.zig");
 const time = @import("cel_time.zig");
 const collection = @import("cel_collection.zig");
 const pattern_file = @import("../pattern.zig");
+const format_file = @import("cel_format.zig");
 const Node = node_file.Node;
 const BinaryOp = node_file.BinaryOp;
 const Scope = type_file.Scope;
@@ -183,6 +184,7 @@ fn of_call(comptime call: Node.Call, comptime scope: Scope) Typed {
         .dyn => if (operands.len == 1) return of_dyn(&operands[0], scope),
         .duration => if (operands.len == 1) return of_duration(&operands[0]),
         .matches => if (pattern_problem(operands)) |problem| return .{ .problem = problem },
+        .format => return format_file.of_format(call, scope),
         else => {},
     }
     if (collection.of_macro(call, scope)) |typed| return typed;

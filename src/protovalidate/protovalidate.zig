@@ -84,6 +84,8 @@ test {
     _ = @import("pattern.zig");
     _ = @import("cel/cel_library.zig");
     _ = @import("cel/cel_list.zig");
+    _ = @import("cel/cel_format.zig");
+    _ = @import("cel/cel_format_test.zig");
     _ = @import("cel/cel_predefined_test.zig");
     _ = @import("shape.zig");
     _ = @import("text.zig");

@@ -77,8 +77,15 @@ change the public API, and the entry marks each change that does.
   problem of the rules. `bytes.pattern` of octets that are not UTF-8 fails with `Unevaluable`.
 - connect-zig pins stdx a second time, as `stdx_regex`, at the commit that brought `regex`,
   and takes that module alone from it (decision 47).
-- Not yet: CEL's `format`, arithmetic on a timestamp or a duration, and `timestamp(string)`. A
-  message with such a rule stops the build, with a message that names the rule.
+- CEL's `format`, `'text %s'.format([values])`, from the CEL strings extension, which
+  `docs/specs/cel/strings.md` holds. The text and the list are literals, and the conversions
+  `%s`, `%d`, `%x` and `%X` are read; `%f`, `%e`, `%o`, `%b` and a precision stop the build. A
+  rule's formatted message is written into the report's storage. protovalidate's conformance
+  suite passes all of its 2872 cases.
+- A formatted message with no room in the report ends `validate` as a full report does:
+  `Invalid`, with the report marked truncated.
+- Not yet: arithmetic on a timestamp or a duration, and `timestamp(string)`. A message with such
+  a rule stops the build, with a message that names the rule.
 
 ### Changed
 

@@ -1654,6 +1654,29 @@ ran on Linux x86-64 with Zig 0.16.0.
     `matches` taken, a `matches` with no literal taken, `matches` of the empty text, and its
     overload removed. Each was `CAUGHT`.
 
+- **CEL's `format`** (decision 47 as amended). `'text %s'.format([values])`, from the CEL strings
+  extension, which `docs/specs/cel/strings.md` holds at cel-spec's pinned commit.
+  - `tools/protovalidate_conformance_check.sh` printed `PASS (failed: 0, skipped: 0, passed:
+    2872, total: 2872)`. The 36 cases of predefined rules left the known-failing list, which
+    is empty.
+  - `tools/cel_differential_check.sh 1 2 3 4 5 6 7 8`, with 400 rules a seed and messages from
+    `format`, printed no difference from protovalidate-go v1.4.1. The first run found one:
+    cel-go copies bytes that are not UTF-8 into `%s`, where the extension writes U+FFFD. The
+    module keeps the extension's text, and docs/specs/README.md lists the difference.
+  - A test found that a text with no room crashed `validate`: the report was not marked
+    truncated, which `validate` asserts. A text with no room now marks it.
+  - The judge counted `validate rules invalid` 2.18% over its baseline at first: each rule
+    set up a text and caught its errors, though none formats. A rule that does not format now
+    holds no text, and the text marks the report itself, so no rule catches: +0.32%.
+  - Mutations against `zig build test-protovalidate`, 18: a replacement for each octet that is
+    not UTF-8, NaN and negative infinity written as Zig writes them, a negative hex with no
+    sign, `X` in lower case, an octet's hex with no leading zero, a count of conversions not
+    checked, `%d` of a string, the text after the last conversion dropped, null written as
+    nothing, a list joined with no space, a violation that keeps the text where `format`
+    wrote it, a tail that counts no text, no rule given the room, a formatted text added as
+    it lies, a room that ignores the violations written, a text with no room that does not
+    mark the report, and a rule's text given no mark. Each was `CAUGHT`.
+
 ### Work not done yet
 
 - A stream that waits for an event of the program once its request ended (colibri issue 130).
@@ -1662,10 +1685,6 @@ ran on Linux x86-64 with Zig 0.16.0.
 - For `oidc`, a measurement before any change: a client sends one token with each call, and
   the verifier checks its signature each time. If that cost shows in a server's profile, a
   verifier may keep the last tokens it took.
-- For `protovalidate`, CEL's `format`, as in ``'not a valid path: `%s`'.format([this])``. The
-  messages of 36 predefined rules of protovalidate's suite take it, and those cases stay on
-  the known-failing list. A formatted message is text no rule holds, so the walk would write
-  it into the report's storage.
 - For `protovalidate`, one pin of stdx. `stdx_regex` pins the commit that brought `regex`
   beside the stdx that colibri pins (decision 47). The two become one when a colibri release
   pins a stdx that holds `regex`.

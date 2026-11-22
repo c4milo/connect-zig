@@ -27,6 +27,8 @@ pub const Error = error{
     Unevaluable,
     /// The expression reads `now`, and the caller passed no time.
     TimeMissing,
+    /// `format` found no room for its text in the report's storage.
+    ReportFull,
     /// A repeated field's octets do not decode: `decode` never read the message.
     Malformed,
     /// The expression read more elements of lists and maps than `constants.cel_steps_max`.
@@ -39,11 +41,42 @@ pub const Error = error{
 pub const Env = struct {
     now: ?proto.wkt.Timestamp = null,
     steps: usize = constants.cel_steps_max,
+    /// Where `format` writes its text, which only a rule whose expression formats is given
+    /// (`cel_rule.zig`). One pointer, so a rule that does not format sets up one word more.
+    text: ?*Text = null,
 
     /// Counts one element read.
     pub fn spend(env: *Env) Error!void {
         if (env.steps == 0) return error.TooManyItems;
         env.steps -= 1;
+    }
+};
+
+/// The room `format` writes its text into: the free part of the report's storage.
+pub const Text = struct {
+    room: []u8,
+    /// The octets of `room` written so far.
+    len: usize = 0,
+    /// The report's mark of a full storage, which a text with no room sets, as a violation
+    /// with no room does.
+    full: ?*bool = null,
+
+    /// Writes `octets` after the text written before.
+    pub fn write(text: *Text, octets: []const u8) Error!void {
+        if (text.room.len - text.len < octets.len) return text.overflow();
+        @memcpy(text.room[text.len..][0..octets.len], octets);
+        text.len += octets.len;
+    }
+
+    /// The room after the text written before, for a writer that fills part of it.
+    pub fn unwritten(text: *const Text) []u8 {
+        return text.room[text.len..];
+    }
+
+    /// Marks the report full and fails: the text has no room.
+    pub fn overflow(text: *Text) Error {
+        if (text.full) |full| full.* = true;
+        return error.ReportFull;
     }
 };
 

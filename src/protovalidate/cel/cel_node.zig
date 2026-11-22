@@ -41,6 +41,7 @@ pub const Function = enum {
     dyn,
     duration,
     matches,
+    format,
     all,
     exists,
     exists_one,

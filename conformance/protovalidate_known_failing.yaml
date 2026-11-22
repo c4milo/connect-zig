@@ -3,42 +3,5 @@
 # the harness as its expected failures: a suite's name, then its cases. The harness fails when
 # a case here passes, so the step that makes one pass removes its line.
 
-predefined_rules:
-  # A predefined rule whose message comes from CEL's `format`, which the module does not read
-  # yet (docs/design.md, "Work not done yet"). Its `matches` runs.
-  - proto/2023/bytes/invalid
-  - proto/2023/bytes/valid
-  - proto/2023/repeated/wrapped/bytes/invalid
-  - proto/2023/repeated/wrapped/bytes/valid
-  - proto/2023/repeated/wrapped/string/invalid
-  - proto/2023/repeated/wrapped/string/valid
-  - proto/2023/string/invalid
-  - proto/2023/string/valid
-  - proto/2023/wrapped/bytes/invalid
-  - proto/2023/wrapped/bytes/valid
-  - proto/2023/wrapped/string/invalid
-  - proto/2023/wrapped/string/valid
-  - proto2/bytes/invalid
-  - proto2/bytes/valid
-  - proto2/repeated/wrapped/bytes/invalid
-  - proto2/repeated/wrapped/bytes/valid
-  - proto2/repeated/wrapped/string/invalid
-  - proto2/repeated/wrapped/string/valid
-  - proto2/string/invalid
-  - proto2/string/valid
-  - proto2/wrapped/bytes/invalid
-  - proto2/wrapped/bytes/valid
-  - proto2/wrapped/string/invalid
-  - proto2/wrapped/string/valid
-  - proto3/bytes/invalid
-  - proto3/bytes/valid
-  - proto3/repeated/wrapped/bytes/invalid
-  - proto3/repeated/wrapped/bytes/valid
-  - proto3/repeated/wrapped/string/invalid
-  - proto3/repeated/wrapped/string/valid
-  - proto3/string/invalid
-  - proto3/string/valid
-  - proto3/wrapped/bytes/invalid
-  - proto3/wrapped/bytes/valid
-  - proto3/wrapped/string/invalid
-  - proto3/wrapped/string/valid
+# No case fails on purpose.
+{}

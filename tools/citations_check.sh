@@ -6,6 +6,8 @@
 # - Each citation `CEL language definition, "<section>"` in src/protovalidate, in spec/ and in
 #   tools/cel_differential names a heading of docs/specs/cel/langdef.md. A citation that names
 #   several sections names each in quotes: "Macros", "List Operators" and "Map Operators".
+# - Each citation `CEL strings extension, "<section>"` names a heading of
+#   docs/specs/cel/strings.md, the same way.
 #
 # It needs python3.
 set -eu
@@ -21,7 +23,14 @@ import pathlib
 import re
 import sys
 
-headings = set(re.findall(r"^#+ (.+)$", pathlib.Path("docs/specs/cel/langdef.md").read_text(encoding="utf-8"), re.M))
+def headings_of(path):
+    return set(re.findall(r"^#+ (.+)$", pathlib.Path(path).read_text(encoding="utf-8"), re.M))
+
+
+documents = {
+    "CEL language definition": headings_of("docs/specs/cel/langdef.md"),
+    "CEL strings extension": headings_of("docs/specs/cel/strings.md"),
+}
 paths = glob.glob("src/protovalidate/**/*.zig", recursive=True) + glob.glob("spec/**/*.lean", recursive=True)
 paths += glob.glob("tools/cel_differential/*.zig") + ["spec/README.md"]
 count = 0
@@ -30,11 +39,12 @@ for path in sorted(paths):
     text = pathlib.Path(path).read_text(encoding="utf-8")
     # A citation may go on to the comment's next line.
     joined = re.sub(r"\n\s*(//[/!]?|--)\s*", " ", text)
-    for cited in re.finditer(r'CEL language definition,\s*((?:"[^"]+"(?:\s*(?:and|,)\s*)*)+)', joined):
-        for name in re.findall(r'"([^"]+)"', cited.group(1)):
-            count += 1
-            if name not in headings:
-                wrong.append(f"{path}: the CEL language definition has no section \"{name}\"")
-print("\n".join(wrong) if wrong else f"{count} citations of the CEL language definition name a section of it")
+    for document, headings in documents.items():
+        for cited in re.finditer(document + r',\s*((?:"[^"]+"(?:\s*(?:and|,)\s*)*)+)', joined):
+            for name in re.findall(r'"([^"]+)"', cited.group(1)):
+                count += 1
+                if name not in headings:
+                    wrong.append(f"{path}: the {document} has no section \"{name}\"")
+print("\n".join(wrong) if wrong else f"{count} citations of the CEL specifications name a section of them")
 sys.exit(1 if wrong else 0)
 PYTHON

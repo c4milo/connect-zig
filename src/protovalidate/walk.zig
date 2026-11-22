@@ -78,10 +78,13 @@ pub fn violate(walk: *Walk, path: ?*const Path, comptime broken: Broken, comptim
     if (!report_file.add(walk.report, path, entry)) return error.ReportFull;
 }
 
-/// Writes a violation whose message the run gave: a CEL rule's own text. The message lasts as
-/// long as the report: it is comptime data.
-pub fn violate_text(walk: *Walk, path: ?*const Path, comptime rule: ?pb.FieldPath, comptime id: []const u8, message: []const u8, comptime for_key: bool) Fault!void {
-    if (!report_file.add(walk.report, path, .{ .rule = rule, .rule_id = id, .message = message, .for_key = for_key })) return error.ReportFull;
+/// Writes a violation whose message the run gave: a CEL rule's own text. A text that `format`
+/// wrote into the report's room is kept in the report's storage; any other is comptime data,
+/// or text of the message `validate` read.
+pub fn violate_text(walk: *Walk, path: ?*const Path, comptime rule: ?pb.FieldPath, comptime id: []const u8, message: []const u8, comptime for_key: bool, comptime formats: bool) Fault!void {
+    const entry: report_file.Entry = .{ .rule = rule, .rule_id = id, .message = message, .for_key = for_key };
+    const added = if (formats) report_file.add_text(walk.report, path, entry) else report_file.add(walk.report, path, entry);
+    if (!added) return error.ReportFull;
 }
 
 /// The `Malformed` fault for any error of the protobuf module's readers: octets that `decode`

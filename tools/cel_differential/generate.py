@@ -190,11 +190,48 @@ class Generator:
             return f"{self.double(depth - 1)}.{self.pick(['isNan()', 'isInf()', 'isInf(1)', 'isInf(-1)'])}"
         return self.pick(["this.b", f"bool({self.pick(['this.b', self.literal_string()])})", f"dyn({self.int(depth - 1)}) == {self.int(0)}"])
 
+    def formatted(self, depth):
+        """`format` of one to three values, each under a conversion that takes its type (CEL
+        strings extension, "Conversion")."""
+        parts, values = [], []
+        for _ in range(self.rng.randrange(1, 4)):
+            kind = self.rng.randrange(7)
+            if kind == 0:
+                parts.append(self.pick(["%s", "%x", "%X"]))
+                values.append(self.string(depth))
+            elif kind == 1:
+                parts.append(self.pick(["%s", "%d", "%x", "%X"]))
+                values.append(self.int(depth))
+            elif kind == 2:
+                parts.append(self.pick(["%s", "%d", "%x"]))
+                values.append(self.uint(depth))
+            elif kind == 3:
+                parts.append("%s")
+                values.append(self.double(depth))
+            elif kind == 4:
+                parts.append("%s")
+                values.append(self.bool(depth))
+            elif kind == 5:
+                # `%s` of bytes that are not UTF-8 differs on purpose: cel-go copies the octets,
+                # and this library writes U+FFFD as the strings extension states
+                # (docs/specs/README.md). So `this.y`, which may hold such octets, takes `%x`.
+                if self.rng.random() < 0.5:
+                    parts.append("%x")
+                    values.append("this.y")
+                else:
+                    parts.append(self.pick(["%s", "%x"]))
+                    values.append("b" + self.literal_string())
+            else:
+                parts.append("%s")
+                values.append(self.pick(["this.rs", "this.ri", "[1, 2]"]))
+        text = self.pick(["", "v=", "<"]) + " ".join(parts) + self.pick(["", ">", "!"])
+        return f"{self.literal(text)}.format([{', '.join(values)}])"
+
     def rule(self):
         depth = self.rng.randrange(1, 5)
         if self.rng.random() < 0.15:
             # A rule that gives a string: the violation's message, or none when it is empty.
-            return f"{self.bool(depth)} ? '' : {self.pick([self.literal_string(), self.string(1)])}"
+            return f"{self.bool(depth)} ? '' : {self.pick([self.literal_string(), self.string(1), self.formatted(1)])}"
         return self.bool(depth)
 
 

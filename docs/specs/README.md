@@ -7,6 +7,7 @@ reads no file of this folder.
 | File | What it is | What the code reads it for |
 | --- | --- | --- |
 | `cel/langdef.md` | The CEL language definition: `doc/langdef.md` of [google/cel-spec](https://github.com/google/cel-spec) at tag v0.25.3, commit `ba58ae5007845f3a1279b488cdeb79645ce958bb`. cel-go v0.33.2 builds on that release, and protovalidate-go v1.4.1 runs that cel-go. | The CEL rules of `protovalidate` (decision 47): the lexis and the grammar, the types, the checks of types, the operators, the macros and the functions. |
+| `cel/strings.md` | The CEL strings extension: `doc/extensions/strings.md` of the same cel-spec commit. | `format`, which protovalidate's libraries turn on and the messages of its predefined rules call: its text, its conversions and the text each type takes. |
 | `cel/LICENSE` | The license of cel-spec, Apache 2.0. | The terms of the copy. |
 
 protovalidate's own rules are in `src/protovalidate/proto/buf/validate/validate.proto`, which
@@ -17,7 +18,8 @@ protovalidate's own rules are in `src/protovalidate/proto/buf/validate/validate.
 A comment on the line that does a check names the section that states the rule: `CEL language
 definition, "Equality"`. The name is a heading of `cel/langdef.md`. A rule of the lexis or of
 the grammar quotes its production, as `"INT_LIT ::= -? DIGIT+"`, and its section is "Syntax".
-`tools/citations_check.sh` requires each cited name to be a heading of the file.
+`tools/citations_check.sh` requires each cited name to be a heading of the file. A citation of
+`cel/strings.md` reads `CEL strings extension, "Conversion"` the same way.
 
 Read the section before a change to the code that cites it, and cite the section in the code
 that a new rule adds.
@@ -54,6 +56,10 @@ stdx's `regex` (decision 47):
   refuses one.
 - A form that stdx refuses: `\p{...}`, `\C`, and `(?i)` over a letter past ASCII. Such a
   pattern stops the build, as a pattern that is no literal does.
+
+One place follows the specification and not cel-go. `%s` of bytes that are not UTF-8, in
+`format`: the CEL strings extension, `cel/strings.md`, replaces each run of such octets with
+one U+FFFD, and cel-go copies them as they are. A violation's message is then always UTF-8.
 
 One place follows neither. Behind `dyn` the module marks each part that came through `dyn` as
 dynamic, where "Gradual Type Checking" and cel-go give the result of a function its declared

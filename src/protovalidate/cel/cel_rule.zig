@@ -7,6 +7,7 @@ const proto = @import("protobuf");
 const pb = @import("buf_validate_validate");
 const table = @import("../table.zig");
 const walk_file = @import("../walk.zig");
+const report_file = @import("../report.zig");
 const program = @import("cel_program.zig");
 const type_file = @import("cel_type.zig");
 const list_file = @import("cel_list.zig");
@@ -92,7 +93,7 @@ fn path_of(comptime site: Site, comptime rule: Rule) pb.FieldPath {
 pub fn check_field(comptime rules: pb.FieldRules, comptime site: Site, this: anytype, walk: *Walk, path: *const Path) Fault!void {
     inline for (comptime rules_of(rules)) |rule| {
         if (try broken(rule, this, walk)) |message| {
-            try walk_file.violate_text(walk, path, comptime path_of(site, rule), rule.id, message, site.for_key);
+            try walk_file.violate_text(walk, path, comptime path_of(site, rule), rule.id, message, site.for_key, comptime formats(rule));
         }
     }
 }
@@ -101,8 +102,14 @@ pub fn check_field(comptime rules: pb.FieldRules, comptime site: Site, this: any
 /// names the message's own field, and no rule path: the path is one of a field's rules.
 pub fn check_message(comptime M: type, comptime rules: pb.MessageRules, message: *const M, walk: *Walk, path: ?*const Path) Fault!void {
     inline for (comptime rules_of(rules)) |rule| {
-        if (try broken(rule, message, walk)) |text| try walk_file.violate_text(walk, path, null, rule.id, text, false);
+        if (try broken(rule, message, walk)) |text| try walk_file.violate_text(walk, path, null, rule.id, text, false, comptime formats(rule));
     }
+}
+
+/// Whether `rule`'s expression may call `format`, whose text the report's storage keeps. A
+/// rule that names `format` in another way, as a field, only costs a copy of its message.
+fn formats(comptime rule: Rule) bool {
+    return std.mem.indexOf(u8, rule.expression, "format") != null;
 }
 
 /// The message of the violation when `this` breaks `rule`, or null.
@@ -115,7 +122,9 @@ fn broken(comptime rule: Rule, this: anytype, walk: *const Walk) Fault!?[]const 
 fn verdict(comptime rule: Rule, comptime scope: Scope, values: anytype, walk: *const Walk) Fault!?[]const u8 {
     // An expression that `dyn` let through with a mistake of types fails each time it runs.
     if (comptime program.Type(rule.expression, scope) == type_file.Failing) return error.Unevaluable;
-    var env: type_file.Env = .{ .now = walk.options.now };
+    // A rule that does not format holds no text at all, so it stores nothing for one.
+    var text: if (formats(rule)) type_file.Text else void = if (comptime formats(rule)) .{ .room = report_file.room(walk.report), .full = &walk.report.truncated } else {};
+    var env: type_file.Env = .{ .now = walk.options.now, .text = if (comptime formats(rule)) &text else null };
     const result = try program.run(rule.expression, scope, values, &env);
     if (comptime @TypeOf(result) == bool) {
         if (result) return null;
@@ -228,7 +237,7 @@ pub fn check_predefined(comptime rules: pb.FieldRules, comptime site: Site, this
         const scope = comptime predefined_scope(entry, holder, @TypeOf(this));
         inline for (comptime predefined_rules(entry)) |rule| {
             if (try verdict(rule, scope, .{ this, comptime rule_value(entry.value), held }, walk)) |message| {
-                try walk_file.violate_text(walk, path, comptime predefined_path(site, holder, entry), rule.id, message, site.for_key);
+                try walk_file.violate_text(walk, path, comptime predefined_path(site, holder, entry), rule.id, message, site.for_key, comptime formats(rule));
             }
         }
     }

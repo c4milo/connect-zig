@@ -14,6 +14,7 @@ const time = @import("cel_time.zig");
 const collection = @import("cel_collection.zig");
 const list_file = @import("cel_list.zig");
 const pattern_file = @import("../pattern.zig");
+const format_file = @import("cel_format.zig");
 const Node = node_file.Node;
 const Scope = type_file.Scope;
 const Env = type_file.Env;
@@ -133,6 +134,7 @@ inline fn eval_call(comptime call: Node.Call, comptime R: type, comptime scope: 
         .duration => return comptime time.parse_duration(operands[0].string).?,
         // The pattern is a literal, which `check.type_of` required.
         .matches => return pattern_file.matches(operands[1].string, try eval(&operands[0], scope, values, env)),
+        .format => return format_file.eval_format(call, scope, values, env),
         .map => return collection.eval_map(call, R, scope, values, env),
         .all, .exists, .exists_one => if (comptime collection.is_macro(call)) return collection.eval_macro(call, scope, values, env),
         else => {},

@@ -17,7 +17,9 @@ import sys
 
 def verdicts(path):
     table = {}
-    with open(path, encoding="utf-8") as file:
+    # A message may hold octets that are not UTF-8, which `format` copied from bytes: each shows
+    # as an escape, the same on both sides.
+    with open(path, encoding="utf-8", errors="backslashreplace") as file:
         for line in file:
             rule, message, verdict = line.rstrip("\n").split(" ", 2)
             table[int(rule), int(message)] = verdict
