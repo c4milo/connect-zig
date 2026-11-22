@@ -8,7 +8,11 @@ are in [docs/decisions.md](docs/decisions.md), and the steps and their measureme
 connect-zig follows [Semantic Versioning](https://semver.org/). Before 1.0, a minor version may
 change the public API, and the entry marks each change that does.
 
-## Unreleased
+## v0.3.0 (2026-11-22)
+
+It builds on colibri v0.19.0 and on stdx v0.1.2, the tag colibri pins, with Zig 0.16.0.
+`protovalidate` takes `regex` from stdx at 44615ef, a commit of stdx's main whose CI passed.
+Four changes to the API are marked below.
 
 ### Added
 
@@ -89,8 +93,8 @@ change the public API, and the entry marks each change that does.
   CEL rules over random messages, with this library's verdicts held to those of
   protovalidate-go v1.4.1, which runs cel-go.
 - `tools/cel_conformance_check.sh`, the check `cel-conformance` of `tools/ci.sh`: cel-spec's
-  conformance suite at v0.25.3, over the code a rule's expression compiles into. 1,045 tests
-  pass, and `tools/cel_conformance/known.txt` gives the reason for each of the 742 that differ.
+  conformance suite at v0.25.3, over the code a rule's expression compiles into. 1,142 tests
+  pass, and `tools/cel_conformance/known.txt` gives the reason for each of the 645 that differ.
 - `tools/compile_time_check.sh`, the check `compile-time`: the build of a schema of 690 CEL
   rules against the build of the same schema with none, held to `bench/compile_time.txt`.
   Unit tests hold the compiler's reading and typing of an expression to a count of branches,
@@ -217,8 +221,8 @@ change the public API, and the entry marks each change that does.
 ### Checked
 
 - protovalidate's conformance harness v1.2.2 runs against the library, with strict messages
-  and strict errors. 2822 of 2872 cases pass, and `conformance/protovalidate_known_failing.yaml`
-  lists the other 50, each under its reason.
+  and strict errors. All 2872 of its cases pass, and `conformance/protovalidate_known_failing.yaml`
+  lists none.
 - Receivers on connect-go and connect-rust join the full-stack check, each on one core. In CI's
   run 182, one core of connect-zig held 8.2 times connect-go's spans a second over TLS on arm64
   and 5.0 times on x86-64, and 2.8 and 1.9 times connect-rust's.
