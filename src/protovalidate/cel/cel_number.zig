@@ -39,9 +39,10 @@ fn divide(comptime T: type, left: T, right: T) Error!T {
 /// The remainder of the truncated division, with the sign of `left`.
 fn modulo(comptime T: type, left: T, right: T) Error!T {
     if (right == 0) return error.Unevaluable;
-    // The least int has no remainder by -1, and the division it would take overflows.
+    // The least int's remainder by -1 fails, as cel-go fails it, because the division it would
+    // take overflows (docs/specs/README.md). Any other int's remainder by -1 is 0.
     if (comptime T == i64) {
-        if (right == -1) return 0;
+        if (right == -1) return if (left == std.math.minInt(i64)) error.Unevaluable else 0;
     }
     return @rem(left, right);
 }
@@ -106,7 +107,9 @@ test "an int operation fails when its result leaves the type, and by zero" {
     try testing.expectError(error.Unevaluable, compute(i64, .divide, seven, 0));
     try testing.expectError(error.Unevaluable, compute(i64, .modulo, seven, 0));
     try testing.expectError(error.Unevaluable, compute(i64, .divide, least, -1));
-    try testing.expectEqual(@as(i64, 0), try compute(i64, .modulo, least, -1));
+    try testing.expectError(error.Unevaluable, compute(i64, .modulo, least, -1));
+    try testing.expectEqual(@as(i64, 0), try compute(i64, .modulo, least + 1, -1));
+    try testing.expectEqual(@as(i64, 0), try compute(i64, .modulo, -seven, -1));
     // A division truncates toward zero, and a remainder takes the sign of its left side.
     try testing.expectEqual(@as(i64, -(seven / two)), try compute(i64, .divide, -seven, two));
     try testing.expectEqual(@as(i64, -(seven % two)), try compute(i64, .modulo, -seven, two));

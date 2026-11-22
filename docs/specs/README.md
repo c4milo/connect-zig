@@ -44,6 +44,9 @@ the module takes cel-go's answer, and the code says so where it does:
   grammar. cel-go reads the text with Go's `time.ParseDuration` (`cel_time.zig`).
 - The words `bool(string)` takes. The definition's examples are "true" and "FALSE". cel-go
   takes the words of Go's `strconv.ParseBool` (`cel_function.zig`).
+- The least int's remainder by -1. "Overflow" makes an operation fail when "the results exceed
+  the range", and the remainder, 0, does not. cel-go fails it, as the division it would take
+  overflows (`cel_number.zig`).
 - `string` of a double and of a uint. "string" says only that it "converts a double to a
   string". cel-go writes it as Go's `strconv.FormatFloat(d, 'g', -1, 64)` does: `1.5`, `1e+06`,
   `+Inf`. The section's example gives `string(123u)` as `"123u"`, and its text gives a uint's
