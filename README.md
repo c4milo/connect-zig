@@ -622,7 +622,7 @@ Not yet done:
 
 - a stream that waits for an event of the program once its request ended (colibri issue 130);
 - in `protovalidate`: CEL's `format`, which the messages of 36 predefined rules of
-  protovalidate's suite take (docs/design.md, "What a later step owes").
+  protovalidate's suite take (docs/design.md, "Work not done yet").
 
 ## Contributing
 

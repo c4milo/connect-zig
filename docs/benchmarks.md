@@ -204,4 +204,4 @@ The nanoseconds of one validation of a message decoded before:
 protovalidate-buffa validates two messages faster: the valid `Medium` and the valid `Rules`. Its
 plugin writes Rust code for each rule, as connect-zig's compiler does. In `Rules`, a CEL index
 of a map, `this[k]`, reads connect-zig's entries from the last one until it finds the key
-(docs/design.md, "What a later step owes").
+(docs/design.md, "Work not done yet").

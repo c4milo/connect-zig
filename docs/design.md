@@ -1143,7 +1143,7 @@ ran on Linux x86-64 with Zig 0.16.0.
     one table reads both.
   - The conformance client keeps the call's deadline, since the library reads no clock. Past
     that deadline it reports a call the server canceled as `deadline_exceeded`, as grpc-go's and
-    grpc-java's clients do. A program with a deadline of its own owes the same rule.
+    grpc-java's clients do. A program with a deadline of its own must follow the same rule.
   - With the four changes, runner v1.0.7 passed its 8232 client cases, and its "Timeouts" suite
     alone 8 times of 8. The pinned runner v1.0.4 passed its 8264.
   - Mutations, 28 of 28 CAUGHT: 2 on the query's order, 8 on the trailers' source, 11 on the
@@ -1435,7 +1435,7 @@ ran on Linux x86-64 with Zig 0.16.0.
     test now. A test with hand-written octets holds the four new numbers of
     `descriptor_pb.zig`, which an encoding by the same file cannot check.
   - The plugin walks the tags of a span in code of its own, about 40 lines, as the protobuf
-    module exports no wire reader. The owner's word is owed on a public name for one.
+    module exports no wire reader. The owner has not ruled on a public name for one.
 - **CEL: the grammar's checks, and large schemas** (step 34, decision 47 as amended). Run on a
   Xeon at 2.1 GHz, x86-64 Linux, 4 cores. The owner asked whether a large schema compiles in
   reasonable time, and for a fuzzer and a Lean model of the CEL reader.
@@ -1453,8 +1453,8 @@ ran on Linux x86-64 with Zig 0.16.0.
   - Three limits fell. The protobuf module stopped at a message of about 500 fields: each
     function that reads every field at compile time now raises its branch quota. The table of
     a message with more than 1,000 `.of(` calls stopped the compiler: the plugin now writes
-    such a table in a block that raises the quota. One limit stays, and "What a later step
-    owes" names it: about 1,000 repeated and map fields in one message.
+    such a table in a block that raises the quota. One limit stays, and "Work not done yet"
+    names it: about 1,000 repeated and map fields in one message.
   - `tools/wide` holds one message of 600 fields with rules, and `zig build test-generated`
     reads it through binary, JSON and `validate`.
   - The CEL reader was read against the language definition for the model. Nine things
@@ -1523,7 +1523,7 @@ ran on Linux x86-64 with Zig 0.16.0.
   - Microseconds: no, while the compiler compiles the rule. A check written by hand as a Zig
     function costs the compiler 0.17 ms. Zig runs comptime code as an interpreter, at about
     3 µs a step, and a rule's text takes about a thousand steps to read. A tree written as a
-    Zig literal is read in 0.04 ms: the plugin could write it, which "What a later step owes"
+    Zig literal is read in 0.04 ms: the plugin could write it, which "Work not done yet"
     names.
   - A rule cost 11.8 ms and costs 7.5 ms: 6.5 ms and 4.1 ms to read its text, 1.9 ms and
     1.2 ms to type it, 3.4 ms and 2.2 ms for its code. A schema of 100 messages of 20 fields,
@@ -1625,7 +1625,7 @@ ran on Linux x86-64 with Zig 0.16.0.
     change, took 355 ns in this run and 241 in the one before, so protovalidate-buffa, at 299,
     was faster in it this time. Its validation alone stays faster, 34 ns to 109. A CEL index
     of a map, `this[k]`, reads the entries from the last one until it finds the key, so `all`
-    over a map reads its entries once for each key. "What a later step owes" names it.
+    over a map reads its entries once for each key. "Work not done yet" names it.
   - The README's chart comes from CI's run 201, at a36988d, on an AMD EPYC 9V45. There
     connect-zig decoded and validated 13 to 58 times as fast as protovalidate-go, and was the
     fastest in all six. Validation alone, protovalidate-buffa was faster in two: the valid
@@ -1636,7 +1636,7 @@ ran on Linux x86-64 with Zig 0.16.0.
   - `tools/protovalidate_conformance_check.sh` printed `PASS (failed: 0, skipped: 36, passed:
     2836, total: 2872)`. The 14 cases of `pattern` left the known-failing list. The 36 cases of
     predefined rules that call `matches` stay: their messages call `format` too, which the
-    module does not read ("What a later step owes").
+    module does not read ("Work not done yet").
   - `tools/cel_differential_check.sh 1 2 3 4 5 6 7 8`, whose generator now writes `matches`
     with 15 RE2 patterns, printed no difference from protovalidate-go v1.4.1 for any seed.
   - The benchmark's `Medium` name takes a pattern now. `validate medium valid` took 9,685
@@ -1653,7 +1653,7 @@ ran on Linux x86-64 with Zig 0.16.0.
     `matches` taken, a `matches` with no literal taken, `matches` of the empty text, and its
     overload removed. Each was `CAUGHT`.
 
-### What a later step owes
+### Work not done yet
 
 - A stream that waits for an event of the program once its request ended (colibri issue 130).
   colibri v0.16.0 left it out, as ruled on 2026-11-10. No release up to v0.17.0 holds it, and

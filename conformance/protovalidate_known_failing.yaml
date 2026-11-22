@@ -5,7 +5,7 @@
 
 predefined_rules:
   # A predefined rule whose message comes from CEL's `format`, which the module does not read
-  # yet (docs/design.md, "What a later step owes"). Its `matches` runs.
+  # yet (docs/design.md, "Work not done yet"). Its `matches` runs.
   - proto/2023/bytes/invalid
   - proto/2023/bytes/valid
   - proto/2023/repeated/wrapped/bytes/invalid
