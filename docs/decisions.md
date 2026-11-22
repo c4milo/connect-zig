@@ -885,6 +885,16 @@ first. Cite an entry by number in code and commits ("decision 6").
       - `+` of two lists joins them as they are read, as `filter` and `map` give a list.
       - Beaten: a rope of the two sides, which every function of strings would read as one;
         and the room given back only when the rule ends, which a macro over a long list fills.
+    - CEL's timestamps and durations follow cel-go: `timestamp(string)` reads RFC 3339 as Go
+      does, arithmetic fails where cel-go's checked arithmetic fails, and the `get` functions
+      take a zone. Amended on 2026-11-22:
+      - A zone is `UTC` or a fixed offset. A zone's name needs the IANA time zone database,
+        which the library does not hold. A literal name stops the build, and a name read from
+        a field fails the expression.
+      - `string` of a timestamp writes UTC, as a `google.protobuf.Timestamp` holds no zone.
+      - Beaten: the database compiled into the library, some 400 KB that each program would
+        carry and that would age with each release of the database; and the database read from
+        the system, which is I/O.
     - protovalidate's conformance harness v1.2.2 runs against `zig build
       protovalidate-executor`. The harness sends each case as an Any beside a
       `FileDescriptorSet`. The library has no dynamic message, so the executor holds the

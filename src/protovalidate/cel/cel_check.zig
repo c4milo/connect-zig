@@ -9,11 +9,13 @@ const type_file = @import("cel_type.zig");
 const select_file = @import("cel_select.zig");
 const function = @import("cel_function.zig");
 const value_file = @import("cel_value.zig");
-const time = @import("cel_time.zig");
 const collection = @import("cel_collection.zig");
 const pattern_file = @import("../pattern.zig");
 const format_file = @import("cel_format.zig");
 const text_file = @import("cel_text.zig");
+const timestamp_file = @import("cel_timestamp.zig");
+const duration_file = @import("cel_duration.zig");
+const time_literal = @import("cel_time_literal.zig");
 const Node = node_file.Node;
 const BinaryOp = node_file.BinaryOp;
 const Scope = type_file.Scope;
@@ -127,12 +129,18 @@ pub fn Overload(comptime op: BinaryOp, comptime L: type, comptime R: type) ?type
     return switch (op) {
         .equal, .not_equal => bool_when(value_file.equatable(L, R)),
         .less, .less_or_equal, .greater, .greater_or_equal => bool_when(value_file.ordered(L, R)),
-        .add => arithmetic(L, R, .with_double) orelse text_file.Concatenated(L, R),
-        .subtract, .multiply, .divide => arithmetic(L, R, .with_double),
+        .add => first_of(arithmetic(L, R, .with_double), first_of(duration_file.Result(op, L, R), text_file.Concatenated(L, R))),
+        .subtract => first_of(arithmetic(L, R, .with_double), duration_file.Result(op, L, R)),
+        .multiply, .divide => arithmetic(L, R, .with_double),
         .modulo => arithmetic(L, R, .integers),
         .in => collection.In(L, R),
         .@"and", .@"or" => null,
     };
+}
+
+/// The type of the first overload that takes the operands, or null.
+fn first_of(comptime first: ?type, comptime second: ?type) ?type {
+    return if (first) |T| T else second;
 }
 
 /// `&&` and `||` take two bools. A side that fails may still be absorbed by the other, so the
@@ -184,14 +192,7 @@ pub fn operands_of(comptime call: Node.Call) []const Node {
 
 fn of_call(comptime call: Node.Call, comptime scope: Scope) Typed {
     const operands = operands_of(call);
-    switch (call.function) {
-        .has => return of_has(operands, scope),
-        .dyn => if (operands.len == 1) return of_dyn(&operands[0], scope),
-        .duration => if (operands.len == 1) return of_duration(&operands[0]),
-        .matches => if (pattern_problem(operands)) |problem| return .{ .problem = problem },
-        .format => return format_file.of_format(call, scope),
-        else => {},
-    }
+    if (of_own(call, operands, scope)) |typed| return typed;
     if (collection.of_macro(call, scope)) |typed| return typed;
     const taken = switch (of_operands(operands, scope)) {
         .types => |taken| taken,
@@ -203,6 +204,24 @@ fn of_call(comptime call: Node.Call, comptime scope: Scope) Typed {
     };
     if (converts_no_literal(call, operands, R)) return .{ .problem = "the conversion `" ++ call.name ++ "` fails for its literal" };
     return .{ .ok = .{ .type = R, .dynamic = taken.dynamic } };
+}
+
+/// The type of a call that reads its operands' nodes, not their types alone: `has`, `dyn`,
+/// a literal of `duration` or `timestamp`, `format`, and the literal of `matches` or of a
+/// zone. Null for any other call, which the overloads type.
+fn of_own(comptime call: Node.Call, comptime operands: []const Node, comptime scope: Scope) ?Typed {
+    switch (call.function) {
+        .has => return of_has(operands, scope),
+        .dyn => if (operands.len == 1) return of_dyn(&operands[0], scope),
+        .duration => if (operands.len == 1) return of_duration(&operands[0], scope),
+        .timestamp => if (operands.len == 1) return of_timestamp(&operands[0], scope),
+        .matches => if (pattern_problem(operands)) |problem| return .{ .problem = problem },
+        .format => return format_file.of_format(call, scope),
+        else => if (call.function.is_time_part()) {
+            if (zone_problem(operands)) |problem| return .{ .problem = problem };
+        },
+    }
+    return null;
 }
 
 /// What stops the pattern of `matches` from compiling, or null: it is no string literal, or stdx
@@ -296,9 +315,40 @@ fn of_dyn(comptime operand: *const Node, comptime scope: Scope) Typed {
     };
 }
 
-/// `duration(string)` of a literal, which the compiler reads once.
-fn of_duration(comptime operand: *const Node) Typed {
-    if (operand.* != .string) return .{ .problem = "`duration` takes a string literal" };
-    if (time.parse_duration(operand.string) == null) return .{ .problem = "`" ++ operand.string ++ "` is no duration" };
+/// `duration(string)`: a literal, which the compiler reads once, or a text read as the
+/// expression runs; and `duration(duration)`.
+fn of_duration(comptime operand: *const Node, comptime scope: Scope) Typed {
+    if (operand.* != .string) return of_conversion(Duration, "duration", operand, scope);
+    if (!time_literal.Valid(Duration, operand.string).value) return .{ .problem = "`" ++ operand.string ++ "` is no duration" };
     return .of(Duration);
+}
+
+/// `timestamp(string)`, of RFC 3339, the same way; and `timestamp(timestamp)`.
+fn of_timestamp(comptime operand: *const Node, comptime scope: Scope) Typed {
+    if (operand.* != .string) return of_conversion(Timestamp, "timestamp", operand, scope);
+    if (!time_literal.Valid(Timestamp, operand.string).value) return .{ .problem = "`" ++ operand.string ++ "` is no timestamp of RFC 3339 in the range of CEL's timestamps" };
+    return .of(Timestamp);
+}
+
+/// A conversion to `T` of a value the build does not know: a string, read as the expression
+/// runs, or a `T`.
+fn of_conversion(comptime T: type, comptime name: []const u8, comptime operand: *const Node, comptime scope: Scope) Typed {
+    const typed = switch (type_of(operand, scope)) {
+        .ok => |ok| ok,
+        .problem => |problem| return .{ .problem = problem },
+    };
+    if (typed.type == Failing) return .{ .ok = typed };
+    if (typed.type == []const u8 or typed.type == T) return .{ .ok = .{ .type = T, .dynamic = typed.dynamic } };
+    return mistake(typed.dynamic, "found no matching overload for `" ++ name ++ "` applied to (" ++ type_file.name_of(typed.type) ++ ")");
+}
+
+/// What stops a `get` function's literal zone, or null: a zone that is no `UTC` and no offset.
+/// cel-go reads a zone's name too, from the IANA time zone database, which this library does
+/// not hold (`cel_timestamp.zig`).
+fn zone_problem(comptime operands: []const Node) ?[]const u8 {
+    // A `get` function's operands: the timestamp, and its zone.
+    const timestamp_and_zone = 2;
+    if (operands.len != timestamp_and_zone or operands[1] != .string) return null;
+    if (timestamp_file.offset_of_zone(operands[1].string) != null) return null;
+    return "the time zone `" ++ operands[1].string ++ "` is no `UTC` and no offset such as `+05:30`, and this module reads no zone names";
 }

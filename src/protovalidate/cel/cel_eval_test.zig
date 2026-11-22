@@ -239,7 +239,7 @@ test "an expression that does not parse or does not type is a problem of the bui
     try expect_problem("has(this)", "`has` takes one field selection");
     try expect_problem("has(this.missing)", "undefined field `missing` of t.Message");
     try expect_problem("has(this.a.b)", "type `int` has no field `b`");
-    try expect_problem("duration(this.name)", "`duration` takes a string literal");
+    try expect_problem("duration(this.a)", "found no matching overload for `duration` applied to (int)");
     try expect_problem("duration('ten')", "`ten` is no duration");
     try expect_problem("this.name.matches(this.name)", "the pattern of `matches` is no string literal, and this module reads each pattern as it compiles");
     try expect_problem("this.name.matches('(')", "stdx's regular expressions refuse the pattern `(`: MissingParenthesis");

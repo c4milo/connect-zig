@@ -16,6 +16,9 @@ const list_file = @import("cel_list.zig");
 const pattern_file = @import("../pattern.zig");
 const format_file = @import("cel_format.zig");
 const text_file = @import("cel_text.zig");
+const timestamp_file = @import("cel_timestamp.zig");
+const duration_file = @import("cel_duration.zig");
+const time_literal = @import("cel_time_literal.zig");
 const Node = node_file.Node;
 const Scope = type_file.Scope;
 const Env = type_file.Env;
@@ -119,6 +122,7 @@ inline fn eval_binary(comptime node: *const Node, comptime scope: Scope, values:
 /// `left op right` of two numbers, and `+` of two strings, bytes values or lists.
 inline fn arithmetic(comptime op: node_file.BinaryOp, left: anytype, right: anytype, env: *Env) Error!check.Overload(op, @TypeOf(left), @TypeOf(right)).? {
     const T = @TypeOf(left);
+    if (comptime duration_file.Result(op, T, @TypeOf(right)) != null) return duration_file.compute(op, left, right);
     if (comptime op == .add and !type_file.is_number(T)) return text_file.concat(left, right, env);
     return number.compute(T, comptime @field(number.Arithmetic, @tagName(op)), left, right);
 }
@@ -146,7 +150,8 @@ inline fn eval_call(comptime call: Node.Call, comptime R: type, comptime scope: 
     switch (comptime call.function) {
         .has => return eval_has(operands[0].select, scope, values, env),
         .dyn => return eval(&operands[0], scope, values, env),
-        .duration => return comptime time.parse_duration(operands[0].string).?,
+        .duration => return eval_time(proto.wkt.Duration, operands, scope, values, env),
+        .timestamp => return eval_time(proto.wkt.Timestamp, operands, scope, values, env),
         // The pattern is a literal, which `check.type_of` required.
         .matches => return pattern_file.matches(operands[1].string, try eval(&operands[0], scope, values, env)),
         .format => return format_file.eval_format(call, scope, values, env),
@@ -159,6 +164,19 @@ inline fn eval_call(comptime call: Node.Call, comptime R: type, comptime scope: 
     inline for (operands, 0..) |*operand, index| taken[index] = try eval(operand, scope, values, env);
     if (comptime operands.len == 1 and collection.is_size(call, @TypeOf(taken[0]))) return list_file.count(taken[0], env);
     return function.run(call.function, R, taken);
+}
+
+/// `duration` or `timestamp` of one operand: a literal, which the compiler read, a `T` as it
+/// is, or a text read as the expression runs, which fails when it names no `T`.
+inline fn eval_time(comptime T: type, comptime operands: []const Node, comptime scope: Scope, values: anytype, env: *Env) Error!T {
+    if (comptime operands[0] == .string) return time_literal.Literal(T, operands[0].string).value;
+    const value = try eval(&operands[0], scope, values, env);
+    if (comptime @TypeOf(value) == T) return value;
+    return parse_time(T, value) orelse error.Unevaluable;
+}
+
+fn parse_time(comptime T: type, text: []const u8) ?T {
+    return time_literal.parse(T, text);
 }
 
 /// The tuple of a call's operands' values.

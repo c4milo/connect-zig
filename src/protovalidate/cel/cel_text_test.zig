@@ -1,5 +1,6 @@
 //! Tests of the values an expression writes: `+` of strings, bytes and lists, and `string` of
-//! a number or a bool (CEL language definition, "Addition (+)" and "string").
+//! a number or a bool (CEL language definition, "Arithmetic Operators" and "Types and
+//! Conversions").
 const std = @import("std");
 const testing = std.testing;
 const proto = @import("protobuf");

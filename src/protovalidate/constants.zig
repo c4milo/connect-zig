@@ -83,6 +83,11 @@ pub const nanos_per_microsecond = 1_000;
 pub const nanos_per_millisecond = 1_000_000;
 pub const seconds_per_minute = 60;
 pub const seconds_per_hour = 3_600;
+/// "Timestamp values are limited to the range of values which can be serialized as a string:
+/// ["0001-01-01T00:00:00Z", "9999-12-31T23:59:59.999999999Z"]" (CEL language definition,
+/// "Overflow"): the seconds from 1970 to the first second and to the last.
+pub const timestamp_seconds_min = -62_135_596_800;
+pub const timestamp_seconds_max = 253_402_300_799;
 /// CEL: the elements of lists and maps one expression reads, at most. A macro inside a macro
 /// reads one list once for each element of another, as `repeated.unique` compares each pair,
 /// so the limit is the pairs of `compared_items_max` elements.

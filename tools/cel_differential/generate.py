@@ -39,6 +39,13 @@ UINTS = [0, 1, 2, 5, 100, 2**32 - 1]
 ULONGS = UINTS + [2**63, 2**64 - 1]
 DOUBLES = ["0.0", "1.5", "2.0", "-2.25", "100.0", "1e300"]
 DURATIONS = ["0s", "1s", "5s", "90s", "1h", "-3s", "1.5s"]
+# Timestamps in UTC: cel-go writes a timestamp read with an offset in that offset, where this
+# library writes UTC (docs/specs/README.md), so `string` of one would differ on purpose.
+TIMESTAMPS = ["2023-12-25T12:30:45.678Z", "2000-02-29T23:59:59Z", "1970-01-01T00:00:00Z", "0001-01-01T00:00:00Z", "9999-12-31T23:59:59.999999999Z", "2024-03-01T08:00:00Z"]
+# Zones cel-go and this library both read: UTC and fixed offsets, no names.
+ZONES = ["UTC", "+05:30", "-08:00", "-00:30", "+14:00", "-12:45", "5:00", "+23:59"]
+TIMESTAMP_PARTS = ["getFullYear", "getMonth", "getDate", "getDayOfMonth", "getDayOfYear", "getDayOfWeek", "getHours", "getMinutes", "getSeconds", "getMilliseconds"]
+DURATION_PARTS = ["getHours", "getMinutes", "getSeconds", "getMilliseconds"]
 # The texts of STRINGS that are identifiers, so a map's key may be selected as a field: `m.ab`.
 KEYS = ["a", "b", "ab", "x1", "k"]
 
@@ -75,7 +82,7 @@ class Generator:
         if kind == 3:
             return f"({self.string(depth - 1)} + {self.string(depth - 1)})"
         if kind == 4:
-            value = self.pick([self.int(depth - 1), self.uint(depth - 1), self.double(depth - 1), self.bool(depth - 1)])
+            value = self.pick([self.int(depth - 1), self.uint(depth - 1), self.double(depth - 1), self.bool(depth - 1), self.timestamp(depth - 1), self.duration(depth - 1)])
             return f"string({value})"
         return self.pick(leaves)
 
@@ -83,7 +90,7 @@ class Generator:
         leaves = ["this.i", "this.j", "this.leaf.count", str(self.pick(INTS)), str(self.pick(INTS))] + self.variables["int"]
         if depth <= 0 or self.rng.random() < 0.4:
             return self.pick(leaves)
-        kind = self.rng.randrange(13)
+        kind = self.rng.randrange(14)
         if kind < 4:
             return f"({self.int(depth - 1)} {self.pick(['+', '-', '*', '/', '%'])} {self.int(depth - 1)})"
         if kind == 4:
@@ -104,6 +111,11 @@ class Generator:
             return f"({self.bool(depth - 1)} ? {self.int(depth - 1)} : {self.int(depth - 1)})"
         if kind == 11:
             return self.derived_int(depth)
+        if kind == 12:
+            if self.rng.random() < 0.3:
+                return f"{self.duration(depth - 1)}.{self.pick(DURATION_PARTS)}()"
+            zone = self.pick(["", self.literal(self.pick(ZONES))])
+            return f"{self.timestamp(depth - 1)}.{self.pick(TIMESTAMP_PARTS)}({zone})"
         return self.pick(leaves)
 
     def derived(self, depth):
@@ -151,8 +163,28 @@ class Generator:
             return f"double({self.pick([self.int(depth - 1), self.uint(depth - 1), self.string(0)])})"
         return self.pick(leaves)
 
-    def duration(self):
-        return self.pick(["this.dur", f"duration('{self.pick(DURATIONS)}')"])
+    def duration(self, depth=0):
+        leaves = ["this.dur", f"duration('{self.pick(DURATIONS)}')"]
+        if depth <= 0 or self.rng.random() < 0.6:
+            return self.pick(leaves)
+        kind = self.rng.randrange(3)
+        if kind == 0:
+            return f"({self.duration(depth - 1)} {self.pick(['+', '-'])} {self.duration(depth - 1)})"
+        if kind == 1:
+            return f"({self.timestamp(depth - 1)} - {self.timestamp(depth - 1)})"
+        return f"duration({self.pick([self.string(0), self.literal(self.pick(DURATIONS))])})"
+
+    def timestamp(self, depth=0):
+        """A timestamp: a literal in UTC, a sum with a duration, or a text read as it runs."""
+        literal = f"timestamp('{self.pick(TIMESTAMPS)}')"
+        if depth <= 0 or self.rng.random() < 0.5:
+            return literal
+        kind = self.rng.randrange(3)
+        if kind == 0:
+            return f"({self.timestamp(depth - 1)} {self.pick(['+', '-'])} {self.duration(depth - 1)})"
+        if kind == 1:
+            return f"({self.duration(depth - 1)} + {self.timestamp(depth - 1)})"
+        return f"timestamp({self.pick([self.literal(self.pick(TIMESTAMPS)), self.string(0)])})"
 
     def variable(self):
         self.counter += 1
@@ -189,7 +221,9 @@ class Generator:
         if kind == 3:
             return f"{self.string(depth)} {order} {self.string(depth)}"
         if kind == 4:
-            return f"{self.duration()} {order} {self.duration()}"
+            if self.rng.random() < 0.5:
+                return f"{self.timestamp(depth)} {order} {self.timestamp(depth)}"
+            return f"{self.duration(depth)} {order} {self.duration(depth)}"
         if kind == 5:
             return f"this.y {self.pick(['==', '!='])} {self.pick(['this.y', 'bytes(this.s)', 'b' + self.literal_string(), 'bytes(this.s) + bytes(this.t)'])}"
         # Numbers of two types, which protovalidate's CEL compares.

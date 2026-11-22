@@ -11,6 +11,9 @@ const Function = @import("cel_node.zig").Function;
 const Bytes = type_file.Bytes;
 const Error = type_file.Error;
 const Timestamp = proto.wkt.Timestamp;
+const Duration = proto.wkt.Duration;
+const timestamp_file = @import("cel_timestamp.zig");
+const duration_file = @import("cel_duration.zig");
 
 /// One list of operand types a function takes, and the type it gives for them.
 const Overload = struct { operands: []const type, result: type };
@@ -37,18 +40,24 @@ fn overloads_of(comptime function: Function) []const Overload {
         },
         // `string` of a number or a bool writes its text, which `cel_text.zig` does.
         .string => &.{
-            .{ .operands = &.{text}, .result = text }, .{ .operands = &.{Bytes}, .result = text },
-            .{ .operands = &.{i64}, .result = text },  .{ .operands = &.{u64}, .result = text },
-            .{ .operands = &.{f64}, .result = text },  .{ .operands = &.{bool}, .result = text },
+            .{ .operands = &.{text}, .result = text },      .{ .operands = &.{Bytes}, .result = text },
+            .{ .operands = &.{i64}, .result = text },       .{ .operands = &.{u64}, .result = text },
+            .{ .operands = &.{f64}, .result = text },       .{ .operands = &.{bool}, .result = text },
+            .{ .operands = &.{Timestamp}, .result = text }, .{ .operands = &.{Duration}, .result = text },
         },
         .bytes => &.{ .{ .operands = &.{text}, .result = Bytes }, .{ .operands = &.{Bytes}, .result = Bytes } },
         .bool => &.{ .{ .operands = &.{bool}, .result = bool }, .{ .operands = &.{text}, .result = bool } },
         // CEL language definition, "String Functions": `matches(string, string) -> bool`, and
         // the same of a target.
         .startsWith, .endsWith, .contains, .matches => &.{.{ .operands = &.{ text, text }, .result = bool }},
+        // A part of a timestamp, in UTC or in a zone, and of a duration.
+        .getFullYear, .getMonth, .getDate, .getDayOfMonth, .getDayOfYear, .getDayOfWeek => &timestamp_parts,
+        .getHours, .getMinutes, .getSeconds, .getMilliseconds => &(timestamp_parts ++ [_]Overload{.{ .operands = &.{Duration}, .result = i64 }}),
         else => &.{},
     };
 }
+
+const timestamp_parts = [_]Overload{ .{ .operands = &.{Timestamp}, .result = i64 }, .{ .operands = &.{ Timestamp, text }, .result = i64 } };
 
 /// The type `function` gives for operands of these types, or null when the module holds no
 /// such function for them.
@@ -82,8 +91,19 @@ pub fn run(comptime function: Function, comptime R: type, operands: anytype) Err
         .startsWith => std.mem.startsWith(u8, first, operands[1]),
         .endsWith => std.mem.endsWith(u8, first, operands[1]),
         .contains => std.mem.indexOf(u8, first, operands[1]) != null,
+        .getFullYear, .getMonth, .getDate, .getDayOfMonth, .getDayOfYear, .getDayOfWeek => time_part(function, operands),
+        .getHours, .getMinutes, .getSeconds, .getMilliseconds => time_part(function, operands),
         else => library.run(function, operands),
     };
+}
+
+/// A part of a timestamp, in UTC or in the zone a second operand names, or of a duration. A
+/// zone the module does not read fails the run.
+fn time_part(comptime function: Function, operands: anytype) Error!i64 {
+    const first = operands[0];
+    if (comptime @TypeOf(first) == Duration) return duration_file.part_of(function, first);
+    const offset = if (comptime operands.len == 1) 0 else timestamp_file.offset_of_zone(operands[1]) orelse return error.Unevaluable;
+    return timestamp_file.part_of(function, first, offset);
 }
 
 /// The types of a tuple's values.
@@ -234,7 +254,7 @@ test "a conversion to a double, a string, bytes or a bool reads each type it tak
     try testing.expect(try call(.bool, .{str("true")}) and try call(.bool, .{str("T")}) and try call(.bool, .{true}));
     try testing.expect(!try call(.bool, .{str("false")}) and !try call(.bool, .{str("0")}));
     try testing.expectError(error.Unevaluable, call(.bool, .{str("yes")}));
-    try testing.expect(comptime Result(.bool, &.{i64}) == null and Result(.string, &.{Timestamp}) == null);
+    try testing.expect(comptime Result(.bool, &.{i64}) == null and Result(.string, &.{ []const u8, []const u8 }) == null);
     try testing.expect(comptime Result(.int, &.{bool}) == null and Result(.uint, &.{Timestamp}) == null);
 }
 

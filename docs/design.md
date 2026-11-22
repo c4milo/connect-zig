@@ -1732,8 +1732,9 @@ ran on Linux x86-64 with Zig 0.16.0.
 
 - **Text and lists an expression writes** (decision 47, amended 2026-11-22). `+` joins two
   strings, two bytes values or two lists, and `string` writes an int, a uint, a double or a
-  bool (CEL language definition, "Addition (+)" and "string"): `cel_text.zig`. A string and a
-  bytes value are written into the room that `format` writes into, the report's free storage. A
+  bool (CEL language definition, "Arithmetic Operators" and "Types and Conversions"):
+  `cel_text.zig`. A string and a bytes value are written into the room that `format` writes
+  into, the report's free storage. A
   `+` whose left side is the last text written writes its right side after it, so `a + b + c`
   writes each part once. A list is joined as it is read, and two list literals join into one.
   - A part whose value holds no text, such as a comparison or a `size`, gives back the text it
@@ -1755,6 +1756,33 @@ ran on Linux x86-64 with Zig 0.16.0.
     a joined list without its right side, a `+` not seen to write, and a uint written with a
     `u`. Each was `CAUGHT`.
 
+- **Timestamps and durations** (decision 47, amended 2026-11-22). `timestamp(string)` and
+  `duration(string)` read a literal once as the build runs, and any other text as the
+  expression runs. A timestamp plus or minus a duration, the duration between two timestamps,
+  and the sum and difference of two durations fail where cel-go's checked arithmetic fails.
+  The ten `get` functions of a timestamp take `UTC` or a fixed offset, and the four of a
+  duration round as Go's do. `string` writes a timestamp in RFC 3339 and a duration in
+  seconds: `cel_timestamp.zig`, `cel_duration.zig`.
+  - The typing reads a literal through `cel_time_literal.zig`, whose constants each raise the
+    branch quota for one literal. The typing's own files raise none, so the compiler keeps
+    their answers (docs/performance.md, "The compiler's time").
+  - Three schemas of chosen values compared the module with protovalidate-go: 3,072 verdicts
+    of texts, zones and durations, 30 of zones and 7 of durations at the int64 range. They
+    found three differences: `getMilliseconds` of a duration, which now follows cel-go; a zone
+    of minutes past 59, which cel-go refuses and now the module does too; and `string` of a
+    timestamp read with an offset, which follows the definition (docs/specs/README.md). The
+    differential check writes timestamps, durations, arithmetic and the `get` functions, and
+    seeds 71 to 86, with 219 such rules, agreed on each of their 128,000 verdicts.
+  - Mutations against `zig build test-protovalidate`, 21: every fourth century year a leap
+    year, January as month 13, a month of 31 days, a timestamp outside the range read, a
+    fraction's digit counted ten times, an offset's sign turned, a fraction's last zeros kept,
+    a zone of 24 hours or 60 minutes read, a negative zone that adds its minutes, 1970 on a
+    Wednesday, January as month 1, a zone that moves no part, a sum past the last timestamp
+    kept, a span past an int64 that wraps, a long duration as zero, units with no rounding,
+    milliseconds under a second, a timestamp minus a duration that adds it, a literal that
+    names no timestamp typed, and a zone name that stops no build. Each was `CAUGHT`, the
+    first and the fifth as the compiler read a test's literal.
+
 ### Work not done yet
 
 - A stream that waits for an event of the program once its request ended (colibri issue 130).
@@ -1773,11 +1801,10 @@ ran on Linux x86-64 with Zig 0.16.0.
 - For `protovalidate`, a `unique` list longer than `compared_items_max` fails with
   `TooManyItems` (decision 47). A program that needs longer lists needs a set in storage it
   passes. No step holds that yet.
-- For `protovalidate`, the parts of CEL that no rule of the conformance suite uses and the
-  module does not read yet: `type`, `duration` of a text
-  that is no literal, `timestamp(string)`, sums and differences of timestamps and
-  durations, and the accessors of a timestamp such as `getFullYear`. Each stops the build with
-  a message that names it.
+- For `protovalidate`, CEL's `type`, which no rule of the conformance suite uses. It stops the
+  build with a message that names it.
+- For `protovalidate`, a zone's name in a `get` function of a timestamp, such as
+  `America/Los_Angeles`, which needs the IANA time zone database (decision 47).
 - For `protovalidate`, the tree of each CEL expression in the table. The compiler takes
   4.1 ms to read a rule's text, and 0.04 ms to read the same tree as a Zig literal. The plugin
   would run the grammar of `cel_grammar.zig` as a program and write each tree beside its

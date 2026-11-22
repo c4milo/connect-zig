@@ -66,6 +66,27 @@ pub const Function = enum {
     isIpPrefix,
     isNan,
     isInf,
+    timestamp,
+    getFullYear,
+    getMonth,
+    getDate,
+    getDayOfMonth,
+    getDayOfYear,
+    getDayOfWeek,
+    getHours,
+    getMinutes,
+    getSeconds,
+    getMilliseconds,
+
+    /// Whether the function gives a part of a timestamp, or of a duration (CEL language
+    /// definition, the `get` functions of "Standard Environment").
+    pub fn is_time_part(function: Function) bool {
+        return switch (function) {
+            .getFullYear, .getMonth, .getDate, .getDayOfMonth, .getDayOfYear, .getDayOfWeek => true,
+            .getHours, .getMinutes, .getSeconds, .getMilliseconds => true,
+            else => false,
+        };
+    }
 
     /// The function `name` names. The compiler finds an enum's member by its name in one
     /// step, where a comparison with each function's name takes it a step for each octet

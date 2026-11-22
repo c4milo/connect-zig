@@ -98,11 +98,13 @@ test "the compiler types the reference expressions within their budget of branch
 }
 
 /// The files that hold the typing of an expression and what it calls, the table's searches
-/// among them. `table_once.zig` is not one: each of its functions is a constant's value.
+/// among them. `table_once.zig` and `cel_time_literal.zig` are not: each of their functions is
+/// a constant's value.
 const typing_files = [_][]const u8{
-    "cel_check.zig",    "cel_collection.zig", "cel_select.zig", "cel_type.zig", "cel_list.zig",
-    "cel_function.zig", "cel_library.zig",    "cel_value.zig",  "cel_time.zig", "cel_number.zig",
-    "cel_eval.zig",     "cel_node.zig",       "../shape.zig",   "../value.zig", "../table.zig",
+    "cel_check.zig",    "cel_collection.zig", "cel_select.zig",   "cel_type.zig",      "cel_list.zig",
+    "cel_function.zig", "cel_library.zig",    "cel_value.zig",    "cel_time.zig",      "cel_number.zig",
+    "cel_eval.zig",     "cel_node.zig",       "../shape.zig",     "../value.zig",      "../table.zig",
+    "cel_text.zig",     "cel_timestamp.zig",  "cel_duration.zig", "cel_lazy_list.zig",
 };
 
 test "no file on the typing's path raises the compiler's branch quota" {

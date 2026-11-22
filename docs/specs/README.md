@@ -44,6 +44,19 @@ the module takes cel-go's answer, and the code says so where it does:
   grammar. cel-go reads the text with Go's `time.ParseDuration` (`cel_time.zig`).
 - The words `bool(string)` takes. The definition's examples are "true" and "FALSE". cel-go
   takes the words of Go's `strconv.ParseBool` (`cel_function.zig`).
+- The text of a timestamp. "timestamp" says "according to RFC3339". cel-go reads it with Go's
+  `time.Parse(time.RFC3339, ...)`, which takes a fraction of any length and counts its first
+  nine digits, and refuses a lower-case `t` or `z` (`cel_timestamp.zig`).
+- A zone's offset. "Timezones" gives `("+" | "-") Digit Digit ":" Digit Digit`. cel-go reads
+  hours from -23 to 23 and minutes from 0 to 59, each an int that may have a sign, so it takes
+  `5:00` and `05:+30` too (`cel_timestamp.zig`).
+- `getMilliseconds` of a duration. "getMilliseconds" gives "the milliseconds portion", as in
+  `duration("1.234s").getMilliseconds() // 234`. cel-go gives all the milliseconds, 1234, and
+  so does the module. getHours, getMinutes and getSeconds round as Go's `Hours()`,
+  `Minutes()` and `Seconds()` do, which may round a sum up to the next unit
+  (`cel_duration.zig`).
+- A duration past an int64 of nanoseconds, in a message. protobuf-go's `AsDuration` gives
+  cel-go the greatest or the least duration, and so does the module (`cel_duration.zig`).
 - The least int's remainder by -1. "Overflow" makes an operation fail when "the results exceed
   the range", and the remainder, 0, does not. cel-go fails it, as the division it would take
   overflows (`cel_number.zig`).
@@ -64,9 +77,19 @@ stdx's `regex` (decision 47):
 - A form that stdx refuses: `\p{...}`, `\C`, and `(?i)` over a letter past ASCII. Such a
   pattern stops the build, as a pattern that is no literal does.
 
-One place follows the specification and not cel-go. `%s` of bytes that are not UTF-8, in
-`format`: the CEL strings extension, `cel/strings.md`, replaces each run of such octets with
-one U+FFFD, and cel-go copies them as they are. A violation's message is then always UTF-8.
+Two places follow the specification and not cel-go:
+
+- `%s` of bytes that are not UTF-8, in `format`: the CEL strings extension, `cel/strings.md`,
+  replaces each run of such octets with one U+FFFD, and cel-go copies them as they are. A
+  violation's message is then always UTF-8.
+- `string` of a timestamp. A CEL timestamp is a `google.protobuf.Timestamp`, which holds no
+  zone, so the module writes it in UTC. cel-go keeps the offset that a timestamp's text gave,
+  and writes `timestamp('2023-12-25T01:00:00+01:00')` with `+01:00` (`cel_timestamp.zig`).
+
+One place differs from cel-go because the module reads no file: a zone's name, such as
+`America/Los_Angeles` or `GMT`. cel-go loads it from the IANA time zone database. The module
+reads `UTC` and fixed offsets alone. A literal name stops the build, and a name from a field
+fails the expression as it runs (decision 47).
 
 One place follows neither. Behind `dyn` the module marks each part that came through `dyn` as
 dynamic, where "Gradual Type Checking" and cel-go give the result of a function its declared

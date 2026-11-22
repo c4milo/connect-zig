@@ -87,6 +87,10 @@ test {
     _ = @import("cel/cel_lazy_list.zig");
     _ = @import("cel/cel_text.zig");
     _ = @import("cel/cel_text_test.zig");
+    _ = @import("cel/cel_timestamp.zig");
+    _ = @import("cel/cel_duration.zig");
+    _ = @import("cel/cel_time_literal.zig");
+    _ = @import("cel/cel_time_test.zig");
     _ = @import("cel/cel_format.zig");
     _ = @import("cel/cel_format_test.zig");
     _ = @import("cel/cel_predefined_test.zig");

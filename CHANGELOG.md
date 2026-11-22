@@ -53,6 +53,9 @@ change the public API, and the entry marks each change that does.
 - A Lean model of the CEL syntax in `spec/lean/`, and `zig build lean`, which requires the
   vectors a unit test replays to be what the model gives. `tools/lean_check.sh` runs it, and
   is the check `lean` of `tools/ci.sh`.
+- CEL's timestamps and durations: `timestamp(string)` and `duration(string)` of any text,
+  arithmetic between them, the `get` functions such as `getFullYear` and `getHours('+05:30')`,
+  and `string` of each. A zone is `UTC` or a fixed offset; a zone's name stops the build.
 - CEL's `+` of two strings, two bytes values or two lists, and `string` of an int, a uint, a
   double or a bool, so a rule's message may be `'too long: ' + string(size(this))`. A string is
   written into the report's storage, as `format` writes, and a list is joined as it is read.

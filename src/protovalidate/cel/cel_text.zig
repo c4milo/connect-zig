@@ -1,5 +1,6 @@
 //! The CEL values an expression writes as it runs: `+` of two strings or two bytes values,
-//! `string` of a number or a bool (CEL language definition, "Addition (+)" and "string"), and
+//! `string` of a number or a bool (CEL language definition, "Arithmetic Operators" and "Types
+//! and Conversions"), and
 //! `+` of two lists. A string and a bytes value are written into the room that `Env.text`
 //! gives, the free part of the report's storage, so the library holds no buffer of its own. A
 //! list is joined as it is read, and needs no room.
@@ -13,6 +14,8 @@ const type_file = @import("cel_type.zig");
 const list_file = @import("cel_list.zig");
 const lazy = @import("cel_lazy_list.zig");
 const constants = @import("../constants.zig");
+const timestamp_file = @import("cel_timestamp.zig");
+const duration_file = @import("cel_duration.zig");
 const Node = node_file.Node;
 const Env = type_file.Env;
 const Error = type_file.Error;
@@ -60,9 +63,10 @@ fn ends_where_writes_go(text: *const Text, octets: []const u8) bool {
     return octets_start >= room_start and octets_start + octets.len == room_start + text.len;
 }
 
-/// Whether `string` of a `T` is written here: an int, a uint, a double or a bool.
+/// Whether `string` of a `T` is written here: an int, a uint, a double, a bool, a timestamp
+/// or a duration.
 pub fn converts(comptime T: type) bool {
-    return T == i64 or T == u64 or T == f64 or T == bool;
+    return T == i64 or T == u64 or T == f64 or T == bool or T == proto.wkt.Timestamp or T == proto.wkt.Duration;
 }
 
 /// `string(value)`: "converts integer values to base 10 representation", a bool to "true" or
@@ -74,6 +78,10 @@ pub fn to_string(value: anytype, env: *Env) Error![]const u8 {
     const start = text.len;
     if (comptime T == f64) {
         try format_double(value, text);
+    } else if (comptime T == proto.wkt.Timestamp) {
+        try timestamp_file.write(value, text);
+    } else if (comptime T == proto.wkt.Duration) {
+        try duration_file.write(value, text);
     } else {
         const written = std.fmt.bufPrint(text.unwritten(), "{d}", .{value}) catch return text.overflow();
         text.len += written.len;
@@ -94,7 +102,8 @@ const exponent_digits_min = 2;
 /// A double as Go's `strconv.FormatFloat(d, 'g', -1, 64)` writes it: the fewest digits that
 /// read back as the double, in fixed form for an exponent of -4 to 5, as in `1.5` and `100000`,
 /// and in scientific form past it, as in `1e+06` and `1.5e-05`. CEL language definition,
-/// "string", says only that it "converts a double to a string" (docs/specs/README.md).
+/// "Types and Conversions", says only that `string` "converts a double to a string"
+/// (docs/specs/README.md).
 fn format_double(value: f64, text: *Text) Error!void {
     if (std.math.isNan(value)) return text.write("NaN");
     if (std.math.isInf(value)) return text.write(if (value > 0) "+Inf" else "-Inf");

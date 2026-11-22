@@ -146,8 +146,9 @@ The text is written into the report's storage, so a report needs room for it.
 
 A rule the module has no check for stops your build, with a message that names it. That holds
 today for a predefined rule whose value is a message that is no wrapper, and for the parts of
-CEL the module does not read yet: arithmetic on a timestamp or a duration,
-`timestamp(string)` and `type`.
+CEL the module does not read yet: `type`. A zone's name, such as `America/Los_Angeles`, in a
+`get` function of a timestamp stops the build too: the module reads `UTC` and fixed offsets
+such as `+05:30`, and no time zone database.
 
 `+` of two strings and `string(number)` write their text into the report's storage, as
 `format` does, so a report needs room for it. Text that the expression no longer needs is
