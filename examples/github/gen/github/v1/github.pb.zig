@@ -4,6 +4,15 @@
 const proto = @import("protobuf");
 const connect = @import("connect");
 
+/// The type of each repeated field, declared once: the compiler counts each call in the
+/// types of a struct's fields against one branch quota.
+const repeated = struct {
+    const string = proto.Repeated([]const u8, .string);
+    const message_Repository = proto.Repeated(Repository, .message);
+    const message_Issue = proto.Repeated(Issue, .message);
+    const int32 = proto.Repeated(i32, .int32);
+};
+
 pub const User = struct {
     login: []const u8 = "",
     id: i64 = 0,
@@ -30,7 +39,7 @@ pub const Repository = struct {
     full_name: []const u8 = "",
     description: []const u8 = "",
     visibility: Visibility = @enumFromInt(0),
-    topics: proto.Repeated([]const u8, .string) = .{},
+    topics: repeated.string = .{},
     open_issues_count: i32 = 0,
     created_at: ?proto.wkt.Timestamp = null,
     _unknown: proto.Unknown = .{},
@@ -105,7 +114,7 @@ pub const ListRepositoriesRequest = struct {
 };
 
 pub const ListRepositoriesResponse = struct {
-    repositories: proto.Repeated(Repository, .message) = .{},
+    repositories: repeated.message_Repository = .{},
     next_page_token: []const u8 = "",
     _unknown: proto.Unknown = .{},
 
@@ -127,7 +136,7 @@ pub const CreateRepositoryRequest = struct {
     name: []const u8 = "",
     description: []const u8 = "",
     visibility: Visibility = @enumFromInt(0),
-    topics: proto.Repeated([]const u8, .string) = .{},
+    topics: repeated.string = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -156,7 +165,7 @@ pub const Issue = struct {
     body: []const u8 = "",
     state: IssueState = @enumFromInt(0),
     author: ?User = null,
-    labels: proto.Repeated([]const u8, .string) = .{},
+    labels: repeated.string = .{},
     created_at: ?proto.wkt.Timestamp = null,
     closed_at: ?proto.wkt.Timestamp = null,
     _unknown: proto.Unknown = .{},
@@ -196,7 +205,7 @@ pub const CreateIssueRequest = struct {
     repository: []const u8 = "",
     title: []const u8 = "",
     body: []const u8 = "",
-    labels: proto.Repeated([]const u8, .string) = .{},
+    labels: repeated.string = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -273,7 +282,7 @@ pub const ListIssuesRequest = struct {
 };
 
 pub const ListIssuesResponse = struct {
-    issues: proto.Repeated(Issue, .message) = .{},
+    issues: repeated.message_Issue = .{},
     next_page_token: []const u8 = "",
     total_count: i32 = 0,
     _unknown: proto.Unknown = .{},
@@ -324,7 +333,7 @@ pub const UpdateIssueRequest = struct {
 
 pub const ImportIssuesResponse = struct {
     created: i32 = 0,
-    numbers: proto.Repeated(i32, .int32) = .{},
+    numbers: repeated.int32 = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {

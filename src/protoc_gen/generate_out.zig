@@ -25,6 +25,11 @@ pub const Out = struct {
     /// Whether the output declares a table of rules, which names `protovalidate.Rules`
     /// (decision 47).
     uses_protovalidate: bool = false,
+    /// The type of each repeated field the output names: its `proto.Repeated` call, and the
+    /// name the file's `repeated` struct declares it under.
+    repeated_types: std.StringArrayHashMapUnmanaged([]const u8) = .empty,
+    /// The names of `repeated_types`, so that two calls never take one name.
+    repeated_names: std.StringHashMapUnmanaged(void) = .empty,
 
     pub fn print(out: *Out, comptime format: []const u8, args: anytype) Allocator.Error!void {
         try out.bytes.print(out.arena, format, args);
@@ -46,6 +51,29 @@ pub const Out = struct {
         return std.fmt.allocPrint(out.arena, "{s}.{s}", .{ module, entry.zig_path });
     }
 
+    /// The expression a struct field names the repeated type `call` with. The compiler counts
+    /// each call in the types of a struct's fields against one branch quota of 1000, and no
+    /// statement of the struct raises it. So each call stands once, in the file's `repeated`
+    /// struct, under `name` or, when another call took it, `name` and a number.
+    pub fn repeated(out: *Out, call: []const u8, name: []const u8) Allocator.Error![]const u8 {
+        const entry = try out.repeated_types.getOrPut(out.arena, call);
+        if (!entry.found_existing) entry.value_ptr.* = try out.free_name(name);
+        return std.fmt.allocPrint(out.arena, "repeated.{s}", .{try names.field_identifier(out.arena, entry.value_ptr.*)});
+    }
+
+    /// `name`, or `name_1`, `name_2` and so on: the first of them that no call took. Of the
+    /// `count + 1` names the loop reads, the `count` taken ones leave one free.
+    fn free_name(out: *Out, name: []const u8) Allocator.Error![]const u8 {
+        var candidate = name;
+        for (0..out.repeated_names.count() + 1) |taken| {
+            if (!out.repeated_names.contains(candidate)) break;
+            candidate = try std.fmt.allocPrint(out.arena, "{s}_{d}", .{ name, taken + 1 });
+        }
+        std.debug.assert(!out.repeated_names.contains(candidate));
+        try out.repeated_names.put(out.arena, candidate, {});
+        return candidate;
+    }
+
     /// The file's text: its header, the imports its body uses, then the body.
     pub fn assemble(out: *const Out) Allocator.Error![]const u8 {
         var text: std.ArrayList(u8) = .empty;
@@ -61,8 +89,22 @@ pub const Out = struct {
         if (out.uses_connect) try text.appendSlice(arena, "const connect = @import(\"connect\");\n");
         if (out.uses_protovalidate) try text.appendSlice(arena, "const validate = @import(\"protovalidate\");\n");
         for (out.used_modules.keys()) |module| try text.print(arena, "const {s} = @import(\"{s}\");\n", .{ module, module });
+        try out.write_repeated(&text);
         try text.appendSlice(arena, out.bytes.items);
         return text.items;
+    }
+
+    /// The `repeated` struct, which declares each repeated type of the file once.
+    fn write_repeated(out: *const Out, text: *std.ArrayList(u8)) Allocator.Error!void {
+        if (out.repeated_types.count() == 0) return;
+        const arena = out.arena;
+        try text.appendSlice(arena, "\n/// The type of each repeated field, declared once: the compiler counts each call in the\n");
+        try text.appendSlice(arena, "/// types of a struct's fields against one branch quota.\nconst repeated = struct {\n");
+        var calls = out.repeated_types.iterator();
+        while (calls.next()) |entry| {
+            try text.print(arena, "    const {s} = {s};\n", .{ try names.identifier(arena, entry.value_ptr.*), entry.key_ptr.* });
+        }
+        try text.appendSlice(arena, "};\n");
     }
 };
 

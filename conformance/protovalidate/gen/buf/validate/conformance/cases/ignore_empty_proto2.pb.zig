@@ -4,6 +4,13 @@
 const proto = @import("protobuf");
 const validate = @import("protovalidate");
 
+/// The type of each repeated field, declared once: the compiler counts each call in the
+/// types of a struct's fields against one branch quota.
+const repeated = struct {
+    const int32 = proto.Repeated(i32, .int32);
+    const message_IgnoreEmptyProto2Map_ValEntry = proto.Repeated(IgnoreEmptyProto2Map.ValEntry, .message);
+};
+
 pub const IgnoreEmptyProto2ScalarOptional = struct {
     val: ?i32 = null,
     _unknown: proto.Unknown = .{},
@@ -133,7 +140,7 @@ pub const IgnoreEmptyProto2Oneof = struct {
 };
 
 pub const IgnoreEmptyProto2Repeated = struct {
-    val: proto.Repeated(i32, .int32) = .{},
+    val: repeated.int32 = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -159,7 +166,7 @@ pub const IgnoreEmptyProto2Repeated = struct {
 };
 
 pub const IgnoreEmptyProto2Map = struct {
-    val: proto.Repeated(IgnoreEmptyProto2Map.ValEntry, .message) = .{},
+    val: repeated.message_IgnoreEmptyProto2Map_ValEntry = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {

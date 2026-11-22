@@ -4,6 +4,21 @@
 const proto = @import("protobuf");
 const validate = @import("protovalidate");
 
+/// The type of each repeated field, declared once: the compiler counts each call in the
+/// types of a struct's fields against one branch quota.
+const repeated = struct {
+    const int32 = proto.Repeated(i32, .int32);
+    const message_EditionsMapIgnoreUnspecified_ValEntry = proto.Repeated(EditionsMapIgnoreUnspecified.ValEntry, .message);
+    const message_EditionsMapIgnoreEmpty_ValEntry = proto.Repeated(EditionsMapIgnoreEmpty.ValEntry, .message);
+    const message_EditionsMapIgnoreAlways_ValEntry = proto.Repeated(EditionsMapIgnoreAlways.ValEntry, .message);
+    const message_EditionsMapKeyIgnoreUnspecified_ValEntry = proto.Repeated(EditionsMapKeyIgnoreUnspecified.ValEntry, .message);
+    const message_EditionsMapKeyIgnoreEmpty_ValEntry = proto.Repeated(EditionsMapKeyIgnoreEmpty.ValEntry, .message);
+    const message_EditionsMapKeyIgnoreAlways_ValEntry = proto.Repeated(EditionsMapKeyIgnoreAlways.ValEntry, .message);
+    const message_EditionsMapValueIgnoreUnspecified_ValEntry = proto.Repeated(EditionsMapValueIgnoreUnspecified.ValEntry, .message);
+    const message_EditionsMapValueIgnoreEmpty_ValEntry = proto.Repeated(EditionsMapValueIgnoreEmpty.ValEntry, .message);
+    const message_EditionsMapValueIgnoreAlways_ValEntry = proto.Repeated(EditionsMapValueIgnoreAlways.ValEntry, .message);
+};
+
 pub const EditionsScalarExplicitPresenceIgnoreUnspecified = struct {
     val: ?i32 = null,
     _unknown: proto.Unknown = .{},
@@ -935,7 +950,7 @@ pub const EditionsOneofIgnoreAlwaysWithDefault = struct {
 };
 
 pub const EditionsRepeatedIgnoreUnspecified = struct {
-    val: proto.Repeated(i32, .int32) = .{},
+    val: repeated.int32 = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -961,7 +976,7 @@ pub const EditionsRepeatedIgnoreUnspecified = struct {
 };
 
 pub const EditionsRepeatedExpandedIgnoreUnspecified = struct {
-    val: proto.Repeated(i32, .int32) = .{},
+    val: repeated.int32 = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -987,7 +1002,7 @@ pub const EditionsRepeatedExpandedIgnoreUnspecified = struct {
 };
 
 pub const EditionsRepeatedIgnoreEmpty = struct {
-    val: proto.Repeated(i32, .int32) = .{},
+    val: repeated.int32 = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -1013,7 +1028,7 @@ pub const EditionsRepeatedIgnoreEmpty = struct {
 };
 
 pub const EditionsRepeatedExpandedIgnoreEmpty = struct {
-    val: proto.Repeated(i32, .int32) = .{},
+    val: repeated.int32 = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -1039,7 +1054,7 @@ pub const EditionsRepeatedExpandedIgnoreEmpty = struct {
 };
 
 pub const EditionsRepeatedIgnoreAlways = struct {
-    val: proto.Repeated(i32, .int32) = .{},
+    val: repeated.int32 = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -1065,7 +1080,7 @@ pub const EditionsRepeatedIgnoreAlways = struct {
 };
 
 pub const EditionsRepeatedExpandedIgnoreAlways = struct {
-    val: proto.Repeated(i32, .int32) = .{},
+    val: repeated.int32 = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -1091,7 +1106,7 @@ pub const EditionsRepeatedExpandedIgnoreAlways = struct {
 };
 
 pub const EditionsMapIgnoreUnspecified = struct {
-    val: proto.Repeated(EditionsMapIgnoreUnspecified.ValEntry, .message) = .{},
+    val: repeated.message_EditionsMapIgnoreUnspecified_ValEntry = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -1136,7 +1151,7 @@ pub const EditionsMapIgnoreUnspecified = struct {
 };
 
 pub const EditionsMapIgnoreEmpty = struct {
-    val: proto.Repeated(EditionsMapIgnoreEmpty.ValEntry, .message) = .{},
+    val: repeated.message_EditionsMapIgnoreEmpty_ValEntry = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -1181,7 +1196,7 @@ pub const EditionsMapIgnoreEmpty = struct {
 };
 
 pub const EditionsMapIgnoreAlways = struct {
-    val: proto.Repeated(EditionsMapIgnoreAlways.ValEntry, .message) = .{},
+    val: repeated.message_EditionsMapIgnoreAlways_ValEntry = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -1226,7 +1241,7 @@ pub const EditionsMapIgnoreAlways = struct {
 };
 
 pub const EditionsRepeatedItemIgnoreUnspecified = struct {
-    val: proto.Repeated(i32, .int32) = .{},
+    val: repeated.int32 = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -1248,7 +1263,7 @@ pub const EditionsRepeatedItemIgnoreUnspecified = struct {
 };
 
 pub const EditionsRepeatedExpandedItemIgnoreUnspecified = struct {
-    val: proto.Repeated(i32, .int32) = .{},
+    val: repeated.int32 = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -1270,7 +1285,7 @@ pub const EditionsRepeatedExpandedItemIgnoreUnspecified = struct {
 };
 
 pub const EditionsRepeatedItemIgnoreEmpty = struct {
-    val: proto.Repeated(i32, .int32) = .{},
+    val: repeated.int32 = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -1292,7 +1307,7 @@ pub const EditionsRepeatedItemIgnoreEmpty = struct {
 };
 
 pub const EditionsRepeatedExpandedItemIgnoreEmpty = struct {
-    val: proto.Repeated(i32, .int32) = .{},
+    val: repeated.int32 = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -1314,7 +1329,7 @@ pub const EditionsRepeatedExpandedItemIgnoreEmpty = struct {
 };
 
 pub const EditionsRepeatedItemIgnoreAlways = struct {
-    val: proto.Repeated(i32, .int32) = .{},
+    val: repeated.int32 = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -1336,7 +1351,7 @@ pub const EditionsRepeatedItemIgnoreAlways = struct {
 };
 
 pub const EditionsRepeatedExpandedItemIgnoreAlways = struct {
-    val: proto.Repeated(i32, .int32) = .{},
+    val: repeated.int32 = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -1358,7 +1373,7 @@ pub const EditionsRepeatedExpandedItemIgnoreAlways = struct {
 };
 
 pub const EditionsMapKeyIgnoreUnspecified = struct {
-    val: proto.Repeated(EditionsMapKeyIgnoreUnspecified.ValEntry, .message) = .{},
+    val: repeated.message_EditionsMapKeyIgnoreUnspecified_ValEntry = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -1399,7 +1414,7 @@ pub const EditionsMapKeyIgnoreUnspecified = struct {
 };
 
 pub const EditionsMapKeyIgnoreEmpty = struct {
-    val: proto.Repeated(EditionsMapKeyIgnoreEmpty.ValEntry, .message) = .{},
+    val: repeated.message_EditionsMapKeyIgnoreEmpty_ValEntry = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -1440,7 +1455,7 @@ pub const EditionsMapKeyIgnoreEmpty = struct {
 };
 
 pub const EditionsMapKeyIgnoreAlways = struct {
-    val: proto.Repeated(EditionsMapKeyIgnoreAlways.ValEntry, .message) = .{},
+    val: repeated.message_EditionsMapKeyIgnoreAlways_ValEntry = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -1481,7 +1496,7 @@ pub const EditionsMapKeyIgnoreAlways = struct {
 };
 
 pub const EditionsMapValueIgnoreUnspecified = struct {
-    val: proto.Repeated(EditionsMapValueIgnoreUnspecified.ValEntry, .message) = .{},
+    val: repeated.message_EditionsMapValueIgnoreUnspecified_ValEntry = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -1522,7 +1537,7 @@ pub const EditionsMapValueIgnoreUnspecified = struct {
 };
 
 pub const EditionsMapValueIgnoreEmpty = struct {
-    val: proto.Repeated(EditionsMapValueIgnoreEmpty.ValEntry, .message) = .{},
+    val: repeated.message_EditionsMapValueIgnoreEmpty_ValEntry = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -1563,7 +1578,7 @@ pub const EditionsMapValueIgnoreEmpty = struct {
 };
 
 pub const EditionsMapValueIgnoreAlways = struct {
-    val: proto.Repeated(EditionsMapValueIgnoreAlways.ValEntry, .message) = .{},
+    val: repeated.message_EditionsMapValueIgnoreAlways_ValEntry = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {

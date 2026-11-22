@@ -5,6 +5,15 @@ const proto = @import("protobuf");
 const connectrpc_conformance_v1_config = @import("connectrpc_conformance_v1_config");
 const connectrpc_conformance_v1_service = @import("connectrpc_conformance_v1_service");
 
+/// The type of each repeated field, declared once: the compiler counts each call in the
+/// types of a struct's fields against one branch quota.
+const repeated = struct {
+    const message_connectrpc_conformance_v1_service_Header = proto.Repeated(connectrpc_conformance_v1_service.Header, .message);
+    const message_proto_wkt_Any = proto.Repeated(proto.wkt.Any, .message);
+    const message_connectrpc_conformance_v1_service_ConformancePayload = proto.Repeated(connectrpc_conformance_v1_service.ConformancePayload, .message);
+    const string = proto.Repeated([]const u8, .string);
+};
+
 pub const ClientCompatRequest = struct {
     test_name: []const u8 = "",
     http_version: connectrpc_conformance_v1_config.HTTPVersion = @enumFromInt(0),
@@ -20,8 +29,8 @@ pub const ClientCompatRequest = struct {
     method: ?[]const u8 = null,
     stream_type: connectrpc_conformance_v1_config.StreamType = @enumFromInt(0),
     use_get_http_method: bool = false,
-    request_headers: proto.Repeated(connectrpc_conformance_v1_service.Header, .message) = .{},
-    request_messages: proto.Repeated(proto.wkt.Any, .message) = .{},
+    request_headers: repeated.message_connectrpc_conformance_v1_service_Header = .{},
+    request_messages: repeated.message_proto_wkt_Any = .{},
     timeout_ms: ?u32 = null,
     request_delay_ms: u32 = 0,
     cancel: ?ClientCompatRequest.Cancel = null,
@@ -127,13 +136,13 @@ pub const ClientCompatResponse = struct {
 };
 
 pub const ClientResponseResult = struct {
-    response_headers: proto.Repeated(connectrpc_conformance_v1_service.Header, .message) = .{},
-    payloads: proto.Repeated(connectrpc_conformance_v1_service.ConformancePayload, .message) = .{},
+    response_headers: repeated.message_connectrpc_conformance_v1_service_Header = .{},
+    payloads: repeated.message_connectrpc_conformance_v1_service_ConformancePayload = .{},
     @"error": ?connectrpc_conformance_v1_service.Error = null,
-    response_trailers: proto.Repeated(connectrpc_conformance_v1_service.Header, .message) = .{},
+    response_trailers: repeated.message_connectrpc_conformance_v1_service_Header = .{},
     num_unsent_requests: i32 = 0,
     http_status_code: ?i32 = null,
-    feedback: proto.Repeated([]const u8, .string) = .{},
+    feedback: repeated.string = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -179,7 +188,7 @@ pub const ClientErrorResult = struct {
 pub const WireDetails = struct {
     actual_status_code: i32 = 0,
     connect_error_raw: ?proto.wkt.Struct = null,
-    actual_http_trailers: proto.Repeated(connectrpc_conformance_v1_service.Header, .message) = .{},
+    actual_http_trailers: repeated.message_connectrpc_conformance_v1_service_Header = .{},
     actual_grpcweb_trailers: ?[]const u8 = null,
     _unknown: proto.Unknown = .{},
 

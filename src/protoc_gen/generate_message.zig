@@ -165,7 +165,9 @@ const Typed = struct { text: []const u8, default: []const u8 };
 fn zig_type(out: *Out, container: []const u8, field: pb.FieldDescriptorProto) Error!Typed {
     if (field.label == .repeated) {
         const value = try value_type(out, container, field);
-        return .{ .text = try std.fmt.allocPrint(out.arena, "proto.Repeated({s}, .{s})", .{ value, try field_kind(out, field) }), .default = ".{}" };
+        const kind = try field_kind(out, field);
+        const call = try std.fmt.allocPrint(out.arena, "proto.Repeated({s}, .{s})", .{ value, kind });
+        return .{ .text = try out.repeated(call, try repeated_name(out.arena, field, value, kind)), .default = ".{}" };
     }
     if (field.type == .message or field.type == .group) {
         const target = index_file.strip_dot(field.type_name orelse "");
@@ -183,6 +185,25 @@ fn zig_type(out: *Out, container: []const u8, field: pb.FieldDescriptorProto) Er
         .@"enum" => "@enumFromInt(0)",
         else => "0",
     } };
+}
+
+/// The name the file's `repeated` struct declares a field's type under: the kind of a scalar,
+/// such as `string`, and for a message or an enum the kind and the element's path, joined by
+/// `_`, such as `message_Node_LabelsEntry`. The kind keeps the name apart from the element's.
+fn repeated_name(arena: Allocator, field: pb.FieldDescriptorProto, value: []const u8, kind: []const u8) Allocator.Error![]const u8 {
+    const kind_text = generate_out.unescaped(kind);
+    switch (field.type.?) {
+        .message, .group, .@"enum" => {},
+        else => return kind_text,
+    }
+    var name: std.ArrayList(u8) = .empty;
+    try name.appendSlice(arena, kind_text);
+    var parts = std.mem.splitScalar(u8, value, '.');
+    while (parts.next()) |part| {
+        try name.append(arena, '_');
+        try name.appendSlice(arena, generate_out.unescaped(part));
+    }
+    return name.items;
 }
 
 /// Whether a scalar field has explicit presence: proto3 `optional`, or a proto2 singular field

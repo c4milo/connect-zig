@@ -4,6 +4,12 @@
 const proto = @import("protobuf");
 const validate = @import("protovalidate");
 
+/// The type of each repeated field, declared once: the compiler counts each call in the
+/// types of a struct's fields against one branch quota.
+const repeated = struct {
+    const group_GroupRepeated_Repeated = proto.Repeated(GroupRepeated.Repeated, .group);
+};
+
 pub const GroupOptional = struct {
     optional: ?GroupOptional.Optional = null,
     _unknown: proto.Unknown = .{},
@@ -45,7 +51,7 @@ pub const GroupOptional = struct {
 };
 
 pub const GroupRepeated = struct {
-    repeated: proto.Repeated(GroupRepeated.Repeated, .group) = .{},
+    repeated: repeated.group_GroupRepeated_Repeated = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {

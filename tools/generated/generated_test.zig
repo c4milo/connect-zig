@@ -66,7 +66,7 @@ const past_items_limit = 100;
 /// The octets the wide message's tests encode into: a few fields are set.
 const wide_room = 4096;
 
-test "a message of 600 fields round-trips through binary and JSON" {
+test "a message of 1,200 fields round-trips through binary and JSON" {
     const leaf: wide.Leaf = .{ .name = "end" };
     const message: wide.Wide = .{ .f1 = 1, .f2 = "ab", .f299 = .of(&.{ 1, 0 }), .f597 = 1, .f598 = "last text", .f600 = leaf };
     var binary: [wide_room]u8 = undefined;
@@ -87,7 +87,7 @@ test "a message of 600 fields round-trips through binary and JSON" {
     try testing.expectEqual(@as(?i32, 1), try elements.next());
 }
 
-test "a message of 600 fields is checked against the rules of each field" {
+test "a message of 1,200 fields is checked against the rules of each field" {
     try testing.expect(comptime protovalidate.rules_error(wide.Wide) == null);
     var storage: [protovalidate.constants.report_bytes_default]u8 align(@alignOf(protovalidate.Violation)) = undefined;
     var report: protovalidate.Report = .init(&storage);
@@ -109,4 +109,31 @@ test "a message of 600 fields is checked against the rules of each field" {
         }
         try testing.expect(found);
     }
+}
+
+/// The `max_items` of the rule of `Lists.f1`, and a list of one item more.
+const lists_max_items = 4;
+const past_max_items = [_]i32{0} ** (lists_max_items + 1);
+
+test "a message of 1,100 repeated and map fields round-trips and is checked against its rules" {
+    const leaf: wide.Leaf = .{ .name = "end" };
+    const message: wide.Lists = .{ .f1 = .of(&.{ 1, 2 }), .f1098 = .of(&.{"last"}), .f1099 = .of(&.{leaf}), .f1100 = .of(&.{.{ .key = "k", .value = 7 }}) };
+    var binary: [wide_room]u8 = undefined;
+    const bytes = try proto.encode(wide.Lists, &message, &binary);
+    const back = try proto.decode(wide.Lists, bytes);
+    try testing.expectEqual(@as(?i32, 7), try proto.map_get(@TypeOf(back.f1100), &back.f1100, "k"));
+    var text: [wide_room]u8 = undefined;
+    const json = try proto.encode_json(wide.Lists, &back, &text);
+    try testing.expectEqualStrings("{\"f1\":[1,2],\"f1098\":[\"last\"],\"f1099\":[{\"name\":\"end\"}],\"f1100\":{\"k\":7}}", json);
+
+    try testing.expect(comptime protovalidate.rules_error(wide.Lists) == null);
+    var storage: [protovalidate.constants.report_bytes_default]u8 align(@alignOf(protovalidate.Violation)) = undefined;
+    var report: protovalidate.Report = .init(&storage);
+    try protovalidate.validate(wide.Lists, &back, .{}, &report);
+    // The first list has more items than its rule takes, and the last list's message breaks its own.
+    const invalid: wide.Lists = .{ .f1 = .of(&past_max_items), .f1099 = .of(&.{.{}}) };
+    try testing.expectError(error.Invalid, protovalidate.validate(wide.Lists, &invalid, .{}, &report));
+    try testing.expectEqual(@as(usize, 2), report.violations().len);
+    try testing.expectEqualStrings("repeated.max_items", report.violations()[0].rule_id.?);
+    try testing.expectEqualStrings("string.min_len", report.violations()[1].rule_id.?);
 }

@@ -4,10 +4,17 @@
 const proto = @import("protobuf");
 const opentelemetry_proto_common_v1_common = @import("opentelemetry_proto_common_v1_common");
 
+/// The type of each repeated field, declared once: the compiler counts each call in the
+/// types of a struct's fields against one branch quota.
+const repeated = struct {
+    const message_opentelemetry_proto_common_v1_common_KeyValue = proto.Repeated(opentelemetry_proto_common_v1_common.KeyValue, .message);
+    const message_opentelemetry_proto_common_v1_common_EntityRef = proto.Repeated(opentelemetry_proto_common_v1_common.EntityRef, .message);
+};
+
 pub const Resource = struct {
-    attributes: proto.Repeated(opentelemetry_proto_common_v1_common.KeyValue, .message) = .{},
+    attributes: repeated.message_opentelemetry_proto_common_v1_common_KeyValue = .{},
     dropped_attributes_count: u32 = 0,
-    entity_refs: proto.Repeated(opentelemetry_proto_common_v1_common.EntityRef, .message) = .{},
+    entity_refs: repeated.message_opentelemetry_proto_common_v1_common_EntityRef = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {

@@ -96,9 +96,11 @@ test "messages, enums, oneofs, maps, recursion and services are generated" {
     };
     const request: pb.CodeGeneratorRequest = .{ .file_to_generate = .of(&.{"demo/v1/demo.proto"}), .proto_file = .of(&.{file}) };
     const text = try generated(arena, &request);
-    try expect_contains(text, "pub const Node = struct {\n    id: u64 = 0,\n    tags: proto.Repeated([]const u8, .string) = .{},\n");
+    try expect_contains(text, "pub const Node = struct {\n    id: u64 = 0,\n    tags: repeated.string = .{},\n");
     try expect_contains(text, "    next: proto.Lazy(Node) = .{},\n");
-    try expect_contains(text, "    labels: proto.Repeated(Node.LabelsEntry, .message) = .{},\n");
+    try expect_contains(text, "    labels: repeated.message_Node_LabelsEntry = .{},\n");
+    try expect_contains(text, "const repeated = struct {\n    const string = proto.Repeated([]const u8, .string);\n" ++
+        "    const message_Node_LabelsEntry = proto.Repeated(Node.LabelsEntry, .message);\n    const int32 = proto.Repeated(i32, .int32);\n};\n");
     try expect_contains(text, "    color: Color = @enumFromInt(0),\n");
     try expect_contains(text, "    choice: ?union(enum) {\n        text: []const u8,\n        number: i32,\n    } = null,\n");
     try expect_contains(text, "    maybe: ?i64 = null,\n");
@@ -233,7 +235,9 @@ test "a file whose messages are delimited writes groups, but a map keeps its ent
     note.type_name = ".demo.v1.Note";
     var notes = field("notes", 2, .message, .repeated);
     notes.type_name = ".demo.v1.Book.NotesEntry";
-    const book: pb.DescriptorProto = .{ .name = "Book", .field = .of(&.{ note, notes }), .nested_type = .of(&.{entry}) };
+    var pages = field("pages", 3, .message, .repeated);
+    pages.type_name = ".demo.v1.Note";
+    const book: pb.DescriptorProto = .{ .name = "Book", .field = .of(&.{ note, notes, pages }), .nested_type = .of(&.{entry}) };
     const file: pb.FileDescriptorProto = .{
         .name = "demo/v1/demo.proto",
         .package = "demo.v1",
@@ -249,4 +253,42 @@ test "a file whose messages are delimited writes groups, but a map keeps its ent
     // The entry's value keeps its length too, and its key has no presence.
     try expect_contains(content, ".name = \"value\", .number = @intFromEnum(@This().FieldNumber.value), .kind = .message");
     try expect_contains(content, "key: []const u8 = \"\",\n");
+    try expect_contains(content, "    notes: repeated.message_Book_NotesEntry = .{},\n    pages: repeated.group_Note = .{},\n");
+}
+
+test "each repeated type stands once in the file's repeated struct, under a name of its own" {
+    var arena_state = std.heap.ArenaAllocator.init(testing.allocator);
+    defer arena_state.deinit();
+    const arena = arena_state.allocator();
+    // A.B_C and A_B.C give one name, so the second type takes a number after it.
+    var first = field("first", 1, .message, .repeated);
+    first.type_name = ".demo.v1.A.B_C";
+    var second = field("second", 2, .message, .repeated);
+    second.type_name = ".demo.v1.A_B.C";
+    var again = field("again", 3, .message, .repeated);
+    again.type_name = ".demo.v1.A.B_C";
+    var colors = field("colors", 4, .@"enum", .repeated);
+    colors.type_name = ".demo.v1.Color";
+    var kinds = field("kinds", 6, .message, .repeated);
+    kinds.type_name = ".demo.v1.type";
+    const lists: pb.DescriptorProto = .{ .name = "Lists", .field = .of(&.{ first, second, again, colors, field("flags", 5, .bool, .repeated), kinds }) };
+    const color: pb.EnumDescriptorProto = .{ .name = "Color", .value = .of(&.{.{ .name = "COLOR_UNSPECIFIED", .number = 0 }}) };
+    const file: pb.FileDescriptorProto = .{
+        .name = "demo/v1/demo.proto",
+        .package = "demo.v1",
+        .message_type = .of(&.{
+            lists,                                                        .{ .name = "A", .nested_type = .of(&.{.{ .name = "B_C" }}) },
+            .{ .name = "A_B", .nested_type = .of(&.{.{ .name = "C" }}) }, .{ .name = "type" },
+        }),
+        .enum_type = .of(&.{color}),
+        .syntax = "proto3",
+    };
+    const request: pb.CodeGeneratorRequest = .{ .file_to_generate = .of(&.{"demo/v1/demo.proto"}), .proto_file = .of(&.{file}) };
+    const text = try generated(arena, &request);
+    try expect_contains(text, "    first: repeated.message_A_B_C = .{},\n    second: repeated.message_A_B_C_1 = .{},\n" ++
+        "    again: repeated.message_A_B_C = .{},\n    colors: repeated.enum_Color = .{},\n    flags: repeated.bool = .{},\n" ++
+        "    kinds: repeated.message_type = .{},\n");
+    try expect_contains(text, "const repeated = struct {\n    const message_A_B_C = proto.Repeated(A.B_C, .message);\n" ++
+        "    const message_A_B_C_1 = proto.Repeated(A_B.C, .message);\n    const enum_Color = proto.Repeated(Color, .@\"enum\");\n" ++
+        "    const @\"bool\" = proto.Repeated(bool, .bool);\n    const message_type = proto.Repeated(@\"type\", .message);\n};\n");
 }

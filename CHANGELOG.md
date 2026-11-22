@@ -135,6 +135,10 @@ change the public API, and the entry marks each change that does.
 
 - A message of about 500 fields or more encodes and decodes. Before, the compiler stopped at
   its default branch quota in `encode`, in `decode` and in the JSON writer.
+- A message of more than about 1,000 repeated and map fields compiles. The plugin now declares
+  each repeated type once, in the file's `repeated` struct, and a field names it there, as
+  `repeated.string`. The type is still `proto.Repeated(T, .kind)`. Before, the compiler stopped
+  at the quota of the struct that held the fields.
 - A macro over a list literal, such as `[1, 2].all(n, n > 0)`, and a signed duration literal,
   such as `duration('-3s')`, compile. Before, each stopped the build with a compiler error.
 - A CEL string with a numbered escape, such as `'é'` or `'\x41'`, compiles. Before, the

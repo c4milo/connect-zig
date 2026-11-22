@@ -4,6 +4,13 @@
 const proto = @import("protobuf");
 const validate = @import("protovalidate");
 
+/// The type of each repeated field, declared once: the compiler counts each call in the
+/// types of a struct's fields against one branch quota.
+const repeated = struct {
+    const message_proto_wkt_Timestamp = proto.Repeated(proto.wkt.Timestamp, .message);
+    const message_ComplexTestMsg_MapValEntry = proto.Repeated(ComplexTestMsg.MapValEntry, .message);
+};
+
 pub const ComplexTestMsg = struct {
     @"const": []const u8 = "",
     nested: proto.Lazy(ComplexTestMsg) = .{},
@@ -17,8 +24,8 @@ pub const ComplexTestMsg = struct {
     double_in: f64 = 0,
     enum_const: ComplexTestEnum = @enumFromInt(0),
     any_val: ?proto.wkt.Any = null,
-    rep_ts_val: proto.Repeated(proto.wkt.Timestamp, .message) = .{},
-    map_val: proto.Repeated(ComplexTestMsg.MapValEntry, .message) = .{},
+    rep_ts_val: repeated.message_proto_wkt_Timestamp = .{},
+    map_val: repeated.message_ComplexTestMsg_MapValEntry = .{},
     bytes_val: []const u8 = "",
     o: ?union(enum) {
         x: []const u8,

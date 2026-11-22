@@ -6,6 +6,16 @@ const validate = @import("protovalidate");
 const buf_validate_conformance_cases_other_package_embed = @import("buf_validate_conformance_cases_other_package_embed");
 const buf_validate_conformance_cases_yet_another_package_embed2 = @import("buf_validate_conformance_cases_yet_another_package_embed2");
 
+/// The type of each repeated field, declared once: the compiler counts each call in the
+/// types of a struct's fields against one branch quota.
+const repeated = struct {
+    const enum_TestEnum = proto.Repeated(TestEnum, .@"enum");
+    const enum_buf_validate_conformance_cases_other_package_embed_Embed_Enumerated = proto.Repeated(buf_validate_conformance_cases_other_package_embed.Embed.Enumerated, .@"enum");
+    const enum_buf_validate_conformance_cases_yet_another_package_embed2_Embed_Enumerated = proto.Repeated(buf_validate_conformance_cases_yet_another_package_embed2.Embed.Enumerated, .@"enum");
+    const message_MapEnumDefined_ValEntry = proto.Repeated(MapEnumDefined.ValEntry, .message);
+    const message_MapExternalEnumDefined_ValEntry = proto.Repeated(MapExternalEnumDefined.ValEntry, .message);
+};
+
 pub const EnumNone = struct {
     val: TestEnum = @enumFromInt(0),
     _unknown: proto.Unknown = .{},
@@ -259,7 +269,7 @@ pub const EnumExternal2 = struct {
 };
 
 pub const RepeatedEnumDefined = struct {
-    val: proto.Repeated(TestEnum, .@"enum") = .{},
+    val: repeated.enum_TestEnum = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -281,7 +291,7 @@ pub const RepeatedEnumDefined = struct {
 };
 
 pub const RepeatedExternalEnumDefined = struct {
-    val: proto.Repeated(buf_validate_conformance_cases_other_package_embed.Embed.Enumerated, .@"enum") = .{},
+    val: repeated.enum_buf_validate_conformance_cases_other_package_embed_Embed_Enumerated = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -303,7 +313,7 @@ pub const RepeatedExternalEnumDefined = struct {
 };
 
 pub const RepeatedYetAnotherExternalEnumDefined = struct {
-    val: proto.Repeated(buf_validate_conformance_cases_yet_another_package_embed2.Embed.Enumerated, .@"enum") = .{},
+    val: repeated.enum_buf_validate_conformance_cases_yet_another_package_embed2_Embed_Enumerated = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -325,7 +335,7 @@ pub const RepeatedYetAnotherExternalEnumDefined = struct {
 };
 
 pub const MapEnumDefined = struct {
-    val: proto.Repeated(MapEnumDefined.ValEntry, .message) = .{},
+    val: repeated.message_MapEnumDefined_ValEntry = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -366,7 +376,7 @@ pub const MapEnumDefined = struct {
 };
 
 pub const MapExternalEnumDefined = struct {
-    val: proto.Repeated(MapExternalEnumDefined.ValEntry, .message) = .{},
+    val: repeated.message_MapExternalEnumDefined_ValEntry = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {

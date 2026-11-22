@@ -4,6 +4,33 @@
 const proto = @import("protobuf");
 const google_protobuf_descriptor = @import("google_protobuf_descriptor");
 
+/// The type of each repeated field, declared once: the compiler counts each call in the
+/// types of a struct's fields against one branch quota.
+const repeated = struct {
+    const unvalidated_string = proto.Repeated([]const u8, .unvalidated_string);
+    const message_Rule = proto.Repeated(Rule, .message);
+    const message_MessageOneofRule = proto.Repeated(MessageOneofRule, .message);
+    const float = proto.Repeated(f32, .float);
+    const double = proto.Repeated(f64, .double);
+    const int32 = proto.Repeated(i32, .int32);
+    const int64 = proto.Repeated(i64, .int64);
+    const uint32 = proto.Repeated(u32, .uint32);
+    const uint64 = proto.Repeated(u64, .uint64);
+    const sint32 = proto.Repeated(i32, .sint32);
+    const sint64 = proto.Repeated(i64, .sint64);
+    const fixed32 = proto.Repeated(u32, .fixed32);
+    const fixed64 = proto.Repeated(u64, .fixed64);
+    const sfixed32 = proto.Repeated(i32, .sfixed32);
+    const sfixed64 = proto.Repeated(i64, .sfixed64);
+    const @"bool" = proto.Repeated(bool, .bool);
+    const bytes = proto.Repeated([]const u8, .bytes);
+    const message_proto_wkt_Duration = proto.Repeated(proto.wkt.Duration, .message);
+    const message_proto_wkt_FieldMask = proto.Repeated(proto.wkt.FieldMask, .message);
+    const message_proto_wkt_Timestamp = proto.Repeated(proto.wkt.Timestamp, .message);
+    const message_Violation = proto.Repeated(Violation, .message);
+    const message_FieldPathElement = proto.Repeated(FieldPathElement, .message);
+};
+
 pub const Rule = struct {
     id: ?[]const u8 = null,
     message: ?[]const u8 = null,
@@ -27,9 +54,9 @@ pub const Rule = struct {
 };
 
 pub const MessageRules = struct {
-    cel_expression: proto.Repeated([]const u8, .unvalidated_string) = .{},
-    cel: proto.Repeated(Rule, .message) = .{},
-    oneof: proto.Repeated(MessageOneofRule, .message) = .{},
+    cel_expression: repeated.unvalidated_string = .{},
+    cel: repeated.message_Rule = .{},
+    oneof: repeated.message_MessageOneofRule = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -49,7 +76,7 @@ pub const MessageRules = struct {
 };
 
 pub const MessageOneofRule = struct {
-    fields: proto.Repeated([]const u8, .unvalidated_string) = .{},
+    fields: repeated.unvalidated_string = .{},
     required: ?bool = null,
     _unknown: proto.Unknown = .{},
 
@@ -84,8 +111,8 @@ pub const OneofRules = struct {
 };
 
 pub const FieldRules = struct {
-    cel_expression: proto.Repeated([]const u8, .unvalidated_string) = .{},
-    cel: proto.Repeated(Rule, .message) = .{},
+    cel_expression: repeated.unvalidated_string = .{},
+    cel: repeated.message_Rule = .{},
     required: ?bool = null,
     ignore: ?Ignore = null,
     type: ?union(enum) {
@@ -177,7 +204,7 @@ pub const FieldRules = struct {
 };
 
 pub const PredefinedRules = struct {
-    cel: proto.Repeated(Rule, .message) = .{},
+    cel: repeated.message_Rule = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -202,10 +229,10 @@ pub const FloatRules = struct {
         gt: f32,
         gte: f32,
     } = null,
-    in: proto.Repeated(f32, .float) = .{},
-    not_in: proto.Repeated(f32, .float) = .{},
+    in: repeated.float = .{},
+    not_in: repeated.float = .{},
     finite: ?bool = null,
-    example: proto.Repeated(f32, .float) = .{},
+    example: repeated.float = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -246,10 +273,10 @@ pub const DoubleRules = struct {
         gt: f64,
         gte: f64,
     } = null,
-    in: proto.Repeated(f64, .double) = .{},
-    not_in: proto.Repeated(f64, .double) = .{},
+    in: repeated.double = .{},
+    not_in: repeated.double = .{},
     finite: ?bool = null,
-    example: proto.Repeated(f64, .double) = .{},
+    example: repeated.double = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -290,9 +317,9 @@ pub const Int32Rules = struct {
         gt: i32,
         gte: i32,
     } = null,
-    in: proto.Repeated(i32, .int32) = .{},
-    not_in: proto.Repeated(i32, .int32) = .{},
-    example: proto.Repeated(i32, .int32) = .{},
+    in: repeated.int32 = .{},
+    not_in: repeated.int32 = .{},
+    example: repeated.int32 = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -331,9 +358,9 @@ pub const Int64Rules = struct {
         gt: i64,
         gte: i64,
     } = null,
-    in: proto.Repeated(i64, .int64) = .{},
-    not_in: proto.Repeated(i64, .int64) = .{},
-    example: proto.Repeated(i64, .int64) = .{},
+    in: repeated.int64 = .{},
+    not_in: repeated.int64 = .{},
+    example: repeated.int64 = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -372,9 +399,9 @@ pub const UInt32Rules = struct {
         gt: u32,
         gte: u32,
     } = null,
-    in: proto.Repeated(u32, .uint32) = .{},
-    not_in: proto.Repeated(u32, .uint32) = .{},
-    example: proto.Repeated(u32, .uint32) = .{},
+    in: repeated.uint32 = .{},
+    not_in: repeated.uint32 = .{},
+    example: repeated.uint32 = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -413,9 +440,9 @@ pub const UInt64Rules = struct {
         gt: u64,
         gte: u64,
     } = null,
-    in: proto.Repeated(u64, .uint64) = .{},
-    not_in: proto.Repeated(u64, .uint64) = .{},
-    example: proto.Repeated(u64, .uint64) = .{},
+    in: repeated.uint64 = .{},
+    not_in: repeated.uint64 = .{},
+    example: repeated.uint64 = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -454,9 +481,9 @@ pub const SInt32Rules = struct {
         gt: i32,
         gte: i32,
     } = null,
-    in: proto.Repeated(i32, .sint32) = .{},
-    not_in: proto.Repeated(i32, .sint32) = .{},
-    example: proto.Repeated(i32, .sint32) = .{},
+    in: repeated.sint32 = .{},
+    not_in: repeated.sint32 = .{},
+    example: repeated.sint32 = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -495,9 +522,9 @@ pub const SInt64Rules = struct {
         gt: i64,
         gte: i64,
     } = null,
-    in: proto.Repeated(i64, .sint64) = .{},
-    not_in: proto.Repeated(i64, .sint64) = .{},
-    example: proto.Repeated(i64, .sint64) = .{},
+    in: repeated.sint64 = .{},
+    not_in: repeated.sint64 = .{},
+    example: repeated.sint64 = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -536,9 +563,9 @@ pub const Fixed32Rules = struct {
         gt: u32,
         gte: u32,
     } = null,
-    in: proto.Repeated(u32, .fixed32) = .{},
-    not_in: proto.Repeated(u32, .fixed32) = .{},
-    example: proto.Repeated(u32, .fixed32) = .{},
+    in: repeated.fixed32 = .{},
+    not_in: repeated.fixed32 = .{},
+    example: repeated.fixed32 = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -577,9 +604,9 @@ pub const Fixed64Rules = struct {
         gt: u64,
         gte: u64,
     } = null,
-    in: proto.Repeated(u64, .fixed64) = .{},
-    not_in: proto.Repeated(u64, .fixed64) = .{},
-    example: proto.Repeated(u64, .fixed64) = .{},
+    in: repeated.fixed64 = .{},
+    not_in: repeated.fixed64 = .{},
+    example: repeated.fixed64 = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -618,9 +645,9 @@ pub const SFixed32Rules = struct {
         gt: i32,
         gte: i32,
     } = null,
-    in: proto.Repeated(i32, .sfixed32) = .{},
-    not_in: proto.Repeated(i32, .sfixed32) = .{},
-    example: proto.Repeated(i32, .sfixed32) = .{},
+    in: repeated.sfixed32 = .{},
+    not_in: repeated.sfixed32 = .{},
+    example: repeated.sfixed32 = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -659,9 +686,9 @@ pub const SFixed64Rules = struct {
         gt: i64,
         gte: i64,
     } = null,
-    in: proto.Repeated(i64, .sfixed64) = .{},
-    not_in: proto.Repeated(i64, .sfixed64) = .{},
-    example: proto.Repeated(i64, .sfixed64) = .{},
+    in: repeated.sfixed64 = .{},
+    not_in: repeated.sfixed64 = .{},
+    example: repeated.sfixed64 = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -692,7 +719,7 @@ pub const SFixed64Rules = struct {
 
 pub const BoolRules = struct {
     @"const": ?bool = null,
-    example: proto.Repeated(bool, .bool) = .{},
+    example: repeated.bool = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -722,8 +749,8 @@ pub const StringRules = struct {
     suffix: ?[]const u8 = null,
     contains: ?[]const u8 = null,
     not_contains: ?[]const u8 = null,
-    in: proto.Repeated([]const u8, .unvalidated_string) = .{},
-    not_in: proto.Repeated([]const u8, .unvalidated_string) = .{},
+    in: repeated.unvalidated_string = .{},
+    not_in: repeated.unvalidated_string = .{},
     well_known: ?union(enum) {
         email: bool,
         hostname: bool,
@@ -748,7 +775,7 @@ pub const StringRules = struct {
         well_known_regex: KnownRegex,
     } = null,
     strict: ?bool = null,
-    example: proto.Repeated([]const u8, .unvalidated_string) = .{},
+    example: repeated.unvalidated_string = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -844,15 +871,15 @@ pub const BytesRules = struct {
     prefix: ?[]const u8 = null,
     suffix: ?[]const u8 = null,
     contains: ?[]const u8 = null,
-    in: proto.Repeated([]const u8, .bytes) = .{},
-    not_in: proto.Repeated([]const u8, .bytes) = .{},
+    in: repeated.bytes = .{},
+    not_in: repeated.bytes = .{},
     well_known: ?union(enum) {
         ip: bool,
         ipv4: bool,
         ipv6: bool,
         uuid: bool,
     } = null,
-    example: proto.Repeated([]const u8, .bytes) = .{},
+    example: repeated.bytes = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -898,9 +925,9 @@ pub const BytesRules = struct {
 pub const EnumRules = struct {
     @"const": ?i32 = null,
     defined_only: ?bool = null,
-    in: proto.Repeated(i32, .int32) = .{},
-    not_in: proto.Repeated(i32, .int32) = .{},
-    example: proto.Repeated(i32, .int32) = .{},
+    in: repeated.int32 = .{},
+    not_in: repeated.int32 = .{},
+    example: repeated.int32 = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -974,8 +1001,8 @@ pub const MapRules = struct {
 };
 
 pub const AnyRules = struct {
-    in: proto.Repeated([]const u8, .unvalidated_string) = .{},
-    not_in: proto.Repeated([]const u8, .unvalidated_string) = .{},
+    in: repeated.unvalidated_string = .{},
+    not_in: repeated.unvalidated_string = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -1002,9 +1029,9 @@ pub const DurationRules = struct {
         gt: proto.wkt.Duration,
         gte: proto.wkt.Duration,
     } = null,
-    in: proto.Repeated(proto.wkt.Duration, .message) = .{},
-    not_in: proto.Repeated(proto.wkt.Duration, .message) = .{},
-    example: proto.Repeated(proto.wkt.Duration, .message) = .{},
+    in: repeated.message_proto_wkt_Duration = .{},
+    not_in: repeated.message_proto_wkt_Duration = .{},
+    example: repeated.message_proto_wkt_Duration = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -1035,9 +1062,9 @@ pub const DurationRules = struct {
 
 pub const FieldMaskRules = struct {
     @"const": ?proto.wkt.FieldMask = null,
-    in: proto.Repeated([]const u8, .unvalidated_string) = .{},
-    not_in: proto.Repeated([]const u8, .unvalidated_string) = .{},
-    example: proto.Repeated(proto.wkt.FieldMask, .message) = .{},
+    in: repeated.unvalidated_string = .{},
+    not_in: repeated.unvalidated_string = .{},
+    example: repeated.message_proto_wkt_FieldMask = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -1071,7 +1098,7 @@ pub const TimestampRules = struct {
         gt_now: bool,
     } = null,
     within: ?proto.wkt.Duration = null,
-    example: proto.Repeated(proto.wkt.Timestamp, .message) = .{},
+    example: repeated.message_proto_wkt_Timestamp = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -1103,7 +1130,7 @@ pub const TimestampRules = struct {
 };
 
 pub const Violations = struct {
-    violations: proto.Repeated(Violation, .message) = .{},
+    violations: repeated.message_Violation = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -1147,7 +1174,7 @@ pub const Violation = struct {
 };
 
 pub const FieldPath = struct {
-    elements: proto.Repeated(FieldPathElement, .message) = .{},
+    elements: repeated.message_FieldPathElement = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {

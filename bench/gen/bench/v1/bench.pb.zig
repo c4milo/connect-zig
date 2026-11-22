@@ -3,6 +3,21 @@
 //! The build gives this file the modules protobuf.
 const proto = @import("protobuf");
 
+/// The type of each repeated field, declared once: the compiler counts each call in the
+/// types of a struct's fields against one branch quota.
+const repeated = struct {
+    const int64 = proto.Repeated(i64, .int64);
+    const string = proto.Repeated([]const u8, .string);
+    const message_Medium_CountersEntry = proto.Repeated(Medium.CountersEntry, .message);
+    const message_Address = proto.Repeated(Address, .message);
+    const sint32 = proto.Repeated(i32, .sint32);
+    const message_Record = proto.Repeated(Record, .message);
+    const message_Tree = proto.Repeated(Tree, .message);
+    const int32 = proto.Repeated(i32, .int32);
+    const uint64 = proto.Repeated(u64, .uint64);
+    const double = proto.Repeated(f64, .double);
+};
+
 pub const Small = struct {
     id: i32 = 0,
     created: i64 = 0,
@@ -61,10 +76,10 @@ pub const Medium = struct {
     name: []const u8 = "",
     status: Status = @enumFromInt(0),
     home: ?Address = null,
-    samples: proto.Repeated(i64, .int64) = .{},
-    tags: proto.Repeated([]const u8, .string) = .{},
-    counters: proto.Repeated(Medium.CountersEntry, .message) = .{},
-    previous: proto.Repeated(Address, .message) = .{},
+    samples: repeated.int64 = .{},
+    tags: repeated.string = .{},
+    counters: repeated.message_Medium_CountersEntry = .{},
+    previous: repeated.message_Address = .{},
     checksum: u64 = 0,
     ratio: f32 = 0,
     delta: i32 = 0,
@@ -136,7 +151,7 @@ pub const Record = struct {
     id: u64 = 0,
     key: []const u8 = "",
     payload: []const u8 = "",
-    values: proto.Repeated(i32, .sint32) = .{},
+    values: repeated.sint32 = .{},
     weight: f64 = 0,
     status: Status = @enumFromInt(0),
     _unknown: proto.Unknown = .{},
@@ -165,7 +180,7 @@ pub const Record = struct {
 
 pub const Large = struct {
     name: []const u8 = "",
-    records: proto.Repeated(Record, .message) = .{},
+    records: repeated.message_Record = .{},
     description: []const u8 = "",
     _unknown: proto.Unknown = .{},
 
@@ -315,7 +330,7 @@ pub const Strings = struct {
 };
 
 pub const Tree = struct {
-    children: proto.Repeated(Tree, .message) = .{},
+    children: repeated.message_Tree = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -331,10 +346,10 @@ pub const Tree = struct {
 };
 
 pub const Packed = struct {
-    small: proto.Repeated(i32, .int32) = .{},
-    wide: proto.Repeated(u64, .uint64) = .{},
-    zigzag: proto.Repeated(i32, .sint32) = .{},
-    reals: proto.Repeated(f64, .double) = .{},
+    small: repeated.int32 = .{},
+    wide: repeated.uint64 = .{},
+    zigzag: repeated.sint32 = .{},
+    reals: repeated.double = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {

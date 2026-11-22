@@ -169,9 +169,8 @@ expression in a Debug build on one core of a 2.1 GHz Xeon: a message of 2,000 fi
 2,003 expressions built in 21 s, and 100 messages with 2,300 expressions in 20 s. With
 standard rules alone, the second schema built in 3 s. A check written by hand costs the
 compiler 0.17 ms, so a rule cannot cost less: [docs/performance.md](performance.md),
-"The compiler's time", says where the rest goes. A message takes at most about 1,000 repeated
-and map fields: Zig counts each one's type against a fixed limit of the struct that holds
-them.
+"The compiler's time", says where the rest goes. A message may hold any count of repeated
+and map fields: `tools/wide` holds one of 1,100.
 
 ## Speed
 

@@ -4,6 +4,14 @@
 const proto = @import("protobuf");
 const validate = @import("protovalidate");
 
+/// The type of each repeated field, declared once: the compiler counts each call in the
+/// types of a struct's fields against one branch quota.
+const repeated = struct {
+    const string = proto.Repeated([]const u8, .string);
+    const message_RequiredEditionsMap_ValEntry = proto.Repeated(RequiredEditionsMap.ValEntry, .message);
+    const message_RequiredEditionsMapIgnoreAlways_ValEntry = proto.Repeated(RequiredEditionsMapIgnoreAlways.ValEntry, .message);
+};
+
 pub const RequiredEditionsScalarExplicitPresence = struct {
     val: ?[]const u8 = null,
     _unknown: proto.Unknown = .{},
@@ -441,7 +449,7 @@ pub const RequiredEditionsOneofIgnoreAlways = struct {
 };
 
 pub const RequiredEditionsRepeated = struct {
-    val: proto.Repeated([]const u8, .string) = .{},
+    val: repeated.string = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -463,7 +471,7 @@ pub const RequiredEditionsRepeated = struct {
 };
 
 pub const RequiredEditionsRepeatedIgnoreAlways = struct {
-    val: proto.Repeated([]const u8, .string) = .{},
+    val: repeated.string = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -485,7 +493,7 @@ pub const RequiredEditionsRepeatedIgnoreAlways = struct {
 };
 
 pub const RequiredEditionsRepeatedExpanded = struct {
-    val: proto.Repeated([]const u8, .string) = .{},
+    val: repeated.string = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -507,7 +515,7 @@ pub const RequiredEditionsRepeatedExpanded = struct {
 };
 
 pub const RequiredEditionsRepeatedExpandedIgnoreAlways = struct {
-    val: proto.Repeated([]const u8, .string) = .{},
+    val: repeated.string = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -529,7 +537,7 @@ pub const RequiredEditionsRepeatedExpandedIgnoreAlways = struct {
 };
 
 pub const RequiredEditionsMap = struct {
-    val: proto.Repeated(RequiredEditionsMap.ValEntry, .message) = .{},
+    val: repeated.message_RequiredEditionsMap_ValEntry = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -570,7 +578,7 @@ pub const RequiredEditionsMap = struct {
 };
 
 pub const RequiredEditionsMapIgnoreAlways = struct {
-    val: proto.Repeated(RequiredEditionsMapIgnoreAlways.ValEntry, .message) = .{},
+    val: repeated.message_RequiredEditionsMapIgnoreAlways_ValEntry = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {

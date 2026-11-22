@@ -4,6 +4,17 @@
 const proto = @import("protobuf");
 const validate = @import("protovalidate");
 
+/// The type of each repeated field, declared once: the compiler counts each call in the
+/// types of a struct's fields against one branch quota.
+const repeated = struct {
+    const string = proto.Repeated([]const u8, .string);
+    const message_RequiredProto3Map_ValEntry = proto.Repeated(RequiredProto3Map.ValEntry, .message);
+    const message_RequiredProto3MapIgnoreAlways_ValEntry = proto.Repeated(RequiredProto3MapIgnoreAlways.ValEntry, .message);
+    const message_RequiredProto3MapKey_ValEntry = proto.Repeated(RequiredProto3MapKey.ValEntry, .message);
+    const message_RequiredProto3MapValue_ValEntry = proto.Repeated(RequiredProto3MapValue.ValEntry, .message);
+    const message_RequiredImplicitProto3Map_ValEntry = proto.Repeated(RequiredImplicitProto3Map.ValEntry, .message);
+};
+
 pub const RequiredProto3Scalar = struct {
     val: []const u8 = "",
     _unknown: proto.Unknown = .{},
@@ -223,7 +234,7 @@ pub const RequiredProto3OneOfIgnoreAlways = struct {
 };
 
 pub const RequiredProto3Repeated = struct {
-    val: proto.Repeated([]const u8, .string) = .{},
+    val: repeated.string = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -245,7 +256,7 @@ pub const RequiredProto3Repeated = struct {
 };
 
 pub const RequiredProto3RepeatedIgnoreAlways = struct {
-    val: proto.Repeated([]const u8, .string) = .{},
+    val: repeated.string = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -267,7 +278,7 @@ pub const RequiredProto3RepeatedIgnoreAlways = struct {
 };
 
 pub const RequiredProto3Map = struct {
-    val: proto.Repeated(RequiredProto3Map.ValEntry, .message) = .{},
+    val: repeated.message_RequiredProto3Map_ValEntry = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -308,7 +319,7 @@ pub const RequiredProto3Map = struct {
 };
 
 pub const RequiredProto3MapIgnoreAlways = struct {
-    val: proto.Repeated(RequiredProto3MapIgnoreAlways.ValEntry, .message) = .{},
+    val: repeated.message_RequiredProto3MapIgnoreAlways_ValEntry = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -349,7 +360,7 @@ pub const RequiredProto3MapIgnoreAlways = struct {
 };
 
 pub const RequiredProto3MapKey = struct {
-    val: proto.Repeated(RequiredProto3MapKey.ValEntry, .message) = .{},
+    val: repeated.message_RequiredProto3MapKey_ValEntry = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -390,7 +401,7 @@ pub const RequiredProto3MapKey = struct {
 };
 
 pub const RequiredProto3MapValue = struct {
-    val: proto.Repeated(RequiredProto3MapValue.ValEntry, .message) = .{},
+    val: repeated.message_RequiredProto3MapValue_ValEntry = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -431,7 +442,7 @@ pub const RequiredProto3MapValue = struct {
 };
 
 pub const RequiredProto3RepeatedItem = struct {
-    val: proto.Repeated([]const u8, .string) = .{},
+    val: repeated.string = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -479,7 +490,7 @@ pub const RequiredImplicitProto3Scalar = struct {
 };
 
 pub const RequiredImplicitProto3Repeated = struct {
-    val: proto.Repeated([]const u8, .string) = .{},
+    val: repeated.string = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -505,7 +516,7 @@ pub const RequiredImplicitProto3Repeated = struct {
 };
 
 pub const RequiredImplicitProto3Map = struct {
-    val: proto.Repeated(RequiredImplicitProto3Map.ValEntry, .message) = .{},
+    val: repeated.message_RequiredImplicitProto3Map_ValEntry = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {

@@ -5,8 +5,14 @@ const proto = @import("protobuf");
 const connect = @import("connect");
 const opentelemetry_proto_trace_v1_trace = @import("opentelemetry_proto_trace_v1_trace");
 
+/// The type of each repeated field, declared once: the compiler counts each call in the
+/// types of a struct's fields against one branch quota.
+const repeated = struct {
+    const message_opentelemetry_proto_trace_v1_trace_ResourceSpans = proto.Repeated(opentelemetry_proto_trace_v1_trace.ResourceSpans, .message);
+};
+
 pub const ExportTraceServiceRequest = struct {
-    resource_spans: proto.Repeated(opentelemetry_proto_trace_v1_trace.ResourceSpans, .message) = .{},
+    resource_spans: repeated.message_opentelemetry_proto_trace_v1_trace_ResourceSpans = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {

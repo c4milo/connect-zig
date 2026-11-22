@@ -5,6 +5,13 @@ const proto = @import("protobuf");
 const google_protobuf_descriptor = @import("google_protobuf_descriptor");
 const buf_validate_conformance_harness_harness = @import("buf_validate_conformance_harness_harness");
 
+/// The type of each repeated field, declared once: the compiler counts each call in the
+/// types of a struct's fields against one branch quota.
+const repeated = struct {
+    const message_SuiteResults = proto.Repeated(SuiteResults, .message);
+    const message_CaseResult = proto.Repeated(CaseResult, .message);
+};
+
 pub const ResultOptions = struct {
     suite_filter: []const u8 = "",
     case_filter: []const u8 = "",
@@ -36,7 +43,7 @@ pub const ResultOptions = struct {
 pub const ResultSet = struct {
     successes: i32 = 0,
     failures: i32 = 0,
-    suites: proto.Repeated(SuiteResults, .message) = .{},
+    suites: repeated.message_SuiteResults = .{},
     options: ?ResultOptions = null,
     expected_failures: i32 = 0,
     _unknown: proto.Unknown = .{},
@@ -65,7 +72,7 @@ pub const SuiteResults = struct {
     name: []const u8 = "",
     successes: i32 = 0,
     failures: i32 = 0,
-    cases: proto.Repeated(CaseResult, .message) = .{},
+    cases: repeated.message_CaseResult = .{},
     fdset: ?google_protobuf_descriptor.FileDescriptorSet = null,
     expected_failures: i32 = 0,
     _unknown: proto.Unknown = .{},

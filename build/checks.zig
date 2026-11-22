@@ -58,10 +58,10 @@ fn add_coverage(b: *std.Build, graph: Graph, schemas: Schemas) void {
 }
 
 /// `zig build test-generated`: the code `buf generate` wrote for the examples compiles, and its
-/// messages round-trip. So does the wide message of tools/wide, 600 fields with rules, which
-/// `protovalidate` also checks. `tools/generate_check.sh` compares that code with what buf
-/// writes now, which needs buf, so it runs from `tools/ci.sh` and not from `zig build test`
-/// (design §8 step 6).
+/// messages round-trip. So do the two messages of tools/wide, of 1,200 fields and of 1,100
+/// repeated and map fields, which `protovalidate` also checks. `tools/generate_check.sh` compares
+/// that code with what buf writes now, which needs buf, so it runs from `tools/ci.sh` and not from
+/// `zig build test` (design §8 step 6).
 fn add_generated(b: *std.Build, graph: Graph) *std.Build.Step {
     // A generated file reaches another by the module name its header states (design §8 step 6):
     // kitchen.proto and large.proto import shared.proto as `kitchen_v1_shared`.

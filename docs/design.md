@@ -1453,8 +1453,8 @@ ran on Linux x86-64 with Zig 0.16.0.
   - Three limits fell. The protobuf module stopped at a message of about 500 fields: each
     function that reads every field at compile time now raises its branch quota. The table of
     a message with more than 1,000 `.of(` calls stopped the compiler: the plugin now writes
-    such a table in a block that raises the quota. One limit stays, and "Work not done yet"
-    names it: about 1,000 repeated and map fields in one message.
+    such a table in a block that raises the quota. One limit stayed: about 1,000 repeated and
+    map fields in one message. The record "Repeated types declared once" removes it.
   - `tools/wide` holds one message of 600 fields with rules, and `zig build test-generated`
     reads it through binary, JSON and `validate`.
   - The CEL reader was read against the language definition for the model. Nine things
@@ -1687,6 +1687,22 @@ ran on Linux x86-64 with Zig 0.16.0.
     `CAUGHT`. With the slice walk and the lookup switched off, the judge failed:
     docs/performance.md's table holds its numbers.
 
+- **Repeated types declared once.** The plugin writes each repeated field's type,
+  `proto.Repeated(T, .kind)`, once in the file's `repeated` struct, and the field names it
+  there, as `repeated.string`. Zig counts each call in the types of a struct's fields against
+  one branch quota of 1000, and no statement of the struct raises it. So a message of more than
+  about 1,000 repeated and map fields did not compile. A declaration is analyzed apart, with a
+  quota of its own. Its name is a scalar's kind, or the kind and the element's path joined by
+  `_`, as `message_Node_LabelsEntry`. When two paths give one name, the second takes a number.
+  - `tools/wide` holds a second message, `Lists`, of 1,100 repeated and map fields: a list of
+    int32, of strings and of `Leaf`, and a map, 275 times. With each call written in its
+    field, the file failed with "evaluation exceeded 1000 backwards branches". With the struct
+    it compiles, and `zig build test-generated` reads it through binary, JSON and `validate`.
+  - Mutations against `zig build test-plugin`, 8: a taken name used again, a type declared
+    twice, a message's name without its kind, a quoted part of a path kept quoted, a
+    declaration named `bool` left unquoted, a field that quotes `bool`, a group named as a
+    message, and a scalar named by a path. Each was `CAUGHT`.
+
 ### Work not done yet
 
 - A stream that waits for an event of the program once its request ended (colibri issue 130).
@@ -1727,10 +1743,6 @@ ran on Linux x86-64 with Zig 0.16.0.
 - For `protovalidate`, a differential check of the grammar alone against cel-go's parser, over
   the Lean model's vectors and random texts. The check of verdicts holds the grammar only
   through the rules it writes.
-- A generated message holds at most about 1,000 repeated and map fields. Zig counts each
-  `proto.Repeated(...)` of a struct's fields against a branch quota of 1000, which no
-  statement of the struct can raise. An alias for each element type, declared once in the
-  file, would take the calls out of the struct.
 - The Lean model states the CEL syntax and proves no theorem. A proof that the model reads the
   text of each tree back as the tree would hold the grammar and the text to each other for
   every tree, where the vectors hold 600. The format checks of step 32, a URI of RFC 3986

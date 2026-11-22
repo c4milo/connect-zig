@@ -4,6 +4,14 @@
 const proto = @import("protobuf");
 const validate = @import("protovalidate");
 
+/// The type of each repeated field, declared once: the compiler counts each call in the
+/// types of a struct's fields against one branch quota.
+const repeated = struct {
+    const int32 = proto.Repeated(i32, .int32);
+    const message_IgnoreEmptyProto3Map_ValEntry = proto.Repeated(IgnoreEmptyProto3Map.ValEntry, .message);
+    const message_IgnoreEmptyMapPairs_ValEntry = proto.Repeated(IgnoreEmptyMapPairs.ValEntry, .message);
+};
+
 pub const IgnoreEmptyProto3Scalar = struct {
     val: i32 = 0,
     _unknown: proto.Unknown = .{},
@@ -111,7 +119,7 @@ pub const IgnoreEmptyProto3Oneof = struct {
 };
 
 pub const IgnoreEmptyProto3Repeated = struct {
-    val: proto.Repeated(i32, .int32) = .{},
+    val: repeated.int32 = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -137,7 +145,7 @@ pub const IgnoreEmptyProto3Repeated = struct {
 };
 
 pub const IgnoreEmptyProto3Map = struct {
-    val: proto.Repeated(IgnoreEmptyProto3Map.ValEntry, .message) = .{},
+    val: repeated.message_IgnoreEmptyProto3Map_ValEntry = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -182,7 +190,7 @@ pub const IgnoreEmptyProto3Map = struct {
 };
 
 pub const IgnoreEmptyRepeatedItems = struct {
-    val: proto.Repeated(i32, .int32) = .{},
+    val: repeated.int32 = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -204,7 +212,7 @@ pub const IgnoreEmptyRepeatedItems = struct {
 };
 
 pub const IgnoreEmptyMapPairs = struct {
-    val: proto.Repeated(IgnoreEmptyMapPairs.ValEntry, .message) = .{},
+    val: repeated.message_IgnoreEmptyMapPairs_ValEntry = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {

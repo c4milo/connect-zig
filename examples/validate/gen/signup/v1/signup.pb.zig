@@ -5,11 +5,17 @@ const proto = @import("protobuf");
 const connect = @import("connect");
 const validate = @import("protovalidate");
 
+/// The type of each repeated field, declared once: the compiler counts each call in the
+/// types of a struct's fields against one branch quota.
+const repeated = struct {
+    const string = proto.Repeated([]const u8, .string);
+};
+
 pub const RegisterRequest = struct {
     email: []const u8 = "",
     name: []const u8 = "",
     age: i32 = 0,
-    tags: proto.Repeated([]const u8, .string) = .{},
+    tags: repeated.string = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {

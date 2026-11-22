@@ -3,10 +3,21 @@
 //! The build gives this file the modules protobuf.
 const proto = @import("protobuf");
 
+/// The type of each repeated field, declared once: the compiler counts each call in the
+/// types of a struct's fields against one branch quota.
+const repeated = struct {
+    const message_ConfigCase = proto.Repeated(ConfigCase, .message);
+    const enum_HTTPVersion = proto.Repeated(HTTPVersion, .@"enum");
+    const enum_Protocol = proto.Repeated(Protocol, .@"enum");
+    const enum_Codec = proto.Repeated(Codec, .@"enum");
+    const enum_Compression = proto.Repeated(Compression, .@"enum");
+    const enum_StreamType = proto.Repeated(StreamType, .@"enum");
+};
+
 pub const Config = struct {
     features: ?Features = null,
-    include_cases: proto.Repeated(ConfigCase, .message) = .{},
-    exclude_cases: proto.Repeated(ConfigCase, .message) = .{},
+    include_cases: repeated.message_ConfigCase = .{},
+    exclude_cases: repeated.message_ConfigCase = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -26,11 +37,11 @@ pub const Config = struct {
 };
 
 pub const Features = struct {
-    versions: proto.Repeated(HTTPVersion, .@"enum") = .{},
-    protocols: proto.Repeated(Protocol, .@"enum") = .{},
-    codecs: proto.Repeated(Codec, .@"enum") = .{},
-    compressions: proto.Repeated(Compression, .@"enum") = .{},
-    stream_types: proto.Repeated(StreamType, .@"enum") = .{},
+    versions: repeated.enum_HTTPVersion = .{},
+    protocols: repeated.enum_Protocol = .{},
+    codecs: repeated.enum_Codec = .{},
+    compressions: repeated.enum_Compression = .{},
+    stream_types: repeated.enum_StreamType = .{},
     supports_h2c: ?bool = null,
     supports_tls: ?bool = null,
     supports_tls_client_certs: ?bool = null,

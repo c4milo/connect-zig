@@ -3,6 +3,12 @@
 //! The build gives this file the modules protobuf.
 const proto = @import("protobuf");
 
+/// The type of each repeated field, declared once: the compiler counts each call in the
+/// types of a struct's fields against one branch quota.
+const repeated = struct {
+    const message_TestStatus = proto.Repeated(TestStatus, .message);
+};
+
 pub const TestStatus = struct {
     name: []const u8 = "",
     failure_message: []const u8 = "",
@@ -26,7 +32,7 @@ pub const TestStatus = struct {
 };
 
 pub const FailureSet = struct {
-    @"test": proto.Repeated(TestStatus, .message) = .{},
+    @"test": repeated.message_TestStatus = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {

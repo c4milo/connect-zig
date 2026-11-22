@@ -5,6 +5,25 @@ const proto = @import("protobuf");
 const validate = @import("protovalidate");
 const buf_validate_conformance_cases_other_package_embed = @import("buf_validate_conformance_cases_other_package_embed");
 
+/// The type of each repeated field, declared once: the compiler counts each call in the
+/// types of a struct's fields against one branch quota.
+const repeated = struct {
+    const int64 = proto.Repeated(i64, .int64);
+    const message_Embed = proto.Repeated(Embed, .message);
+    const message_buf_validate_conformance_cases_other_package_embed_Embed = proto.Repeated(buf_validate_conformance_cases_other_package_embed.Embed, .message);
+    const double = proto.Repeated(f64, .double);
+    const sfixed32 = proto.Repeated(i32, .sfixed32);
+    const uint32 = proto.Repeated(u32, .uint32);
+    const string = proto.Repeated([]const u8, .string);
+    const int32 = proto.Repeated(i32, .int32);
+    const float = proto.Repeated(f32, .float);
+    const enum_AnEnum = proto.Repeated(AnEnum, .@"enum");
+    const enum_RepeatedEmbeddedEnumIn_AnotherInEnum = proto.Repeated(RepeatedEmbeddedEnumIn.AnotherInEnum, .@"enum");
+    const enum_RepeatedEmbeddedEnumNotIn_AnotherNotInEnum = proto.Repeated(RepeatedEmbeddedEnumNotIn.AnotherNotInEnum, .@"enum");
+    const message_proto_wkt_Any = proto.Repeated(proto.wkt.Any, .message);
+    const message_proto_wkt_Duration = proto.Repeated(proto.wkt.Duration, .message);
+};
+
 pub const Embed = struct {
     val: i64 = 0,
     _unknown: proto.Unknown = .{},
@@ -28,7 +47,7 @@ pub const Embed = struct {
 };
 
 pub const RepeatedNone = struct {
-    val: proto.Repeated(i64, .int64) = .{},
+    val: repeated.int64 = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -44,7 +63,7 @@ pub const RepeatedNone = struct {
 };
 
 pub const RepeatedEmbedNone = struct {
-    val: proto.Repeated(Embed, .message) = .{},
+    val: repeated.message_Embed = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -62,7 +81,7 @@ pub const RepeatedEmbedNone = struct {
 };
 
 pub const RepeatedEmbedCrossPackageNone = struct {
-    val: proto.Repeated(buf_validate_conformance_cases_other_package_embed.Embed, .message) = .{},
+    val: repeated.message_buf_validate_conformance_cases_other_package_embed_Embed = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -80,7 +99,7 @@ pub const RepeatedEmbedCrossPackageNone = struct {
 };
 
 pub const RepeatedMin = struct {
-    val: proto.Repeated(Embed, .message) = .{},
+    val: repeated.message_Embed = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -106,7 +125,7 @@ pub const RepeatedMin = struct {
 };
 
 pub const RepeatedMax = struct {
-    val: proto.Repeated(f64, .double) = .{},
+    val: repeated.double = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -132,7 +151,7 @@ pub const RepeatedMax = struct {
 };
 
 pub const RepeatedMinMax = struct {
-    val: proto.Repeated(i32, .sfixed32) = .{},
+    val: repeated.sfixed32 = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -159,7 +178,7 @@ pub const RepeatedMinMax = struct {
 };
 
 pub const RepeatedExact = struct {
-    val: proto.Repeated(u32, .uint32) = .{},
+    val: repeated.uint32 = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -186,7 +205,7 @@ pub const RepeatedExact = struct {
 };
 
 pub const RepeatedUnique = struct {
-    val: proto.Repeated([]const u8, .string) = .{},
+    val: repeated.string = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -208,7 +227,7 @@ pub const RepeatedUnique = struct {
 };
 
 pub const RepeatedNotUnique = struct {
-    val: proto.Repeated([]const u8, .string) = .{},
+    val: repeated.string = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -230,8 +249,8 @@ pub const RepeatedNotUnique = struct {
 };
 
 pub const RepeatedMultipleUnique = struct {
-    a: proto.Repeated([]const u8, .string) = .{},
-    b: proto.Repeated(i32, .int32) = .{},
+    a: repeated.string = .{},
+    b: repeated.int32 = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -256,7 +275,7 @@ pub const RepeatedMultipleUnique = struct {
 };
 
 pub const RepeatedItemRule = struct {
-    val: proto.Repeated(f32, .float) = .{},
+    val: repeated.float = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -278,7 +297,7 @@ pub const RepeatedItemRule = struct {
 };
 
 pub const RepeatedItemPattern = struct {
-    val: proto.Repeated([]const u8, .string) = .{},
+    val: repeated.string = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -300,7 +319,7 @@ pub const RepeatedItemPattern = struct {
 };
 
 pub const RepeatedEmbedSkip = struct {
-    val: proto.Repeated(Embed, .message) = .{},
+    val: repeated.message_Embed = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -322,7 +341,7 @@ pub const RepeatedEmbedSkip = struct {
 };
 
 pub const RepeatedItemIn = struct {
-    val: proto.Repeated([]const u8, .string) = .{},
+    val: repeated.string = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -344,7 +363,7 @@ pub const RepeatedItemIn = struct {
 };
 
 pub const RepeatedItemNotIn = struct {
-    val: proto.Repeated([]const u8, .string) = .{},
+    val: repeated.string = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -366,7 +385,7 @@ pub const RepeatedItemNotIn = struct {
 };
 
 pub const RepeatedEnumIn = struct {
-    val: proto.Repeated(AnEnum, .@"enum") = .{},
+    val: repeated.enum_AnEnum = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -388,7 +407,7 @@ pub const RepeatedEnumIn = struct {
 };
 
 pub const RepeatedEnumNotIn = struct {
-    val: proto.Repeated(AnEnum, .@"enum") = .{},
+    val: repeated.enum_AnEnum = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -410,7 +429,7 @@ pub const RepeatedEnumNotIn = struct {
 };
 
 pub const RepeatedEmbeddedEnumIn = struct {
-    val: proto.Repeated(RepeatedEmbeddedEnumIn.AnotherInEnum, .@"enum") = .{},
+    val: repeated.enum_RepeatedEmbeddedEnumIn_AnotherInEnum = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -445,7 +464,7 @@ pub const RepeatedEmbeddedEnumIn = struct {
 };
 
 pub const RepeatedEmbeddedEnumNotIn = struct {
-    val: proto.Repeated(RepeatedEmbeddedEnumNotIn.AnotherNotInEnum, .@"enum") = .{},
+    val: repeated.enum_RepeatedEmbeddedEnumNotIn_AnotherNotInEnum = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -480,7 +499,7 @@ pub const RepeatedEmbeddedEnumNotIn = struct {
 };
 
 pub const RepeatedAnyIn = struct {
-    val: proto.Repeated(proto.wkt.Any, .message) = .{},
+    val: repeated.message_proto_wkt_Any = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -502,7 +521,7 @@ pub const RepeatedAnyIn = struct {
 };
 
 pub const RepeatedAnyNotIn = struct {
-    val: proto.Repeated(proto.wkt.Any, .message) = .{},
+    val: repeated.message_proto_wkt_Any = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -524,7 +543,7 @@ pub const RepeatedAnyNotIn = struct {
 };
 
 pub const RepeatedMinAndItemLen = struct {
-    val: proto.Repeated([]const u8, .string) = .{},
+    val: repeated.string = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -550,7 +569,7 @@ pub const RepeatedMinAndItemLen = struct {
 };
 
 pub const RepeatedMinAndMaxItemLen = struct {
-    val: proto.Repeated([]const u8, .string) = .{},
+    val: repeated.string = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -576,7 +595,7 @@ pub const RepeatedMinAndMaxItemLen = struct {
 };
 
 pub const RepeatedDuration = struct {
-    val: proto.Repeated(proto.wkt.Duration, .message) = .{},
+    val: repeated.message_proto_wkt_Duration = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -602,7 +621,7 @@ pub const RepeatedDuration = struct {
 };
 
 pub const RepeatedExactIgnore = struct {
-    val: proto.Repeated(u32, .uint32) = .{},
+    val: repeated.uint32 = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {

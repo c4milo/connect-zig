@@ -5,8 +5,19 @@ const proto = @import("protobuf");
 const opentelemetry_proto_resource_v1_resource = @import("opentelemetry_proto_resource_v1_resource");
 const opentelemetry_proto_common_v1_common = @import("opentelemetry_proto_common_v1_common");
 
+/// The type of each repeated field, declared once: the compiler counts each call in the
+/// types of a struct's fields against one branch quota.
+const repeated = struct {
+    const message_ResourceSpans = proto.Repeated(ResourceSpans, .message);
+    const message_ScopeSpans = proto.Repeated(ScopeSpans, .message);
+    const message_Span = proto.Repeated(Span, .message);
+    const message_opentelemetry_proto_common_v1_common_KeyValue = proto.Repeated(opentelemetry_proto_common_v1_common.KeyValue, .message);
+    const message_Span_Event = proto.Repeated(Span.Event, .message);
+    const message_Span_Link = proto.Repeated(Span.Link, .message);
+};
+
 pub const TracesData = struct {
-    resource_spans: proto.Repeated(ResourceSpans, .message) = .{},
+    resource_spans: repeated.message_ResourceSpans = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -23,7 +34,7 @@ pub const TracesData = struct {
 
 pub const ResourceSpans = struct {
     resource: ?opentelemetry_proto_resource_v1_resource.Resource = null,
-    scope_spans: proto.Repeated(ScopeSpans, .message) = .{},
+    scope_spans: repeated.message_ScopeSpans = .{},
     schema_url: []const u8 = "",
     _unknown: proto.Unknown = .{},
 
@@ -45,7 +56,7 @@ pub const ResourceSpans = struct {
 
 pub const ScopeSpans = struct {
     scope: ?opentelemetry_proto_common_v1_common.InstrumentationScope = null,
-    spans: proto.Repeated(Span, .message) = .{},
+    spans: repeated.message_Span = .{},
     schema_url: []const u8 = "",
     _unknown: proto.Unknown = .{},
 
@@ -75,11 +86,11 @@ pub const Span = struct {
     kind: Span.SpanKind = @enumFromInt(0),
     start_time_unix_nano: u64 = 0,
     end_time_unix_nano: u64 = 0,
-    attributes: proto.Repeated(opentelemetry_proto_common_v1_common.KeyValue, .message) = .{},
+    attributes: repeated.message_opentelemetry_proto_common_v1_common_KeyValue = .{},
     dropped_attributes_count: u32 = 0,
-    events: proto.Repeated(Span.Event, .message) = .{},
+    events: repeated.message_Span_Event = .{},
     dropped_events_count: u32 = 0,
-    links: proto.Repeated(Span.Link, .message) = .{},
+    links: repeated.message_Span_Link = .{},
     dropped_links_count: u32 = 0,
     status: ?Status = null,
     _unknown: proto.Unknown = .{},
@@ -128,7 +139,7 @@ pub const Span = struct {
     pub const Event = struct {
         time_unix_nano: u64 = 0,
         name: []const u8 = "",
-        attributes: proto.Repeated(opentelemetry_proto_common_v1_common.KeyValue, .message) = .{},
+        attributes: repeated.message_opentelemetry_proto_common_v1_common_KeyValue = .{},
         dropped_attributes_count: u32 = 0,
         _unknown: proto.Unknown = .{},
 
@@ -154,7 +165,7 @@ pub const Span = struct {
         trace_id: []const u8 = "",
         span_id: []const u8 = "",
         trace_state: []const u8 = "",
-        attributes: proto.Repeated(opentelemetry_proto_common_v1_common.KeyValue, .message) = .{},
+        attributes: repeated.message_opentelemetry_proto_common_v1_common_KeyValue = .{},
         dropped_attributes_count: u32 = 0,
         flags: u32 = 0,
         _unknown: proto.Unknown = .{},

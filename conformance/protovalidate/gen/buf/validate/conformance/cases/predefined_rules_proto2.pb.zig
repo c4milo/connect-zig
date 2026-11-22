@@ -4,6 +4,21 @@
 const proto = @import("protobuf");
 const validate = @import("protovalidate");
 
+/// The type of each repeated field, declared once: the compiler counts each call in the
+/// types of a struct's fields against one branch quota.
+const repeated = struct {
+    const uint64 = proto.Repeated(u64, .uint64);
+    const message_proto_wkt_FloatValue = proto.Repeated(proto.wkt.FloatValue, .message);
+    const message_proto_wkt_DoubleValue = proto.Repeated(proto.wkt.DoubleValue, .message);
+    const message_proto_wkt_Int32Value = proto.Repeated(proto.wkt.Int32Value, .message);
+    const message_proto_wkt_Int64Value = proto.Repeated(proto.wkt.Int64Value, .message);
+    const message_proto_wkt_UInt32Value = proto.Repeated(proto.wkt.UInt32Value, .message);
+    const message_proto_wkt_UInt64Value = proto.Repeated(proto.wkt.UInt64Value, .message);
+    const message_proto_wkt_BoolValue = proto.Repeated(proto.wkt.BoolValue, .message);
+    const message_proto_wkt_StringValue = proto.Repeated(proto.wkt.StringValue, .message);
+    const message_proto_wkt_BytesValue = proto.Repeated(proto.wkt.BytesValue, .message);
+};
+
 pub const PredefinedFloatRuleProto2 = struct {
     val: ?f32 = null,
     _unknown: proto.Unknown = .{},
@@ -434,7 +449,7 @@ pub const PredefinedEnumRuleProto2 = struct {
 };
 
 pub const PredefinedRepeatedRuleProto2 = struct {
-    val: proto.Repeated(u64, .uint64) = .{},
+    val: repeated.uint64 = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -748,7 +763,7 @@ pub const PredefinedWrappedBytesRuleProto2 = struct {
 };
 
 pub const PredefinedRepeatedWrappedFloatRuleProto2 = struct {
-    val: proto.Repeated(proto.wkt.FloatValue, .message) = .{},
+    val: repeated.message_proto_wkt_FloatValue = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -774,7 +789,7 @@ pub const PredefinedRepeatedWrappedFloatRuleProto2 = struct {
 };
 
 pub const PredefinedRepeatedWrappedDoubleRuleProto2 = struct {
-    val: proto.Repeated(proto.wkt.DoubleValue, .message) = .{},
+    val: repeated.message_proto_wkt_DoubleValue = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -800,7 +815,7 @@ pub const PredefinedRepeatedWrappedDoubleRuleProto2 = struct {
 };
 
 pub const PredefinedRepeatedWrappedInt32RuleProto2 = struct {
-    val: proto.Repeated(proto.wkt.Int32Value, .message) = .{},
+    val: repeated.message_proto_wkt_Int32Value = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -827,7 +842,7 @@ pub const PredefinedRepeatedWrappedInt32RuleProto2 = struct {
 };
 
 pub const PredefinedRepeatedWrappedInt64RuleProto2 = struct {
-    val: proto.Repeated(proto.wkt.Int64Value, .message) = .{},
+    val: repeated.message_proto_wkt_Int64Value = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -854,7 +869,7 @@ pub const PredefinedRepeatedWrappedInt64RuleProto2 = struct {
 };
 
 pub const PredefinedRepeatedWrappedUInt32RuleProto2 = struct {
-    val: proto.Repeated(proto.wkt.UInt32Value, .message) = .{},
+    val: repeated.message_proto_wkt_UInt32Value = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -880,7 +895,7 @@ pub const PredefinedRepeatedWrappedUInt32RuleProto2 = struct {
 };
 
 pub const PredefinedRepeatedWrappedUInt64RuleProto2 = struct {
-    val: proto.Repeated(proto.wkt.UInt64Value, .message) = .{},
+    val: repeated.message_proto_wkt_UInt64Value = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -906,7 +921,7 @@ pub const PredefinedRepeatedWrappedUInt64RuleProto2 = struct {
 };
 
 pub const PredefinedRepeatedWrappedBoolRuleProto2 = struct {
-    val: proto.Repeated(proto.wkt.BoolValue, .message) = .{},
+    val: repeated.message_proto_wkt_BoolValue = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -932,7 +947,7 @@ pub const PredefinedRepeatedWrappedBoolRuleProto2 = struct {
 };
 
 pub const PredefinedRepeatedWrappedStringRuleProto2 = struct {
-    val: proto.Repeated(proto.wkt.StringValue, .message) = .{},
+    val: repeated.message_proto_wkt_StringValue = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -958,7 +973,7 @@ pub const PredefinedRepeatedWrappedStringRuleProto2 = struct {
 };
 
 pub const PredefinedRepeatedWrappedBytesRuleProto2 = struct {
-    val: proto.Repeated(proto.wkt.BytesValue, .message) = .{},
+    val: repeated.message_proto_wkt_BytesValue = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {

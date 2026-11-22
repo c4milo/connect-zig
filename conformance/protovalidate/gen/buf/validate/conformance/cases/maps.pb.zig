@@ -4,8 +4,27 @@
 const proto = @import("protobuf");
 const validate = @import("protovalidate");
 
+/// The type of each repeated field, declared once: the compiler counts each call in the
+/// types of a struct's fields against one branch quota.
+const repeated = struct {
+    const message_MapNone_ValEntry = proto.Repeated(MapNone.ValEntry, .message);
+    const message_MapMin_ValEntry = proto.Repeated(MapMin.ValEntry, .message);
+    const message_MapMax_ValEntry = proto.Repeated(MapMax.ValEntry, .message);
+    const message_MapMinMax_ValEntry = proto.Repeated(MapMinMax.ValEntry, .message);
+    const message_MapExact_ValEntry = proto.Repeated(MapExact.ValEntry, .message);
+    const message_MapKeys_ValEntry = proto.Repeated(MapKeys.ValEntry, .message);
+    const message_MapValues_ValEntry = proto.Repeated(MapValues.ValEntry, .message);
+    const message_MapKeysPattern_ValEntry = proto.Repeated(MapKeysPattern.ValEntry, .message);
+    const message_MapValuesPattern_ValEntry = proto.Repeated(MapValuesPattern.ValEntry, .message);
+    const message_MapRecursive_ValEntry = proto.Repeated(MapRecursive.ValEntry, .message);
+    const message_MapExactIgnore_ValEntry = proto.Repeated(MapExactIgnore.ValEntry, .message);
+    const message_MultipleMaps_FirstEntry = proto.Repeated(MultipleMaps.FirstEntry, .message);
+    const message_MultipleMaps_SecondEntry = proto.Repeated(MultipleMaps.SecondEntry, .message);
+    const message_MultipleMaps_ThirdEntry = proto.Repeated(MultipleMaps.ThirdEntry, .message);
+};
+
 pub const MapNone = struct {
-    val: proto.Repeated(MapNone.ValEntry, .message) = .{},
+    val: repeated.message_MapNone_ValEntry = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -40,7 +59,7 @@ pub const MapNone = struct {
 };
 
 pub const MapMin = struct {
-    val: proto.Repeated(MapMin.ValEntry, .message) = .{},
+    val: repeated.message_MapMin_ValEntry = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -85,7 +104,7 @@ pub const MapMin = struct {
 };
 
 pub const MapMax = struct {
-    val: proto.Repeated(MapMax.ValEntry, .message) = .{},
+    val: repeated.message_MapMax_ValEntry = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -130,7 +149,7 @@ pub const MapMax = struct {
 };
 
 pub const MapMinMax = struct {
-    val: proto.Repeated(MapMinMax.ValEntry, .message) = .{},
+    val: repeated.message_MapMinMax_ValEntry = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -176,7 +195,7 @@ pub const MapMinMax = struct {
 };
 
 pub const MapExact = struct {
-    val: proto.Repeated(MapExact.ValEntry, .message) = .{},
+    val: repeated.message_MapExact_ValEntry = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -222,7 +241,7 @@ pub const MapExact = struct {
 };
 
 pub const MapKeys = struct {
-    val: proto.Repeated(MapKeys.ValEntry, .message) = .{},
+    val: repeated.message_MapKeys_ValEntry = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -263,7 +282,7 @@ pub const MapKeys = struct {
 };
 
 pub const MapValues = struct {
-    val: proto.Repeated(MapValues.ValEntry, .message) = .{},
+    val: repeated.message_MapValues_ValEntry = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -308,7 +327,7 @@ pub const MapValues = struct {
 };
 
 pub const MapKeysPattern = struct {
-    val: proto.Repeated(MapKeysPattern.ValEntry, .message) = .{},
+    val: repeated.message_MapKeysPattern_ValEntry = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -349,7 +368,7 @@ pub const MapKeysPattern = struct {
 };
 
 pub const MapValuesPattern = struct {
-    val: proto.Repeated(MapValuesPattern.ValEntry, .message) = .{},
+    val: repeated.message_MapValuesPattern_ValEntry = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -390,7 +409,7 @@ pub const MapValuesPattern = struct {
 };
 
 pub const MapRecursive = struct {
-    val: proto.Repeated(MapRecursive.ValEntry, .message) = .{},
+    val: repeated.message_MapRecursive_ValEntry = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -453,7 +472,7 @@ pub const MapRecursive = struct {
 };
 
 pub const MapExactIgnore = struct {
-    val: proto.Repeated(MapExactIgnore.ValEntry, .message) = .{},
+    val: repeated.message_MapExactIgnore_ValEntry = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -499,9 +518,9 @@ pub const MapExactIgnore = struct {
 };
 
 pub const MultipleMaps = struct {
-    first: proto.Repeated(MultipleMaps.FirstEntry, .message) = .{},
-    second: proto.Repeated(MultipleMaps.SecondEntry, .message) = .{},
-    third: proto.Repeated(MultipleMaps.ThirdEntry, .message) = .{},
+    first: repeated.message_MultipleMaps_FirstEntry = .{},
+    second: repeated.message_MultipleMaps_SecondEntry = .{},
+    third: repeated.message_MultipleMaps_ThirdEntry = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {

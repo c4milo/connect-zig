@@ -3,25 +3,36 @@
 //! The build gives this file the modules protobuf.
 const proto = @import("protobuf");
 
+/// The type of each repeated field, declared once: the compiler counts each call in the
+/// types of a struct's fields against one branch quota.
+const repeated = struct {
+    const int32 = proto.Repeated(i32, .int32);
+    const group_Everything_Item = proto.Repeated(Everything.Item, .group);
+    const message_Everything_CountsEntry = proto.Repeated(Everything.CountsEntry, .message);
+    const enum_Size = proto.Repeated(Size, .@"enum");
+    const message_Everything_SizesByNameEntry = proto.Repeated(Everything.SizesByNameEntry, .message);
+    const unvalidated_string = proto.Repeated([]const u8, .unvalidated_string);
+};
+
 pub const Everything = struct {
     count: ?i32 = null,
     label: ?[]const u8 = null,
     id: ?i64 = null,
-    unpacked: proto.Repeated(i32, .int32) = .{},
-    @"packed": proto.Repeated(i32, .int32) = .{},
+    unpacked: repeated.int32 = .{},
+    @"packed": repeated.int32 = .{},
     inner: ?Everything.Inner = null,
-    item: proto.Repeated(Everything.Item, .group) = .{},
+    item: repeated.group_Everything_Item = .{},
     child: proto.Lazy(Everything) = .{},
-    counts: proto.Repeated(Everything.CountsEntry, .message) = .{},
+    counts: repeated.message_Everything_CountsEntry = .{},
     size: ?Size = null,
-    sizes: proto.Repeated(Size, .@"enum") = .{},
-    packed_sizes: proto.Repeated(Size, .@"enum") = .{},
-    sizes_by_name: proto.Repeated(Everything.SizesByNameEntry, .message) = .{},
+    sizes: repeated.enum_Size = .{},
+    packed_sizes: repeated.enum_Size = .{},
+    sizes_by_name: repeated.message_Everything_SizesByNameEntry = .{},
     pick: ?union(enum) {
         picked_size: Size,
         picked_label: []const u8,
     } = null,
-    labels: proto.Repeated([]const u8, .unvalidated_string) = .{},
+    labels: repeated.unvalidated_string = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {

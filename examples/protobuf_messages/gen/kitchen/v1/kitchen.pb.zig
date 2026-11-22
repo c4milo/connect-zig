@@ -5,6 +5,16 @@ const proto = @import("protobuf");
 const connect = @import("connect");
 const kitchen_v1_shared = @import("kitchen_v1_shared");
 
+/// The type of each repeated field, declared once: the compiler counts each call in the
+/// types of a struct's fields against one branch quota.
+const repeated = struct {
+    const int32 = proto.Repeated(i32, .int32);
+    const message_Tree = proto.Repeated(Tree, .message);
+    const message_Tree_NamedEntry = proto.Repeated(Tree.NamedEntry, .message);
+    const message_Tree_LabelsEntry = proto.Repeated(Tree.LabelsEntry, .message);
+    const message_Tree_Leaf = proto.Repeated(Tree.Leaf, .message);
+};
+
 pub const Scalars = struct {
     a_double: f64 = 0,
     a_float: f32 = 0,
@@ -22,8 +32,8 @@ pub const Scalars = struct {
     a_sint32: i32 = 0,
     a_sint64: i64 = 0,
     maybe: ?i32 = null,
-    packed_numbers: proto.Repeated(i32, .int32) = .{},
-    unpacked_numbers: proto.Repeated(i32, .int32) = .{},
+    packed_numbers: repeated.int32 = .{},
+    unpacked_numbers: repeated.int32 = .{},
     mood: Mood = @enumFromInt(0),
     _unknown: proto.Unknown = .{},
 
@@ -78,15 +88,15 @@ pub const Scalars = struct {
 pub const Tree = struct {
     name: []const u8 = "",
     parent: proto.Lazy(Tree) = .{},
-    children: proto.Repeated(Tree, .message) = .{},
-    named: proto.Repeated(Tree.NamedEntry, .message) = .{},
-    labels: proto.Repeated(Tree.LabelsEntry, .message) = .{},
+    children: repeated.message_Tree = .{},
+    named: repeated.message_Tree_NamedEntry = .{},
+    labels: repeated.message_Tree_LabelsEntry = .{},
     payload: ?union(enum) {
         text: []const u8,
         scalars: Scalars,
         twin: proto.Lazy(Tree),
     } = null,
-    leaves: proto.Repeated(Tree.Leaf, .message) = .{},
+    leaves: repeated.message_Tree_Leaf = .{},
     created: ?proto.wkt.Timestamp = null,
     age: ?proto.wkt.Duration = null,
     mask: ?proto.wkt.FieldMask = null,

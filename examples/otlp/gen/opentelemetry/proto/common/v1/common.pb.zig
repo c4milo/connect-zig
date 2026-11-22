@@ -3,6 +3,14 @@
 //! The build gives this file the modules protobuf.
 const proto = @import("protobuf");
 
+/// The type of each repeated field, declared once: the compiler counts each call in the
+/// types of a struct's fields against one branch quota.
+const repeated = struct {
+    const message_AnyValue = proto.Repeated(AnyValue, .message);
+    const message_KeyValue = proto.Repeated(KeyValue, .message);
+    const string = proto.Repeated([]const u8, .string);
+};
+
 pub const AnyValue = struct {
     value: ?union(enum) {
         string_value: []const u8,
@@ -43,7 +51,7 @@ pub const AnyValue = struct {
 };
 
 pub const ArrayValue = struct {
-    values: proto.Repeated(AnyValue, .message) = .{},
+    values: repeated.message_AnyValue = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -59,7 +67,7 @@ pub const ArrayValue = struct {
 };
 
 pub const KeyValueList = struct {
-    values: proto.Repeated(KeyValue, .message) = .{},
+    values: repeated.message_KeyValue = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -99,7 +107,7 @@ pub const KeyValue = struct {
 pub const InstrumentationScope = struct {
     name: []const u8 = "",
     version: []const u8 = "",
-    attributes: proto.Repeated(KeyValue, .message) = .{},
+    attributes: repeated.message_KeyValue = .{},
     dropped_attributes_count: u32 = 0,
     _unknown: proto.Unknown = .{},
 
@@ -124,8 +132,8 @@ pub const InstrumentationScope = struct {
 pub const EntityRef = struct {
     schema_url: []const u8 = "",
     type: []const u8 = "",
-    id_keys: proto.Repeated([]const u8, .string) = .{},
-    description_keys: proto.Repeated([]const u8, .string) = .{},
+    id_keys: repeated.string = .{},
+    description_keys: repeated.string = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
