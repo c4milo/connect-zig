@@ -62,6 +62,7 @@ inline fn eval_name(comptime node: *const Node, comptime scope: Scope, values: a
 inline fn eval_select(comptime node: *const Node, comptime scope: Scope, values: anytype, env: *Env) Error!Result(node, scope) {
     const select = comptime node.select;
     const target = try eval(select.of, scope, values, env);
+    if (comptime type_file.MessageOf(@TypeOf(target)) == null) return collection.select_key(target, select.field, env);
     const M = comptime type_file.MessageOf(@TypeOf(target)).?;
     return select_file.read(M, comptime select_file.field_of(M, select.field).?, pointer_to(M, &target));
 }
@@ -154,6 +155,7 @@ fn Operands(comptime operands: []const Node, comptime scope: Scope) type {
 
 inline fn eval_has(comptime select: Node.Select, comptime scope: Scope, values: anytype, env: *Env) Error!bool {
     const target = try eval(select.of, scope, values, env);
+    if (comptime type_file.MessageOf(@TypeOf(target)) == null) return collection.has_key(target, select.field, env);
     const M = comptime type_file.MessageOf(@TypeOf(target)).?;
     return select_file.has(M, comptime select_file.field_of(M, select.field).?, pointer_to(M, &target));
 }

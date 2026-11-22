@@ -81,6 +81,26 @@ pub fn eval_index(comptime index: Node.Index, comptime R: type, comptime scope: 
     return try target.get(at, env) orelse error.Unevaluable;
 }
 
+/// The type of `map.f`, a map of string keys read at the key `f`, or null when `T` is no such
+/// map. CEL language definition, "Field Selection": "If `e` evaluates to a map, then `e.f` is
+/// equivalent to `e['f']`".
+pub fn KeySelected(comptime T: type) ?type {
+    if (!list_file.is_map(T) or T.Key != []const u8) return null;
+    return list_file.Taken(T.Value);
+}
+
+/// `map.f`: the value at the key `f`. A key the map does not hold fails the run, as `map['f']`
+/// does.
+pub fn select_key(map: anytype, comptime key: []const u8, env: *Env) Error!KeySelected(@TypeOf(map)).? {
+    return try map.get(@as([]const u8, key), env) orelse error.Unevaluable;
+}
+
+/// `has(map.f)`: "indicates whether the string `f` is a key in the map" (CEL language
+/// definition, "Field Selection").
+pub fn has_key(map: anytype, comptime key: []const u8, env: *Env) Error!bool {
+    return try map.get(@as([]const u8, key), env) != null;
+}
+
 /// `value in list` and `key in map`.
 pub fn In(comptime L: type, comptime R: type) ?type {
     const V = Variable(R) orelse return null;

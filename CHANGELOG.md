@@ -53,6 +53,8 @@ change the public API, and the entry marks each change that does.
 - A Lean model of the CEL syntax in `spec/lean/`, and `zig build lean`, which requires the
   vectors a unit test replays to be what the model gives. `tools/lean_check.sh` runs it, and
   is the check `lean` of `tools/ci.sh`.
+- CEL reads a map's string key as a field: `this.labels.env` is `this.labels['env']`, and
+  `has(this.labels.env)` tells whether the map holds the key.
 - CEL's `filter(x, p)`, `map(x, t)` and `map(x, p, t)` on any list or map, such as
   `this.items.filter(i, i.price > 0).size() > 0`. The list they give is computed as it is read,
   so it needs no memory. Before, only `map` of a list literal compiled.

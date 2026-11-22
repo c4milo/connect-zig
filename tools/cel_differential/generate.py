@@ -39,6 +39,8 @@ UINTS = [0, 1, 2, 5, 100, 2**32 - 1]
 ULONGS = UINTS + [2**63, 2**64 - 1]
 DOUBLES = ["0.0", "1.5", "2.0", "-2.25", "100.0", "1e300"]
 DURATIONS = ["0s", "1s", "5s", "90s", "1h", "-3s", "1.5s"]
+# The texts of STRINGS that are identifiers, so a map's key may be selected as a field: `m.ab`.
+KEYS = ["a", "b", "ab", "x1", "k"]
 
 
 class Generator:
@@ -90,6 +92,8 @@ class Generator:
         if kind == 8:
             return f"this.ri[{self.int(0)}]"
         if kind == 9:
+            if self.rng.random() < 0.4:
+                return f"this.msi.{self.pick(KEYS)}"
             return f"this.msi[{self.string(0)}]"
         if kind == 10:
             return f"({self.bool(depth - 1)} ? {self.int(depth - 1)} : {self.int(depth - 1)})"
@@ -212,7 +216,7 @@ class Generator:
         if kind == 11:
             return self.macro(depth)
         if kind == 12:
-            return f"has({self.pick(['this.leaf', 'this.leaf.name', 'this.s', 'this.i', 'this.dur', 'this.b'])})"
+            return f"has({self.pick(['this.leaf', 'this.leaf.name', 'this.s', 'this.i', 'this.dur', 'this.b', 'this.msi.' + self.pick(KEYS)])})"
         if kind == 13:
             function = self.pick(["isEmail()", "isHostname()", "isIp()", "isIp(4)", "isIp(6)", "isUri()", "isUriRef()", "isIpPrefix()", "isHostAndPort(true)"])
             return f"{self.string(depth - 1)}.{function}"

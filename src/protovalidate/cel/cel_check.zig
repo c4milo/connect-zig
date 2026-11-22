@@ -66,7 +66,10 @@ fn of_select(comptime select: Node.Select, comptime scope: Scope) Typed {
     };
     const T = target.type;
     if (T == Failing) return .{ .ok = target };
-    const M = type_file.MessageOf(T) orelse return mistake(target.dynamic, "type `" ++ type_file.name_of(T) ++ "` has no field `" ++ select.field ++ "`");
+    const M = type_file.MessageOf(T) orelse {
+        if (collection.KeySelected(T)) |V| return .{ .ok = .{ .type = V, .dynamic = target.dynamic } };
+        return mistake(target.dynamic, "type `" ++ type_file.name_of(T) ++ "` has no field `" ++ select.field ++ "`");
+    };
     const field = select_file.field_of(M, select.field) orelse {
         return mistake(target.dynamic, "undefined field `" ++ select.field ++ "` of " ++ M.protobuf.full_name);
     };
@@ -274,7 +277,10 @@ fn of_has(comptime operands: []const Node, comptime scope: Scope) Typed {
         .problem => |problem| return .{ .problem = problem },
     };
     if (target.type == Failing) return .{ .ok = target };
-    const M = type_file.MessageOf(target.type) orelse return mistake(target.dynamic, "type `" ++ type_file.name_of(target.type) ++ "` has no field `" ++ select.field ++ "`");
+    const M = type_file.MessageOf(target.type) orelse {
+        if (collection.KeySelected(target.type) != null) return .{ .ok = .{ .type = bool, .dynamic = target.dynamic } };
+        return mistake(target.dynamic, "type `" ++ type_file.name_of(target.type) ++ "` has no field `" ++ select.field ++ "`");
+    };
     if (select_file.field_of(M, select.field) == null) return mistake(target.dynamic, "undefined field `" ++ select.field ++ "` of " ++ M.protobuf.full_name);
     return .{ .ok = .{ .type = bool, .dynamic = target.dynamic } };
 }

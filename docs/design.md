@@ -1721,6 +1721,15 @@ ran on Linux x86-64 with Zig 0.16.0.
     entry, a predicate of int typed, `filter` with three arguments, a stored list read element
     by element, and `map(x, p, t)` without its predicate. Each was `CAUGHT`.
 
+- **A map's key as a field.** `this.labels.env` reads a map of string keys at the key `env`, as
+  `this.labels['env']` does, and `has(this.labels.env)` tells whether the map holds the key (CEL
+  language definition, "Field Selection"). The checker tries a message first, so a selection of
+  a message's field costs the compiler no more branches.
+  - The differential check selects keys of `this.msi` and asks `has` of them. Seeds 41 to 46,
+    with 76 such rules, agreed with protovalidate-go on each of their 48,000 verdicts.
+  - Mutations against `zig build test-protovalidate`, 3: `has` of a key always true, a map of
+    int keys that takes a selection, and a selection that reads another key. Each was `CAUGHT`.
+
 ### Work not done yet
 
 - A stream that waits for an event of the program once its request ended (colibri issue 130).
@@ -1740,7 +1749,7 @@ ran on Linux x86-64 with Zig 0.16.0.
   `TooManyItems` (decision 47). A program that needs longer lists needs a set in storage it
   passes. No step holds that yet.
 - For `protovalidate`, the parts of CEL that no rule of the conformance suite uses and the
-  module does not read yet: a selection of a map's key, `m.key`, `type`, `duration` of a text
+  module does not read yet: `type`, `duration` of a text
   that is no literal, `timestamp(string)`, sums and differences of timestamps and
   durations, the accessors of a timestamp such as `getFullYear`, `string` of a number, and `+`
   of two strings. Each stops the build with a message that names it.

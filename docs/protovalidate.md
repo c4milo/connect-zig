@@ -147,8 +147,8 @@ The text is written into the report's storage, so a report needs room for it.
 A rule the module has no check for stops your build, with a message that names it. That holds
 today for a predefined rule whose value is a message that is no wrapper, and for the parts of
 CEL the module does not read yet: arithmetic on a timestamp or a duration,
-`timestamp(string)`, `type`, a map's key as a selection, `m.key`, and `string(number)` and
-`+` of two strings, which build a value that needs room.
+`timestamp(string)`, `type`, and `string(number)` and `+` of two strings, which build a value
+that needs room.
 
 `filter` and `map` work on any list or map. The list they give is computed as you read it,
 so it takes no memory, and reading it twice computes it twice.

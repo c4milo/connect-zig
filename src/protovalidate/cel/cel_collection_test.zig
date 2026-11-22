@@ -227,3 +227,13 @@ test "filter and map give a list that each read computes" {
     try testing.expectError(error.Unevaluable, run("this.numbers.filter(n, 10 / (n - 5) > 0).size() > 0", &message));
     try testing.expectError(error.Unevaluable, run("this.numbers.filter(n, n > 2)[2] == 0", &message));
 }
+
+test "a map of string keys reads a key as a field, and has tells whether it holds the key" {
+    const message: Message = .{ .counts = .of(&.{ .{ .key = "x", .value = 1 }, .{ .key = "y", .value = 7 }, .{ .key = "x", .value = 2 } }) };
+    try expect_true("this.counts.x == 2 && this.counts.y == 7 && this.counts.x == this.counts['x']", &message);
+    try expect_true("has(this.counts.y) && !has(this.counts.z) && dyn(this.counts).y == 7", &message);
+    // A key the map does not hold fails the run, as an index of it does.
+    try testing.expectError(error.Unevaluable, run("this.counts.z == 0", &message));
+    try expect_problem("this.by_id.a == 0", "type `map(int, t.Item)` has no field `a`");
+    try expect_problem("has(this.by_id.a)", "type `map(int, t.Item)` has no field `a`");
+}
