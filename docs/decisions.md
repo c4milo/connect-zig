@@ -841,7 +841,14 @@ first. Cite an entry by number in code and commits ("decision 6").
         in validate.proto's expression.
       - Each search runs stdx's `Searcher` in memory on the stack, with a DFA cache of
         `pattern_cache_words`. The library keeps no memory between calls, so each search
-        builds its DFA's states again.
+        builds its DFA's states again. Amended on 2026-11-22, ruled by the owner: each thread
+        keeps one searcher for each pattern, made ready at its first check, in `threadlocal`
+        memory of a size the build knows. Its DFA states depend on the pattern alone, so a
+        check gives the answer a fresh searcher would, and no two threads write one. A
+        pattern's memory is about 8 to 14 KiB a thread, and the email pattern's 73 KiB. It is
+        zero storage the binary does not hold. The medium message's checks took 64% fewer
+        instructions. Beaten: a fresh searcher for each check, 1 to 3 µs each, and a cache the
+        caller passes to `validate`, which every program would size for each pattern.
       - stdx's `regex` came in a release that colibri does not pin yet. So `build.zig.zon`
         pins that commit a second time, as `stdx_regex`, and takes `regex` alone from it. A
         second copy of stdx's `json` would export the same kernel symbols twice, and `regex`

@@ -1797,6 +1797,18 @@ ran on Linux x86-64 with Zig 0.16.0.
     as list, two names of one length as one type, Duration's name as no type, and a dotted name
     never a type. Each was `CAUGHT`, four as the compiler typed a test's expression.
 
+- **A pattern's searcher kept on its thread** (decision 47, amended 2026-11-22). `pattern.zig`
+  keeps one stdx searcher for each pattern and thread, made ready at its first check, where it
+  made one for each check. The pin moved to stdx's `85f532c`, whose CI passed, and whose
+  `Searcher.init` takes a `codec.Features`: the module passes none, so the searches take their
+  16-octet paths.
+  - `tools/perf_check.sh`: validate medium valid fell from 9,684 instructions to 3,521, medium
+    invalid from 6,899 to 3,596, and decode and validate medium valid from 12,988 to 6,830. The
+    other rows did not move past 2%.
+  - Mutations: a searcher made ready at each check, which `tools/perf_check.sh` failed at
+    +93.07%, and one searcher for every pattern, which `zig build test-protovalidate` failed.
+    Each was `CAUGHT`.
+
 ### Work not done yet
 
 - A stream that waits for an event of the program once its request ended (colibri issue 130).
@@ -1808,10 +1820,10 @@ ran on Linux x86-64 with Zig 0.16.0.
 - For `protovalidate`, one pin of stdx. `stdx_regex` pins the commit that brought `regex`
   beside the stdx that colibri pins (decision 47). The two become one when a colibri release
   pins a stdx that holds `regex`.
-- For `protovalidate`, a pattern's search keeps no DFA from one call to the next, so it builds
-  its states again each time: about 6,400 instructions for the benchmark's name of 12 octets.
-  A DFA that the compiler builds whole from a pattern the build knows would cost about the
-  octets read. stdx's session has the numbers; the module changes when stdx offers it.
+- For `protovalidate`, a DFA that the compiler builds whole from a pattern the build knows,
+  which the owner approved for stdx on 2026-11-22 (stdx's decision 86). A kept searcher builds
+  its states at its first checks; such a DFA would hold them all in the binary. The module
+  moves to it once stdx holds it.
 - For `protovalidate`, a `unique` list longer than `compared_items_max` fails with
   `TooManyItems` (decision 47). A program that needs longer lists needs a set in storage it
   passes. No step holds that yet.

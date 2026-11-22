@@ -1,6 +1,7 @@
 //! The regular expressions of `pattern` and of CEL's `matches`, on stdx's `regex` module
 //! (decision 47). A pattern is text the build knows, so the compiler reads it into a program
-//! once, and a pattern stdx refuses stops the build with stdx's message.
+//! once, and a pattern stdx refuses stops the build with stdx's message. Each thread keeps one
+//! searcher for each pattern, so a check reads the DFA states that earlier checks built.
 const std = @import("std");
 const regex = @import("regex");
 const constants = @import("constants.zig");
@@ -10,13 +11,29 @@ const constants = @import("constants.zig");
 /// states its own anchors. An octet of `text` that is not UTF-8 matches nothing. The caller
 /// checked the pattern with `problem_of`, as `rules_error` does.
 pub fn matches(comptime pattern: []const u8, text: []const u8) bool {
-    const program = comptime Compiled(pattern).result catch unreachable;
-    // The searcher clears each part of its memory that it reads before it writes, as stdx's own
-    // tests rely on, so the memory needs no fill.
-    var memory: [regex.Searcher.memory_len(program.forward_len, program.slot_count(), constants.pattern_cache_words)]u64 = undefined;
-    var searcher: regex.Searcher = undefined;
-    searcher.init(&program, &memory);
-    return searcher.is_match(text);
+    const Kept = Searcher(pattern);
+    if (!Kept.ready) {
+        // No feature is named, so the searches take their 16-octet paths on every CPU: the texts
+        // of a rule are short, and the library probes no CPU.
+        Kept.searcher.init(&Kept.program, .{}, &Kept.memory);
+        Kept.ready = true;
+    }
+    return Kept.searcher.is_match(text);
+}
+
+/// The searcher of `pattern` on this thread, made ready at its first check and kept (decision
+/// 47, amended 2026-11-22). Its DFA states depend on the pattern alone, never on a text, so a
+/// check gives the answer a fresh searcher would. Each thread holds its own, so no two threads
+/// write one, and its memory is a constant size the build knows.
+fn Searcher(comptime pattern: []const u8) type {
+    return struct {
+        const program = Compiled(pattern).result catch unreachable;
+        // The searcher clears each part of its memory that it reads before it writes, as stdx's
+        // own tests rely on, so the memory needs no fill.
+        threadlocal var memory: [regex.Searcher.memory_len(program.forward_len, program.slot_count(), constants.pattern_cache_words)]u64 align(@alignOf(u64)) = undefined;
+        threadlocal var searcher: regex.Searcher align(@alignOf(regex.Searcher)) = undefined;
+        threadlocal var ready: bool align(@alignOf(bool)) = false;
+    };
 }
 
 /// What stops stdx from reading `pattern`, or null: a form of RE2's that stdx refuses, such as
@@ -86,4 +103,24 @@ test "an octet that is not UTF-8 matches nothing" {
 test "a pattern that stdx refuses is a problem that names it" {
     try testing.expect(comptime problem_of("^[a-z]+$") == null);
     try testing.expectEqualStrings("stdx's regular expressions refuse the pattern `\\p{Greek}`: UnsupportedProperty", comptime problem_of("\\p{Greek}").?);
+}
+
+/// The answer of a searcher made ready for `text` alone.
+fn fresh(comptime pattern: []const u8, text: []const u8) bool {
+    const Kept = Searcher(pattern);
+    var memory: @TypeOf(Kept.memory) = undefined;
+    var searcher: regex.Searcher = undefined;
+    searcher.init(&Kept.program, .{}, &memory);
+    return searcher.is_match(text);
+}
+
+test "a kept searcher gives each text the answer a fresh one gives" {
+    const pattern = "^[A-Z][a-z]+( [A-Z][a-z]+)*$";
+    const texts = [_][]const u8{ "Ada", "ada", "Ada Lovelace", "Ada lovelace", "", "Ada Lovelace Byron", "A", "Ab Cd Ef Gh", "Ada  Byron" };
+    // Twice over, so the second pass reads the states the first one built.
+    for (0..2) |_| {
+        for (texts) |text| try testing.expectEqual(fresh(pattern, text), matches(pattern, text));
+    }
+    // Another pattern keeps a searcher of its own.
+    try testing.expect(matches("^[a-z]+$", "ada") and !matches(pattern, "ada") and !matches("^[a-z]+$", "Ada"));
 }

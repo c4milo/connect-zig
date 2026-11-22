@@ -143,6 +143,10 @@ change the public API, and the entry marks each change that does.
   map's lookup stops at the key, from its last entry back.
 - `tools/perf_check.sh` also counts `protovalidate` on the six messages of the validation
   benchmark, `bench-validate --instructions`, against `bench/instructions.txt`.
+- `pattern` and CEL's `matches` keep one stdx searcher for each pattern and thread, made ready
+  at the first check, so a later check reads the DFA states the earlier ones built. A pattern
+  takes about 8 to 14 KiB of thread-local storage a thread. The medium benchmark's checks take
+  64% fewer instructions.
 
 ### Fixed
 
