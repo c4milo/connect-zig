@@ -152,6 +152,9 @@ change the public API, and the entry marks each change that does.
   declares each repeated type once, at the top, as `const RepeatedSpan = proto.Repeated(Span,
   .message);`, and each field uses that name. The field types are the same as before. Before,
   Zig stopped at the branch quota of the struct that held the fields.
+- In CEL, a conversion of a conversion of a constant that fails, such as `uint(double(-100))`,
+  stops the build, as protovalidate-go refuses the rule. Before, only a conversion of a literal
+  did, and the rule failed each time it ran.
 - In CEL, the least int's remainder by -1 fails, as it fails in cel-go. Before, it gave 0, and
   a rule that read it could pass where protovalidate-go's fails.
 - A macro over a list literal, such as `[1, 2].all(n, n > 0)`, and a signed duration literal,

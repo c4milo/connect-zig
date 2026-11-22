@@ -248,11 +248,15 @@ test "an expression that does not parse or does not type is a problem of the bui
     // A name the module holds no function for, with the operands of a function it holds.
     try expect_problem("this.name.nothing()", "found no matching overload for `nothing` applied to (string)");
     // A conversion of a literal is computed once: one that fails is a problem of the build.
-    try expect_problem("int('x') == 1", "the conversion `int` fails for its literal");
-    try expect_problem("this.on || bool('k')", "the conversion `bool` fails for its literal");
-    try expect_problem("uint(-1) == 1u", "the conversion `uint` fails for its literal");
-    try expect_problem("double('b') > 1.0", "the conversion `double` fails for its literal");
-    try expect_problem("string(b'\\xff') == ''", "the conversion `string` fails for its literal");
+    try expect_problem("int('x') == 1", "the conversion `int` fails for its constant operand");
+    try expect_problem("this.on || bool('k')", "the conversion `bool` fails for its constant operand");
+    try expect_problem("uint(-1) == 1u", "the conversion `uint` fails for its constant operand");
+    try expect_problem("double('b') > 1.0", "the conversion `double` fails for its constant operand");
+    try expect_problem("string(b'\\xff') == ''", "the conversion `string` fails for its constant operand");
+    // A conversion of a conversion of a constant is computed too, as cel-go computes it.
+    try expect_problem("uint(double(-100)) == 1u", "the conversion `uint` fails for its constant operand");
+    try expect_problem("int(string(1.5)) == 1", "the conversion `int` fails for its constant operand");
+    try expect_problem("int(dyn('x')) == 1", "the conversion `int` fails for its constant operand");
     try expect_problem("dyn(this.a, this.b)", "found no matching overload for `dyn` applied to (int, int)");
     try testing.expect(comptime program.problem_of("this.a < this.b", scope) == null);
 }

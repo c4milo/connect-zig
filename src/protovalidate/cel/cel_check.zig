@@ -17,6 +17,7 @@ const timestamp_file = @import("cel_timestamp.zig");
 const duration_file = @import("cel_duration.zig");
 const time_literal = @import("cel_time_literal.zig");
 const type_value = @import("cel_type_value.zig");
+const constant = @import("cel_constant.zig");
 const TypeValue = type_value.TypeValue;
 const Node = node_file.Node;
 const BinaryOp = node_file.BinaryOp;
@@ -207,7 +208,7 @@ fn of_call(comptime call: Node.Call, comptime scope: Scope) Typed {
     const R = function.Result(call.function, taken.types) orelse {
         return mistake(taken.dynamic, "found no matching overload for `" ++ call.name ++ "` applied to (" ++ names_of(taken.types) ++ ")");
     };
-    if (converts_no_literal(call, operands, R)) return .{ .problem = "the conversion `" ++ call.name ++ "` fails for its literal" };
+    if (fails_on_constant(call, operands)) return .{ .problem = "the conversion `" ++ call.name ++ "` fails for its constant operand" };
     return .{ .ok = .{ .type = R, .dynamic = taken.dynamic } };
 }
 
@@ -265,24 +266,10 @@ fn pattern_problem(comptime operands: []const Node) ?[]const u8 {
 /// Whether `call` is a conversion of a literal that fails. cel-go computes such a conversion
 /// once, before the expression runs, and refuses the expression when it fails: `int('x')`
 /// and `bool('k')` can give no value. The compiler computes it here the same way.
-fn converts_no_literal(comptime call: Node.Call, comptime operands: []const Node, comptime R: type) bool {
-    const converts = switch (call.function) {
-        .int, .uint, .double, .bytes, .bool => operands.len == 1,
-        // `string` fails for bytes alone, which may not be UTF-8.
-        .string => operands.len == 1 and operands[0] == .bytes,
-        else => false,
-    };
-    if (!converts) return false;
-    return switch (operands[0]) {
-        inline .int, .uint, .double, .boolean, .string => |value| fails(call.function, R, value),
-        .bytes => |octets| fails(call.function, R, Bytes{ .octets = octets }),
-        else => false,
-    };
-}
-
-fn fails(comptime converter: node_file.Function, comptime R: type, comptime value: anytype) bool {
-    _ = function.run(converter, R, .{value}) catch return true;
-    return false;
+fn fails_on_constant(comptime call: Node.Call, comptime operands: []const Node) bool {
+    if (!constant.is_conversion(call.function) or operands.len != 1) return false;
+    const operand = constant.value_of(&operands[0]) orelse return false;
+    return constant.convert(call.function, operand) == null;
 }
 
 /// The types of a call's operands, or what stops the call: an operand's problem, or an operand

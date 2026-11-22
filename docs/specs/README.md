@@ -36,10 +36,11 @@ the module takes cel-go's answer, and the code says so where it does:
 - `uint` of a double below zero. "Types and Conversions" says "rounds toward zero, errors if
   out of range", and not whether -0.5 is in range. cel-go takes no double below zero
   (`cel_function.zig`).
-- A conversion of a literal that fails, such as `int('x')`. The definition makes it a failure
-  as the expression runs. cel-go computes a conversion of a constant once, before the
-  expression runs, and protovalidate-go refuses the rule. The module stops the build
-  (`cel_check.zig`).
+- A conversion of a constant that fails, such as `int('x')` or `uint(double(-100))`. The
+  definition makes it a failure as the expression runs. protovalidate-go builds its programs
+  with cel-go's `OptOptimize`, which computes each type conversion of a constant once, before
+  the expression runs, from the inside out, and refuses the rule when one fails. The module
+  stops the build (`cel_constant.zig`).
 - The text of a duration. "Types and Conversions" lists the suffixes and gives examples, and no
   grammar. cel-go reads the text with Go's `time.ParseDuration` (`cel_time.zig`).
 - The words `bool(string)` takes. The definition's examples are "true" and "FALSE". cel-go
