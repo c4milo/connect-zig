@@ -16,6 +16,8 @@ const text_file = @import("cel_text.zig");
 const timestamp_file = @import("cel_timestamp.zig");
 const duration_file = @import("cel_duration.zig");
 const time_literal = @import("cel_time_literal.zig");
+const type_value = @import("cel_type_value.zig");
+const TypeValue = type_value.TypeValue;
 const Node = node_file.Node;
 const BinaryOp = node_file.BinaryOp;
 const Scope = type_file.Scope;
@@ -59,13 +61,16 @@ fn of_name(comptime name: []const u8, comptime scope: Scope) Typed {
     if (scope.index_of(name)) |index| return .of(scope.types[index]);
     // validate.proto, Rule.expression: `now` is the time of the validation.
     if (std.mem.eql(u8, name, "now")) return .of(Timestamp);
+    if (type_value.named(name) != null) return .of(TypeValue);
     return .{ .problem = "undeclared reference to `" ++ name ++ "`" };
 }
 
 fn of_select(comptime select: Node.Select, comptime scope: Scope) Typed {
     const target = switch (type_of(select.of, scope)) {
         .ok => |ok| ok,
-        .problem => |problem| return .{ .problem = problem },
+        // A target that names no value may be the start of a type's name, such as
+        // `google.protobuf` of `google.protobuf.Timestamp`.
+        .problem => |problem| return if (type_value.dotted(select, scope) != null) .of(TypeValue) else .{ .problem = problem },
     };
     const T = target.type;
     if (T == Failing) return .{ .ok = target };
@@ -213,15 +218,34 @@ fn of_own(comptime call: Node.Call, comptime operands: []const Node, comptime sc
     switch (call.function) {
         .has => return of_has(operands, scope),
         .dyn => if (operands.len == 1) return of_dyn(&operands[0], scope),
-        .duration => if (operands.len == 1) return of_duration(&operands[0], scope),
-        .timestamp => if (operands.len == 1) return of_timestamp(&operands[0], scope),
+        .type => if (operands.len == 1) return of_type_call(&operands[0], scope),
         .matches => if (pattern_problem(operands)) |problem| return .{ .problem = problem },
         .format => return format_file.of_format(call, scope),
+        else => return of_time(call, operands, scope),
+    }
+    return null;
+}
+
+/// `of_own` of `duration`, `timestamp` and the `get` functions.
+fn of_time(comptime call: Node.Call, comptime operands: []const Node, comptime scope: Scope) ?Typed {
+    switch (call.function) {
+        .duration => if (operands.len == 1) return of_duration(&operands[0], scope),
+        .timestamp => if (operands.len == 1) return of_timestamp(&operands[0], scope),
         else => if (call.function.is_time_part()) {
             if (zone_problem(operands)) |problem| return .{ .problem = problem };
         },
     }
     return null;
+}
+
+/// `type(value)`: the type of any value (CEL language definition, "Type Values").
+fn of_type_call(comptime operand: *const Node, comptime scope: Scope) Typed {
+    const typed = switch (type_of(operand, scope)) {
+        .ok => |ok| ok,
+        .problem => |problem| return .{ .problem = problem },
+    };
+    if (typed.type == Failing) return .{ .ok = typed };
+    return .{ .ok = .{ .type = TypeValue, .dynamic = typed.dynamic } };
 }
 
 /// What stops the pattern of `matches` from compiling, or null: it is no string literal, or stdx

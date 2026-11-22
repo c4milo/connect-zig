@@ -19,6 +19,7 @@ const text_file = @import("cel_text.zig");
 const timestamp_file = @import("cel_timestamp.zig");
 const duration_file = @import("cel_duration.zig");
 const time_literal = @import("cel_time_literal.zig");
+const type_value = @import("cel_type_value.zig");
 const Node = node_file.Node;
 const Scope = type_file.Scope;
 const Env = type_file.Env;
@@ -70,11 +71,13 @@ pub fn eval_as(comptime R: type, comptime node: *const Node, comptime scope: Sco
 
 inline fn eval_name(comptime node: *const Node, comptime scope: Scope, values: anytype, env: *Env) Error!Result(node, scope) {
     if (comptime scope.index_of(node.name)) |index| return values[index];
+    if (comptime Result(node, scope) == type_value.TypeValue) return comptime type_value.named(node.name).?;
     return env.now orelse error.TimeMissing;
 }
 
 inline fn eval_select(comptime node: *const Node, comptime scope: Scope, values: anytype, env: *Env) Error!Result(node, scope) {
     const select = comptime node.select;
+    if (comptime Result(node, scope) == type_value.TypeValue) return comptime type_value.dotted(select, scope).?;
     const target = try eval(select.of, scope, values, env);
     if (comptime type_file.MessageOf(@TypeOf(target)) == null) return collection.select_key(target, select.field, env);
     const M = comptime type_file.MessageOf(@TypeOf(target)).?;
@@ -152,6 +155,7 @@ inline fn eval_call(comptime call: Node.Call, comptime R: type, comptime scope: 
         .dyn => return eval(&operands[0], scope, values, env),
         .duration => return eval_time(proto.wkt.Duration, operands, scope, values, env),
         .timestamp => return eval_time(proto.wkt.Timestamp, operands, scope, values, env),
+        .type => return type_value.of(try eval(&operands[0], scope, values, env)),
         // The pattern is a literal, which `check.type_of` required.
         .matches => return pattern_file.matches(operands[1].string, try eval(&operands[0], scope, values, env)),
         .format => return format_file.eval_format(call, scope, values, env),

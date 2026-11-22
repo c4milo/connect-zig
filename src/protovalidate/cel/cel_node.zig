@@ -67,6 +67,7 @@ pub const Function = enum {
     isNan,
     isInf,
     timestamp,
+    type,
     getFullYear,
     getMonth,
     getDate,

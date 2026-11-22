@@ -1783,6 +1783,20 @@ ran on Linux x86-64 with Zig 0.16.0.
     names no timestamp typed, and a zone name that stops no build. Each was `CAUGHT`, the
     first and the fifth as the compiler read a test's literal.
 
+- **Types as values** (CEL language definition, "Type Values"). `type(x)` gives a value's
+  type, and CEL's own names, `int` to `type`, name types, as do a well-known type's and a
+  message's full names: `cel_type_value.zig`. The compiler knows each value's type but a
+  wrapper's, which is `null_type` when it is not set, so a type value is the type's name. A
+  dotted name is read as a type only where its first name is no value, so a selection of a
+  field costs the typing no more branches.
+  - The differential check writes `type` of each kind of value beside a type's name or another
+    value's type. Seeds 91 to 98, with 54 such rules, agreed with protovalidate-go on each of
+    their verdicts but those of one rule, `uint(double(-100))`, which the next commit fixes.
+  - Mutations against `zig build test-protovalidate`, 7: a short type name that names nothing,
+    a message in a field that names no type, an unset wrapper of the wrapped type, a map's type
+    as list, two names of one length as one type, Duration's name as no type, and a dotted name
+    never a type. Each was `CAUGHT`, four as the compiler typed a test's expression.
+
 ### Work not done yet
 
 - A stream that waits for an event of the program once its request ended (colibri issue 130).
@@ -1801,8 +1815,6 @@ ran on Linux x86-64 with Zig 0.16.0.
 - For `protovalidate`, a `unique` list longer than `compared_items_max` fails with
   `TooManyItems` (decision 47). A program that needs longer lists needs a set in storage it
   passes. No step holds that yet.
-- For `protovalidate`, CEL's `type`, which no rule of the conformance suite uses. It stops the
-  build with a message that names it.
 - For `protovalidate`, a zone's name in a `get` function of a timestamp, such as
   `America/Los_Angeles`, which needs the IANA time zone database (decision 47).
 - For `protovalidate`, the tree of each CEL expression in the table. The compiler takes

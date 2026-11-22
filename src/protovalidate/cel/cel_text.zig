@@ -208,6 +208,7 @@ pub fn holds_no_text(comptime T: type) bool {
     if (type_file.is_message(T)) return true;
     return switch (T) {
         bool, i64, u64, f64, type_file.Null, type_file.Failing, proto.wkt.Timestamp, proto.wkt.Duration => true,
+        @import("cel_type_value.zig").TypeValue => true,
         else => false,
     };
 }

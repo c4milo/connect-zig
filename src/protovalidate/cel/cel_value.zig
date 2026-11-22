@@ -5,6 +5,7 @@ const proto = @import("protobuf");
 const type_file = @import("cel_type.zig");
 const number = @import("cel_number.zig");
 const Bytes = type_file.Bytes;
+const TypeValue = @import("cel_type_value.zig").TypeValue;
 const Null = type_file.Null;
 const Timestamp = proto.wkt.Timestamp;
 const Duration = proto.wkt.Duration;
@@ -18,7 +19,7 @@ pub fn equatable(comptime L: type, comptime R: type) bool {
     if (@typeInfo(L) == .optional) return R == Null or equatable(@typeInfo(L).optional.child, R);
     if (@typeInfo(R) == .optional) return equatable(R, L);
     if (L != R) return false;
-    return L == bool or L == []const u8 or L == Bytes or L == Null or L == Timestamp or L == Duration;
+    return L == bool or L == []const u8 or L == Bytes or L == Null or L == Timestamp or L == Duration or L == TypeValue;
 }
 
 /// Whether a `L` and a `R` may be equal as an expression runs, which `dyn` leaves to the run:
@@ -56,6 +57,7 @@ pub fn equal(left: anytype, right: anytype) bool {
         Bytes => std.mem.eql(u8, left.octets, right.octets),
         Null => true,
         Timestamp, Duration => left.seconds == right.seconds and left.nanos == right.nanos,
+        TypeValue => std.mem.eql(u8, left.name, right.name),
         else => comptime unreachable,
     };
 }

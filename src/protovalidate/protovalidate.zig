@@ -90,6 +90,8 @@ test {
     _ = @import("cel/cel_timestamp.zig");
     _ = @import("cel/cel_duration.zig");
     _ = @import("cel/cel_time_literal.zig");
+    _ = @import("cel/cel_type_value.zig");
+    _ = @import("cel/cel_type_value_test.zig");
     _ = @import("cel/cel_time_test.zig");
     _ = @import("cel/cel_format.zig");
     _ = @import("cel/cel_format_test.zig");

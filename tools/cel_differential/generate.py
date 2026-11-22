@@ -46,6 +46,8 @@ TIMESTAMPS = ["2023-12-25T12:30:45.678Z", "2000-02-29T23:59:59Z", "1970-01-01T00
 ZONES = ["UTC", "+05:30", "-08:00", "-00:30", "+14:00", "-12:45", "5:00", "+23:59"]
 TIMESTAMP_PARTS = ["getFullYear", "getMonth", "getDate", "getDayOfMonth", "getDayOfYear", "getDayOfWeek", "getHours", "getMinutes", "getSeconds", "getMilliseconds"]
 DURATION_PARTS = ["getHours", "getMinutes", "getSeconds", "getMilliseconds"]
+# The names of types an expression may write: CEL's own, a message's, and two well-known types'.
+TYPE_NAMES = ["int", "uint", "double", "string", "bytes", "bool", "list", "map", "null_type", "type", "diff.v1.Leaf", "google.protobuf.Duration", "google.protobuf.Timestamp"]
 # The texts of STRINGS that are identifiers, so a map's key may be selected as a field: `m.ab`.
 KEYS = ["a", "b", "ab", "x1", "k"]
 
@@ -261,7 +263,17 @@ class Generator:
             return f"{self.string(depth - 1)}.{function}"
         if kind == 14:
             return f"{self.double(depth - 1)}.{self.pick(['isNan()', 'isInf()', 'isInf(1)', 'isInf(-1)'])}"
+        if self.rng.random() < 0.3:
+            return self.type_check(depth - 1)
         return self.pick(["this.b", f"bool({self.pick(['this.b', self.literal_string()])})", f"dyn({self.int(depth - 1)}) == {self.int(0)}"])
+
+    def type_check(self, depth):
+        """`type` of a value beside a type's name, or beside the type of another value."""
+        values = [self.int(depth), self.uint(depth), self.double(depth), self.string(depth), "this.y", "this.rs", "this.msi", "this.leaf", "this.dur", self.timestamp(depth), "null", self.bool(0), "this"]
+        if self.rng.random() < 0.2:
+            return f"type({self.pick(values)}) {self.pick(['==', '!='])} type({self.pick(values)})"
+        name = self.pick(TYPE_NAMES)
+        return f"type({self.pick(values)}) {self.pick(['==', '!='])} {name}"
 
     def formatted(self, depth):
         """`format` of one to three values, each under a conversion that takes its type (CEL
