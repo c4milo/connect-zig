@@ -11,8 +11,8 @@
         // the commit connect-zig pins as `stdx_regex`, so the type is the one protovalidate
         // takes.
         .stdx = .{
-            .url = "git+https://github.com/c4milo/stdx#d92523191721fcb795bfcf63dd25984434888c76",
-            .hash = "stdx-0.2.0-BD60tue7SQAGvJhLpqUP_YP-4HiuyUjvVsOzpz5Zw3Bv",
+            .url = "git+https://github.com/c4milo/stdx#44615ef4e802e2c6f563cbf17133a0d7068c32fd",
+            .hash = "stdx-0.2.0-BD60tijNTwBpf2cKspD8YCLIJDbE5DohzNIk9l9i7WwK",
         },
     },
     .paths = .{ "build.zig", "build.zig.zon", "buf.gen.yaml", "proto", "gen", "src" },

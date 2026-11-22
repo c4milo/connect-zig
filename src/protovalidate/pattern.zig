@@ -74,8 +74,9 @@ fn SearcherOf(comptime octets: anytype) type {
     };
 }
 
-/// What stops stdx from reading `pattern`, or null: a form of RE2's that stdx refuses, such as
-/// `\p{...}`, or a pattern that is not RE2's syntax.
+/// What stops stdx from reading `pattern`, or null: a pattern that is not RE2's syntax, such as
+/// `\p{Nothing}` or a backreference, or one past a limit of stdx's, such as a class of more
+/// ranges than it holds.
 pub fn problem_of(comptime pattern: []const u8) ?[]const u8 {
     _ = Compiled(pattern).result catch |refusal| {
         return "stdx's regular expressions refuse the pattern `" ++ pattern ++ "`: " ++ @errorName(refusal);
@@ -157,7 +158,17 @@ test "an octet that is not UTF-8 matches nothing" {
 
 test "a pattern that stdx refuses is a problem that names it" {
     try testing.expect(comptime problem_of("^[a-z]+$") == null);
-    try testing.expectEqualStrings("stdx's regular expressions refuse the pattern `\\p{Greek}`: UnsupportedProperty", comptime problem_of("\\p{Greek}").?);
+    try testing.expectEqualStrings("stdx's regular expressions refuse the pattern `\\p{Nothing}`: InvalidProperty", comptime problem_of("\\p{Nothing}").?);
+}
+
+test "a pattern reads Unicode's properties, and folds case past ASCII" {
+    try testing.expect(matches("^\\p{Greek}+$", "\u{3b1}\u{3b2}\u{3b3}", testing_cpu_features));
+    try testing.expect(!matches("^\\p{Greek}+$", "abc", testing_cpu_features));
+    try testing.expect(matches("^\\pL+$", "caf\u{e9}", testing_cpu_features));
+    try testing.expect(!matches("^\\pL+$", "caf\u{e9}1", testing_cpu_features));
+    try testing.expect(matches("^[\\P{Lu}]+$", "abc", testing_cpu_features) and !matches("^\\P{Lu}+$", "aBc", testing_cpu_features));
+    // (?i) folds by Unicode's simple case folding, as Go's regexp does: k folds with U+212A.
+    try testing.expect(matches("^(?i)k$", "\u{212a}", testing_cpu_features) and matches("^(?i)\u{e9}$", "\u{c9}", testing_cpu_features));
 }
 
 /// The answer of a searcher made ready for `text` alone.

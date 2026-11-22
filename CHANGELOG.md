@@ -176,9 +176,10 @@ change the public API, and the entry marks each change that does.
 
 ### Fixed
 
-- A `pattern` rule or a CEL `matches` with a named group, `(?P<name>re)` or `(?<name>re)`,
-  compiles and matches as RE2 reads it. Before, stdx refused the group and the build stopped.
-  The `stdx_regex` pin moved to d925231, whose CI passed.
+- A `pattern` rule or a CEL `matches` with a named group, `(?P<name>re)` or `(?<name>re)`, a
+  Unicode property such as `\p{Greek}` or `\pL`, or `(?i)` past ASCII compiles and matches as
+  RE2 reads it, from Unicode 17.0.0. Before, stdx refused each and the build stopped. The
+  `stdx_regex` pin moved to 44615ef, whose CI passed.
 - A message of about 500 fields or more encodes and decodes. Before, the compiler stopped at
   its default branch quota in `encode`, in `decode` and in the JSON writer.
 - A message with more than about 1,000 repeated and map fields compiles. A generated file now

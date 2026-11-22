@@ -1958,6 +1958,20 @@ ran on Linux x86-64 with Zig 0.16.0.
     ints with its neighbour, the first stored element read for each, and a stored list's size
     one too large. Each was `CAUGHT`.
 
+- **Unicode in a pattern** (decision 47). The `stdx_regex` pin, and the validate example's
+  stdx, moved from `d925231` to `44615ef`. stdx's `regex` reads Unicode 17.0.0's properties,
+  `\pL`, `\p{Greek}`, `\P{Lu}` and `\p{^Lu}`, with Go's loose names, and folds `(?i)` by
+  Unicode's simple case folding, as Go's regexp does. A `\p` that names nothing is
+  `InvalidProperty`, which the test of a refused pattern now names. At `d925231` the new tests
+  stopped the build with `UnsupportedProperty` and `UnsupportedCaseFolding`.
+  - `tools/protovalidate_conformance_check.sh` printed `PASS (failed: 0, skipped: 0, passed:
+    2872, total: 2872)`, `tools/cel_conformance_check.sh` the counts it printed before,
+    `tools/cel_differential_check.sh 11` agreed on each of its 8,000 verdicts, and
+    `tools/perf_check.sh` counted each validation within 0.1% of before.
+  - `tools/compile_time_check.sh` printed a ratio of 4.68 on its first run, +13.5% over its
+    baseline of 4.12, and 4.35, +5.7%, on the next. Its schema holds no pattern, and its runs
+    earlier the same day gave 3.87 to 4.26, so the first run measured the machine's load.
+
 ### Work not done yet
 
 - A stream that waits for an event of the program once its request ended (colibri issue 130).

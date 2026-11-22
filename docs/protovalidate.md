@@ -146,9 +146,11 @@ value as `rule` and the rule message as `rules`. A value is a scalar, a wrapper 
 
 ## Patterns
 
-`pattern` and CEL's `matches` take RE2's syntax, on stdx's regular expressions. The compiler
-reads each pattern once, so the pattern of `matches` is a string literal, and a pattern stdx
-refuses, such as one with `\p{...}`, stops your build.
+`pattern` and CEL's `matches` take RE2's syntax, on stdx's regular expressions: named groups,
+Unicode's properties such as `\p{Greek}`, and `(?i)` past ASCII, from Unicode 17.0.0. The
+compiler reads each pattern once, so the pattern of `matches` is a string literal, and a
+pattern stdx refuses, such as one with a backreference, which RE2 refuses too, stops your
+build.
 
 ## Messages from `format`
 

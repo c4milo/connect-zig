@@ -292,7 +292,7 @@ test "rules of another type than the field's are a mismatch" {
 }
 
 test "a rule with no check, a CEL rule and a rule the plugin could not write each stop the type" {
-    try expect_problem(Message([]const u8, .string, field_rules(.{ .type = .{ .string = .{ .pattern = "\\p{Greek}" } } })), "t.Message.val: stdx's regular expressions refuse the pattern `\\p{Greek}`: UnsupportedProperty");
+    try expect_problem(Message([]const u8, .string, field_rules(.{ .type = .{ .string = .{ .pattern = "\\p{Nothing}" } } })), "t.Message.val: stdx's regular expressions refuse the pattern `\\p{Nothing}`: InvalidProperty");
     try expect_problem(Message([]const u8, .bytes, field_rules(.{ .type = .{ .bytes = .{ .pattern = "(" } } })), "t.Message.val: stdx's regular expressions refuse the pattern `(`");
     try testing.expect(comptime rules_error(Message([]const u8, .string, field_rules(.{ .type = .{ .string = .{ .pattern = "^a+$" } } }))) == null);
     try expect_problem(Message(i32, .int32, field_rules(.{ .cel_expression = .of(&.{"this > "}) })), "t.Message.val: `this > `: the expression ends early");
