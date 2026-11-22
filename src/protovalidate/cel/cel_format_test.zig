@@ -57,6 +57,11 @@ test "s writes each type as its text states" {
     try expect_text("'%s %s %s'.format([0.0 / 0.0, 1.0 / 0.0, -1.0 / 0.0])", &sample, "NaN Infinity -Infinity");
     try expect_text("'%s'.format([null])", &sample, "null");
     try expect_text("'%s'.format([[1, 2, 3]])", &sample, "[1, 2, 3]");
+    try expect_text("'%s, %s'.format([duration('8747s'), duration('-1.5s')])", &sample, "8747s, -1.5s");
+    try expect_text("'%s'.format([timestamp('2009-11-10T23:00:00.5+01:00')])", &sample, "2009-11-10T22:00:00.5Z");
+    try expect_text("'%s %s'.format([type(1), dyn(duration('1s'))])", &sample, "int 1s");
+    try expect_text("'%%%s%% and %%'.format([this.count])", &sample, "%-26% and %");
+    try expect_text("'%%'.format([])", &sample, "%");
     try expect_text("'%s'.format([['a', 'b']])", &sample, "[a, b]");
     try expect_text("'no conversion'.format([])", &sample, "no conversion");
 }

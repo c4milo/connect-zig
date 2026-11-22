@@ -9,6 +9,9 @@ const type_file = @import("cel_type.zig");
 const check = @import("cel_check.zig");
 const evaluation = @import("cel_eval.zig");
 const list_file = @import("cel_list.zig");
+const timestamp_file = @import("cel_timestamp.zig");
+const duration_file = @import("cel_duration.zig");
+const TypeValue = @import("cel_type_value.zig").TypeValue;
 const Node = node_file.Node;
 const Scope = type_file.Scope;
 const Env = type_file.Env;
@@ -16,6 +19,8 @@ const Error = type_file.Error;
 const Typed = type_file.Typed;
 const Bytes = type_file.Bytes;
 const Null = type_file.Null;
+const Timestamp = proto.wkt.Timestamp;
+const Duration = proto.wkt.Duration;
 
 /// CEL strings extension, "Conversion": the conversions the module writes. `f`, `e`, `o`, `b`
 /// and a precision stop the build: no rule of protovalidate's suite uses them.
@@ -50,12 +55,19 @@ fn parse(comptime text: []const u8) Parsed {
         }
         if (octet != '%') continue;
         if (place + 1 == text.len) return .{ .problem = "the text of `format` ends with a `%`" };
+        letter = true;
+        // `%%` writes one `%`, as cel-go writes it: the extension's text names no such
+        // conversion (docs/specs/README.md).
+        if (text[place + 1] == '%') {
+            pieces = pieces ++ [_]Piece{.{ .text = text[start .. place + 1] }};
+            start = place + conversion_len;
+            continue;
+        }
         const conversion = conversion_of(text[place + 1]) orelse {
             return .{ .problem = "`format` does not read the conversion `" ++ text[place..][0..conversion_len] ++ "` yet" };
         };
         if (place != start) pieces = pieces ++ [_]Piece{.{ .text = text[start..place] }};
         pieces = pieces ++ [_]Piece{.{ .value = .{ .conversion = conversion, .index = value_count(pieces) } }};
-        letter = true;
         start = place + conversion_len;
     }
     if (start != text.len) pieces = pieces ++ [_]Piece{.{ .text = text[start..] }};
@@ -124,10 +136,15 @@ fn of_values(comptime pieces: []const Piece, comptime values: []const Node, comp
 fn takes(comptime conversion: Conversion, comptime T: type) bool {
     if (@typeInfo(T) == .optional) return takes(conversion, @typeInfo(T).optional.child) and conversion == .s;
     return switch (conversion) {
-        .s => T == bool or type_file.is_number(T) or T == []const u8 or T == Bytes or T == Null or takes_list(T),
+        .s => T == bool or type_file.is_number(T) or T == []const u8 or T == Bytes or T == Null or takes_time(T) or takes_list(T),
         .d => T == i64 or T == u64,
         .x, .X => T == i64 or T == u64 or T == []const u8 or T == Bytes,
     };
+}
+
+/// A timestamp, a duration and a type.
+fn takes_time(comptime T: type) bool {
+    return T == Timestamp or T == Duration or T == TypeValue;
 }
 
 fn takes_list(comptime T: type) bool {
@@ -181,6 +198,12 @@ fn write_string(value: anytype, env: *Env) Error!void {
     if (comptime T == Null) return put(env, "null");
     if (comptime T == f64) return write_double(value, env);
     if (comptime type_file.is_number(T)) return write_print("{d}", value, env);
+    // A duration "is formatted as decimal seconds as if the value was converted to `double`
+    // and then formatted as `%ds`", and a timestamp "according to RFC 3339 and is always in
+    // UTC", as `string` writes each. A type "is formatted as a string".
+    if (comptime T == Duration) return duration_file.write(value, env.text.?);
+    if (comptime T == Timestamp) return timestamp_file.write(value, env.text.?);
+    if (comptime T == TypeValue) return put(env, value.name);
     return write_list(value, env);
 }
 

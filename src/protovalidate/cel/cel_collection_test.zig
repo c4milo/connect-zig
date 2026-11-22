@@ -127,6 +127,16 @@ test "an index takes a list's element and a map's value" {
     try expect_true("[7, 8][1] == 8", &sample);
 }
 
+test "behind dyn a list takes a uint and a double with no fraction as its index" {
+    try expect_true("[7, 8, 9][dyn(1u)] == 8 && [7, 8, 9][dyn(2.0)] == 9 && this.numbers[dyn(-0.0)] == 2", &sample);
+    try testing.expectError(error.Unevaluable, run("[7, 8, 9][dyn(0.5)] == 7", &sample));
+    try testing.expectError(error.Unevaluable, run("[7, 8, 9][dyn(3u)] == 7", &sample));
+    try testing.expectError(error.Unevaluable, run("[7, 8, 9][dyn(18446744073709551615u)] == 7", &sample));
+    try testing.expectError(error.Unevaluable, run("[7, 8, 9][dyn(1.0 / 0.0)] == 7", &sample));
+    try testing.expectError(error.Unevaluable, run("[7, 8, 9][dyn(0.0 / 0.0)] == 7", &sample));
+    try expect_problem("[7, 8, 9][1u]", "found no matching overload for `[]` applied to (list(int), uint)");
+}
+
 test "all and exists read each element of a list, and each key of a map" {
     try expect_true("this.numbers.all(n, n % 2 == 0) && this.names.all(n, n.size() == 3)", &sample);
     try expect_false("this.numbers.all(n, n > 2)", &sample);

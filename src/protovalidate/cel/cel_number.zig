@@ -76,17 +76,17 @@ fn order_double(left: anytype, right: anytype) ?std.math.Order {
     return reversed.invert();
 }
 
-/// How a double stands to an integer. A double past the integer type's range is decided by
-/// its sign, and one within it by its whole part, then by its fraction.
+/// How a double stands to an integer, as cel-go orders them: a double past the integer type's
+/// range by its sign, and one within it against the integer made a double, which rounds an
+/// integer past 2^53. So `dyn(9223372036854775807) >= 9223372036854775808.0` holds, where a
+/// continuous number line would put the integer below (docs/specs/README.md).
 fn double_to_integer(double: f64, comptime I: type, integer: I) ?std.math.Order {
     if (std.math.isNan(double)) return null;
-    const limit: f64 = @floatFromInt(@as(u128, 1) << @bitSizeOf(u64));
-    if (double >= limit) return .gt;
-    if (double <= -limit) return .lt;
-    const whole: i128 = @intFromFloat(@trunc(double));
-    const by_whole = std.math.order(whole, @as(i128, integer));
-    if (by_whole != .eq) return by_whole;
-    return std.math.order(double - @trunc(double), 0);
+    const lowest: f64 = @floatFromInt(std.math.minInt(I));
+    const highest: f64 = @floatFromInt(std.math.maxInt(I));
+    if (double < lowest) return .lt;
+    if (double > highest) return .gt;
+    return std.math.order(double, @as(f64, @floatFromInt(integer)));
 }
 
 const testing = std.testing;
@@ -153,4 +153,18 @@ test "numbers of different types compare by value" {
     try testing.expectEqual(@as(?Order, .gt), order(std.math.inf(f64), @as(u64, std.math.maxInt(u64))));
     try testing.expectEqual(@as(?Order, .lt), order(-std.math.inf(f64), @as(i64, least)));
     try testing.expectEqual(@as(?Order, .gt), order(@as(u64, 0), -std.math.inf(f64)));
+    try testing.expectEqual(@as(?Order, .lt), order(@as(f64, -0.5), @as(u64, 0)));
+}
+
+test "an integer past 2^53 compares with a double as the double it rounds to" {
+    const Order = std.math.Order;
+    const two_to_63: f64 = 9223372036854775808.0;
+    const two_to_53 = 9007199254740992;
+    try testing.expectEqual(@as(?Order, .eq), order(two_to_63, @as(i64, greatest)));
+    try testing.expectEqual(@as(?Order, .eq), order(@as(i64, greatest), two_to_63));
+    try testing.expectEqual(@as(?Order, .eq), order(@as(i64, two_to_53 + 1), @as(f64, two_to_53)));
+    try testing.expectEqual(@as(?Order, .gt), order(two_to_63 * 2, @as(i64, greatest)));
+    try testing.expectEqual(@as(?Order, .eq), order(two_to_63 * 2, @as(u64, std.math.maxInt(u64))));
+    try testing.expectEqual(@as(?Order, .gt), order(two_to_63 * 4, @as(u64, std.math.maxInt(u64))));
+    try testing.expectEqual(@as(?Order, .lt), order(-two_to_63 * 2, @as(i64, least)));
 }

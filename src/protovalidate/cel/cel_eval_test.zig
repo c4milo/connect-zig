@@ -136,6 +136,11 @@ test "a side that fails is absorbed when the other side decides" {
     try testing.expectError(error.Unevaluable, run("this.a / 0 == 1 && true", &sample));
     try testing.expectError(error.Unevaluable, run("false || this.a / 0 == 1", &sample));
     try testing.expectError(error.Unevaluable, run("this.a / 0 == 1 || this.a / 0 == 1", &sample));
+    // Behind `dyn` a side that holds no bool fails, and is absorbed the same way.
+    try expect_false("dyn(this.a) && false", &sample);
+    try expect_true("true || dyn('a')", &sample);
+    try testing.expectError(error.Unevaluable, run("dyn(this.a) && true", &sample));
+    try testing.expectError(error.Unevaluable, run("false || dyn(1u)", &sample));
 }
 
 test "a field that is not set reads as its default, has tells, and a wrapper is null" {
@@ -244,9 +249,10 @@ test "an expression that does not parse or does not type is a problem of the bui
     try expect_problem("this.name.matches(this.name)", "the pattern of `matches` is no string literal, and this module reads each pattern as it compiles");
     try expect_problem("this.name.matches('(')", "stdx's regular expressions refuse the pattern `(`: MissingParenthesis");
     try expect_problem("this.a.matches('a')", "found no matching overload for `matches` applied to (int, string)");
-    try expect_problem("unknown(this.a)", "found no matching overload for `unknown` applied to (int)");
+    try expect_problem("unknown(this.a)", "undeclared reference to `unknown`");
     // A name the module holds no function for, with the operands of a function it holds.
-    try expect_problem("this.name.nothing()", "found no matching overload for `nothing` applied to (string)");
+    try expect_problem("this.name.nothing()", "undeclared reference to `nothing`");
+    try expect_problem("dyn(this.name).nothing() || true", "undeclared reference to `nothing`");
     // A conversion of a literal is computed once: one that fails is a problem of the build.
     try expect_problem("int('x') == 1", "the conversion `int` fails for its constant operand");
     try expect_problem("this.on || bool('k')", "the conversion `bool` fails for its constant operand");

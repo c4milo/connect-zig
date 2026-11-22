@@ -164,6 +164,17 @@ change the public API, and the entry marks each change that does.
   did, and the rule failed each time it ran.
 - In CEL, the least int's remainder by -1 fails, as it fails in cel-go. Before, it gave 0, and
   a rule that read it could pass where protovalidate-go's fails.
+- In CEL, a double compares with an int or a uint as cel-go compares them: against the integer
+  made a double, so `dyn(9223372036854775807) >= 9223372036854775808.0` is true. Before, the two
+  compared exactly.
+- In CEL, a side of `&&` or `||` behind `dyn` that holds no bool fails, and the other side
+  absorbs the failure: `dyn(1) && false` is false. Before, the whole expression failed.
+- In CEL, a list takes a uint and a double with no fraction as its index behind `dyn`, as in
+  cel-go: `[7, 8][dyn(1u)]` is 8. Before, the expression failed.
+- In CEL's `format`, `%s` writes a timestamp, a duration and a type, as the strings extension
+  says, and `%%` writes one `%`. Before, each stopped the build.
+- In CEL, a function that no library declares stops the build behind `dyn` too, as cel-go
+  refuses it. Before, `dyn(x).nothing()` compiled and failed each time it ran.
 - A macro over a list literal, such as `[1, 2].all(n, n > 0)`, and a signed duration literal,
   such as `duration('-3s')`, compile. Before, each stopped the build with a compiler error.
 - A CEL string with a numbered escape, such as `'é'` or `'\x41'`, compiles. Before, the

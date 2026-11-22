@@ -65,6 +65,9 @@ pub fn of_index(comptime index: Node.Index, comptime scope: Scope) Typed {
     const dynamic = target.dynamic or at.dynamic;
     if (target.type == Failing or at.type == Failing) return .{ .ok = .{ .type = Failing, .dynamic = dynamic } };
     if (Indexed(target.type, at.type)) |R| return .{ .ok = .{ .type = R, .dynamic = dynamic } };
+    if (at.dynamic and list_file.is_list(target.type) and (at.type == u64 or at.type == f64)) {
+        return .{ .ok = .{ .type = list_file.Taken(list_file.ElementOf(target.type)), .dynamic = true } };
+    }
     return check.mistake(dynamic, "found no matching overload for `[]` applied to (" ++ type_file.name_of(target.type) ++ ", " ++ type_file.name_of(at.type) ++ ")");
 }
 
@@ -77,9 +80,22 @@ fn Indexed(comptime T: type, comptime At: type) ?type {
 pub fn eval_index(comptime index: Node.Index, comptime R: type, comptime scope: Scope, values: anytype, env: *Env) Error!R {
     const target = try evaluation.eval(index.of, scope, values, env);
     const at = try evaluation.eval(index.at, scope, values, env);
-    if (comptime !list_file.is_map(@TypeOf(target))) return list_file.at(target, at, env);
+    if (comptime !list_file.is_map(@TypeOf(target))) return list_file.at(target, try list_index(at), env);
     // "map[key]": a key the map does not hold fails the run.
     return try target.get(at, env) orelse error.Unevaluable;
+}
+
+/// A list's index: an int, or behind `dyn` a uint or a double with no fraction, as cel-go reads
+/// one. A uint past the greatest int, or a double with a fraction, fails the run
+/// (docs/specs/README.md).
+fn list_index(at: anytype) Error!i64 {
+    const At = @TypeOf(at);
+    if (comptime At == i64) return at;
+    if (comptime At == u64) return std.math.cast(i64, at) orelse error.Unevaluable;
+    // A double not a number has no whole part equal to it, and one past the ints none in range.
+    const past_ints: f64 = @floatFromInt(@as(u64, 1) << (@bitSizeOf(i64) - 1));
+    if (@trunc(at) != at or !(at >= -past_ints and at < past_ints)) return error.Unevaluable;
+    return @intFromFloat(at);
 }
 
 /// The type of `map.f`, a map of string keys read at the key `f`, or null when `T` is no such

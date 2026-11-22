@@ -134,13 +134,21 @@ inline fn arithmetic(comptime op: node_file.BinaryOp, left: anytype, right: anyt
 /// operators are commutative over failures: a side that fails is absorbed when the other side
 /// gives the absorbing value (CEL language definition, "Logical Operators").
 inline fn eval_logic(comptime binary: Node.Binary, comptime absorbing: bool, comptime scope: Scope, values: anytype, env: *Env) Error!bool {
-    const left = eval_as(bool, binary.left, scope, values, env) catch |failure| {
-        const right = eval_as(bool, binary.right, scope, values, env) catch return failure;
+    const left = eval_side(binary.left, scope, values, env) catch |failure| {
+        const right = eval_side(binary.right, scope, values, env) catch return failure;
         if (right == absorbing) return absorbing;
         return failure;
     };
     if (left == absorbing) return absorbing;
-    return eval_as(bool, binary.right, scope, values, env);
+    return eval_side(binary.right, scope, values, env);
+}
+
+/// A side of `&&` or `||`. A side that holds no bool, which `dyn` lets the checker take, fails.
+/// It is a function of its own, as `eval_as` is, so the compiler types the side's part under
+/// the function's branch quota and not its caller's.
+fn eval_side(comptime node: *const Node, comptime scope: Scope, values: anytype, env: *Env) Error!bool {
+    if (comptime Result(node, scope) != bool) return error.Unevaluable;
+    return eval(node, scope, values, env);
 }
 
 inline fn eval_conditional(comptime conditional: Node.Conditional, comptime R: type, comptime scope: Scope, values: anytype, env: *Env) Error!R {

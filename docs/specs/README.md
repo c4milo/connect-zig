@@ -70,6 +70,15 @@ the module takes cel-go's answer, and the code says so where it does:
 - An order of two numbers of different types. "Ordering" gives it as an expression runs, and
   "Comparison Operators" declares no such overload for the checker. protovalidate's CEL
   environment declares them, with cel-go's `CrossTypeNumericComparisons` (`cel_value.zig`).
+- An order of a double and an integer. "Numbers" puts the numbers on "a continuous number
+  line". cel-go compares a double within the integer type's range with the integer made a
+  double, which rounds an integer past 2^53, so `dyn(9223372036854775807) >=
+  9223372036854775808.0` is true. cel-spec's conformance suite expects cel-go's answer
+  (`cel_number.zig`).
+- A list's index behind `dyn`. "List Operators" gives `list(A)[int] -> A`. cel-go also takes a
+  uint and a double with no fraction (`cel_collection.zig`).
+- `%%` in the text of `format`. The strings extension names no such conversion. cel-go writes
+  one `%`, as cel-spec's conformance suite expects (`cel_format.zig`).
 
 Two places differ from cel-go in the regular expressions of `matches`, which follow RE2 and
 stdx's `regex` (decision 47):

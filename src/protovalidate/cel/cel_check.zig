@@ -115,6 +115,7 @@ fn of_binary(comptime binary: Node.Binary, comptime scope: Scope) Typed {
     // compare them as they run: two values of unlike types are not equal (CEL language
     // definition, "Equality").
     if (dynamic and compares_as_it_runs(binary.op, right.type)) return .{ .ok = .{ .type = bool, .dynamic = true } };
+    if (absorbs_as_it_runs(binary.op, left, right)) return .{ .ok = .{ .type = bool, .dynamic = true } };
     return mistake(dynamic, "found no matching overload for `" ++ binary.op.text() ++ "` applied to (" ++ type_file.name_of(left.type) ++ ", " ++ type_file.name_of(right.type) ++ ")");
 }
 
@@ -126,6 +127,14 @@ fn compares_as_it_runs(comptime op: BinaryOp, comptime R: type) bool {
         .in => collection.is_collection(R),
         else => false,
     };
+}
+
+/// Whether `&&` or `||` behind `dyn` takes a side that holds no bool. That side fails as it
+/// runs, and the other side may still absorb the failure: `dyn(1) && false` is false (CEL
+/// language definition, "Logical Operators").
+fn absorbs_as_it_runs(comptime op: BinaryOp, comptime left: Typed.Ok, comptime right: Typed.Ok) bool {
+    if (op != .@"and" and op != .@"or") return false;
+    return (left.type == bool or left.dynamic) and (right.type == bool or right.dynamic);
 }
 
 /// The type `left op right` has, or null when the operator takes no such pair.
@@ -200,6 +209,9 @@ fn of_call(comptime call: Node.Call, comptime scope: Scope) Typed {
     const operands = operands_of(call);
     if (of_own(call, operands, scope)) |typed| return typed;
     if (collection.of_macro(call, scope)) |typed| return typed;
+    // A function the environment does not declare stops the build, behind `dyn` too, as
+    // cel-go's checker refuses it.
+    if (call.function == .unknown) return .{ .problem = "undeclared reference to `" ++ call.name ++ "`" };
     const taken = switch (of_operands(operands, scope)) {
         .types => |taken| taken,
         .stopped => |typed| return typed,
