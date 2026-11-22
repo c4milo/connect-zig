@@ -8,6 +8,7 @@ const node_file = @import("cel_node.zig");
 const type_file = @import("cel_type.zig");
 const list_file = @import("cel_list.zig");
 const value_file = @import("cel_value.zig");
+const equal_file = @import("cel_equal.zig");
 const check = @import("cel_check.zig");
 const evaluation = @import("cel_eval.zig");
 const lazy = @import("cel_lazy_list.zig");
@@ -30,7 +31,7 @@ pub fn Variable(comptime T: type) ?type {
 
 /// A list literal: its elements are of one type.
 pub fn of_list(comptime elements: []const Node, comptime scope: Scope) Typed {
-    if (elements.len == 0) return .{ .problem = "an empty list literal has no type" };
+    if (elements.len == 0) return .of([0]type_file.NoElement);
     var dynamic = false;
     var Element: ?type = null;
     for (elements) |*element| {
@@ -65,7 +66,8 @@ pub fn of_index(comptime index: Node.Index, comptime scope: Scope) Typed {
     };
     const dynamic = target.dynamic or at.dynamic;
     if (target.type == Failing or at.type == Failing) return .{ .ok = .{ .type = Failing, .dynamic = dynamic } };
-    if (Indexed(target.type, at.type)) |R| return .{ .ok = .{ .type = R, .dynamic = dynamic } };
+    // An index of `[]` is of no type the checker knows, as behind `dyn`.
+    if (Indexed(target.type, at.type)) |R| return .{ .ok = .{ .type = R, .dynamic = dynamic or R == type_file.NoElement } };
     if (at.dynamic and list_file.is_list(target.type) and (at.type == u64 or at.type == f64)) {
         return .{ .ok = .{ .type = list_file.Taken(list_file.ElementOf(target.type)), .dynamic = true } };
     }
@@ -126,7 +128,8 @@ pub fn has_key(map: anytype, comptime key: []const u8, env: *Env) Error!bool {
 /// `value in list` and `key in map`.
 pub fn In(comptime L: type, comptime R: type) ?type {
     const V = Variable(R) orelse return null;
-    return if (value_file.equatable(L, V)) bool else null;
+    // `[]` holds no element, so `in` takes any value with it.
+    return if (V == type_file.NoElement or equal_file.equatable(L, V)) bool else null;
 }
 
 /// Whether `T` is a list or a map.
@@ -136,7 +139,7 @@ pub fn is_collection(comptime T: type) bool {
 
 pub fn holds(collection: anytype, value: anytype, env: *Env) Error!bool {
     // Behind `dyn` a value may be of a type no element has: it is no element then.
-    if (comptime !value_file.equal_as_they_run(Variable(@TypeOf(collection)).?, @TypeOf(value))) return false;
+    if (comptime !equal_file.equal_as_they_run(Variable(@TypeOf(collection)).?, @TypeOf(value))) return false;
     if (comptime !list_file.is_map(@TypeOf(collection))) return list_file.list_holds(collection, value, env);
     var keys = collection.iterator();
     for (0..proto.constants.limits.elements_max) |_| {
@@ -221,12 +224,14 @@ fn of_steps(comptime call: Node.Call, comptime target: Typed.Ok, comptime scope:
         .ok => |ok| ok,
         .problem => |problem| return .{ .problem = problem },
     };
-    if (kept.type == Failing) return .{ .ok = kept };
     const transform: ?*const Node = if (call.function == .map) &call.arguments[call.arguments.len - 1] else null;
     const element = switch (if (transform) |node| check.type_of(node, inner) else Typed.of(V)) {
         .ok => |ok| ok,
         .problem => |problem| return .{ .problem = problem },
     };
+    // `filter` and `map` of `[]` read no element, and give `[]`.
+    if (V == type_file.NoElement) return .of([0]type_file.NoElement);
+    if (kept.type == Failing) return .{ .ok = kept };
     if (element.type == Failing) return .{ .ok = element };
     const steps: lazy.Steps = .{ .variable = call.arguments[0].name, .predicate = predicate, .transform = transform };
     return .{ .ok = .{ .type = Derived(target.type, steps, element.type, scope), .dynamic = target.dynamic or kept.dynamic or element.dynamic } };

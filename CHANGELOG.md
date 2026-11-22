@@ -66,6 +66,10 @@ change the public API, and the entry marks each change that does.
 - CEL's `filter(x, p)`, `map(x, t)` and `map(x, p, t)` on any list or map, such as
   `this.items.filter(i, i.price > 0).size() > 0`. The list they give is computed as it is read,
   so it needs no memory. Before, only `map` of a list literal compiled.
+- CEL's `==` and `!=` of two lists: equal when they have one length and the elements at each
+  place are equal, such as `this.tags == ['a', 'b']`. `in` finds a list in a list of lists.
+- CEL's empty list literal, `[]`, which is a list of any element type: `this.tags != []`,
+  `[] + this.tags` and `[].all(x, x > 0)` compile.
 - The plugin raises the compiler's branch quota in the table of a message with more than 500
   list and message rules, so a message of a thousand fields with rules compiles.
 - `docs/specs/cel/langdef.md`, the CEL language definition as cel-spec published it at

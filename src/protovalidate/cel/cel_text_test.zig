@@ -88,6 +88,9 @@ test "a macro gives back the text each element's expression wrote" {
     // A filter that leaves out each element but the last reads them all in one step.
     try expect_true("this.numbers.map(n, string(n) + '!').filter(s, s == '32!').size() == 1", &message);
     try expect_true("'32!' in this.numbers.map(n, string(n) + '!') && this.numbers.map(n, string(n) + '!')[22] == '32!'", &message);
+    // `==` of two lists reads the two elements at each place, and gives back their text.
+    try expect_true("this.numbers.map(n, string(n) + '!') == this.numbers.map(m, string(m) + '!')", &message);
+    try expect_true("this.numbers.map(n, string(n) + '!').map(s, s.size()) == this.numbers.map(n, 3)", &message);
 }
 
 test "text past the room fails the expression" {

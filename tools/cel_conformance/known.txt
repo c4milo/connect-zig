@@ -22,9 +22,7 @@ string_ext/format/.*	`%d` of `format` takes no double$	`%d` of a double that is 
 # Parts of the language the module does not build.
 .*	unexpected `\{`$	a map literal or a message literal: a rule reads the maps and the messages of its message, and builds none
 (parse/whitespace|parse/comments|comparisons/eq_literal)/.*	(unexpected `\.`|expected `,` before `\{`)$	a message literal, here with a type name that starts with `.` or behind `dyn`
-.*	an empty list literal has no type$	an empty list literal, `[]`, whose element type the module does not infer
 .*	a list literal holds an? \w+ and an? \w+$	a list literal whose elements are of two types, a `list(dyn)`
-.*	found no matching overload for `(==|!=)` applied to \(list	`==` and `!=` of two lists
 .*	found no matching overload for `timestamp` applied to \(int\)$	`timestamp` of an int, which cel-go takes and CEL language definition, "Types and Conversions", does not list
 timestamps/timestamp_selectors_tz/.*	this module reads no zone names$	a zone name of the IANA database, which the module does not hold (docs/specs/README.md)
 parse/nest/parens	the expression nests too deep$	33 levels of parentheses, past `cel_depth_max`, 32; CEL language definition, "Syntax", asks for 12

@@ -8,6 +8,7 @@ const table = @import("../table.zig");
 const shape = @import("../shape.zig");
 const type_file = @import("cel_type.zig");
 const value_file = @import("cel_value.zig");
+const equal_file = @import("cel_equal.zig");
 const text_file = @import("cel_text.zig");
 const Env = type_file.Env;
 const Error = type_file.Error;
@@ -68,6 +69,7 @@ fn ArrayIterator(comptime A: type) type {
 
         pub fn next(it: *@This(), env: *Env) Error!?@typeInfo(A).array.child {
             try env.spend();
+            if (comptime @typeInfo(A).array.len == 0) return null;
             if (it.index == it.items.len) return null;
             defer it.index += 1;
             return it.items[it.index];
@@ -261,7 +263,7 @@ pub fn list_holds(list: anytype, value: anytype, env: *Env) Error!bool {
         const written = text_file.mark_element(@TypeOf(list), env);
         defer text_file.free_element(@TypeOf(list), env, written);
         const element = try elements.next(env) orelse return false;
-        if (value_file.equal(element, value)) return true;
+        if (try equal_file.equal(element, value, env)) return true;
     }
     unreachable;
 }

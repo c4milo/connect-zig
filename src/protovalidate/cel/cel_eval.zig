@@ -9,6 +9,7 @@ const check = @import("cel_check.zig");
 const select_file = @import("cel_select.zig");
 const function = @import("cel_function.zig");
 const value_file = @import("cel_value.zig");
+const equal_file = @import("cel_equal.zig");
 const number = @import("cel_number.zig");
 const time = @import("cel_time.zig");
 const collection = @import("cel_collection.zig");
@@ -107,10 +108,10 @@ inline fn eval_binary(comptime node: *const Node, comptime scope: Scope, values:
     const left = try eval(binary.left, scope, values, env);
     const right = try eval(binary.right, scope, values, env);
     // Behind `dyn` the two sides may be of unlike types, which are not equal.
-    const alike = comptime value_file.equal_as_they_run(@TypeOf(left), @TypeOf(right));
+    const alike = comptime equal_file.equal_as_they_run(@TypeOf(left), @TypeOf(right));
     return switch (comptime binary.op) {
-        .equal => if (alike) value_file.equal(left, right) else false,
-        .not_equal => if (alike) !value_file.equal(left, right) else true,
+        .equal => if (alike) try equal_file.equal(left, right, env) else false,
+        .not_equal => if (alike) !try equal_file.equal(left, right, env) else true,
         // A double that is not a number stands in no order, so each comparison is false.
         .less => value_file.order(left, right) == .lt,
         .greater => value_file.order(left, right) == .gt,

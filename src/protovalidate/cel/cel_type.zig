@@ -21,6 +21,12 @@ pub const Null = struct {};
 /// and an operator with no overload for its operands are errors of the run, not of the build
 /// (CEL language definition, "Gradual Type Checking").
 pub const Failing = struct {};
+/// The element type of `[]`, which no element fixes, and so no value has. The checker reads
+/// it as `dyn`: "The type `dyn` is used for heterogeneous values" (CEL language definition,
+/// "Aggregate Values"), and cel-go gives `[]` the type `list(dyn)`.
+pub const NoElement = struct {
+    pub const cel_name = "dyn";
+};
 
 pub const Error = error{
     /// The expression failed as it ran: a division by zero, an overflow, a conversion of a

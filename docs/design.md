@@ -1883,6 +1883,25 @@ ran on Linux x86-64 with Zig 0.16.0.
     binding for an index at any name, and a short string's size with no ASCII check. Each was
     `CAUGHT`.
 
+- **`==` of two lists, and `[]`** (decision 47). `==` and `!=` take two lists whose elements
+  they take, and compare the elements at each place (CEL language definition, "Lists and
+  Maps"; `cel_equal.zig`). Lists of two known lengths that differ read no element. Behind
+  `dyn` the elements are compared as they run, so `dyn([1]) == [1u]` is true. `[]` is a list of
+  `NoElement`, which the checker reads as `dyn`: it compares with any list, joins any list,
+  and `in` and each macro take it. `filter` and `map` of it give `[]`.
+  - `tools/cel_conformance_check.sh` printed `pass 1070 known 717 unchecked 29 refused 0 wrong
+    0 skipped 688`, where it printed `pass 1045 known 742`. Its two lines for `[]` and for `==`
+    of two lists left `known.txt`.
+  - `tools/protovalidate_conformance_check.sh` printed `PASS (failed: 0, skipped: 0, passed:
+    2872, total: 2872)`, `tools/cel_differential_check.sh 5 6` agreed on each of its 16,000
+    verdicts, and `tools/perf_check.sh` counted each validation as before.
+  - Mutations against `zig build test-protovalidate`, 13: two lists not taken by `==`, `[]`
+    not taken with a list, no early end for two known lengths, a list taken as equal to a
+    longer one, an element that differs ignored, the elements' text kept, no mark when only
+    the left list writes text, two lists not compared as they run, and five that refuse `[]`:
+    a variable over it read with no `dyn`, an index of it the same way, `in` over it, it joined
+    with a list, and `filter` and `map` of it. Each was `CAUGHT`.
+
 ### Work not done yet
 
 - A stream that waits for an event of the program once its request ended (colibri issue 130).
@@ -1912,9 +1931,8 @@ ran on Linux x86-64 with Zig 0.16.0.
   `exists` and `exists_one` do ("A map's entry in a macro"). Their expressions still search
   the map for each key.
 - For `protovalidate`, the parts of CEL that cel-spec's conformance suite tests and the module
-  does not build: a map literal, a message literal, an empty list literal, a list literal of two
-  element types, `==` of two lists, `timestamp` of an int, and the strings extension's functions
-  but `format`. No rule of protovalidate's suite needs one. `tools/cel_conformance/known.txt`
+  does not build: a map literal, a message literal, a list literal of two element types,
+  `timestamp` of an int, and the strings extension's functions but `format`. No rule of protovalidate's suite needs one. `tools/cel_conformance/known.txt`
   names each test.
 - For `protovalidate`, cel-go's typing behind `dyn`. cel-go gives the result of a function on
   a dynamic value a type, and refuses `dyn(x).size() == 'a'`. This module marks the result as

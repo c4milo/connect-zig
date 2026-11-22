@@ -27,6 +27,9 @@ const Bytes = type_file.Bytes;
 pub fn Concatenated(comptime L: type, comptime R: type) ?type {
     if (L == []const u8 or L == Bytes) return if (L == R) L else null;
     if (!list_file.is_list(L) or !list_file.is_list(R)) return null;
+    // `[]` joined with a list is that list.
+    if (list_file.ElementOf(L) == type_file.NoElement) return R;
+    if (list_file.ElementOf(R) == type_file.NoElement) return L;
     if (list_file.ElementOf(L) != list_file.ElementOf(R)) return null;
     if (@typeInfo(L) == .array and @typeInfo(R) == .array) return [@typeInfo(L).array.len + @typeInfo(R).array.len]list_file.ElementOf(L);
     return lazy.Joined(L, R);
@@ -37,6 +40,8 @@ pub fn concat(left: anytype, right: anytype, env: *Env) Error!Concatenated(@Type
     const L = @TypeOf(left);
     if (comptime L == []const u8) return join(left, right, env);
     if (comptime L == Bytes) return .{ .octets = try join(left.octets, right.octets, env) };
+    if (comptime list_file.ElementOf(L) == type_file.NoElement) return right;
+    if (comptime list_file.ElementOf(@TypeOf(right)) == type_file.NoElement) return left;
     if (comptime @typeInfo(L) == .array and @typeInfo(@TypeOf(right)) == .array) return left ++ right;
     return .{ .left = left, .right = right };
 }

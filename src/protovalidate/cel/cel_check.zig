@@ -9,6 +9,7 @@ const type_file = @import("cel_type.zig");
 const select_file = @import("cel_select.zig");
 const function = @import("cel_function.zig");
 const value_file = @import("cel_value.zig");
+const equal_file = @import("cel_equal.zig");
 const collection = @import("cel_collection.zig");
 const pattern_file = @import("../pattern.zig");
 const format_file = @import("cel_format.zig");
@@ -59,7 +60,8 @@ pub fn mistake(comptime dynamic: bool, comptime problem: []const u8) Typed {
 }
 
 fn of_name(comptime name: []const u8, comptime scope: Scope) Typed {
-    if (scope.index_of(name)) |index| return .of(scope.types[index]);
+    // A macro's variable over `[]` is of no type the checker knows, as behind `dyn`.
+    if (scope.index_of(name)) |index| return .{ .ok = .{ .type = scope.types[index], .dynamic = scope.types[index] == type_file.NoElement } };
     // validate.proto, Rule.expression: `now` is the time of the validation.
     if (std.mem.eql(u8, name, "now")) return .of(Timestamp);
     if (type_value.named(name) != null) return .of(TypeValue);
@@ -142,7 +144,7 @@ pub fn Overload(comptime op: BinaryOp, comptime L: type, comptime R: type) ?type
     if (op == .@"and" or op == .@"or") return logical(L, R);
     if (L == Failing or R == Failing) return Failing;
     return switch (op) {
-        .equal, .not_equal => bool_when(value_file.equatable(L, R)),
+        .equal, .not_equal => bool_when(equal_file.equatable(L, R)),
         .less, .less_or_equal, .greater, .greater_or_equal => bool_when(value_file.ordered(L, R)),
         .add => first_of(arithmetic(L, R, .with_double), first_of(duration_file.Result(op, L, R), text_file.Concatenated(L, R))),
         .subtract => first_of(arithmetic(L, R, .with_double), duration_file.Result(op, L, R)),
