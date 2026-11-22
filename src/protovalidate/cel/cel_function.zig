@@ -123,6 +123,13 @@ fn octets_of(value: anytype) []const u8 {
 /// that is not UTF-8 has no count of code points.
 fn size(value: anytype) Error!i64 {
     if (comptime @TypeOf(value) == Bytes) return @intCast(value.octets.len);
+    // An ASCII string has a code point for each octet. std's count reads a word at a time, and
+    // a string shorter than a word octet by octet through its decoder.
+    if (value.len < @sizeOf(usize)) {
+        for (value) |octet| {
+            if (!std.ascii.isAscii(octet)) break;
+        } else return @intCast(value.len);
+    }
     const count = std.unicode.utf8CountCodepoints(value) catch return error.Unevaluable;
     return @intCast(count);
 }

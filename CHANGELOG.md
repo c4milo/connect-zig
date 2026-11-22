@@ -152,6 +152,11 @@ change the public API, and the entry marks each change that does.
   docs/performance.md lists what each costs when it is switched off.
 - CEL reads a repeated field or a map that `decode_into` stored from its slice, and a stored
   map's lookup stops at the key, from its last entry back.
+- A CEL macro over a map whose expression reads the map at the macro's variable, as
+  `this.all(k, this[k] > 0)` does, gives the expression each entry's value, so the index
+  searches no entry. Such a macro reads each key once, at its last entry. CEL's `size` of a
+  short ASCII string counts its octets. The benchmark's valid `Rules` takes 18% fewer
+  instructions.
 - `tools/perf_check.sh` also counts `protovalidate` on the six messages of the validation
   benchmark, `bench-validate --instructions`, against `bench/instructions.txt`.
 - `pattern` and CEL's `matches` keep one stdx searcher for each pattern and thread, made ready

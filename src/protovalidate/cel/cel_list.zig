@@ -173,18 +173,51 @@ fn KeyIterator(comptime F: type) type {
         /// The stored entries, which the iterator reads in place, or null.
         stored: ?[]const F.Element,
         place: usize = 0,
+        /// The entry `next` read last. An entry of a view lies in `inner`, until the next call.
+        entry: *const F.Element = undefined,
 
         pub fn next(it: *@This(), env: *Env) Error!?KeyOf(F) {
             try env.spend();
             if (it.stored) |entries| {
                 if (it.place == entries.len) return null;
-                defer it.place += 1;
-                return key_of(F, &entries[it.place]);
+                it.entry = &entries[it.place];
+                it.place += 1;
+                return key_of(F, it.entry);
             }
-            const entry = (it.inner.next() catch return error.Malformed) orelse return null;
-            return key_of(F, entry);
+            it.entry = (it.inner.next() catch return error.Malformed) orelse return null;
+            return key_of(F, it.entry);
+        }
+
+        /// The value of the entry `next` read last.
+        pub fn value(it: *const @This()) Taken(ValueOf(F)) {
+            return take(ValueOf(F), value_of(F, it.entry));
+        }
+
+        /// Whether an entry after the one `next` read last holds `key`. Stored entries are read
+        /// in place, and a view's from a copy of the iterator.
+        pub fn holds_later(it: *const @This(), key: KeyOf(F), env: *Env) Error!bool {
+            if (it.stored) |entries| return stored_holds(F, entries[it.place..], key, env);
+            return later_holds(it.*, key, env);
         }
     };
+}
+
+fn stored_holds(comptime F: type, entries: []const F.Element, key: KeyOf(F), env: *Env) Error!bool {
+    for (entries) |*entry| {
+        try env.spend();
+        if (value_file.equal(key_of(F, entry), key)) return true;
+    }
+    return false;
+}
+
+/// Whether a key that `start` has yet to read equals `key`.
+fn later_holds(start: anytype, key: anytype, env: *Env) Error!bool {
+    var later = start;
+    for (0..proto.constants.limits.elements_max) |_| {
+        const other = try later.next(env) orelse return false;
+        if (value_file.equal(other, key)) return true;
+    }
+    unreachable;
 }
 
 /// The value of `key` in the map field `field`: the last entry's that holds it.
@@ -264,12 +297,7 @@ fn may_be_stored(comptime T: type) bool {
 
 /// Whether an entry after the iterator's place holds `key`.
 pub fn key_again(comptime M: type, after: M.Iterator, key: M.Key, env: *Env) Error!bool {
-    var later = after;
-    for (0..proto.constants.limits.elements_max) |_| {
-        const other = try later.next(env) orelse return false;
-        if (value_file.equal(other, key)) return true;
-    }
-    unreachable;
+    return after.holds_later(key, env);
 }
 
 /// `list[index]`: the element at `index`, counted from 0. An index outside the list fails: no
@@ -337,10 +365,11 @@ test "each element read counts against the expression's limit" {
     env.steps = 1;
     try testing.expectEqual(@as(i64, 1), try at(list, 1, &env));
     try testing.expectEqual(@as(usize, 0), env.steps);
-    // A map's one key, the search for it among the later entries and the end are three reads.
+    // A map's one key and the end are two reads. The search for the key among the later
+    // entries reads each stored one, and there is none.
     env.steps = reads;
     try testing.expectEqual(@as(i64, 1), try count(map, &env));
-    try testing.expectEqual(@as(usize, 0), env.steps);
+    try testing.expectEqual(@as(usize, 1), env.steps);
     // A stored map's lookup reads from the last entry back and stops at the key: one read.
     env.steps = reads;
     try testing.expectEqual(@as(?i64, 1), try map.get(@as(i64, 1), &env));

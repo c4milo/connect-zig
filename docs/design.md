@@ -1859,6 +1859,30 @@ ran on Linux x86-64 with Zig 0.16.0.
     `known.txt` that names no test, a line taken away, a value changed and a value made a
     failure each made `compare.py` exit 1.
 
+- **A map's entry in a macro** (decision 47). A macro over a map whose
+  expression reads the map at the macro's variable, as `this.all(k, this[k] >= 0)` does, binds
+  each entry's value beside the key (`cel_entry.zig`). The index reads that binding and
+  searches no entry. The macro reads each key once, at the last entry that holds it, so it
+  searches the later entries for the key: n(n − 1)/2 reads for a map of n keys, where the
+  indexes read n(n + 1)/2. A macro inside the expression that binds the key's name or the map's
+  first name again hides the binding, and the index searches the map. `size` of a string shorter
+  than a word counts its octets when each is ASCII, where std's count decoded each one.
+  - `tools/perf_check.sh`: validate rules valid took 1,169 instructions, where it took 1,418,
+    and rules invalid 1,118, where it took 1,262. Decode and validate rules valid took 2,878,
+    where it took 3,127. Each fast path, switched off, failed the check, and
+    docs/performance.md lists by how much.
+  - `tools/protovalidate_conformance_check.sh` printed `PASS (failed: 0, skipped: 0, passed:
+    2872, total: 2872)`, and `tools/cel_conformance_check.sh` the counts it printed before.
+    `tools/cel_differential_check.sh 1 2 3 4`, whose rules read `this.msi[x]` inside a macro
+    over `this.msi`, agreed on each of its 32,000 verdicts. `tools/compile_time_check.sh`
+    printed a ratio of 4.25, +3.2% over its baseline of 4.12.
+  - Mutations against `zig build test-protovalidate`, 10: no skip of a key that a later entry
+    holds, an index that reads the binding though an inner macro hides the map's name, or though
+    the binding is another map's, no binding at all, a binding for each macro over a map, the
+    first entry's value for each key, no search of the later stored entries or of a view's, a
+    binding for an index at any name, and a short string's size with no ASCII check. Each was
+    `CAUGHT`.
+
 ### Work not done yet
 
 - A stream that waits for an event of the program once its request ended (colibri issue 130).
@@ -1884,11 +1908,9 @@ ran on Linux x86-64 with Zig 0.16.0.
   would run the grammar of `cel_grammar.zig` as a program and write each tree beside its
   text, and a table written by hand would keep its text alone. It changes what a generated
   file holds, and a tree that differs from its text needs a check, so the owner rules first.
-- For `protovalidate`, a CEL index of a map, `this[k]`, without a search of the entries for
-  each key. A stored map's search now starts at its last entry and stops at the key, so `all`
-  over a map of n keys reads about n²/2 entries, where it read n². A macro over a map gives
-  each key with its value, so an expression that indexes the map by the macro's variable could
-  read the value the macro holds, once the macro knows no later entry repeats the key.
+- For `protovalidate`, `filter` and `map` over a map that bind each entry's value, as `all`,
+  `exists` and `exists_one` do ("A map's entry in a macro"). Their expressions still search
+  the map for each key.
 - For `protovalidate`, the parts of CEL that cel-spec's conformance suite tests and the module
   does not build: a map literal, a message literal, an empty list literal, a list literal of two
   element types, `==` of two lists, `timestamp` of an int, and the strings extension's functions

@@ -249,6 +249,7 @@ The nanoseconds of one validation of a message decoded before:
 | `Rules`, invalid | 82.6 | 7,811.4 | 20,261.9 | 130.4 | 17,259.4 |
 
 protovalidate-buffa validates one message faster: the valid `Rules`. Its plugin writes Rust code
-for each rule, as connect-zig's compiler does. In `Rules`, a CEL index
-of a map, `this[k]`, reads connect-zig's entries from the last one until it finds the key
-(docs/design.md, "Work not done yet").
+for each rule, as connect-zig's compiler does. In run 223, `this.all(k, this[k] >= 0)` searched
+connect-zig's map for each key. Since then the macro gives the index each entry's value, and
+`validate rules valid` takes 1,169 instructions, where it took 1,418 (docs/design.md, "A map's
+entry in a macro"). The table holds run 223's times.

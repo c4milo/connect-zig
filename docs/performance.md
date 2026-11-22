@@ -168,6 +168,8 @@ failed (the owner's ruling of 2026-11-09). A new fast path joins this list the s
 | Hexadecimal digits and a hostname label's octets looked up in a table | `format_name.zig`, `all_hexadecimal` and `is_label` | validate small valid +20.11%, medium valid +7.80%, medium invalid +2.82% |
 | A stored list's and map's elements walked in their slice, and a stored map's key looked up from its last entry back | `cel_list.zig`, `Iterator`, `KeyIterator` and `stored_value_at` | validate rules valid +12.41%, rules invalid +6.11%, decode and validate rules valid +5.91% |
 | A pattern's searcher kept on its thread, made ready once | `pattern.zig`, `Searcher` | decode and validate medium valid +93.07%, medium invalid +55.62% |
+| A map's entry value bound beside its key in a macro whose expression reads the map at the key | `cel_entry.zig`, `bound_name` and `place_of` | validate rules valid +15.23%, rules invalid +10.64%, decode and validate rules valid +6.18% |
+| A short ASCII string's size read from its length | `cel_function.zig`, `size` | validate rules valid +5.65%, decode and validate rules valid +2.29%, validate rules invalid +2.06% |
 
 ## The compiler's time
 

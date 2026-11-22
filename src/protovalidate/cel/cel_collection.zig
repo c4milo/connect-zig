@@ -11,6 +11,7 @@ const value_file = @import("cel_value.zig");
 const check = @import("cel_check.zig");
 const evaluation = @import("cel_eval.zig");
 const lazy = @import("cel_lazy_list.zig");
+const entry_file = @import("cel_entry.zig");
 const text_file = @import("cel_text.zig");
 const Node = node_file.Node;
 const Scope = type_file.Scope;
@@ -78,6 +79,10 @@ fn Indexed(comptime T: type, comptime At: type) ?type {
 }
 
 pub fn eval_index(comptime index: Node.Index, comptime R: type, comptime scope: Scope, values: anytype, env: *Env) Error!R {
+    // A macro over the map bound the value of the entry its variable names.
+    if (comptime entry_file.place_of(index, scope)) |place| {
+        if (comptime @TypeOf(values[place]) == R) return values[place];
+    }
     const target = try evaluation.eval(index.of, scope, values, env);
     const at = try evaluation.eval(index.at, scope, values, env);
     if (comptime !list_file.is_map(@TypeOf(target))) return list_file.at(target, try list_index(at), env);
@@ -266,16 +271,26 @@ fn eval_map(comptime call: Node.Call, comptime R: type, comptime scope: Scope, v
 
 pub fn eval_macro(comptime call: Node.Call, comptime scope: Scope, values: anytype, env: *Env) Error!bool {
     const collection = try evaluation.eval(call.target.?, scope, values, env);
-    const inner = comptime scope.with(call.arguments[0].name, Variable(@TypeOf(collection)).?);
+    const C = @TypeOf(collection);
+    const bound = comptime entry_file.bound_name(call, C);
+    const variable = comptime scope.with(call.arguments[0].name, Variable(C).?);
+    const inner = comptime if (bound) |name| variable.with(name, list_file.Taken(C.Value)) else variable;
     const body = &call.arguments[1];
-    if (comptime call.function == .exists_one) return exists_one(collection, body, inner, values, env);
-    return every(collection, comptime call.function == .exists, body, inner, values, env);
+    if (comptime call.function == .exists_one) return exists_one(collection, bound != null, body, inner, values, env);
+    return every(collection, comptime call.function == .exists, bound != null, body, inner, values, env);
+}
+
+/// What a macro's expression reads beside the expression's names: the element, and in a macro
+/// that binds each entry's value (`cel_entry.zig`) the value of the key's entry.
+inline fn read_of(comptime binds: bool, element: anytype, elements: anytype) if (binds) struct { @TypeOf(element), @TypeOf(elements.value()) } else struct { @TypeOf(element) } {
+    if (comptime binds) return .{ element, elements.value() };
+    return .{element};
 }
 
 /// `all`, whose absorbing value is false, and `exists`, whose is true. As `&&` and `||` do,
 /// a macro gives its absorbing value when an element has it, even if another element's
 /// expression fails; with none, a failure fails the macro (CEL language definition, "Macros").
-fn every(collection: anytype, comptime absorbing: bool, comptime body: *const Node, comptime inner: Scope, values: anytype, env: *Env) Error!bool {
+fn every(collection: anytype, comptime absorbing: bool, comptime binds: bool, comptime body: *const Node, comptime inner: Scope, values: anytype, env: *Env) Error!bool {
     var failure: ?Error = null;
     var elements = list_file.iterate(collection);
     for (0..proto.constants.limits.elements_max) |_| {
@@ -283,7 +298,9 @@ fn every(collection: anytype, comptime absorbing: bool, comptime body: *const No
         const written = text_file.mark_element(@TypeOf(collection), env);
         defer text_file.free_element(@TypeOf(collection), env, written);
         const element = try elements.next(env) orelse return failure orelse !absorbing;
-        const result = evaluation.eval_as(bool, body, inner, values ++ .{element}, env) catch |failed| {
+        // A key that a later entry holds is read at that entry, with its value.
+        if (binds and try list_file.key_again(@TypeOf(collection), elements, element, env)) continue;
+        const result = evaluation.eval_as(bool, body, inner, values ++ read_of(binds, element, &elements), env) catch |failed| {
             failure = failure orelse failed;
             continue;
         };
@@ -294,7 +311,7 @@ fn every(collection: anytype, comptime absorbing: bool, comptime body: *const No
 
 /// `exists_one`: the expression is true for one element, and a failure fails the macro. A
 /// map's key that a later entry repeats is read once.
-fn exists_one(collection: anytype, comptime body: *const Node, comptime inner: Scope, values: anytype, env: *Env) Error!bool {
+fn exists_one(collection: anytype, comptime binds: bool, comptime body: *const Node, comptime inner: Scope, values: anytype, env: *Env) Error!bool {
     const C = @TypeOf(collection);
     var matches: usize = 0;
     var elements = list_file.iterate(collection);
@@ -305,7 +322,7 @@ fn exists_one(collection: anytype, comptime body: *const Node, comptime inner: S
         if (comptime list_file.is_map(C)) {
             if (try list_file.key_again(C, elements, element, env)) continue;
         }
-        if (try evaluation.eval_as(bool, body, inner, values ++ .{element}, env)) matches += 1;
+        if (try evaluation.eval_as(bool, body, inner, values ++ read_of(binds, element, &elements), env)) matches += 1;
     }
     unreachable;
 }
