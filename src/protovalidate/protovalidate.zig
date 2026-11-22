@@ -79,6 +79,7 @@ test {
     _ = @import("cel/cel_collection_test.zig");
     _ = @import("cel/cel_cost_test.zig");
     _ = @import("cel_reader.zig");
+    _ = @import("cel_expression.zig");
     _ = @import("octet_class.zig");
     _ = @import("octet_search.zig");
     _ = @import("pattern.zig");

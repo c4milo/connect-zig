@@ -1,0 +1,30 @@
+# The tests of cel-spec's conformance suite whose result differs from the suite's and passes,
+# each with its reason. Each line holds three fields split by tabs: a regular expression over
+# the test's full name (file/section/test), one over what differs, and the reason.
+# tools/cel_conformance/compare.py reads it, and fails on a line that names no test.
+#
+# The extensions of cel-go that protovalidate's CEL environment does not turn on.
+math_ext/.*	.	cel-go's math extension, `math.greatest` and the rest, which protovalidate's CEL environment does not turn on
+network_ext/.*	.	cel-go's network extension, `ip` and `cidr`, which protovalidate's CEL environment does not turn on; protovalidate declares `isIp` and `isIpPrefix` of its own
+optionals/.*	.	cel-go's optional values, `optional.of` and `.?`, which protovalidate's CEL environment does not turn on
+lists_ext/.*	.	cel-go's lists extension, `flatten`, `slice`, `sort` and the rest, which protovalidate's CEL environment does not turn on
+macros2/.*	.	the macros of two variables, cel-go's `TwoVarComprehensions`, which protovalidate's CEL environment does not turn on
+block_ext/.*	.	`cel.block`, which cel-go's optimizer writes and protovalidate's CEL environment does not declare
+bindings_ext/.*	.	`cel.bind`, cel-go's bindings extension, which protovalidate's CEL environment does not turn on
+encoders_ext/.*	.	cel-go's encoders extension, `base64.encode` and `base64.decode`, which protovalidate's CEL environment does not turn on
+#
+# The strings extension, which protovalidate-go turns on whole. protovalidate's rules call
+# `format` alone, and the module builds that one.
+string_ext/.*	undeclared reference to `(charAt|indexOf|lastIndexOf|lowerAscii|upperAscii|replace|split|join|substring|trim|reverse|quote)`$	a function of the strings extension other than `format`
+string_ext/format/.*	`format` does not read the conversion `%[feob.]` yet$	the conversions `%f`, `%e`, `%o` and `%b`, and a precision, of `format`: no rule of protovalidate's suite writes one
+string_ext/format/.*	`%d` of `format` takes no double$	`%d` of a double that is NaN or infinite, which cel-go writes as `NaN` and `Infinity`; the extension's table lists no double under `d`
+#
+# Parts of the language the module does not build.
+.*	unexpected `\{`$	a map literal or a message literal: a rule reads the maps and the messages of its message, and builds none
+(parse/whitespace|parse/comments|comparisons/eq_literal)/.*	(unexpected `\.`|expected `,` before `\{`)$	a message literal, here with a type name that starts with `.` or behind `dyn`
+.*	an empty list literal has no type$	an empty list literal, `[]`, whose element type the module does not infer
+.*	a list literal holds an? \w+ and an? \w+$	a list literal whose elements are of two types, a `list(dyn)`
+.*	found no matching overload for `(==|!=)` applied to \(list	`==` and `!=` of two lists
+.*	found no matching overload for `timestamp` applied to \(int\)$	`timestamp` of an int, which cel-go takes and CEL language definition, "Types and Conversions", does not list
+timestamps/timestamp_selectors_tz/.*	this module reads no zone names$	a zone name of the IANA database, which the module does not hold (docs/specs/README.md)
+parse/nest/parens	the expression nests too deep$	33 levels of parentheses, past `cel_depth_max`, 32; CEL language definition, "Syntax", asks for 12

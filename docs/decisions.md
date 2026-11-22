@@ -902,6 +902,24 @@ first. Cite an entry by number in code and commits ("decision 6").
       - Beaten: the database compiled into the library, some 400 KB that each program would
         carry and that would age with each release of the database; and the database read from
         the system, which is I/O.
+    - cel-spec's conformance suite runs against the code that a rule's expression compiles into.
+      Amended on 2026-11-22:
+      - `tools/cel_conformance_check.sh` reads the suite of cel-spec v0.25.3, the release of
+        `docs/specs/cel`, and runs each test that declares no variables and builds no message:
+        1,819 of 2,504. A rule's names are its own, so the check declares none.
+      - 1,045 pass. 742 differ for a reason that `tools/cel_conformance/known.txt` gives: an
+        extension that protovalidate's CEL environment does not turn on, a function of the
+        strings extension other than `format`, and parts of the language the module does not
+        build: a map literal, a message literal, an empty list literal, a list of two types,
+        and `==` of two lists. 29 turn the type check off, which a rule always has.
+      - Its first run found four differences, and each follows cel-go now: a double compares
+        with an integer as the integer made a double; a side of `&&` or `||` behind `dyn` that
+        holds no bool fails and is absorbed; a list takes a uint and a whole double as its
+        index behind `dyn`; and `%s` of `format` writes a timestamp, a duration and a type. A
+        function that no library declares stops the build behind `dyn` too, and `%%` writes
+        one `%`.
+      - Beaten: the suite's tests with variables, which a runner would declare one by one, and
+        a differential check alone, whose generator writes only what it was taught.
     - protovalidate's conformance harness v1.2.2 runs against `zig build
       protovalidate-executor`. The harness sends each case as an Any beside a
       `FileDescriptorSet`. The library has no dynamic message, so the executor holds the

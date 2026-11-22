@@ -11,7 +11,9 @@ reads no file of this folder.
 | `cel/LICENSE` | The license of cel-spec, Apache 2.0. | The terms of the copy. |
 
 protovalidate's own rules are in `src/protovalidate/proto/buf/validate/validate.proto`, which
-`tools/protovalidate_conformance_check.sh` holds to its release.
+`tools/protovalidate_conformance_check.sh` holds to its release. `tools/cel_conformance_check.sh`
+runs the conformance suite of the same cel-spec commit, and requires the two files of `cel/` to
+be that commit's.
 
 ## How the code cites the CEL language definition
 

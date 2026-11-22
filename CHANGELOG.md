@@ -80,6 +80,9 @@ change the public API, and the entry marks each change that does.
 - `tools/cel_differential_check.sh`, the check `cel-differential` of `tools/ci.sh`: random
   CEL rules over random messages, with this library's verdicts held to those of
   protovalidate-go v1.4.1, which runs cel-go.
+- `tools/cel_conformance_check.sh`, the check `cel-conformance` of `tools/ci.sh`: cel-spec's
+  conformance suite at v0.25.3, over the code a rule's expression compiles into. 1,045 tests
+  pass, and `tools/cel_conformance/known.txt` gives the reason for each of the 742 that differ.
 - `tools/compile_time_check.sh`, the check `compile-time`: the build of a schema of 690 CEL
   rules against the build of the same schema with none, held to `bench/compile_time.txt`.
   Unit tests hold the compiler's reading and typing of an expression to a count of branches,

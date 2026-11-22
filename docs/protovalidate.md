@@ -207,6 +207,13 @@ measured.
   message, a failure as the rule runs, or a rule that does not compile. On six seeds, 60,000
   verdicts of 1,500 rules were the same. Its first runs found six differences, which
   [decision 47](decisions.md) lists.
+- `tools/cel_conformance_check.sh` runs [cel-spec's conformance
+  suite](https://github.com/google/cel-spec/tree/v0.25.3/tests/simple) v0.25.3 over the code a
+  rule's expression compiles into: each of its 1,819 tests that declare no variables and build
+  no message. 1,045 pass. 742 test an extension that protovalidate does not turn on, or a part
+  of the language this library does not build, such as a map literal; `known.txt` beside the
+  script gives the reason for each. Its first run found four differences, which
+  [decision 47](decisions.md) lists.
 - `tools/compile_time_check.sh` holds what a schema's CEL rules cost the compiler to a
   baseline, and unit tests hold the compiler's reading and typing of an expression to a count
   of branches.

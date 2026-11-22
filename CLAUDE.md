@@ -219,6 +219,15 @@ confirm a test fails. Report `CAUGHT` or `NOT CAUGHT` per mutation in the commit
   rule runs, or a rule that does not compile. `tools/cel_differential/known.txt` holds the
   differences that pass, each with its reason. `CEL_DIFFERENTIAL_RULES` and
   `CEL_DIFFERENTIAL_MESSAGES` set a seed's size. It needs buf, python3 and go.
+- CEL conformance: `tools/cel_conformance_check.sh` runs cel-spec's conformance suite at
+  v0.25.3, the commit of `docs/specs/cel`, which it clones into a cache unless `CEL_SPEC` names
+  a checkout. `tools/cel_conformance/generate.py` writes a case for each test that declares no
+  variables and builds no message, and `zig build cel-conformance-runner
+  -Dcel-conformance=<folder>` compiles each case's expression as a rule's expression compiles,
+  over `src/protovalidate/cel_expression.zig`, a module root no package exports.
+  `tools/cel_conformance/compare.py` fails on a result that differs from the suite's and that
+  `tools/cel_conformance/known.txt` does not hold with its reason. It needs git, buf and
+  python3.
 - Compile time: `tools/compile_time_check.sh` builds `zig build compile-time-subject
   -Dcompile-time=<folder>` over a schema of 690 CEL rules and over the same schema with none
   (`tools/compile_time/schema.py`), five times each in turns. It fails when the ratio of the two least

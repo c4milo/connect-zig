@@ -1809,6 +1809,28 @@ ran on Linux x86-64 with Zig 0.16.0.
     +93.07%, and one searcher for every pattern, which `zig build test-protovalidate` failed.
     Each was `CAUGHT`.
 
+- **cel-spec's conformance suite** (decision 47, amended 2026-11-22).
+  `tools/cel_conformance_check.sh` clones cel-spec at v0.25.3 and runs its 1,819 tests that
+  declare no variables and build no message over `src/protovalidate/cel_expression.zig`, the
+  code a rule's expression compiles into. It is the check `cel-conformance` of `tools/ci.sh`.
+  - Its first run printed `pass 1027 refused 577 wrong 10`. The ten were four differences
+    from cel-go, which the module now follows: the order of a double and an integer past 2^53,
+    a side of `&&` and `||` behind `dyn` that holds no bool, a list's index of a uint or a
+    double behind `dyn`, and `%s` of a timestamp and a duration. The suite also showed `%%`,
+    which `format` now writes as `%`, and `dyn(x).flatten()`, which compiled: a function that
+    no library declares now stops the build.
+  - It prints `pass 1045 known 742 unchecked 29 refused 0 wrong 0 skipped 688`. The 742 are
+    the lines of `tools/cel_conformance/known.txt`: eight extensions that protovalidate's CEL
+    environment does not turn on, the strings extension but `format`, and the parts of the
+    language that "Work not done yet" names. The 29 turn the type check off.
+  - Mutations against `zig build test-protovalidate`, 10: a double compared with an integer
+    exactly, the greatest int's bound as `>=`, no side behind `dyn` absorbed, a side that holds
+    no bool as false, a uint index past the list wrapped, a double index with a fraction read,
+    a uint index taken without `dyn`, `%s` of a type refused, `%%` written as nothing, and an
+    undeclared function compiled behind `dyn`. Each was `CAUGHT`. Against the check: a line of
+    `known.txt` that names no test, a line taken away, a value changed and a value made a
+    failure each made `compare.py` exit 1.
+
 ### Work not done yet
 
 - A stream that waits for an event of the program once its request ended (colibri issue 130).
@@ -1839,6 +1861,11 @@ ran on Linux x86-64 with Zig 0.16.0.
   over a map of n keys reads about n²/2 entries, where it read n². A macro over a map gives
   each key with its value, so an expression that indexes the map by the macro's variable could
   read the value the macro holds, once the macro knows no later entry repeats the key.
+- For `protovalidate`, the parts of CEL that cel-spec's conformance suite tests and the module
+  does not build: a map literal, a message literal, an empty list literal, a list literal of two
+  element types, `==` of two lists, `timestamp` of an int, and the strings extension's functions
+  but `format`. No rule of protovalidate's suite needs one. `tools/cel_conformance/known.txt`
+  names each test.
 - For `protovalidate`, cel-go's typing behind `dyn`. cel-go gives the result of a function on
   a dynamic value a type, and refuses `dyn(x).size() == 'a'`. This module marks the result as
   dynamic and compiles the expression. The differential check writes no such rule yet.
