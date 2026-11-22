@@ -159,7 +159,7 @@ confirm a test fails. Report `CAUGHT` or `NOT CAUGHT` per mutation in the commit
   protovalidate-go (`bench/validate/go`), protovalidate-es on Node.js (`bench/validate/node`),
   and protovalidate-buffa and prost-protovalidate (`bench/validate/rust`) on the schema of
   `bench/validate/proto` and the messages of `bench/validate/cases`. It fails when two give one
-  message different verdicts. `tools/validate_chart.py` draws the README's chart from its
+  message different verdicts. `tools/validate_chart.py` draws the chart of `docs/benchmarks.md` from its
   output, and `tools/ci.sh` runs it as `validate-compare`. `tools/generate_check.sh` holds
   `bench/validate/gen`; `bench/validate/go/buf.gen.yaml` says how the Go code is written. It
   needs buf, go, node with npm and cargo; prost-protovalidate's build runs protoc, which
@@ -273,7 +273,7 @@ confirm a test fails. Report `CAUGHT` or `NOT CAUGHT` per mutation in the commit
   names them. `.github/workflows/main.yml` runs each check of `--list` as a job of its own on each
   push and pull request. A new check joins `tools/ci.sh`, never the workflow file. `test`,
   `bench-compare` and `fullstack` run a second time on an arm64 runner: `test` because an aarch64
-  Linux link can fail where x86-64's passes, and the other two for the README's arm64 charts.
-  `fullstack` and `bench-compare` draw the README's charts into `ci-charts/`, which CI keeps with
-  the run as `charts-<check>-<arch>`. To update the README, copy a chosen run's charts to
-  `docs/images` (decision 44).
+  Linux link can fail where x86-64's passes, and the other two for the arm64 charts.
+  `fullstack` and `bench-compare` draw the charts of `docs/benchmarks.md` and the README into
+  `ci-charts/`, which CI keeps with the run as `charts-<check>-<arch>`. To update them, copy a
+  chosen run's charts to `docs/images` (decision 44).

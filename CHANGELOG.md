@@ -89,6 +89,9 @@ change the public API, and the entry marks each change that does.
 
 ### Changed
 
+- The README is a quarter of its length. `docs/guide.md` holds the full walkthrough,
+  `docs/protovalidate.md` the guide to validation, `docs/testing.md` every check with its
+  command, and `docs/benchmarks.md` every chart.
 - connect-zig builds on colibri v0.19.0. **Changes a program's setup.** A program that serves TLS
   on `colibri.Server` passes room for its TLS sessions: a field
   `tls_buffer: [server.Config.tls_buffer_len(n)]u8`, where `n` is the TCP connections over TLS

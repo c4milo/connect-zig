@@ -31,7 +31,7 @@ pepegrillo and Rotor, which the tooling and the examples use.
 Some checks need more, and each script in `tools/` names what it needs: buf for the generated
 code and interop, Go for the coverage and benchmark comparisons, node, python3 and cargo for the
 clients in `interop/`, and valgrind for the performance gate. `tools/ci.sh` runs every check, as
-CI does.
+CI does, and [docs/testing.md](docs/testing.md) lists each one with its command.
 
 ## The rules a change keeps
 
@@ -64,8 +64,8 @@ Commits are [Conventional Commits](https://www.conventionalcommits.org/):
 `type(scope): description`.
 
 - The type is one of `feat`, `fix`, `docs`, `test`, `refactor`, `perf`, `build`, `ci` or `chore`.
-- The scope is one of `protobuf`, `connect`, `connect-colibri`, `plugin`, `examples`, `build`,
-  `ci` or `docs`.
+- The scope is one of `protobuf`, `connect`, `connect-colibri`, `oidc`, `protovalidate`,
+  `plugin`, `examples`, `build`, `ci` or `docs`.
 - The description is imperative and lowercase, with no period, and the subject line fits in 72
   columns.
 - The body says why, in at most 4 paragraphs and 150 words, with lines of at most 100 columns.
