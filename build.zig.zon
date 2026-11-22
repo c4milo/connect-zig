@@ -19,7 +19,7 @@
         // from it. The symbols it exports, its AVX2 searches', no other stdx module defines, so
         // it links beside the stdx above, which colibri pins too.
         .stdx_regex = .{
-            .url = "git+https://github.com/c4milo/stdx#85f532cb3fb3985a393ff9351c5cafe109326697",
+            .url = "git+https://github.com/c4milo/stdx#652513deae604ac4bbf7522a54a4872b0c420c92",
             .hash = "stdx-0.2.0-BD60tnrUSAD45aUhENvIzCmMjRgYbhE9jWiu9_96nwks",
         },
         // Developer tooling only, never linked into the library (decision 15). Lazy, and requested
