@@ -2070,7 +2070,9 @@ ran on Linux x86-64 with Zig 0.16.0.
   count from 1,169 instructions to 722, and in run 231 it took 77.5 ns to protovalidate-buffa's
   39.2, on another machine. "A repeated key searched for after its result" took it to 580. A
   profile shows the rest spread thin: each macro's iterator and its steps, each rule's `Env`,
-  and each result that an expression stores and reads back.
+  and each result that an expression stores and reads back. Three changes moved the count by
+  3 instructions or none: `eval_side` inline and `eval_as` inline, which LLVM inlines already,
+  and the time copied only into a rule whose text names `now`, which counted 577.
 - For `protovalidate`, `filter` and `map` over a map that bind each entry's value, as `all`,
   `exists` and `exists_one` do ("A map's entry in a macro"). Their expressions still search
   the map for each key.
