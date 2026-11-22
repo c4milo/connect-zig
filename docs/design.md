@@ -1486,6 +1486,19 @@ ran on Linux x86-64 with Zig 0.16.0.
   first attempt of `bench-compare` on arm64 timed some of connect-zig's cells at twice the lab's
   time, with the same CPU and code; a second attempt matched the lab, and the README takes it.
   valgrind 3.26 counted the routed call's instructions as 3.22 did: 4,177 and 4,430.
+- **colibri v0.19.1** (colibri `b785d8eb`). It is v0.19.0 with one fix, colibri's pull request
+  [145](https://github.com/c4milo/colibri/pull/145): a socket closes only once its staged
+  close's shutdown has completed.
+  - io_uring runs a shutdown on a worker, which looks up the descriptor only when it starts. A
+    close that ran first freed the descriptor's number, the next accept took it, and the
+    shutdown then ended the write side of that new connection.
+  - This was the h11 "unexpected EOF" that the conformance suite still read after the 120 s
+    waits: one case in about one run of three, each with no response at all. A capture showed
+    the server read the whole request and send a FIN with no octet of a response.
+  - The race came most often while a handler waited. `pause` in `conformance/echo.zig` sleeps on
+    `std.Io`, so the server's one thread stops, and the closes of that wait run together after it.
+  - On v0.19.0 with the fix, 30 runs of the h11 cases in zstd and br passed, where v0.19.0 failed
+    4 of its first 11. The whole server half then passed 5 runs of 5.
 - **colibri v0.19.0** (`af0b01e`). CI's
   [run 185](https://github.com/c4milo/connect-zig/actions/runs/44627403358). colibri issue 137
   halved each socket's buffers and decision 167 moved each TLS session into a buffer the program
