@@ -177,9 +177,10 @@ embedded descriptor.
 Each verdict is "valid", or "invalid:" and the rule ids of the violations in order. The check
 fails when two implementations give one message different verdicts.
 
-CI's [run 201](https://github.com/c4milo/connect-zig/actions/runs/44961446526) ran the check at commit a36988d, on an AMD EPYC 9V45, x86-64. Each of the
-five gave each message the same verdict. The nanoseconds of one decode and one validation, which
-the README's chart draws:
+CI's [run 201](https://github.com/c4milo/connect-zig/actions/runs/44961446526) ran the check at
+commit a36988d, on an AMD EPYC 9V45, x86-64. That commit is c06c45d on main, the same files
+with the author's name fixed. Each of the five gave each message the same verdict. The
+nanoseconds of one decode and one validation, which the README's chart draws:
 
 | Message | connect-zig | protovalidate-go | protovalidate-es | protovalidate-buffa | prost-protovalidate |
 | --- | ---: | ---: | ---: | ---: | ---: |
