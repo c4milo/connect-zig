@@ -8,6 +8,7 @@ const table = @import("../table.zig");
 const shape = @import("../shape.zig");
 const type_file = @import("cel_type.zig");
 const value_file = @import("cel_value.zig");
+const text_file = @import("cel_text.zig");
 const Env = type_file.Env;
 const Error = type_file.Error;
 
@@ -224,6 +225,8 @@ pub fn map_is_read(comptime F: type) bool {
 pub fn list_holds(list: anytype, value: anytype, env: *Env) Error!bool {
     var elements = iterate(list);
     for (0..proto.constants.limits.elements_max) |_| {
+        const written = text_file.mark_element(@TypeOf(list), env);
+        defer text_file.free_element(@TypeOf(list), env, written);
         const element = try elements.next(env) orelse return false;
         if (value_file.equal(element, value)) return true;
     }
@@ -242,6 +245,8 @@ pub fn count(collection: anytype, env: *Env) Error!i64 {
     var total: i64 = 0;
     var elements = if (comptime is_map(@TypeOf(collection))) collection.iterator() else iterate(collection);
     for (0..proto.constants.limits.elements_max) |_| {
+        const written = text_file.mark_element(C, env);
+        defer text_file.free_element(C, env, written);
         const element = try elements.next(env) orelse return total;
         if (comptime is_map(@TypeOf(collection))) {
             if (try key_again(@TypeOf(collection), elements, element, env)) continue;
@@ -282,8 +287,11 @@ pub fn at(list: anytype, index: i64, env: *Env) Error!Taken(ElementOf(@TypeOf(li
     var elements = iterate(list);
     var place: i64 = 0;
     for (0..proto.constants.limits.elements_max) |_| {
+        const written = text_file.mark_element(L, env);
         const element = try elements.next(env) orelse return error.Unevaluable;
         if (place == index) return take(ElementOf(@TypeOf(list)), element);
+        // An element before the index is read no more, and its text goes.
+        text_file.free_element(L, env, written);
         place += 1;
     }
     unreachable;

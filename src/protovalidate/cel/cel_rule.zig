@@ -106,10 +106,11 @@ pub fn check_message(comptime M: type, comptime rules: pb.MessageRules, message:
     }
 }
 
-/// Whether `rule`'s expression may call `format`, whose text the report's storage keeps. A
-/// rule that names `format` in another way, as a field, only costs a copy of its message.
+/// Whether `rule`'s expression may write text, which the report's storage keeps: a `format`, a
+/// `+` or a `string` in it. A `+` of two numbers counts too, which only costs a copy of the
+/// rule's message.
 fn formats(comptime rule: Rule) bool {
-    return std.mem.indexOf(u8, rule.expression, "format") != null;
+    return program.writes_text(rule.expression);
 }
 
 /// The message of the violation when `this` breaks `rule`, or null.

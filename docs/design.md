@@ -1730,6 +1730,31 @@ ran on Linux x86-64 with Zig 0.16.0.
   - Mutations against `zig build test-protovalidate`, 3: `has` of a key always true, a map of
     int keys that takes a selection, and a selection that reads another key. Each was `CAUGHT`.
 
+- **Text and lists an expression writes** (decision 47, amended 2026-11-22). `+` joins two
+  strings, two bytes values or two lists, and `string` writes an int, a uint, a double or a
+  bool (CEL language definition, "Addition (+)" and "string"): `cel_text.zig`. A string and a
+  bytes value are written into the room that `format` writes into, the report's free storage. A
+  `+` whose left side is the last text written writes its right side after it, so `a + b + c`
+  writes each part once. A list is joined as it is read, and two list literals join into one.
+  - A part whose value holds no text, such as a comparison or a `size`, gives back the text it
+    wrote once its value is known. A macro, `size`, `in` and an index give back each element's
+    text once they are done with it, and `filter` each element it leaves out. A list cannot do
+    that itself: `format` writes between two reads of it. So a rule over a long list writes
+    only as much text as one element takes.
+  - The checker finds whether a rule writes text from its tree, where it looked for the word
+    `format` in its text before.
+  - The differential check writes `+` of strings, bytes and lists, and `string` of each type.
+    Seeds 51 to 62 agreed with protovalidate-go on each of their 96,000 verdicts, but one
+    verdict of the smallest int's `% -1`, which the next commit fixes. A schema of 108 chosen
+    values of `string` of a double, an int, a uint and a bool agreed too, `+Inf` and `1e+06`
+    among them.
+  - Mutations against `zig build test-protovalidate`, 14: the last text copied again, no text
+    freed, a part that holds no text keeping what it wrote, `all`, an index and `filter`
+    keeping each element's text, a double of 1e6 in fixed form, an exponent of one digit,
+    infinity without its sign, a string joined with bytes, lists of two element types joined,
+    a joined list without its right side, a `+` not seen to write, and a uint written with a
+    `u`. Each was `CAUGHT`.
+
 ### Work not done yet
 
 - A stream that waits for an event of the program once its request ended (colibri issue 130).
@@ -1751,8 +1776,8 @@ ran on Linux x86-64 with Zig 0.16.0.
 - For `protovalidate`, the parts of CEL that no rule of the conformance suite uses and the
   module does not read yet: `type`, `duration` of a text
   that is no literal, `timestamp(string)`, sums and differences of timestamps and
-  durations, the accessors of a timestamp such as `getFullYear`, `string` of a number, and `+`
-  of two strings. Each stops the build with a message that names it.
+  durations, and the accessors of a timestamp such as `getFullYear`. Each stops the build with
+  a message that names it.
 - For `protovalidate`, the tree of each CEL expression in the table. The compiler takes
   4.1 ms to read a rule's text, and 0.04 ms to read the same tree as a Zig literal. The plugin
   would run the grammar of `cel_grammar.zig` as a program and write each tree beside its

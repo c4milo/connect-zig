@@ -15,6 +15,7 @@ const collection = @import("cel_collection.zig");
 const list_file = @import("cel_list.zig");
 const pattern_file = @import("../pattern.zig");
 const format_file = @import("cel_format.zig");
+const text_file = @import("cel_text.zig");
 const Node = node_file.Node;
 const Scope = type_file.Scope;
 const Env = type_file.Env;
@@ -31,6 +32,16 @@ pub fn Result(comptime node: *const Node, comptime scope: Scope) type {
 /// more than the helper's lines do (docs/performance.md).
 pub fn eval(comptime node: *const Node, comptime scope: Scope, values: anytype, env: *Env) Error!Result(node, scope) {
     if (comptime Result(node, scope) == Failing) return error.Unevaluable;
+    // A part whose value holds no text frees the text it wrote once the value is known.
+    if (comptime text_file.writes(node) and text_file.holds_no_text(Result(node, scope))) {
+        const written = text_file.mark(env);
+        defer text_file.free(env, written);
+        return eval_part(node, scope, values, env);
+    }
+    return eval_part(node, scope, values, env);
+}
+
+fn eval_part(comptime node: *const Node, comptime scope: Scope, values: anytype, env: *Env) Error!Result(node, scope) {
     switch (comptime node.*) {
         inline .int, .uint, .double, .boolean, .string => |value| return value,
         .bytes => |octets| return .{ .octets = octets },
@@ -99,14 +110,17 @@ inline fn eval_binary(comptime node: *const Node, comptime scope: Scope, values:
         .greater => value_file.order(left, right) == .gt,
         .less_or_equal => if (value_file.order(left, right)) |order| order != .gt else false,
         .greater_or_equal => if (value_file.order(left, right)) |order| order != .lt else false,
-        .add => number.compute(@TypeOf(left), .add, left, right),
-        .subtract => number.compute(@TypeOf(left), .subtract, left, right),
-        .multiply => number.compute(@TypeOf(left), .multiply, left, right),
-        .divide => number.compute(@TypeOf(left), .divide, left, right),
-        .modulo => number.compute(@TypeOf(left), .modulo, left, right),
+        .add, .subtract, .multiply, .divide, .modulo => arithmetic(binary.op, left, right, env),
         .in => collection.holds(right, left, env),
         .@"and", .@"or" => comptime unreachable,
     };
+}
+
+/// `left op right` of two numbers, and `+` of two strings, bytes values or lists.
+inline fn arithmetic(comptime op: node_file.BinaryOp, left: anytype, right: anytype, env: *Env) Error!check.Overload(op, @TypeOf(left), @TypeOf(right)).? {
+    const T = @TypeOf(left);
+    if (comptime op == .add and !type_file.is_number(T)) return text_file.concat(left, right, env);
+    return number.compute(T, comptime @field(number.Arithmetic, @tagName(op)), left, right);
 }
 
 /// `left && right`, whose absorbing value is false, and `left || right`, whose is true. The
@@ -136,6 +150,7 @@ inline fn eval_call(comptime call: Node.Call, comptime R: type, comptime scope: 
         // The pattern is a literal, which `check.type_of` required.
         .matches => return pattern_file.matches(operands[1].string, try eval(&operands[0], scope, values, env)),
         .format => return format_file.eval_format(call, scope, values, env),
+        .string => if (comptime operands.len == 1 and text_file.converts(Result(&operands[0], scope))) return text_file.to_string(try eval(&operands[0], scope, values, env), env),
         .map, .filter => return collection.eval_derived(call, R, scope, values, env),
         .all, .exists, .exists_one => if (comptime collection.is_macro(call)) return collection.eval_macro(call, scope, values, env),
         else => {},

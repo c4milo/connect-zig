@@ -7,6 +7,7 @@ const parser = @import("cel_parse.zig");
 const check = @import("cel_check.zig");
 const evaluation = @import("cel_eval.zig");
 const type_file = @import("cel_type.zig");
+const text_file = @import("cel_text.zig");
 const Scope = type_file.Scope;
 
 /// What stops `text` from being compiled for the names of `scope`, or null. The problem starts
@@ -53,4 +54,10 @@ fn typed_of(comptime text: []const u8, comptime scope: Scope) type_file.Typed {
 /// The value of `text` for `values`, a tuple with one value for each name of `scope`.
 pub fn run(comptime text: []const u8, comptime scope: Scope, values: anytype, env: *type_file.Env) type_file.Error!Type(text, scope) {
     return evaluation.eval(comptime parser.tree_of(text), scope, values, env);
+}
+
+/// Whether `text` may write text as it runs, which needs the room of `Env.text`: a `+`, a
+/// `string` or a `format` in it.
+pub fn writes_text(comptime text: []const u8) bool {
+    return text_file.writes(parser.tree_of(text));
 }

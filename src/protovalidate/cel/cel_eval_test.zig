@@ -225,7 +225,7 @@ test "an expression that does not parse or does not type is a problem of the bui
     try expect_problem("this.ratio != this.a", "found no matching overload for `!=` applied to (double, int)");
     try expect_problem("this.wrapped == 1u", "found no matching overload for `==` applied to (wrapper(int), uint)");
     try expect_problem("this.a + 1u", "found no matching overload for `+` applied to (int, uint)");
-    try expect_problem("this.name + this.name", "found no matching overload for `+` applied to (string, string)");
+    try expect_problem("this.name + 1", "found no matching overload for `+` applied to (string, int)");
     try expect_problem("this.on * this.on", "found no matching overload for `*` applied to (bool, bool)");
     try expect_problem("this.ratio % 2.0", "found no matching overload for `%` applied to (double, double)");
     try expect_problem("this.name < 1", "found no matching overload for `<` applied to (string, int)");

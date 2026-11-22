@@ -65,13 +65,18 @@ class Generator:
         leaves = ["this.s", "this.t", "this.leaf.name", self.literal_string(), self.literal_string()] + self.variables["string"]
         if depth <= 0 or self.rng.random() < 0.6:
             return self.pick(leaves)
-        kind = self.rng.randrange(4)
+        kind = self.rng.randrange(6)
         if kind == 0:
             return f"this.rs[{self.int(0)}]"
         if kind == 1:
             return f"({self.bool(depth - 1)} ? {self.string(depth - 1)} : {self.string(depth - 1)})"
         if kind == 2:
             return f"string({self.string(depth - 1)})"
+        if kind == 3:
+            return f"({self.string(depth - 1)} + {self.string(depth - 1)})"
+        if kind == 4:
+            value = self.pick([self.int(depth - 1), self.uint(depth - 1), self.double(depth - 1), self.bool(depth - 1)])
+            return f"string({value})"
         return self.pick(leaves)
 
     def int(self, depth):
@@ -86,7 +91,7 @@ class Generator:
         if kind == 5:
             return f"{self.string(depth - 1)}.size()"
         if kind == 6:
-            return self.pick(["this.rs.size()", "this.ri.size()", "this.msi.size()", "this.y.size()"])
+            return self.pick(["this.rs.size()", "this.ri.size()", "this.msi.size()", "this.y.size()", "(this.rs + this.rs).size()", "(this.ri + [1, 2]).size()", "(this.y + b'ab').size()"])
         if kind == 7:
             return f"int({self.pick([self.uint(depth - 1), self.double(depth - 1), self.string(0)])})"
         if kind == 8:
@@ -186,7 +191,7 @@ class Generator:
         if kind == 4:
             return f"{self.duration()} {order} {self.duration()}"
         if kind == 5:
-            return f"this.y {self.pick(['==', '!='])} {self.pick(['this.y', 'bytes(this.s)', 'b' + self.literal_string()])}"
+            return f"this.y {self.pick(['==', '!='])} {self.pick(['this.y', 'bytes(this.s)', 'b' + self.literal_string(), 'bytes(this.s) + bytes(this.t)'])}"
         # Numbers of two types, which protovalidate's CEL compares.
         left, right = self.rng.sample([self.int(depth), self.uint(depth), self.double(depth)], 2)
         return f"{left} {order} {right}"

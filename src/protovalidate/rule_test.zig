@@ -264,3 +264,14 @@ test "a formatted message with no room in the report ends validate as a full rep
     try testing.expect(report.truncated);
     try testing.expectEqual(@as(usize, 0), report.violations().len);
 }
+
+test "a CEL rule's message may join text, which the report keeps" {
+    const rules: pb.FieldRules = comptime .{ .cel = .of(&.{.{ .id = "joined", .expression = "this.size() > 2 ? 'too long: ' + this + ' (' + string(this.size()) + ')' : ''" }}) };
+    const T = support.One(Text, .string, rules);
+    var storage: [constants.report_bytes_default]u8 align(report_file.storage_alignment) = undefined;
+    var report: report_file.Report = .init(&storage);
+    const message: T = .{ .val = "abcd" };
+    try testing.expectError(error.Invalid, validate_file.validate(T, &message, .{}, &report));
+    try testing.expectEqualStrings("too long: abcd (4)", report.violations()[0].message.?);
+    try expect(Text, .string, rules, "ab", "");
+}

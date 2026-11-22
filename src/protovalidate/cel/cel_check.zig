@@ -13,6 +13,7 @@ const time = @import("cel_time.zig");
 const collection = @import("cel_collection.zig");
 const pattern_file = @import("../pattern.zig");
 const format_file = @import("cel_format.zig");
+const text_file = @import("cel_text.zig");
 const Node = node_file.Node;
 const BinaryOp = node_file.BinaryOp;
 const Scope = type_file.Scope;
@@ -126,7 +127,8 @@ pub fn Overload(comptime op: BinaryOp, comptime L: type, comptime R: type) ?type
     return switch (op) {
         .equal, .not_equal => bool_when(value_file.equatable(L, R)),
         .less, .less_or_equal, .greater, .greater_or_equal => bool_when(value_file.ordered(L, R)),
-        .add, .subtract, .multiply, .divide => arithmetic(L, R, .with_double),
+        .add => arithmetic(L, R, .with_double) orelse text_file.Concatenated(L, R),
+        .subtract, .multiply, .divide => arithmetic(L, R, .with_double),
         .modulo => arithmetic(L, R, .integers),
         .in => collection.In(L, R),
         .@"and", .@"or" => null,
@@ -222,7 +224,9 @@ fn pattern_problem(comptime operands: []const Node) ?[]const u8 {
 /// and `bool('k')` can give no value. The compiler computes it here the same way.
 fn converts_no_literal(comptime call: Node.Call, comptime operands: []const Node, comptime R: type) bool {
     const converts = switch (call.function) {
-        .int, .uint, .double, .string, .bytes, .bool => operands.len == 1,
+        .int, .uint, .double, .bytes, .bool => operands.len == 1,
+        // `string` fails for bytes alone, which may not be UTF-8.
+        .string => operands.len == 1 and operands[0] == .bytes,
         else => false,
     };
     if (!converts) return false;

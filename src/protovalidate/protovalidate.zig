@@ -85,6 +85,8 @@ test {
     _ = @import("cel/cel_library.zig");
     _ = @import("cel/cel_list.zig");
     _ = @import("cel/cel_lazy_list.zig");
+    _ = @import("cel/cel_text.zig");
+    _ = @import("cel/cel_text_test.zig");
     _ = @import("cel/cel_format.zig");
     _ = @import("cel/cel_format_test.zig");
     _ = @import("cel/cel_predefined_test.zig");

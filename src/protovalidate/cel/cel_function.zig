@@ -35,7 +35,12 @@ fn overloads_of(comptime function: Function) []const Overload {
             .{ .operands = &.{i64}, .result = f64 }, .{ .operands = &.{u64}, .result = f64 },
             .{ .operands = &.{f64}, .result = f64 }, .{ .operands = &.{text}, .result = f64 },
         },
-        .string => &.{ .{ .operands = &.{text}, .result = text }, .{ .operands = &.{Bytes}, .result = text } },
+        // `string` of a number or a bool writes its text, which `cel_text.zig` does.
+        .string => &.{
+            .{ .operands = &.{text}, .result = text }, .{ .operands = &.{Bytes}, .result = text },
+            .{ .operands = &.{i64}, .result = text },  .{ .operands = &.{u64}, .result = text },
+            .{ .operands = &.{f64}, .result = text },  .{ .operands = &.{bool}, .result = text },
+        },
         .bytes => &.{ .{ .operands = &.{text}, .result = Bytes }, .{ .operands = &.{Bytes}, .result = Bytes } },
         .bool => &.{ .{ .operands = &.{bool}, .result = bool }, .{ .operands = &.{text}, .result = bool } },
         // CEL language definition, "String Functions": `matches(string, string) -> bool`, and
@@ -229,7 +234,7 @@ test "a conversion to a double, a string, bytes or a bool reads each type it tak
     try testing.expect(try call(.bool, .{str("true")}) and try call(.bool, .{str("T")}) and try call(.bool, .{true}));
     try testing.expect(!try call(.bool, .{str("false")}) and !try call(.bool, .{str("0")}));
     try testing.expectError(error.Unevaluable, call(.bool, .{str("yes")}));
-    try testing.expect(comptime Result(.bool, &.{i64}) == null and Result(.string, &.{i64}) == null);
+    try testing.expect(comptime Result(.bool, &.{i64}) == null and Result(.string, &.{Timestamp}) == null);
     try testing.expect(comptime Result(.int, &.{bool}) == null and Result(.uint, &.{Timestamp}) == null);
 }
 

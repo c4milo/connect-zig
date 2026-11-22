@@ -11,6 +11,7 @@ const value_file = @import("cel_value.zig");
 const check = @import("cel_check.zig");
 const evaluation = @import("cel_eval.zig");
 const lazy = @import("cel_lazy_list.zig");
+const text_file = @import("cel_text.zig");
 const Node = node_file.Node;
 const Scope = type_file.Scope;
 const Typed = type_file.Typed;
@@ -262,6 +263,9 @@ fn every(collection: anytype, comptime absorbing: bool, comptime body: *const No
     var failure: ?Error = null;
     var elements = list_file.iterate(collection);
     for (0..proto.constants.limits.elements_max) |_| {
+        // The element and its expression are read here alone: their text goes once both are.
+        const written = text_file.mark_element(@TypeOf(collection), env);
+        defer text_file.free_element(@TypeOf(collection), env, written);
         const element = try elements.next(env) orelse return failure orelse !absorbing;
         const result = evaluation.eval_as(bool, body, inner, values ++ .{element}, env) catch |failed| {
             failure = failure orelse failed;
@@ -279,6 +283,8 @@ fn exists_one(collection: anytype, comptime body: *const Node, comptime inner: S
     var matches: usize = 0;
     var elements = list_file.iterate(collection);
     for (0..proto.constants.limits.elements_max) |_| {
+        const written = text_file.mark_element(C, env);
+        defer text_file.free_element(C, env, written);
         const element = try elements.next(env) orelse return matches == 1;
         if (comptime list_file.is_map(C)) {
             if (try list_file.key_again(C, elements, element, env)) continue;

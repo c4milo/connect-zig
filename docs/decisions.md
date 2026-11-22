@@ -876,6 +876,15 @@ first. Cite an entry by number in code and commits ("decision 6").
         before, whose length the compiler knows.
       - Beaten: a list in the free part of the report's storage, which copies each element and
         bounds the list by the room; and a buffer on the stack, which bounds it by a constant.
+    - CEL's `+` of two strings or two bytes values, and `string` of a number or a bool, write
+      their text where `format` writes its own. Amended on 2026-11-22:
+      - A part whose value holds no text gives back what it wrote once its value is known. A
+        reader of a list that writes its elements, such as `map(x, string(x))`, gives back each
+        element's text once it is done with the element. So the room bounds the text that one
+        part of an expression holds at a time, and not the text of a whole run.
+      - `+` of two lists joins them as they are read, as `filter` and `map` give a list.
+      - Beaten: a rope of the two sides, which every function of strings would read as one;
+        and the room given back only when the rule ends, which a macro over a long list fills.
     - protovalidate's conformance harness v1.2.2 runs against `zig build
       protovalidate-executor`. The harness sends each case as an Any beside a
       `FileDescriptorSet`. The library has no dynamic message, so the executor holds the

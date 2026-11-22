@@ -1,7 +1,8 @@
-//! The lists that `filter` and `map` give (CEL language definition, "Macros"). Such a list is
-//! computed as the caller reads it: each element of the source list, or each key of the source
-//! map, goes through the predicate and the transform one at a time. Nothing is copied, so the
-//! list needs no storage, and `size`, `in`, an index and the macros read it as any other list.
+//! The lists that `filter` and `map` give (CEL language definition, "Macros"), and the list
+//! that `+` of two lists gives ("Addition (+)"). Such a list is computed as the caller reads
+//! it: each element of the source list, or each key of the source map, goes through the
+//! predicate and the transform one at a time. Nothing is copied, so the list needs no storage,
+//! and `size`, `in`, an index and the macros read it as any other list.
 const std = @import("std");
 const proto = @import("protobuf");
 const node_file = @import("cel_node.zig");
@@ -9,6 +10,7 @@ const type_file = @import("cel_type.zig");
 const list_file = @import("cel_list.zig");
 const collection = @import("cel_collection.zig");
 const evaluation = @import("cel_eval.zig");
+const text_file = @import("cel_text.zig");
 const Node = node_file.Node;
 const Scope = type_file.Scope;
 const Env = type_file.Env;
@@ -38,6 +40,9 @@ pub fn LazyList(comptime Source: type, comptime steps: Steps, comptime scope: Sc
         const inner = scope.with(steps.variable, Variable);
         pub const Element = if (steps.transform) |transform| evaluation.Result(transform, inner) else Variable;
         pub const cel_name = "list(" ++ type_file.name_of(Element) ++ ")";
+        /// Whether an element's text is written as it is read (`text_file.writes_elements`).
+        pub const writes_text = text_file.writes_elements(Source) or
+            (steps.transform != null and text_file.writes(steps.transform.?) and !text_file.holds_no_text(Element));
 
         pub const Iterator = struct {
             source: list_file.IteratorOf(Source),
@@ -47,8 +52,11 @@ pub fn LazyList(comptime Source: type, comptime steps: Steps, comptime scope: Sc
             /// the read, as it fails the macro in CEL.
             pub fn next(it: *Iterator, env: *Env) Error!?Element {
                 for (0..proto.constants.limits.elements_max) |_| {
+                    const written = text_file.mark_element(Source, env);
                     const element = try it.source.next(env) orelse return null;
                     if (try kept(Source, steps, inner, Element, it.source, it.values ++ .{element}, env)) |value| return value;
+                    // The list leaves the element out, so no one reads its text.
+                    text_file.free_element(Source, env, written);
                 }
                 unreachable;
             }
@@ -56,6 +64,38 @@ pub fn LazyList(comptime Source: type, comptime steps: Steps, comptime scope: Sc
 
         pub fn iterator(list: Self) Iterator {
             return .{ .source = list_file.iterate(list.source), .values = list.values };
+        }
+    };
+}
+
+/// `left + right` of two lists: the elements of `left`, then those of `right`.
+pub fn Joined(comptime Left: type, comptime Right: type) type {
+    return struct {
+        left: Left,
+        right: Right,
+
+        const Self = @This();
+        pub const Element = list_file.ElementOf(Left);
+        pub const cel_name = "list(" ++ type_file.name_of(Element) ++ ")";
+        pub const writes_text = text_file.writes_elements(Left) or text_file.writes_elements(Right);
+
+        pub const Iterator = struct {
+            left: list_file.IteratorOf(Left),
+            right: list_file.IteratorOf(Right),
+            /// Whether the left list has no element left.
+            left_done: bool = false,
+
+            pub fn next(it: *Iterator, env: *Env) Error!?Element {
+                if (!it.left_done) {
+                    if (try it.left.next(env)) |element| return element;
+                    it.left_done = true;
+                }
+                return it.right.next(env);
+            }
+        };
+
+        pub fn iterator(list: Self) Iterator {
+            return .{ .left = list_file.iterate(list.left), .right = list_file.iterate(list.right) };
         }
     };
 }
