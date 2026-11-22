@@ -30,21 +30,21 @@ number with no sign, so "--9223372036854775808" is no expression.
 
 ## What the model leaves out
 
-`protovalidate` reads no map literal, no message literal and no name that starts with ".". The
-model has none, so a text that holds one has no tree in the model and in the Zig alike.
+`protovalidate` reads no message literal and no name that starts with ".". The model has
+none, so a text that holds one has no tree in the model and in the Zig alike.
 
 The Zig grammar refuses an expression whose parts nest more than `cel_depth_max` deep. The
 model has no such limit, and no vector nests that deep.
 
 ## How the Zig grammar is held to it
 
-`lake exe vectors --write <directory>` writes `cel_vectors.txt`: 6,655 expressions, each with
+`lake exe vectors --write <directory>` writes `cel_vectors.txt`: 6,671 expressions, each with
 the text of its tree or "!" for a text that is no expression. The expressions are:
 
 - every sequence of one, two and three tokens of an alphabet of 16;
 - every pair of those tokens with no space between them;
 - 1,200 sequences of four to nine tokens, and 600 trees, from a fixed generator;
-- 223 expressions chosen for the rules of the lexis: each escape, each prefix of a string, the
+- 239 expressions chosen for the rules of the lexis: each escape, each prefix of a string, the
   ends of each number's range, each keyword and each reserved word.
 
 The unit test "the grammar reads each expression of the Lean model's vectors as the model does"
@@ -75,7 +75,7 @@ with its seed. A count of 2,500 gives 10,000 expressions, which the two read in 
 
 Nothing yet. The model is a definition that Lean accepts as total: each function ends, by a
 count of steps that falls. No theorem states a property of the grammar. The check above is a
-comparison on 6,655 cases, and Zig's fuzzer holds two more properties on any input: a parse
+comparison on 6,671 cases, and Zig's fuzzer holds two more properties on any input: a parse
 depends on its text alone, and a tree's text reads back as the tree.
 
 ## Commands

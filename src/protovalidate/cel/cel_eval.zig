@@ -13,6 +13,7 @@ const equal_file = @import("cel_equal.zig");
 const number = @import("cel_number.zig");
 const time = @import("cel_time.zig");
 const collection = @import("cel_collection.zig");
+const map_literal = @import("cel_map_literal.zig");
 const list_file = @import("cel_list.zig");
 const pattern_file = @import("../pattern.zig");
 const format_file = @import("cel_format.zig");
@@ -61,6 +62,7 @@ fn eval_part(comptime node: *const Node, comptime scope: Scope, values: anytype,
         .call => |call| return eval_call(call, comptime Result(node, scope), scope, values, env),
         .index => |index| return collection.eval_index(index, comptime Result(node, scope), scope, values, env),
         .list => |elements| return collection.eval_list(elements, comptime Result(node, scope), scope, values, env),
+        .map => |parts| return map_literal.eval_map(parts, comptime Result(node, scope), scope, values, env),
     }
 }
 

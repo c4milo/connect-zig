@@ -260,4 +260,4 @@ test "the grammar reads each expression of the Lean model's vectors as the model
     try testing.expectEqual(@as(usize, vectors_len), checked);
 }
 /// The vectors the file holds: a file cut short fails.
-const vectors_len = 6655;
+const vectors_len = 6671;

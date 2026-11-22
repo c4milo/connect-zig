@@ -12,10 +12,12 @@
 //! Multiplication = [Multiplication ("*" | "/" | "%")] Unary
 //! Unary          = Member | "!" {"!"} Member | "-" {"-"} Member
 //! Member         = Primary | Member "." IDENT ["(" [ExprList] ")"] | Member "[" Expr "]"
-//! Primary        = IDENT ["(" [ExprList] ")"] | "(" Expr ")" | "[" [ExprList] "]" | LITERAL
+//! Primary        = IDENT ["(" [ExprList] ")"] | "(" Expr ")" | "[" [ExprList] [","] "]"
+//!                | "{" [MapInits] [","] "}" | LITERAL
+//! MapInits       = Expr ":" Expr {"," Expr ":" Expr}
 //! ```
 //!
-//! The module reads no map and no message literal: an expression of a rule builds neither.
+//! The module reads no message literal: an expression of a rule builds none.
 const std = @import("std");
 const constants = @import("../constants.zig");
 const token_file = @import("cel_token.zig");
@@ -249,6 +251,23 @@ fn selection(comptime B: type, p: *Reader(B), target: B.Value) Error!B.Value {
 /// ("Primary = ... | '[' [ExprList] [','] ']'"), and a call's arguments take none.
 const LastComma = enum { last_comma, no_last_comma };
 
+/// A map literal's keys and values in turns, up to "}": "'{' [MapInits] [','] '}'", where
+/// "MapInits = Expr ':' Expr {',' Expr ':' Expr}".
+fn entries(comptime B: type, p: *Reader(B)) Error!B.Arguments {
+    var parts = p.builder.arguments();
+    if (take(B, p, .close_brace)) return parts;
+    // Each turn passes an entry, so the text's length bounds the turns.
+    for (0..p.tokens.text.len) |_| {
+        p.builder.add(&parts, try expression(B, p));
+        try expect(B, p, .colon);
+        p.builder.add(&parts, try expression(B, p));
+        if (take(B, p, .close_brace)) return parts;
+        try expect(B, p, .comma);
+        if (take(B, p, .close_brace)) return parts;
+    }
+    return parts;
+}
+
 /// The expressions up to `close`, with commas between them.
 fn list(comptime B: type, p: *Reader(B), close: Mark, last: LastComma) Error!B.Arguments {
     var arguments = p.builder.arguments();
@@ -271,6 +290,7 @@ fn primary(comptime B: type, p: *Reader(B)) Error!B.Value {
         return inner;
     }
     if (token.mark == .open_bracket) return p.builder.list(try list(B, p, .close_bracket, .last_comma));
+    if (token.mark == .open_brace) return p.builder.map(try entries(B, p));
     // "INT_LIT ::= -? DIGIT+" and "FLOAT_LIT ::= -? ...": a number's sign is part of the
     // literal, so "!-5" reads. A "-" before any other part is the operator, which `unary` reads.
     if (token.mark == .minus and (p.ahead.kind == .int or p.ahead.kind == .double)) return negative_literal(B, p);

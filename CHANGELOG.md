@@ -70,6 +70,10 @@ change the public API, and the entry marks each change that does.
   place are equal, such as `this.tags == ['a', 'b']`. `in` finds a list in a list of lists.
 - CEL's empty list literal, `[]`, which is a list of any element type: `this.tags != []`,
   `[] + this.tags` and `[].all(x, x > 0)` compile.
+- CEL's map literals, `{'a': 1, 'b': 2}`, whose keys are ints, uints, bools or strings of one
+  type, and whose values are of one type; `{}` is a map of any. An index, `in`, `size`, `has`,
+  a key read as a field and each macro read one. Two equal keys fail the run. `==` and `!=`
+  compare two maps, a map field's included: `this.labels == {'env': 'prod'}`.
 - The plugin raises the compiler's branch quota in the table of a message with more than 500
   list and message rules, so a message of a thousand fields with rules compiles.
 - `docs/specs/cel/langdef.md`, the CEL language definition as cel-spec published it at

@@ -56,7 +56,7 @@ fn reads(comptime node: *const Node, comptime name: []const u8, comptime variabl
         .conditional => |conditional| reads(conditional.condition, name, variable) or
             reads(conditional.then, name, variable) or reads(conditional.otherwise, name, variable),
         .call => |call| (call.target != null and reads(call.target.?, name, variable)) or reads_any(call.arguments, name, variable),
-        .list => |elements| reads_any(elements, name, variable),
+        .list, .map => |parts| reads_any(parts, name, variable),
         else => false,
     };
 }

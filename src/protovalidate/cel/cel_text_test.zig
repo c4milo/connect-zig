@@ -91,6 +91,8 @@ test "a macro gives back the text each element's expression wrote" {
     // `==` of two lists reads the two elements at each place, and gives back their text.
     try expect_true("this.numbers.map(n, string(n) + '!') == this.numbers.map(m, string(m) + '!')", &message);
     try expect_true("this.numbers.map(n, string(n) + '!').map(s, s.size()) == this.numbers.map(n, 3)", &message);
+    // A map literal's value holds the text it wrote until the map is read.
+    try expect_true("this.numbers.all(n, {'k': string(n) + '!'}.k.size() == 3)", &message);
 }
 
 test "text past the room fails the expression" {

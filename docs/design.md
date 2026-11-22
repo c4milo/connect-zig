@@ -1902,6 +1902,31 @@ ran on Linux x86-64 with Zig 0.16.0.
     a variable over it read with no `dyn`, an index of it the same way, `in` over it, it joined
     with a list, and `filter` and `map` of it. Each was `CAUGHT`.
 
+- **Map literals** (decision 47). The grammar reads `{k: v, ...}` ("'{' [MapInits] [','] '}'",
+  CEL language definition, "Syntax"), and the Lean model reads it too: its vector file holds
+  6,671 expressions, 16 of them new texts for the map's rules. A map literal is a
+  `MapLiteral(K, V, n)` (`cel_map_literal.zig`): its keys are of one type, an int, a uint, a
+  bool or a string ("Aggregate Values"), and its values of one type. It computes each key and
+  each value in the order of the text, and fails when two keys are equal. `==` compares two
+  maps, a map field's too, key by key, and reads a message map's repeated key at its last
+  entry. `{}` holds `NoElement` keys and values.
+  - `tools/cel_conformance_check.sh` printed `pass 1142 known 645 unchecked 29 refused 0 wrong
+    0 skipped 688`. A map literal of two key or two value types, and a field's name in
+    backquotes, are the new lines of `known.txt`.
+  - `tools/lean_check.sh 11 12 13` read 30,000 random expressions alike in the model and the
+    Zig grammar. `tools/protovalidate_conformance_check.sh` printed `PASS (failed: 0, skipped:
+    0, passed: 2872, total: 2872)`, `tools/cel_differential_check.sh 7 8` agreed on each of its
+    16,000 verdicts, `tools/perf_check.sh` counted each validation as before, and
+    `tools/compile_time_check.sh` printed a ratio of 4.26, +3.5% over its baseline of 4.12.
+  - Mutations against `zig build test-protovalidate`, 20: no colon in an entry, no comma after
+    the last entry, no map literal read, the tree's text of an entry, a key of any type, values
+    of two types, two equal keys taken, the first value for each key, no step for each key
+    read, each key read again later, no field of `{}`, a field of `{}` read with no `dyn`, two
+    maps not taken by `==`, not compared as they run, no count of keys, keys of two types
+    taken as equal, a repeated key read at its first entry, a key the right map lacks taken, the
+    two values of a key not compared, and the text a map literal's value writes not kept. Each
+    was `CAUGHT`.
+
 ### Work not done yet
 
 - A stream that waits for an event of the program once its request ended (colibri issue 130).
@@ -1931,8 +1956,9 @@ ran on Linux x86-64 with Zig 0.16.0.
   `exists` and `exists_one` do ("A map's entry in a macro"). Their expressions still search
   the map for each key.
 - For `protovalidate`, the parts of CEL that cel-spec's conformance suite tests and the module
-  does not build: a map literal, a message literal, a list literal of two element types,
-  `timestamp` of an int, and the strings extension's functions but `format`. No rule of protovalidate's suite needs one. `tools/cel_conformance/known.txt`
+  does not build: a message literal, a list or a map literal of two element types, a field's
+  name in backquotes, which cel-go reads and the language definition does not hold, `timestamp`
+  of an int, and the strings extension's functions but `format`. No rule of protovalidate's suite needs one. `tools/cel_conformance/known.txt`
   names each test.
 - For `protovalidate`, cel-go's typing behind `dyn`. cel-go gives the result of a function on
   a dynamic value a type, and refuses `dyn(x).size() == 'a'`. This module marks the result as

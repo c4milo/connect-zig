@@ -171,6 +171,11 @@ given back as it runs.
 `filter` and `map` work on any list or map. The list they give is computed as you read it,
 so it takes no memory, and reading it twice computes it twice.
 
+A list literal, `[1, 2]`, and a map literal, `{'a': 1, 'b': 2}`, hold elements of one type,
+and a map's keys are ints, uints, bools or strings. `[]` and `{}` are a list and a map of any
+type. `==` compares two lists element by element, and two maps key by key, so
+`this.labels == {'env': 'prod'}` reads.
+
 ## How it follows CEL
 
 The CEL rules follow the [CEL language definition](specs/cel/langdef.md), which the tree
@@ -210,7 +215,7 @@ measured.
   strict messages and strict errors. All 2872 of its cases pass.
 - `tools/lean_check.sh` builds a [Lean model](../spec/README.md) of the CEL syntax, written
   from the CEL language definition, and requires the vector file beside the Zig grammar to be
-  what the model gives. A unit test reads each of the 6,655 expressions with the grammar the
+  what the model gives. A unit test reads each of the 6,671 expressions with the grammar the
   compiler runs, and requires the model's tree or its refusal. No theorem is proved yet. The
   script then draws 10,000 expressions from a new seed, gives each to the model and to the
   Zig grammar, and requires the same tree: on five seeds, 50,000 expressions were read alike.
@@ -224,8 +229,8 @@ measured.
 - `tools/cel_conformance_check.sh` runs [cel-spec's conformance
   suite](https://github.com/google/cel-spec/tree/v0.25.3/tests/simple) v0.25.3 over the code a
   rule's expression compiles into: each of its 1,819 tests that declare no variables and build
-  no message. 1,045 pass. 742 test an extension that protovalidate does not turn on, or a part
-  of the language this library does not build, such as a map literal; `known.txt` beside the
+  no message. 1,142 pass. 645 test an extension that protovalidate does not turn on, or a part
+  of the language this library does not build, such as a message literal; `known.txt` beside the
   script gives the reason for each. Its first run found four differences, which
   [decision 47](decisions.md) lists.
 - `tools/compile_time_check.sh` holds what a schema's CEL rules cost the compiler to a

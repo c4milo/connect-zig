@@ -109,7 +109,8 @@ fn list_index(at: anytype) Error!i64 {
 /// map. CEL language definition, "Field Selection": "If `e` evaluates to a map, then `e.f` is
 /// equivalent to `e['f']`".
 pub fn KeySelected(comptime T: type) ?type {
-    if (!list_file.is_map(T) or T.Key != []const u8) return null;
+    // `{}` holds no key, so a selection of it is no field and `has` of it is false.
+    if (!list_file.is_map(T) or (T.Key != []const u8 and T.Key != type_file.NoElement)) return null;
     return list_file.Taken(T.Value);
 }
 

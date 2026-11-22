@@ -11,6 +11,7 @@ const function = @import("cel_function.zig");
 const value_file = @import("cel_value.zig");
 const equal_file = @import("cel_equal.zig");
 const collection = @import("cel_collection.zig");
+const map_literal = @import("cel_map_literal.zig");
 const pattern_file = @import("../pattern.zig");
 const format_file = @import("cel_format.zig");
 const text_file = @import("cel_text.zig");
@@ -48,6 +49,7 @@ pub fn type_of(comptime node: *const Node, comptime scope: Scope) Typed {
             .call => |call| of_call(call, scope),
             .index => |index| collection.of_index(index, scope),
             .list => |elements| collection.of_list(elements, scope),
+            .map => |parts| map_literal.of_map(parts, scope),
         };
     }
 }
@@ -78,7 +80,8 @@ fn of_select(comptime select: Node.Select, comptime scope: Scope) Typed {
     const T = target.type;
     if (T == Failing) return .{ .ok = target };
     const M = type_file.MessageOf(T) orelse {
-        if (collection.KeySelected(T)) |V| return .{ .ok = .{ .type = V, .dynamic = target.dynamic } };
+        // A field of `{}` is of no type the checker knows, as behind `dyn`.
+        if (collection.KeySelected(T)) |V| return .{ .ok = .{ .type = V, .dynamic = target.dynamic or V == type_file.NoElement } };
         return mistake(target.dynamic, "type `" ++ type_file.name_of(T) ++ "` has no field `" ++ select.field ++ "`");
     };
     const field = select_file.field_of(M, select.field) orelse {

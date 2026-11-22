@@ -64,12 +64,20 @@ def write : Expr → Octets
   | .call name none arguments => name ++ octetsOf "(" ++ writeList arguments ++ octetsOf ")"
   | .call name (some target) arguments => write target ++ octetsOf "." ++ name ++ octetsOf "(" ++ writeList arguments ++ octetsOf ")"
   | .list elements => octetsOf "[" ++ writeList elements ++ octetsOf "]"
+  | .map entries => octetsOf "{" ++ writeEntries entries ++ octetsOf "}"
 
 /-- The texts of the parts of a list, with ", " between them. -/
 def writeList : List Expr → Octets
   | [] => []
   | [e] => write e
   | e :: rest => write e ++ octetsOf ", " ++ writeList rest
+
+/-- The texts of a map literal's entries, each key with ": " and its value, and ", " between
+two entries. -/
+def writeEntries : List (Expr × Expr) → Octets
+  | [] => []
+  | [(key, value)] => write key ++ octetsOf ": " ++ write value
+  | (key, value) :: rest => write key ++ octetsOf ": " ++ write value ++ octetsOf ", " ++ writeEntries rest
 
 end
 

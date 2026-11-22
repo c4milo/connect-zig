@@ -81,14 +81,14 @@ the grammar reads of some expression: a name is no keyword, and a number is in i
 def tree : Nat → Nat → Expr × Nat
   | 0, state =>
     let leaves : List Expr := [.name (octetsOf "a"), .name (octetsOf "this"), .int 7, .int (-7), .uint 7, .double false (octetsOf "1.5"), .double true (octetsOf "2.5"),
-      .bool true, .null, .string (octetsOf "it's"), .bytes [0xff, 0x41], .int (-(2 ^ 63)), .list []]
+      .bool true, .null, .string (octetsOf "it's"), .bytes [0xff, 0x41], .int (-(2 ^ 63)), .list [], .map []]
     (leaves.getD (pick state leaves.length) .null, next state)
   | depth + 1, state =>
     let (first, state1) := tree depth (next state)
     let (second, state2) := tree depth state1
     let (third, state3) := tree depth state2
     let ops : List BinaryOp := [.or, .and, .less, .lessOrEqual, .greater, .greaterOrEqual, .equal, .notEqual, .in_, .add, .subtract, .multiply, .divide, .modulo]
-    match pick state 9 with
+    match pick state 10 with
     | 0 => (.binary (ops.getD (pick (next state3) ops.length) .add) first second, next (next state3))
     | 1 => (.conditional first second third, state3)
     | 2 => (.unary .not first, state1)
@@ -97,6 +97,7 @@ def tree : Nat → Nat → Expr × Nat
     | 5 => (.index first second, state2)
     | 6 => (.call (octetsOf "size") (some first) [], state1)
     | 7 => (.call (octetsOf "f") none [first, second], state2)
+    | 8 => (.map [(first, second), (third, first)], state3)
     | _ => (.list [first, second, third], state3)
 
 /-- `count` trees from `state`, of 1 to 3 parts one inside another. -/
@@ -194,7 +195,9 @@ def chosen : List Octets :=
     "[]", "[a]", "[a,]", "[a, b,]", "[,]", "[a,,]", "[a b]", "f()", "f(a,)", "f(,)", "a.f(b,)", "a[]", "a[b,]", "a[b][c]",
     "(a)", "((a))", "()", "(a", "a)", "a ? b : c", "a ? b : c ? d : e", "a ? b ? c : d : e", "a ? b", "a ? : c", "a : b",
     "a || b && c || d", "a < b + c * d && e in f", "a - b - c", "a / b % c * d", "a == b != c", "a < b < c",
-    "a = b", "a & b", "a | b", "a <> b", "a === b", "a !== b", "a !b", "a ! = b", "#", "a @ b", "a ; b", "{}", "{a: b}", "a{b: c}", ".a", "a..b", "a.", "a.1", "a.(b)",
+    "a = b", "a & b", "a | b", "a <> b", "a === b", "a !== b", "a !b", "a ! = b", "#", "a @ b", "a ; b", "{}", "{a: b}", "a{b: c}",
+    "{a: b,}", "{a: b, c: d}", "{,}", "{a}", "{a:}", "{:}", "{a: b c: d}", "{a: b,,}", "{a ? b : c : d}", "{a: b ? c : d}",
+    "{a: {b: c}}.d", "{a: b}[c]", "-{a: b}", "{a: b}.size()", "{a: [b]}", "[{a: b}]", ".a", "a..b", "a.", "a.1", "a.(b)",
     "1.size()", "1.5.floor()", "-5.abs()", "(-5).abs()", "-a.b", "[1][0]", "'s'.size()", "!a.b[c]"].map octetsOf) ++
   -- Octets that are no ASCII: in a string, in a bytes literal, in a comment, and outside each.
   [octetsOf "'" ++ [0xc3, 0xa9] ++ octetsOf "'", octetsOf "b'" ++ [0xff] ++ octetsOf "'", octetsOf "'" ++ [0x00, 0x01] ++ octetsOf "'",

@@ -22,6 +22,8 @@ pub const Node = union(enum) {
     call: Call,
     /// A list literal's elements.
     list: []const Node,
+    /// A map literal's keys and values in turns: each key, then its value.
+    map: []const Node,
 
     pub const Select = struct { of: *const Node, field: []const u8 };
     pub const Index = struct { of: *const Node, at: *const Node };
@@ -192,6 +194,7 @@ pub fn render(comptime node: *const Node) []const u8 {
             .conditional => |conditional| "(" ++ render(conditional.condition) ++ " ? " ++ render(conditional.then) ++ " : " ++ render(conditional.otherwise) ++ ")",
             .call => |call| render_target(call.target) ++ call.name ++ "(" ++ render_list(call.arguments) ++ ")",
             .list => |elements| "[" ++ render_list(elements) ++ "]",
+            .map => |parts| "{" ++ render_entries(parts) ++ "}",
         };
     }
 }
@@ -251,6 +254,18 @@ fn render_list(comptime nodes: []const Node) []const u8 {
     comptime {
         var text: []const u8 = "";
         for (nodes, 0..) |*node, index| text = text ++ (if (index == 0) "" else ", ") ++ render(node);
+        return text;
+    }
+}
+
+/// The parts of one entry of a map literal, `map`: its key, then its value.
+pub const entry_parts = 2;
+
+/// A map literal's entries: each key, ": " and its value, with ", " between two entries.
+fn render_entries(comptime parts: []const Node) []const u8 {
+    comptime {
+        var text: []const u8 = "";
+        for (parts, 0..) |*node, index| text = text ++ (if (index == 0) "" else if (index % entry_parts == 0) ", " else ": ") ++ render(node);
         return text;
     }
 }

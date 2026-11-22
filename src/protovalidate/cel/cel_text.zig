@@ -194,7 +194,7 @@ fn writes_in(comptime node: *const Node) bool {
         .index => |index| writes(index.of) or writes(index.at),
         .conditional => |conditional| writes(conditional.condition) or writes(conditional.then) or writes(conditional.otherwise),
         .call => |call| call.function == .string or call.function == .format or (call.target != null and writes(call.target.?)) or any_writes(call.arguments),
-        .list => |elements| any_writes(elements),
+        .list, .map => |parts| any_writes(parts),
         else => false,
     };
 }

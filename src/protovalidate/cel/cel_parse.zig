@@ -125,6 +125,10 @@ const Builder = struct {
     pub fn list(_: Builder, comptime elements: Arguments) Node {
         return .{ .list = elements };
     }
+
+    pub fn map(_: Builder, comptime parts: Arguments) Node {
+        return .{ .map = parts };
+    }
 };
 
 const testing = std.testing;
@@ -219,6 +223,13 @@ test "a literal is a number, a string, bytes, a boolean or null" {
     try testing.expectEqualStrings("(duration('10s') >= this)", comptime shown("duration('10s') >= this"));
 }
 
+test "a map literal holds each key with its value, in the order of the text" {
+    try testing.expectEqualStrings("{}", comptime shown("{}"));
+    try testing.expectEqualStrings("{'a': 1, b: [2]}", comptime shown("{'a': 1, b: [2],}"));
+    try testing.expectEqualStrings("{(a ? b : c): {d: e}}.f", comptime shown("{a ? b : c : {d: e}}.f"));
+    try testing.expectEqualStrings("({1: 2}[1] == 2)", comptime shown("{1: 2}[1] == 2"));
+}
+
 test "a wrong expression gives its problem" {
     try testing.expectEqualStrings("problem: the expression ends early", comptime shown("a &&"));
     try testing.expectEqualStrings("problem: the expression ends early", comptime shown(""));
@@ -229,7 +240,10 @@ test "a wrong expression gives its problem" {
     try testing.expectEqualStrings("problem: expected `]` before `)`", comptime shown("a[1)"));
     try testing.expectEqualStrings("problem: expected `,` before `b`", comptime shown("f(a b)"));
     try testing.expectEqualStrings("problem: expected a name after `.`, before `1`", comptime shown("a. 1"));
-    try testing.expectEqualStrings("problem: unexpected `{`", comptime shown("{}"));
+    try testing.expectEqualStrings("problem: expected `:` before `}`", comptime shown("{a}"));
+    try testing.expectEqualStrings("problem: expected `,` before `c`", comptime shown("{a: b c: d}"));
+    try testing.expectEqualStrings("problem: unexpected `,`", comptime shown("{,}"));
+    try testing.expectEqualStrings("problem: unexpected `{`", comptime shown("a{b: c}"));
     try testing.expectEqualStrings("problem: unexpected `in`", comptime shown("in"));
     // "IDENT ::= SELECTOR - RESERVED" and "SELECTOR ::= ... - KEYWORD".
     try testing.expectEqualStrings("problem: `as` is a reserved word", comptime shown("as"));

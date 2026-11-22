@@ -1,7 +1,8 @@
-//! `==` and `!=` of two values that may be lists. "Two `list` values equal if their entries at
-//! each ordinal are equal" (CEL language definition, "Lists and Maps"): the lists have one
-//! length, and each element equals the element at its place in the other. Any other two values
-//! are equal as `cel_value.zig` says.
+//! `==` and `!=` of two values that may be lists or maps (CEL language definition, "Lists and
+//! Maps"). "Two `list` values equal if their entries at each ordinal are equal": the lists have
+//! one length, and each element equals the element at its place in the other. "Two `map`
+//! values are equal if their entries are the same": the maps hold the same keys, and each
+//! key's two values are equal. Any other two values are equal as `cel_value.zig` says.
 const std = @import("std");
 const proto = @import("protobuf");
 const type_file = @import("cel_type.zig");
@@ -17,8 +18,11 @@ const NoElement = type_file.NoElement;
 /// with any other list's: "the type-checker uses homogeneous equality" (CEL language definition,
 /// "Equality").
 pub fn equatable(comptime L: type, comptime R: type) bool {
+    // Two scalars first: the compiler counts each call, and most operands of `==` are scalars.
+    if (value_file.equatable(L, R)) return true;
     if (list_file.is_list(L) and list_file.is_list(R)) return elements_equatable(list_file.ElementOf(L), list_file.ElementOf(R));
-    return value_file.equatable(L, R);
+    if (list_file.is_map(L) and list_file.is_map(R)) return elements_equatable(L.Key, R.Key) and elements_equatable(L.Value, R.Value);
+    return false;
 }
 
 fn elements_equatable(comptime L: type, comptime R: type) bool {
@@ -28,8 +32,8 @@ fn elements_equatable(comptime L: type, comptime R: type) bool {
 /// Whether a `L` and a `R` may be equal as an expression runs: two lists, whose elements are
 /// compared as they run, or two values `cel_value.zig` says may be equal.
 pub fn equal_as_they_run(comptime L: type, comptime R: type) bool {
-    if (list_file.is_list(L) and list_file.is_list(R)) return true;
-    return value_file.equal_as_they_run(L, R);
+    if (value_file.equal_as_they_run(L, R)) return true;
+    return (list_file.is_list(L) and list_file.is_list(R)) or (list_file.is_map(L) and list_file.is_map(R));
 }
 
 /// `left == right`. Two lists are read element by element, which may fail as a read of either
@@ -38,6 +42,7 @@ pub fn equal(left: anytype, right: anytype, env: *Env) Error!bool {
     const L = @TypeOf(left);
     const R = @TypeOf(right);
     if (comptime list_file.is_list(L) and list_file.is_list(R)) return equal_lists(left, right, env);
+    if (comptime list_file.is_map(L) and list_file.is_map(R)) return equal_maps(left, right, env);
     if (comptime !value_file.equal_as_they_run(L, R)) return false;
     return value_file.equal(left, right);
 }
@@ -57,6 +62,23 @@ fn equal_lists(left: anytype, right: anytype, env: *Env) Error!bool {
         const other = try rights.next(env);
         if (one == null or other == null) return one == null and other == null;
         if (!try equal(one.?, other.?, env)) return false;
+    }
+    unreachable;
+}
+
+/// Whether each key of `left` is a key of `right` with an equal value, and the two hold as many
+/// keys. A key that a later entry of `left` holds again is read at that entry, whose value is
+/// the map's. Keys of two types that are never equal leave two empty maps alone equal.
+fn equal_maps(left: anytype, right: anytype, env: *Env) Error!bool {
+    const L = @TypeOf(left);
+    if (try list_file.count(left, env) != try list_file.count(right, env)) return false;
+    if (comptime !value_file.equal_as_they_run(L.Key, @TypeOf(right).Key)) return try list_file.count(left, env) == 0;
+    var keys = left.iterator();
+    for (0..proto.constants.limits.elements_max) |_| {
+        const key = try keys.next(env) orelse return true;
+        if (try list_file.key_again(L, keys, key, env)) continue;
+        const other = try right.get(key, env) orelse return false;
+        if (!try equal(keys.value(), other, env)) return false;
     }
     unreachable;
 }

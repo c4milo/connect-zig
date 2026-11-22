@@ -716,7 +716,8 @@ first. Cite an entry by number in code and commits ("decision 6").
         bytes literal's `b` before its `r`, `0x` in lower case, no line end in a string of
         single quotes, the reserved words, a keyword as no field's name, a comma after a
         list literal's last element, and a number's sign as part of its literal. It reads no
-        map literal, no message literal and no name that starts with ".".
+        message literal and no name that starts with ".". It reads a map literal since the
+        amendment of 2026-11-22 below.
       - Where the definition gives a text two readings, the reader takes cel-go's, which
         protovalidate's libraries run. One "-" before a number is the number's sign, which a
         member starts with: "-2.5.isInf()" asks -2.5. A run of two or more is a run of
@@ -933,6 +934,8 @@ first. Cite an entry by number in code and commits ("decision 6").
         strings extension other than `format`, and parts of the language the module does not
         build: a map literal, a message literal, an empty list literal, a list of two types,
         and `==` of two lists. 29 turn the type check off, which a rule always has.
+      - The same day the owner asked for the largest of those parts: map literals, `[]` and
+        `==` of two lists. The module builds them, `==` of two maps too, and 1,142 pass.
       - Its first run found four differences, and each follows cel-go now: a double compares
         with an integer as the integer made a double; a side of `&&` or `||` behind `dyn` that
         holds no bool fails and is absorbed; a list takes a uint and a whole double as its

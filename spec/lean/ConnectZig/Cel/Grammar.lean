@@ -14,10 +14,12 @@ the tokens of `Cel.lex`:
     Multiplication = [Multiplication ("*" | "/" | "%")] Unary
     Unary          = Member | "!" {"!"} Member | "-" {"-"} Member
     Member         = Primary | Member "." SELECTOR ["(" [ExprList] ")"] | Member "[" Expr "]"
-    Primary        = IDENT ["(" [ExprList] ")"] | "(" Expr ")" | "[" [ExprList] [","] "]" | LITERAL
+    Primary        = IDENT ["(" [ExprList] ")"] | "(" Expr ")" | "[" [ExprList] [","] "]"
+                   | "{" [MapInits] [","] "}" | LITERAL
+    MapInits       = Expr ":" Expr {"," Expr ":" Expr}
 
-`protovalidate` reads no map literal, no message literal and no name that starts with ".", so
-the model has none: an expression that holds one has no tree.
+`protovalidate` reads no message literal and no name that starts with ".", so the model has
+none: an expression that holds one has no tree.
 
 A number's sign is part of its literal ("INT_LIT ::= -? DIGIT+", "FLOAT_LIT ::= -? ..."), and
 `Unary` takes a run of "-" too, so the language definition gives "--5" two readings. The model
@@ -99,6 +101,8 @@ inductive Expr where
   | call (name : Octets) (target : Option Expr) (arguments : List Expr)
   /-- A list literal. -/
   | list (elements : List Expr)
+  /-- A map literal: each key with its value, in the order of the text. -/
+  | map (entries : List (Expr × Expr))
   deriving BEq, Repr
 
 /-- "KEYWORD ::= BOOL_LIT | NULL_LIT | 'in'". -/
@@ -349,6 +353,9 @@ def primary : Nat → List Token → Read
     | .mark "[" :: ts => do
       let (elements, ts) ← exprList fuel true "]" ts
       pure (.list elements, ts)
+    | .mark "{" :: ts => do
+      let (entries, ts) ← mapInits fuel ts
+      pure (.map entries, ts)
     | .mark "-" :: ts => signed ts
     | .int magnitude :: ts => if magnitude < 2 ^ 63 then some (.int magnitude, ts) else none
     | .uint magnitude :: ts => if magnitude < 2 ^ 64 then some (.uint magnitude, ts) else none
@@ -377,6 +384,31 @@ def exprListRest : Nat → Bool → String → List Expr → List Token → Opti
       else exprListRest fuel lastComma close (element :: done) (.mark m :: ts')
     | .mark "," :: ts => exprListRest fuel lastComma close (element :: done) ts
     | .mark m :: ts => if m == close then pure ((element :: done).reverse, ts) else none
+    | _ => none
+
+/-- `[MapInits]` and the "}" after it. A map literal takes a comma after its last entry
+("'{' [MapInits] [','] '}'"). -/
+def mapInits : Nat → List Token → Option (List (Expr × Expr) × List Token)
+  | 0, _ => none
+  | fuel + 1, ts =>
+    match ts with
+    | .mark "}" :: ts' => some ([], ts')
+    | _ => mapInitsRest fuel [] ts
+
+/-- The entries of a map literal after those in `done`, which holds them in reverse: "Expr ':'
+Expr", with "," between two entries. -/
+def mapInitsRest : Nat → List (Expr × Expr) → List Token → Option (List (Expr × Expr) × List Token)
+  | 0, _, _ => none
+  | fuel + 1, done, ts => do
+    let (key, ts) ← expr fuel ts
+    let ts ← match ts with
+      | .mark ":" :: ts => some ts
+      | _ => none
+    let (value, ts) ← expr fuel ts
+    match ts with
+    | .mark "," :: .mark "}" :: ts' => pure (((key, value) :: done).reverse, ts')
+    | .mark "," :: ts => mapInitsRest fuel ((key, value) :: done) ts
+    | .mark "}" :: ts => pure (((key, value) :: done).reverse, ts)
     | _ => none
 
 end

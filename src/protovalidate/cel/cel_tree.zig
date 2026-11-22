@@ -38,6 +38,8 @@ pub const Item = union(enum) {
     conditional: struct { condition: Index, then: Index, otherwise: Index },
     call: struct { name: []const u8, target: ?Index, arguments: Span },
     list: Span,
+    /// A map literal's keys and values in turns.
+    map: Span,
 
     /// A double literal's value, and its text in the expression.
     pub const Double = struct { value: f64, text: []const u8 };
@@ -174,6 +176,10 @@ pub const Builder = struct {
     pub fn list(b: Builder, elements: Arguments) Index {
         return b.tree.put(.{ .list = b.tree.close(elements.mark) });
     }
+
+    pub fn map(b: Builder, parts: Arguments) Index {
+        return b.tree.put(.{ .map = b.tree.close(parts.mark) });
+    }
 };
 
 /// How a tree's text writes a double: its value with an exponent, which the compiler's tree
@@ -188,7 +194,7 @@ pub fn write(tree: *const Tree, at: Index, doubles: Doubles, writer: *Writer) Wr
     switch (tree.items[at]) {
         .int, .uint, .double, .boolean, .string, .bytes, .null, .name => try write_leaf(tree.items[at], doubles, writer),
         .unary, .binary, .conditional => try write_operator(tree, at, doubles, writer),
-        .select, .index, .call, .list => try write_member(tree, at, doubles, writer),
+        .select, .index, .call, .list, .map => try write_member(tree, at, doubles, writer),
     }
 }
 
@@ -290,6 +296,7 @@ fn write_member(tree: *const Tree, at: Index, doubles: Doubles, writer: *Writer)
             try write_parts(tree, call.arguments, "(", ")", doubles, writer);
         },
         .list => |elements| try write_parts(tree, elements, "[", "]", doubles, writer),
+        .map => |parts| try write_entries(tree, parts, doubles, writer),
         else => unreachable,
     }
 }
@@ -301,4 +308,14 @@ fn write_parts(tree: *const Tree, span: Span, open: []const u8, close: []const u
         try write(tree, part, doubles, writer);
     }
     try writer.writeAll(close);
+}
+
+/// A map literal's entries: each key, ": " and its value, with ", " between two entries.
+fn write_entries(tree: *const Tree, span: Span, doubles: Doubles, writer: *Writer) Writer.Error!void {
+    try writer.writeAll("{");
+    for (tree.links[span.start..][0..span.len], 0..) |part, place| {
+        if (place != 0) try writer.writeAll(if (place % node_file.entry_parts == 0) ", " else ": ");
+        try write(tree, part, doubles, writer);
+    }
+    try writer.writeAll("}");
 }

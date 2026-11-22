@@ -71,6 +71,7 @@ fn write_value(value: anytype, env: *cel.Env, out: *std.Io.Writer) WriteError!vo
         return out.writeAll("{\"nullValue\":null}");
     }
     if (comptime cel.is_list(T)) return write_list(value, env, out);
+    if (comptime cel.is_map(T)) return write_map(value, env, out);
     switch (T) {
         bool => try out.print("{{\"boolValue\":{}}}", .{value}),
         i64 => try out.print("{{\"int64Value\":\"{d}\"}}", .{value}),
@@ -97,6 +98,21 @@ fn write_list(list: anytype, env: *cel.Env, out: *std.Io.Writer) WriteError!void
         const element = try elements.next(env) orelse break;
         if (index != 0) try out.writeAll(",");
         try write_value(element, env, out);
+    }
+    try out.writeAll("]}}");
+}
+
+fn write_map(map: anytype, env: *cel.Env, out: *std.Io.Writer) WriteError!void {
+    try out.writeAll("{\"mapValue\":{\"entries\":[");
+    var keys = map.iterator();
+    for (0..proto.constants.limits.elements_max) |index| {
+        const key = try keys.next(env) orelse break;
+        if (index != 0) try out.writeAll(",");
+        try out.writeAll("{\"key\":");
+        try write_value(key, env, out);
+        try out.writeAll(",\"value\":");
+        try write_value(try map.get(key, env) orelse return error.Unevaluable, env, out);
+        try out.writeAll("}");
     }
     try out.writeAll("]}}");
 }

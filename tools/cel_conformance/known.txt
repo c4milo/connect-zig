@@ -20,7 +20,9 @@ string_ext/format/.*	`format` does not read the conversion `%[feob.]` yet$	the c
 string_ext/format/.*	`%d` of `format` takes no double$	`%d` of a double that is NaN or infinite, which cel-go writes as `NaN` and `Infinity`; the extension's table lists no double under `d`
 #
 # Parts of the language the module does not build.
-.*	unexpected `\{`$	a map literal or a message literal: a rule reads the maps and the messages of its message, and builds none
+.*	unexpected `\{`$	a message literal: a rule reads the messages of its message, and builds none
+.*	a map literal holds an? .+ (key|value) and an? .+ (key|value)$	a map literal whose keys or values are of two types, a `map(dyn, dyn)`
+fields/quoted_map_fields/.*	expected a name after `\.`, before `{3}$	a field's name in backquotes, which cel-go reads and CEL language definition, "Syntax", does not define
 (parse/whitespace|parse/comments|comparisons/eq_literal)/.*	(unexpected `\.`|expected `,` before `\{`)$	a message literal, here with a type name that starts with `.` or behind `dyn`
 .*	a list literal holds an? \w+ and an? \w+$	a list literal whose elements are of two types, a `list(dyn)`
 .*	found no matching overload for `timestamp` applied to \(int\)$	`timestamp` of an int, which cel-go takes and CEL language definition, "Types and Conversions", does not list
