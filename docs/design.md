@@ -1687,21 +1687,27 @@ ran on Linux x86-64 with Zig 0.16.0.
     `CAUGHT`. With the slice walk and the lookup switched off, the judge failed:
     docs/performance.md's table holds its numbers.
 
-- **Repeated types declared once.** The plugin writes each repeated field's type,
-  `proto.Repeated(T, .kind)`, once in the file's `repeated` struct, and the field names it
-  there, as `repeated.string`. Zig counts each call in the types of a struct's fields against
-  one branch quota of 1000, and no statement of the struct raises it. So a message of more than
-  about 1,000 repeated and map fields did not compile. A declaration is analyzed apart, with a
-  quota of its own. Its name is a scalar's kind, or the kind and the element's path joined by
-  `_`, as `message_Node_LabelsEntry`. When two paths give one name, the second takes a number.
+- **Repeated types declared once.** The plugin declares each repeated field's type once, at
+  the top of the generated file, and the field uses that name: `const RepeatedSpan =
+  proto.Repeated(Span, .message);`, then `spans: RepeatedSpan = .{}`. Zig counts every function
+  call in a struct's field types against one branch quota of 1,000, and nothing inside the
+  struct can raise it. So a message with more than about 1,000 repeated and map fields did not
+  compile. A declaration at file level gets a quota of its own.
+  - A name is `Repeated` and the element in TitleCase: the kind of a scalar, as in
+    `RepeatedString` and `RepeatedSint32`, and the path of a message or an enum in its own
+    file, as in `RepeatedNodeLabelsEntry` and `RepeatedKeyValue`. A message written as a group
+    is `RepeatedGroupNote`. A name that the file already gives a type or a service, at any
+    depth, or that an earlier repeated type took, gets the next free number: `RepeatedEmbed2`.
   - `tools/wide` holds a second message, `Lists`, of 1,100 repeated and map fields: a list of
-    int32, of strings and of `Leaf`, and a map, 275 times. With each call written in its
-    field, the file failed with "evaluation exceeded 1000 backwards branches". With the struct
+    int32, of strings and of `Leaf`, and a map, 275 times. With each call written in its field,
+    the file failed with "evaluation exceeded 1000 backwards branches". With the declarations
     it compiles, and `zig build test-generated` reads it through binary, JSON and `validate`.
-  - Mutations against `zig build test-plugin`, 8: a taken name used again, a type declared
-    twice, a message's name without its kind, a quoted part of a path kept quoted, a
-    declaration named `bool` left unquoted, a field that quotes `bool`, a group named as a
-    message, and a scalar named by a path. Each was `CAUGHT`.
+  - Mutations against `zig build test-plugin`, 13: a taken name used again, a type declared
+    twice, numbers that start at 1, the file's types left out of the taken names, a service
+    left out, a nested type taken by its full path, a well-known type looked up in the index,
+    an imported type named with its module, a part left in lower case, an empty part read, a
+    group named as a message, a scalar's kind left in lower case, and a quoted part kept
+    quoted. Each was `CAUGHT`.
 
 ### Work not done yet
 

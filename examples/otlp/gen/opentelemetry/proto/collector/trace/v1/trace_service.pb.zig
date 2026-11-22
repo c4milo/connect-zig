@@ -5,14 +5,13 @@ const proto = @import("protobuf");
 const connect = @import("connect");
 const opentelemetry_proto_trace_v1_trace = @import("opentelemetry_proto_trace_v1_trace");
 
-/// The type of each repeated field, declared once: the compiler counts each call in the
-/// types of a struct's fields against one branch quota.
-const repeated = struct {
-    const message_opentelemetry_proto_trace_v1_trace_ResourceSpans = proto.Repeated(opentelemetry_proto_trace_v1_trace.ResourceSpans, .message);
-};
+// Each repeated field's type, declared once. Zig counts every function call in a struct's
+// field types against one branch quota, so a message with more than about 1,000 repeated
+// fields would not compile if each field called `proto.Repeated` itself.
+const RepeatedResourceSpans = proto.Repeated(opentelemetry_proto_trace_v1_trace.ResourceSpans, .message);
 
 pub const ExportTraceServiceRequest = struct {
-    resource_spans: repeated.message_opentelemetry_proto_trace_v1_trace_ResourceSpans = .{},
+    resource_spans: RepeatedResourceSpans = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {

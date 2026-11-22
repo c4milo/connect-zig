@@ -5,24 +5,23 @@ const proto = @import("protobuf");
 const connect = @import("connect");
 const connectrpc_conformance_v1_config = @import("connectrpc_conformance_v1_config");
 
-/// The type of each repeated field, declared once: the compiler counts each call in the
-/// types of a struct's fields against one branch quota.
-const repeated = struct {
-    const message_Header = proto.Repeated(Header, .message);
-    const bytes = proto.Repeated([]const u8, .bytes);
-    const message_proto_wkt_Any = proto.Repeated(proto.wkt.Any, .message);
-    const string = proto.Repeated([]const u8, .string);
-    const message_RawHTTPRequest_EncodedQueryParam = proto.Repeated(RawHTTPRequest.EncodedQueryParam, .message);
-    const message_StreamContents_StreamItem = proto.Repeated(StreamContents.StreamItem, .message);
-};
+// Each repeated field's type, declared once. Zig counts every function call in a struct's
+// field types against one branch quota, so a message with more than about 1,000 repeated
+// fields would not compile if each field called `proto.Repeated` itself.
+const RepeatedHeader = proto.Repeated(Header, .message);
+const RepeatedBytes = proto.Repeated([]const u8, .bytes);
+const RepeatedAny = proto.Repeated(proto.wkt.Any, .message);
+const RepeatedString = proto.Repeated([]const u8, .string);
+const RepeatedRawHTTPRequestEncodedQueryParam = proto.Repeated(RawHTTPRequest.EncodedQueryParam, .message);
+const RepeatedStreamContentsStreamItem = proto.Repeated(StreamContents.StreamItem, .message);
 
 pub const UnaryResponseDefinition = struct {
-    response_headers: repeated.message_Header = .{},
+    response_headers: RepeatedHeader = .{},
     response: ?union(enum) {
         response_data: []const u8,
         @"error": Error,
     } = null,
-    response_trailers: repeated.message_Header = .{},
+    response_trailers: RepeatedHeader = .{},
     response_delay_ms: u32 = 0,
     raw_response: ?RawHTTPResponse = null,
     _unknown: proto.Unknown = .{},
@@ -50,11 +49,11 @@ pub const UnaryResponseDefinition = struct {
 };
 
 pub const StreamResponseDefinition = struct {
-    response_headers: repeated.message_Header = .{},
-    response_data: repeated.bytes = .{},
+    response_headers: RepeatedHeader = .{},
+    response_data: RepeatedBytes = .{},
     response_delay_ms: u32 = 0,
     @"error": ?Error = null,
-    response_trailers: repeated.message_Header = .{},
+    response_trailers: RepeatedHeader = .{},
     raw_response: ?RawHTTPResponse = null,
     _unknown: proto.Unknown = .{},
 
@@ -293,9 +292,9 @@ pub const ConformancePayload = struct {
     };
 
     pub const RequestInfo = struct {
-        request_headers: repeated.message_Header = .{},
+        request_headers: RepeatedHeader = .{},
         timeout_ms: ?i64 = null,
-        requests: repeated.message_proto_wkt_Any = .{},
+        requests: RepeatedAny = .{},
         connect_get_info: ?ConformancePayload.ConnectGetInfo = null,
         _unknown: proto.Unknown = .{},
 
@@ -318,7 +317,7 @@ pub const ConformancePayload = struct {
     };
 
     pub const ConnectGetInfo = struct {
-        query_params: repeated.message_Header = .{},
+        query_params: RepeatedHeader = .{},
         _unknown: proto.Unknown = .{},
 
         pub const FieldNumber = enum(u29) {
@@ -337,7 +336,7 @@ pub const ConformancePayload = struct {
 pub const Error = struct {
     code: connectrpc_conformance_v1_config.Code = @enumFromInt(0),
     message: ?[]const u8 = null,
-    details: repeated.message_proto_wkt_Any = .{},
+    details: RepeatedAny = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -358,7 +357,7 @@ pub const Error = struct {
 
 pub const Header = struct {
     name: []const u8 = "",
-    value: repeated.string = .{},
+    value: RepeatedString = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -378,9 +377,9 @@ pub const Header = struct {
 pub const RawHTTPRequest = struct {
     verb: []const u8 = "",
     uri: []const u8 = "",
-    headers: repeated.message_Header = .{},
-    raw_query_params: repeated.message_Header = .{},
-    encoded_query_params: repeated.message_RawHTTPRequest_EncodedQueryParam = .{},
+    headers: RepeatedHeader = .{},
+    raw_query_params: RepeatedHeader = .{},
+    encoded_query_params: RepeatedRawHTTPRequestEncodedQueryParam = .{},
     body: ?union(enum) {
         unary: MessageContents,
         stream: StreamContents,
@@ -461,7 +460,7 @@ pub const MessageContents = struct {
 };
 
 pub const StreamContents = struct {
-    items: repeated.message_StreamContents_StreamItem = .{},
+    items: RepeatedStreamContentsStreamItem = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -500,12 +499,12 @@ pub const StreamContents = struct {
 
 pub const RawHTTPResponse = struct {
     status_code: u32 = 0,
-    headers: repeated.message_Header = .{},
+    headers: RepeatedHeader = .{},
     body: ?union(enum) {
         unary: MessageContents,
         stream: StreamContents,
     } = null,
-    trailers: repeated.message_Header = .{},
+    trailers: RepeatedHeader = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {

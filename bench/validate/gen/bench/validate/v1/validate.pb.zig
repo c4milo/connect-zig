@@ -4,14 +4,13 @@
 const proto = @import("protobuf");
 const validate = @import("protovalidate");
 
-/// The type of each repeated field, declared once: the compiler counts each call in the
-/// types of a struct's fields against one branch quota.
-const repeated = struct {
-    const string = proto.Repeated([]const u8, .string);
-    const message_Medium_LimitsEntry = proto.Repeated(Medium.LimitsEntry, .message);
-    const int64 = proto.Repeated(i64, .int64);
-    const message_Rules_WeightsEntry = proto.Repeated(Rules.WeightsEntry, .message);
-};
+// Each repeated field's type, declared once. Zig counts every function call in a struct's
+// field types against one branch quota, so a message with more than about 1,000 repeated
+// fields would not compile if each field called `proto.Repeated` itself.
+const RepeatedString = proto.Repeated([]const u8, .string);
+const RepeatedMediumLimitsEntry = proto.Repeated(Medium.LimitsEntry, .message);
+const RepeatedInt64 = proto.Repeated(i64, .int64);
+const RepeatedRulesWeightsEntry = proto.Repeated(Rules.WeightsEntry, .message);
 
 pub const Small = struct {
     name: []const u8 = "",
@@ -94,8 +93,8 @@ pub const Medium = struct {
     quota: u64 = 0,
     score: f64 = 0,
     plan: Plan = @enumFromInt(0),
-    tags: repeated.string = .{},
-    limits: repeated.message_Medium_LimitsEntry = .{},
+    tags: RepeatedString = .{},
+    limits: RepeatedMediumLimitsEntry = .{},
     address: ?Address = null,
     token: []const u8 = "",
     ttl: ?proto.wkt.Duration = null,
@@ -203,9 +202,9 @@ pub const Medium = struct {
 };
 
 pub const Rules = struct {
-    values: repeated.int64 = .{},
-    names: repeated.string = .{},
-    weights: repeated.message_Rules_WeightsEntry = .{},
+    values: RepeatedInt64 = .{},
+    names: RepeatedString = .{},
+    weights: RepeatedRulesWeightsEntry = .{},
     low: i64 = 0,
     high: i64 = 0,
     _unknown: proto.Unknown = .{},

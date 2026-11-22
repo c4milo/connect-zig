@@ -3,13 +3,12 @@
 //! The build gives this file the modules protobuf.
 const proto = @import("protobuf");
 
-/// The type of each repeated field, declared once: the compiler counts each call in the
-/// types of a struct's fields against one branch quota.
-const repeated = struct {
-    const message_AnyValue = proto.Repeated(AnyValue, .message);
-    const message_KeyValue = proto.Repeated(KeyValue, .message);
-    const string = proto.Repeated([]const u8, .string);
-};
+// Each repeated field's type, declared once. Zig counts every function call in a struct's
+// field types against one branch quota, so a message with more than about 1,000 repeated
+// fields would not compile if each field called `proto.Repeated` itself.
+const RepeatedAnyValue = proto.Repeated(AnyValue, .message);
+const RepeatedKeyValue = proto.Repeated(KeyValue, .message);
+const RepeatedString = proto.Repeated([]const u8, .string);
 
 pub const AnyValue = struct {
     value: ?union(enum) {
@@ -51,7 +50,7 @@ pub const AnyValue = struct {
 };
 
 pub const ArrayValue = struct {
-    values: repeated.message_AnyValue = .{},
+    values: RepeatedAnyValue = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -67,7 +66,7 @@ pub const ArrayValue = struct {
 };
 
 pub const KeyValueList = struct {
-    values: repeated.message_KeyValue = .{},
+    values: RepeatedKeyValue = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -107,7 +106,7 @@ pub const KeyValue = struct {
 pub const InstrumentationScope = struct {
     name: []const u8 = "",
     version: []const u8 = "",
-    attributes: repeated.message_KeyValue = .{},
+    attributes: RepeatedKeyValue = .{},
     dropped_attributes_count: u32 = 0,
     _unknown: proto.Unknown = .{},
 
@@ -132,8 +131,8 @@ pub const InstrumentationScope = struct {
 pub const EntityRef = struct {
     schema_url: []const u8 = "",
     type: []const u8 = "",
-    id_keys: repeated.string = .{},
-    description_keys: repeated.string = .{},
+    id_keys: RepeatedString = .{},
+    description_keys: RepeatedString = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {

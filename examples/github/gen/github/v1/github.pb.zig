@@ -4,14 +4,13 @@
 const proto = @import("protobuf");
 const connect = @import("connect");
 
-/// The type of each repeated field, declared once: the compiler counts each call in the
-/// types of a struct's fields against one branch quota.
-const repeated = struct {
-    const string = proto.Repeated([]const u8, .string);
-    const message_Repository = proto.Repeated(Repository, .message);
-    const message_Issue = proto.Repeated(Issue, .message);
-    const int32 = proto.Repeated(i32, .int32);
-};
+// Each repeated field's type, declared once. Zig counts every function call in a struct's
+// field types against one branch quota, so a message with more than about 1,000 repeated
+// fields would not compile if each field called `proto.Repeated` itself.
+const RepeatedString = proto.Repeated([]const u8, .string);
+const RepeatedRepository = proto.Repeated(Repository, .message);
+const RepeatedIssue = proto.Repeated(Issue, .message);
+const RepeatedInt32 = proto.Repeated(i32, .int32);
 
 pub const User = struct {
     login: []const u8 = "",
@@ -39,7 +38,7 @@ pub const Repository = struct {
     full_name: []const u8 = "",
     description: []const u8 = "",
     visibility: Visibility = @enumFromInt(0),
-    topics: repeated.string = .{},
+    topics: RepeatedString = .{},
     open_issues_count: i32 = 0,
     created_at: ?proto.wkt.Timestamp = null,
     _unknown: proto.Unknown = .{},
@@ -114,7 +113,7 @@ pub const ListRepositoriesRequest = struct {
 };
 
 pub const ListRepositoriesResponse = struct {
-    repositories: repeated.message_Repository = .{},
+    repositories: RepeatedRepository = .{},
     next_page_token: []const u8 = "",
     _unknown: proto.Unknown = .{},
 
@@ -136,7 +135,7 @@ pub const CreateRepositoryRequest = struct {
     name: []const u8 = "",
     description: []const u8 = "",
     visibility: Visibility = @enumFromInt(0),
-    topics: repeated.string = .{},
+    topics: RepeatedString = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -165,7 +164,7 @@ pub const Issue = struct {
     body: []const u8 = "",
     state: IssueState = @enumFromInt(0),
     author: ?User = null,
-    labels: repeated.string = .{},
+    labels: RepeatedString = .{},
     created_at: ?proto.wkt.Timestamp = null,
     closed_at: ?proto.wkt.Timestamp = null,
     _unknown: proto.Unknown = .{},
@@ -205,7 +204,7 @@ pub const CreateIssueRequest = struct {
     repository: []const u8 = "",
     title: []const u8 = "",
     body: []const u8 = "",
-    labels: repeated.string = .{},
+    labels: RepeatedString = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -282,7 +281,7 @@ pub const ListIssuesRequest = struct {
 };
 
 pub const ListIssuesResponse = struct {
-    issues: repeated.message_Issue = .{},
+    issues: RepeatedIssue = .{},
     next_page_token: []const u8 = "",
     total_count: i32 = 0,
     _unknown: proto.Unknown = .{},
@@ -333,7 +332,7 @@ pub const UpdateIssueRequest = struct {
 
 pub const ImportIssuesResponse = struct {
     created: i32 = 0,
-    numbers: repeated.int32 = .{},
+    numbers: RepeatedInt32 = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {

@@ -4,13 +4,12 @@
 const proto = @import("protobuf");
 const validate = @import("protovalidate");
 
-/// The type of each repeated field, declared once: the compiler counts each call in the
-/// types of a struct's fields against one branch quota.
-const repeated = struct {
-    const int32 = proto.Repeated(i32, .int32);
-    const message_IgnoreEmptyProto3Map_ValEntry = proto.Repeated(IgnoreEmptyProto3Map.ValEntry, .message);
-    const message_IgnoreEmptyMapPairs_ValEntry = proto.Repeated(IgnoreEmptyMapPairs.ValEntry, .message);
-};
+// Each repeated field's type, declared once. Zig counts every function call in a struct's
+// field types against one branch quota, so a message with more than about 1,000 repeated
+// fields would not compile if each field called `proto.Repeated` itself.
+const RepeatedInt32 = proto.Repeated(i32, .int32);
+const RepeatedIgnoreEmptyProto3MapValEntry = proto.Repeated(IgnoreEmptyProto3Map.ValEntry, .message);
+const RepeatedIgnoreEmptyMapPairsValEntry = proto.Repeated(IgnoreEmptyMapPairs.ValEntry, .message);
 
 pub const IgnoreEmptyProto3Scalar = struct {
     val: i32 = 0,
@@ -119,7 +118,7 @@ pub const IgnoreEmptyProto3Oneof = struct {
 };
 
 pub const IgnoreEmptyProto3Repeated = struct {
-    val: repeated.int32 = .{},
+    val: RepeatedInt32 = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -145,7 +144,7 @@ pub const IgnoreEmptyProto3Repeated = struct {
 };
 
 pub const IgnoreEmptyProto3Map = struct {
-    val: repeated.message_IgnoreEmptyProto3Map_ValEntry = .{},
+    val: RepeatedIgnoreEmptyProto3MapValEntry = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -190,7 +189,7 @@ pub const IgnoreEmptyProto3Map = struct {
 };
 
 pub const IgnoreEmptyRepeatedItems = struct {
-    val: repeated.int32 = .{},
+    val: RepeatedInt32 = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -212,7 +211,7 @@ pub const IgnoreEmptyRepeatedItems = struct {
 };
 
 pub const IgnoreEmptyMapPairs = struct {
-    val: repeated.message_IgnoreEmptyMapPairs_ValEntry = .{},
+    val: RepeatedIgnoreEmptyMapPairsValEntry = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {

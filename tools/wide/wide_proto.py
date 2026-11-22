@@ -7,9 +7,9 @@ a message of about 500 fields or more needs (docs/design.md §8, "Large schemas"
 module reads each of its fields at compile time, the plugin raises the compiler's branch quota in
 its table, `protovalidate` finds each field's rules without a search of the table, and each
 function that reads every field raises the quota itself. The compiler's default quota is 1000
-branches, so the message has more fields than that. The second holds the plugin to one more: it
-declares each repeated type once in the file, since the compiler counts each call in the types
-of a struct's fields against one quota.
+branches, so the message has more fields than that. The second message holds the plugin to one
+more: it declares each repeated type once, at the top of the file, because the compiler counts
+every call in a struct's field types against one quota.
 
 Usage: python3 tools/wide/wide_proto.py, then tools/generate_check.sh --write.
 """

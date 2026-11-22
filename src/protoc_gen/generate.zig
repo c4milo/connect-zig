@@ -21,6 +21,7 @@ pub const Output = struct { name: []const u8, content: []const u8 };
 
 pub fn file(arena: Allocator, index: *const Index, descriptor: pb.FileDescriptorProto) Error![]const Output {
     var out: Out = .{ .arena = arena, .index = index, .file = descriptor.name orelse "", .features = .of_file(descriptor) };
+    try reserve_names(&out, descriptor);
     const package = descriptor.package orelse "";
     var messages = descriptor.message_type.iterator();
     while (try messages.next()) |message| try generate_message.write(&out, package, message.*, 0);
@@ -31,4 +32,18 @@ pub fn file(arena: Allocator, index: *const Index, descriptor: pb.FileDescriptor
     const outputs = try arena.alloc(Output, 1);
     outputs[0] = .{ .name = try names.output_path(arena, descriptor.name orelse ""), .content = try out.assemble() };
     return outputs;
+}
+
+/// Reserves the name of each type and each service the file declares, at any depth, so that no
+/// repeated type is declared under one of them: a nested type would hide it in its message.
+fn reserve_names(out: *Out, descriptor: pb.FileDescriptorProto) Error!void {
+    var entries = out.index.entries.iterator();
+    while (entries.next()) |entry| {
+        if (!std.mem.eql(u8, entry.value_ptr.file, out.file)) continue;
+        const path = entry.value_ptr.zig_path;
+        const start = if (std.mem.lastIndexOfScalar(u8, path, '.')) |dot| dot + 1 else 0;
+        try out.reserve(path[start..]);
+    }
+    var services = descriptor.service.iterator();
+    while (try services.next()) |service| try out.reserve(service.name orelse "");
 }

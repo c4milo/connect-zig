@@ -96,11 +96,12 @@ test "messages, enums, oneofs, maps, recursion and services are generated" {
     };
     const request: pb.CodeGeneratorRequest = .{ .file_to_generate = .of(&.{"demo/v1/demo.proto"}), .proto_file = .of(&.{file}) };
     const text = try generated(arena, &request);
-    try expect_contains(text, "pub const Node = struct {\n    id: u64 = 0,\n    tags: repeated.string = .{},\n");
+    try expect_contains(text, "pub const Node = struct {\n    id: u64 = 0,\n    tags: RepeatedString = .{},\n");
     try expect_contains(text, "    next: proto.Lazy(Node) = .{},\n");
-    try expect_contains(text, "    labels: repeated.message_Node_LabelsEntry = .{},\n");
-    try expect_contains(text, "const repeated = struct {\n    const string = proto.Repeated([]const u8, .string);\n" ++
-        "    const message_Node_LabelsEntry = proto.Repeated(Node.LabelsEntry, .message);\n    const int32 = proto.Repeated(i32, .int32);\n};\n");
+    try expect_contains(text, "    labels: RepeatedNodeLabelsEntry = .{},\n");
+    try expect_contains(text, "fields would not compile if each field called `proto.Repeated` itself.\n" ++
+        "const RepeatedString = proto.Repeated([]const u8, .string);\n" ++
+        "const RepeatedNodeLabelsEntry = proto.Repeated(Node.LabelsEntry, .message);\nconst RepeatedInt32 = proto.Repeated(i32, .int32);\n\npub const Node");
     try expect_contains(text, "    color: Color = @enumFromInt(0),\n");
     try expect_contains(text, "    choice: ?union(enum) {\n        text: []const u8,\n        number: i32,\n    } = null,\n");
     try expect_contains(text, "    maybe: ?i64 = null,\n");
@@ -207,19 +208,23 @@ test "a type of another file is named through that file's module" {
     const arena = arena_state.allocator();
     var tag = field("tag", 1, .message, .optional);
     tag.type_name = ".shared.v1.Tag";
+    var tags = field("tags", 2, .message, .repeated);
+    tags.type_name = ".shared.v1.Tag";
     const shared: pb.FileDescriptorProto = .{ .name = "shared/v1/shared.proto", .package = "shared.v1", .message_type = .of(&.{.{ .name = "Tag" }}), .syntax = "proto3" };
     const file: pb.FileDescriptorProto = .{
         .name = "demo/v1/demo.proto",
         .package = "demo.v1",
         .dependency = .of(&.{"shared/v1/shared.proto"}),
-        .message_type = .of(&.{.{ .name = "Holder", .field = .of(&.{tag}) }}),
+        .message_type = .of(&.{.{ .name = "Holder", .field = .of(&.{ tag, tags }) }}),
         .syntax = "proto3",
     };
     const request: pb.CodeGeneratorRequest = .{ .file_to_generate = .of(&.{"demo/v1/demo.proto"}), .proto_file = .of(&.{ shared, file }) };
     const text = try generated(arena, &request);
     try expect_contains(text, "//! The build gives this file the modules protobuf, shared_v1_shared.\n");
     try expect_contains(text, "const shared_v1_shared = @import(\"shared_v1_shared\");\n");
-    try expect_contains(text, "    tag: ?shared_v1_shared.Tag = null,\n");
+    try expect_contains(text, "    tag: ?shared_v1_shared.Tag = null,\n    tags: RepeatedTag = .{},\n");
+    // A repeated type is named by its path in its own file, without the module's name.
+    try expect_contains(text, "const RepeatedTag = proto.Repeated(shared_v1_shared.Tag, .message);\n");
 }
 
 test "a file whose messages are delimited writes groups, but a map keeps its entries' lengths" {
@@ -253,10 +258,10 @@ test "a file whose messages are delimited writes groups, but a map keeps its ent
     // The entry's value keeps its length too, and its key has no presence.
     try expect_contains(content, ".name = \"value\", .number = @intFromEnum(@This().FieldNumber.value), .kind = .message");
     try expect_contains(content, "key: []const u8 = \"\",\n");
-    try expect_contains(content, "    notes: repeated.message_Book_NotesEntry = .{},\n    pages: repeated.group_Note = .{},\n");
+    try expect_contains(content, "    notes: RepeatedBookNotesEntry = .{},\n    pages: RepeatedGroupNote = .{},\n");
 }
 
-test "each repeated type stands once in the file's repeated struct, under a name of its own" {
+test "each repeated type is declared once, under a name no other type of the file has" {
     var arena_state = std.heap.ArenaAllocator.init(testing.allocator);
     defer arena_state.deinit();
     const arena = arena_state.allocator();
@@ -267,28 +272,36 @@ test "each repeated type stands once in the file's repeated struct, under a name
     second.type_name = ".demo.v1.A_B.C";
     var again = field("again", 3, .message, .repeated);
     again.type_name = ".demo.v1.A.B_C";
+    // The file declares a message RepeatedColor, a service RepeatedBool and a nested message
+    // RepeatedType, so the lists of Color, of bool and of `type` take the next names.
     var colors = field("colors", 4, .@"enum", .repeated);
     colors.type_name = ".demo.v1.Color";
     var kinds = field("kinds", 6, .message, .repeated);
     kinds.type_name = ".demo.v1.type";
-    const lists: pb.DescriptorProto = .{ .name = "Lists", .field = .of(&.{ first, second, again, colors, field("flags", 5, .bool, .repeated), kinds }) };
+    var stamps = field("stamps", 7, .message, .repeated);
+    stamps.type_name = ".google.protobuf.Timestamp";
+    var hidden = field("hidden", 8, .message, .repeated);
+    hidden.type_name = ".demo.v1._private";
+    const fields = [_]pb.FieldDescriptorProto{ first, second, again, colors, field("flags", 5, .bool, .repeated), kinds, stamps, hidden };
     const color: pb.EnumDescriptorProto = .{ .name = "Color", .value = .of(&.{.{ .name = "COLOR_UNSPECIFIED", .number = 0 }}) };
     const file: pb.FileDescriptorProto = .{
         .name = "demo/v1/demo.proto",
         .package = "demo.v1",
         .message_type = .of(&.{
-            lists,                                                        .{ .name = "A", .nested_type = .of(&.{.{ .name = "B_C" }}) },
+            .{ .name = "Lists", .field = .of(&fields) },                  .{ .name = "A", .nested_type = .of(&.{ .{ .name = "B_C" }, .{ .name = "RepeatedType" } }) },
             .{ .name = "A_B", .nested_type = .of(&.{.{ .name = "C" }}) }, .{ .name = "type" },
+            .{ .name = "RepeatedColor" },                                 .{ .name = "_private" },
         }),
         .enum_type = .of(&.{color}),
+        .service = .of(&.{.{ .name = "RepeatedBool" }}),
         .syntax = "proto3",
     };
     const request: pb.CodeGeneratorRequest = .{ .file_to_generate = .of(&.{"demo/v1/demo.proto"}), .proto_file = .of(&.{file}) };
     const text = try generated(arena, &request);
-    try expect_contains(text, "    first: repeated.message_A_B_C = .{},\n    second: repeated.message_A_B_C_1 = .{},\n" ++
-        "    again: repeated.message_A_B_C = .{},\n    colors: repeated.enum_Color = .{},\n    flags: repeated.bool = .{},\n" ++
-        "    kinds: repeated.message_type = .{},\n");
-    try expect_contains(text, "const repeated = struct {\n    const message_A_B_C = proto.Repeated(A.B_C, .message);\n" ++
-        "    const message_A_B_C_1 = proto.Repeated(A_B.C, .message);\n    const enum_Color = proto.Repeated(Color, .@\"enum\");\n" ++
-        "    const @\"bool\" = proto.Repeated(bool, .bool);\n    const message_type = proto.Repeated(@\"type\", .message);\n};\n");
+    try expect_contains(text, "    first: RepeatedABC = .{},\n    second: RepeatedABC2 = .{},\n    again: RepeatedABC = .{},\n" ++
+        "    colors: RepeatedColor2 = .{},\n    flags: RepeatedBool2 = .{},\n    kinds: RepeatedType2 = .{},\n    stamps: RepeatedTimestamp = .{},\n" ++
+        "    hidden: RepeatedPrivate = .{},\n");
+    try expect_contains(text, "const RepeatedABC = proto.Repeated(A.B_C, .message);\nconst RepeatedABC2 = proto.Repeated(A_B.C, .message);\n" ++
+        "const RepeatedColor2 = proto.Repeated(Color, .@\"enum\");\nconst RepeatedBool2 = proto.Repeated(bool, .bool);\n" ++
+        "const RepeatedType2 = proto.Repeated(@\"type\", .message);\nconst RepeatedTimestamp = proto.Repeated(proto.wkt.Timestamp, .message);\n");
 }

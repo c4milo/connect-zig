@@ -3,34 +3,33 @@
 //! The build gives this file the modules protobuf.
 const proto = @import("protobuf");
 
-/// The type of each repeated field, declared once: the compiler counts each call in the
-/// types of a struct's fields against one branch quota.
-const repeated = struct {
-    const message_FileDescriptorProto = proto.Repeated(FileDescriptorProto, .message);
-    const unvalidated_string = proto.Repeated([]const u8, .unvalidated_string);
-    const int32 = proto.Repeated(i32, .int32);
-    const message_DescriptorProto = proto.Repeated(DescriptorProto, .message);
-    const message_EnumDescriptorProto = proto.Repeated(EnumDescriptorProto, .message);
-    const message_ServiceDescriptorProto = proto.Repeated(ServiceDescriptorProto, .message);
-    const message_FieldDescriptorProto = proto.Repeated(FieldDescriptorProto, .message);
-    const message_DescriptorProto_ExtensionRange = proto.Repeated(DescriptorProto.ExtensionRange, .message);
-    const message_OneofDescriptorProto = proto.Repeated(OneofDescriptorProto, .message);
-    const message_DescriptorProto_ReservedRange = proto.Repeated(DescriptorProto.ReservedRange, .message);
-    const message_UninterpretedOption = proto.Repeated(UninterpretedOption, .message);
-    const message_ExtensionRangeOptions_Declaration = proto.Repeated(ExtensionRangeOptions.Declaration, .message);
-    const message_EnumValueDescriptorProto = proto.Repeated(EnumValueDescriptorProto, .message);
-    const message_EnumDescriptorProto_EnumReservedRange = proto.Repeated(EnumDescriptorProto.EnumReservedRange, .message);
-    const message_MethodDescriptorProto = proto.Repeated(MethodDescriptorProto, .message);
-    const enum_FieldOptions_OptionTargetType = proto.Repeated(FieldOptions.OptionTargetType, .@"enum");
-    const message_FieldOptions_EditionDefault = proto.Repeated(FieldOptions.EditionDefault, .message);
-    const message_UninterpretedOption_NamePart = proto.Repeated(UninterpretedOption.NamePart, .message);
-    const message_FeatureSetDefaults_FeatureSetEditionDefault = proto.Repeated(FeatureSetDefaults.FeatureSetEditionDefault, .message);
-    const message_SourceCodeInfo_Location = proto.Repeated(SourceCodeInfo.Location, .message);
-    const message_GeneratedCodeInfo_Annotation = proto.Repeated(GeneratedCodeInfo.Annotation, .message);
-};
+// Each repeated field's type, declared once. Zig counts every function call in a struct's
+// field types against one branch quota, so a message with more than about 1,000 repeated
+// fields would not compile if each field called `proto.Repeated` itself.
+const RepeatedFileDescriptorProto = proto.Repeated(FileDescriptorProto, .message);
+const RepeatedUnvalidatedString = proto.Repeated([]const u8, .unvalidated_string);
+const RepeatedInt32 = proto.Repeated(i32, .int32);
+const RepeatedDescriptorProto = proto.Repeated(DescriptorProto, .message);
+const RepeatedEnumDescriptorProto = proto.Repeated(EnumDescriptorProto, .message);
+const RepeatedServiceDescriptorProto = proto.Repeated(ServiceDescriptorProto, .message);
+const RepeatedFieldDescriptorProto = proto.Repeated(FieldDescriptorProto, .message);
+const RepeatedDescriptorProtoExtensionRange = proto.Repeated(DescriptorProto.ExtensionRange, .message);
+const RepeatedOneofDescriptorProto = proto.Repeated(OneofDescriptorProto, .message);
+const RepeatedDescriptorProtoReservedRange = proto.Repeated(DescriptorProto.ReservedRange, .message);
+const RepeatedUninterpretedOption = proto.Repeated(UninterpretedOption, .message);
+const RepeatedExtensionRangeOptionsDeclaration = proto.Repeated(ExtensionRangeOptions.Declaration, .message);
+const RepeatedEnumValueDescriptorProto = proto.Repeated(EnumValueDescriptorProto, .message);
+const RepeatedEnumDescriptorProtoEnumReservedRange = proto.Repeated(EnumDescriptorProto.EnumReservedRange, .message);
+const RepeatedMethodDescriptorProto = proto.Repeated(MethodDescriptorProto, .message);
+const RepeatedFieldOptionsOptionTargetType = proto.Repeated(FieldOptions.OptionTargetType, .@"enum");
+const RepeatedFieldOptionsEditionDefault = proto.Repeated(FieldOptions.EditionDefault, .message);
+const RepeatedUninterpretedOptionNamePart = proto.Repeated(UninterpretedOption.NamePart, .message);
+const RepeatedFeatureSetDefaultsFeatureSetEditionDefault = proto.Repeated(FeatureSetDefaults.FeatureSetEditionDefault, .message);
+const RepeatedSourceCodeInfoLocation = proto.Repeated(SourceCodeInfo.Location, .message);
+const RepeatedGeneratedCodeInfoAnnotation = proto.Repeated(GeneratedCodeInfo.Annotation, .message);
 
 pub const FileDescriptorSet = struct {
-    file: repeated.message_FileDescriptorProto = .{},
+    file: RepeatedFileDescriptorProto = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -48,14 +47,14 @@ pub const FileDescriptorSet = struct {
 pub const FileDescriptorProto = struct {
     name: ?[]const u8 = null,
     package: ?[]const u8 = null,
-    dependency: repeated.unvalidated_string = .{},
-    public_dependency: repeated.int32 = .{},
-    weak_dependency: repeated.int32 = .{},
-    option_dependency: repeated.unvalidated_string = .{},
-    message_type: repeated.message_DescriptorProto = .{},
-    enum_type: repeated.message_EnumDescriptorProto = .{},
-    service: repeated.message_ServiceDescriptorProto = .{},
-    extension: repeated.message_FieldDescriptorProto = .{},
+    dependency: RepeatedUnvalidatedString = .{},
+    public_dependency: RepeatedInt32 = .{},
+    weak_dependency: RepeatedInt32 = .{},
+    option_dependency: RepeatedUnvalidatedString = .{},
+    message_type: RepeatedDescriptorProto = .{},
+    enum_type: RepeatedEnumDescriptorProto = .{},
+    service: RepeatedServiceDescriptorProto = .{},
+    extension: RepeatedFieldDescriptorProto = .{},
     options: ?FileOptions = null,
     source_code_info: ?SourceCodeInfo = null,
     syntax: ?[]const u8 = null,
@@ -102,15 +101,15 @@ pub const FileDescriptorProto = struct {
 
 pub const DescriptorProto = struct {
     name: ?[]const u8 = null,
-    field: repeated.message_FieldDescriptorProto = .{},
-    extension: repeated.message_FieldDescriptorProto = .{},
-    nested_type: repeated.message_DescriptorProto = .{},
-    enum_type: repeated.message_EnumDescriptorProto = .{},
-    extension_range: repeated.message_DescriptorProto_ExtensionRange = .{},
-    oneof_decl: repeated.message_OneofDescriptorProto = .{},
+    field: RepeatedFieldDescriptorProto = .{},
+    extension: RepeatedFieldDescriptorProto = .{},
+    nested_type: RepeatedDescriptorProto = .{},
+    enum_type: RepeatedEnumDescriptorProto = .{},
+    extension_range: RepeatedDescriptorProtoExtensionRange = .{},
+    oneof_decl: RepeatedOneofDescriptorProto = .{},
     options: ?MessageOptions = null,
-    reserved_range: repeated.message_DescriptorProto_ReservedRange = .{},
-    reserved_name: repeated.unvalidated_string = .{},
+    reserved_range: RepeatedDescriptorProtoReservedRange = .{},
+    reserved_name: RepeatedUnvalidatedString = .{},
     visibility: ?SymbolVisibility = null,
     _unknown: proto.Unknown = .{},
 
@@ -188,8 +187,8 @@ pub const DescriptorProto = struct {
 };
 
 pub const ExtensionRangeOptions = struct {
-    uninterpreted_option: repeated.message_UninterpretedOption = .{},
-    declaration: repeated.message_ExtensionRangeOptions_Declaration = .{},
+    uninterpreted_option: RepeatedUninterpretedOption = .{},
+    declaration: RepeatedExtensionRangeOptionsDeclaration = .{},
     features: ?FeatureSet = null,
     verification: ?ExtensionRangeOptions.VerificationState = null,
     _unknown: proto.Unknown = .{},
@@ -374,10 +373,10 @@ pub const OneofDescriptorProto = struct {
 
 pub const EnumDescriptorProto = struct {
     name: ?[]const u8 = null,
-    value: repeated.message_EnumValueDescriptorProto = .{},
+    value: RepeatedEnumValueDescriptorProto = .{},
     options: ?EnumOptions = null,
-    reserved_range: repeated.message_EnumDescriptorProto_EnumReservedRange = .{},
-    reserved_name: repeated.unvalidated_string = .{},
+    reserved_range: RepeatedEnumDescriptorProtoEnumReservedRange = .{},
+    reserved_name: RepeatedUnvalidatedString = .{},
     visibility: ?SymbolVisibility = null,
     _unknown: proto.Unknown = .{},
 
@@ -446,7 +445,7 @@ pub const EnumValueDescriptorProto = struct {
 
 pub const ServiceDescriptorProto = struct {
     name: ?[]const u8 = null,
-    method: repeated.message_MethodDescriptorProto = .{},
+    method: RepeatedMethodDescriptorProto = .{},
     options: ?ServiceOptions = null,
     _unknown: proto.Unknown = .{},
 
@@ -518,7 +517,7 @@ pub const FileOptions = struct {
     php_metadata_namespace: ?[]const u8 = null,
     ruby_package: ?[]const u8 = null,
     features: ?FeatureSet = null,
-    uninterpreted_option: repeated.message_UninterpretedOption = .{},
+    uninterpreted_option: RepeatedUninterpretedOption = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -593,7 +592,7 @@ pub const MessageOptions = struct {
     map_entry: ?bool = null,
     deprecated_legacy_json_field_conflicts: ?bool = null,
     features: ?FeatureSet = null,
-    uninterpreted_option: repeated.message_UninterpretedOption = .{},
+    uninterpreted_option: RepeatedUninterpretedOption = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -630,11 +629,11 @@ pub const FieldOptions = struct {
     weak: ?bool = null,
     debug_redact: ?bool = null,
     retention: ?FieldOptions.OptionRetention = null,
-    targets: repeated.enum_FieldOptions_OptionTargetType = .{},
-    edition_defaults: repeated.message_FieldOptions_EditionDefault = .{},
+    targets: RepeatedFieldOptionsOptionTargetType = .{},
+    edition_defaults: RepeatedFieldOptionsEditionDefault = .{},
     features: ?FeatureSet = null,
     feature_support: ?FieldOptions.FeatureSupport = null,
-    uninterpreted_option: repeated.message_UninterpretedOption = .{},
+    uninterpreted_option: RepeatedUninterpretedOption = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -790,7 +789,7 @@ pub const FieldOptions = struct {
 
 pub const OneofOptions = struct {
     features: ?FeatureSet = null,
-    uninterpreted_option: repeated.message_UninterpretedOption = .{},
+    uninterpreted_option: RepeatedUninterpretedOption = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -812,7 +811,7 @@ pub const EnumOptions = struct {
     deprecated: ?bool = null,
     deprecated_legacy_json_field_conflicts: ?bool = null,
     features: ?FeatureSet = null,
-    uninterpreted_option: repeated.message_UninterpretedOption = .{},
+    uninterpreted_option: RepeatedUninterpretedOption = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -840,7 +839,7 @@ pub const EnumValueOptions = struct {
     features: ?FeatureSet = null,
     debug_redact: ?bool = null,
     feature_support: ?FieldOptions.FeatureSupport = null,
-    uninterpreted_option: repeated.message_UninterpretedOption = .{},
+    uninterpreted_option: RepeatedUninterpretedOption = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -866,7 +865,7 @@ pub const EnumValueOptions = struct {
 pub const ServiceOptions = struct {
     features: ?FeatureSet = null,
     deprecated: ?bool = null,
-    uninterpreted_option: repeated.message_UninterpretedOption = .{},
+    uninterpreted_option: RepeatedUninterpretedOption = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -889,7 +888,7 @@ pub const MethodOptions = struct {
     deprecated: ?bool = null,
     idempotency_level: ?MethodOptions.IdempotencyLevel = null,
     features: ?FeatureSet = null,
-    uninterpreted_option: repeated.message_UninterpretedOption = .{},
+    uninterpreted_option: RepeatedUninterpretedOption = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -924,7 +923,7 @@ pub const MethodOptions = struct {
 };
 
 pub const UninterpretedOption = struct {
-    name: repeated.message_UninterpretedOption_NamePart = .{},
+    name: RepeatedUninterpretedOptionNamePart = .{},
     identifier_value: ?[]const u8 = null,
     positive_int_value: ?u64 = null,
     negative_int_value: ?i64 = null,
@@ -1158,7 +1157,7 @@ pub const FeatureSet = struct {
 };
 
 pub const FeatureSetDefaults = struct {
-    defaults: repeated.message_FeatureSetDefaults_FeatureSetEditionDefault = .{},
+    defaults: RepeatedFeatureSetDefaultsFeatureSetEditionDefault = .{},
     minimum_edition: ?Edition = null,
     maximum_edition: ?Edition = null,
     _unknown: proto.Unknown = .{},
@@ -1202,7 +1201,7 @@ pub const FeatureSetDefaults = struct {
 };
 
 pub const SourceCodeInfo = struct {
-    location: repeated.message_SourceCodeInfo_Location = .{},
+    location: RepeatedSourceCodeInfoLocation = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -1217,11 +1216,11 @@ pub const SourceCodeInfo = struct {
     };
 
     pub const Location = struct {
-        path: repeated.int32 = .{},
-        span: repeated.int32 = .{},
+        path: RepeatedInt32 = .{},
+        span: RepeatedInt32 = .{},
         leading_comments: ?[]const u8 = null,
         trailing_comments: ?[]const u8 = null,
-        leading_detached_comments: repeated.unvalidated_string = .{},
+        leading_detached_comments: RepeatedUnvalidatedString = .{},
         _unknown: proto.Unknown = .{},
 
         pub const FieldNumber = enum(u29) {
@@ -1246,7 +1245,7 @@ pub const SourceCodeInfo = struct {
 };
 
 pub const GeneratedCodeInfo = struct {
-    annotation: repeated.message_GeneratedCodeInfo_Annotation = .{},
+    annotation: RepeatedGeneratedCodeInfoAnnotation = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -1261,7 +1260,7 @@ pub const GeneratedCodeInfo = struct {
     };
 
     pub const Annotation = struct {
-        path: repeated.int32 = .{},
+        path: RepeatedInt32 = .{},
         source_file: ?[]const u8 = null,
         begin: ?i32 = null,
         end: ?i32 = null,

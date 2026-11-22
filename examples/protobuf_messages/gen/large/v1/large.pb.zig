@@ -5,11 +5,10 @@ const proto = @import("protobuf");
 const connect = @import("connect");
 const kitchen_v1_shared = @import("kitchen_v1_shared");
 
-/// The type of each repeated field, declared once: the compiler counts each call in the
-/// types of a struct's fields against one branch quota.
-const repeated = struct {
-    const message_Ledger = proto.Repeated(Ledger, .message);
-};
+// Each repeated field's type, declared once. Zig counts every function call in a struct's
+// field types against one branch quota, so a message with more than about 1,000 repeated
+// fields would not compile if each field called `proto.Repeated` itself.
+const RepeatedLedger = proto.Repeated(Ledger, .message);
 
 pub const Account = struct {
     field_1: i64 = 0,
@@ -383,7 +382,7 @@ pub const Ledger = struct {
     field_80: i64 = 0,
     owner: ?Account = null,
     visibility: Account.Profile.Visibility = @enumFromInt(0),
-    children: repeated.message_Ledger = .{},
+    children: RepeatedLedger = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {

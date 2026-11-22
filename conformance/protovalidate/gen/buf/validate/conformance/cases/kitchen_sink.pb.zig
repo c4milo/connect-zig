@@ -4,12 +4,11 @@
 const proto = @import("protobuf");
 const validate = @import("protovalidate");
 
-/// The type of each repeated field, declared once: the compiler counts each call in the
-/// types of a struct's fields against one branch quota.
-const repeated = struct {
-    const message_proto_wkt_Timestamp = proto.Repeated(proto.wkt.Timestamp, .message);
-    const message_ComplexTestMsg_MapValEntry = proto.Repeated(ComplexTestMsg.MapValEntry, .message);
-};
+// Each repeated field's type, declared once. Zig counts every function call in a struct's
+// field types against one branch quota, so a message with more than about 1,000 repeated
+// fields would not compile if each field called `proto.Repeated` itself.
+const RepeatedTimestamp = proto.Repeated(proto.wkt.Timestamp, .message);
+const RepeatedComplexTestMsgMapValEntry = proto.Repeated(ComplexTestMsg.MapValEntry, .message);
 
 pub const ComplexTestMsg = struct {
     @"const": []const u8 = "",
@@ -24,8 +23,8 @@ pub const ComplexTestMsg = struct {
     double_in: f64 = 0,
     enum_const: ComplexTestEnum = @enumFromInt(0),
     any_val: ?proto.wkt.Any = null,
-    rep_ts_val: repeated.message_proto_wkt_Timestamp = .{},
-    map_val: repeated.message_ComplexTestMsg_MapValEntry = .{},
+    rep_ts_val: RepeatedTimestamp = .{},
+    map_val: RepeatedComplexTestMsgMapValEntry = .{},
     bytes_val: []const u8 = "",
     o: ?union(enum) {
         x: []const u8,

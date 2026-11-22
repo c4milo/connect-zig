@@ -4,11 +4,10 @@
 const proto = @import("protobuf");
 const validate = @import("protovalidate");
 
-/// The type of each repeated field, declared once: the compiler counts each call in the
-/// types of a struct's fields against one branch quota.
-const repeated = struct {
-    const group_GroupRepeated_Repeated = proto.Repeated(GroupRepeated.Repeated, .group);
-};
+// Each repeated field's type, declared once. Zig counts every function call in a struct's
+// field types against one branch quota, so a message with more than about 1,000 repeated
+// fields would not compile if each field called `proto.Repeated` itself.
+const RepeatedGroupGroupRepeatedRepeated = proto.Repeated(GroupRepeated.Repeated, .group);
 
 pub const GroupOptional = struct {
     optional: ?GroupOptional.Optional = null,
@@ -51,7 +50,7 @@ pub const GroupOptional = struct {
 };
 
 pub const GroupRepeated = struct {
-    repeated: repeated.group_GroupRepeated_Repeated = .{},
+    repeated: RepeatedGroupGroupRepeatedRepeated = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {

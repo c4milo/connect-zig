@@ -5,12 +5,11 @@ const proto = @import("protobuf");
 const google_protobuf_descriptor = @import("google_protobuf_descriptor");
 const buf_validate_conformance_harness_harness = @import("buf_validate_conformance_harness_harness");
 
-/// The type of each repeated field, declared once: the compiler counts each call in the
-/// types of a struct's fields against one branch quota.
-const repeated = struct {
-    const message_SuiteResults = proto.Repeated(SuiteResults, .message);
-    const message_CaseResult = proto.Repeated(CaseResult, .message);
-};
+// Each repeated field's type, declared once. Zig counts every function call in a struct's
+// field types against one branch quota, so a message with more than about 1,000 repeated
+// fields would not compile if each field called `proto.Repeated` itself.
+const RepeatedSuiteResults = proto.Repeated(SuiteResults, .message);
+const RepeatedCaseResult = proto.Repeated(CaseResult, .message);
 
 pub const ResultOptions = struct {
     suite_filter: []const u8 = "",
@@ -43,7 +42,7 @@ pub const ResultOptions = struct {
 pub const ResultSet = struct {
     successes: i32 = 0,
     failures: i32 = 0,
-    suites: repeated.message_SuiteResults = .{},
+    suites: RepeatedSuiteResults = .{},
     options: ?ResultOptions = null,
     expected_failures: i32 = 0,
     _unknown: proto.Unknown = .{},
@@ -72,7 +71,7 @@ pub const SuiteResults = struct {
     name: []const u8 = "",
     successes: i32 = 0,
     failures: i32 = 0,
-    cases: repeated.message_CaseResult = .{},
+    cases: RepeatedCaseResult = .{},
     fdset: ?google_protobuf_descriptor.FileDescriptorSet = null,
     expected_failures: i32 = 0,
     _unknown: proto.Unknown = .{},

@@ -4,20 +4,19 @@
 const proto = @import("protobuf");
 const validate = @import("protovalidate");
 
-/// The type of each repeated field, declared once: the compiler counts each call in the
-/// types of a struct's fields against one branch quota.
-const repeated = struct {
-    const int32 = proto.Repeated(i32, .int32);
-    const message_Proto3MapIgnoreUnspecified_ValEntry = proto.Repeated(Proto3MapIgnoreUnspecified.ValEntry, .message);
-    const message_Proto3MapIgnoreEmpty_ValEntry = proto.Repeated(Proto3MapIgnoreEmpty.ValEntry, .message);
-    const message_Proto3MapIgnoreAlways_ValEntry = proto.Repeated(Proto3MapIgnoreAlways.ValEntry, .message);
-    const message_Proto3MapKeyIgnoreUnspecified_ValEntry = proto.Repeated(Proto3MapKeyIgnoreUnspecified.ValEntry, .message);
-    const message_Proto3MapKeyIgnoreEmpty_ValEntry = proto.Repeated(Proto3MapKeyIgnoreEmpty.ValEntry, .message);
-    const message_Proto3MapKeyIgnoreAlways_ValEntry = proto.Repeated(Proto3MapKeyIgnoreAlways.ValEntry, .message);
-    const message_Proto3MapValueIgnoreUnspecified_ValEntry = proto.Repeated(Proto3MapValueIgnoreUnspecified.ValEntry, .message);
-    const message_Proto3MapValueIgnoreEmpty_ValEntry = proto.Repeated(Proto3MapValueIgnoreEmpty.ValEntry, .message);
-    const message_Proto3MapValueIgnoreAlways_ValEntry = proto.Repeated(Proto3MapValueIgnoreAlways.ValEntry, .message);
-};
+// Each repeated field's type, declared once. Zig counts every function call in a struct's
+// field types against one branch quota, so a message with more than about 1,000 repeated
+// fields would not compile if each field called `proto.Repeated` itself.
+const RepeatedInt32 = proto.Repeated(i32, .int32);
+const RepeatedProto3MapIgnoreUnspecifiedValEntry = proto.Repeated(Proto3MapIgnoreUnspecified.ValEntry, .message);
+const RepeatedProto3MapIgnoreEmptyValEntry = proto.Repeated(Proto3MapIgnoreEmpty.ValEntry, .message);
+const RepeatedProto3MapIgnoreAlwaysValEntry = proto.Repeated(Proto3MapIgnoreAlways.ValEntry, .message);
+const RepeatedProto3MapKeyIgnoreUnspecifiedValEntry = proto.Repeated(Proto3MapKeyIgnoreUnspecified.ValEntry, .message);
+const RepeatedProto3MapKeyIgnoreEmptyValEntry = proto.Repeated(Proto3MapKeyIgnoreEmpty.ValEntry, .message);
+const RepeatedProto3MapKeyIgnoreAlwaysValEntry = proto.Repeated(Proto3MapKeyIgnoreAlways.ValEntry, .message);
+const RepeatedProto3MapValueIgnoreUnspecifiedValEntry = proto.Repeated(Proto3MapValueIgnoreUnspecified.ValEntry, .message);
+const RepeatedProto3MapValueIgnoreEmptyValEntry = proto.Repeated(Proto3MapValueIgnoreEmpty.ValEntry, .message);
+const RepeatedProto3MapValueIgnoreAlwaysValEntry = proto.Repeated(Proto3MapValueIgnoreAlways.ValEntry, .message);
 
 pub const Proto3ScalarOptionalIgnoreUnspecified = struct {
     val: ?i32 = null,
@@ -414,7 +413,7 @@ pub const Proto3OneofIgnoreAlways = struct {
 };
 
 pub const Proto3RepeatedIgnoreUnspecified = struct {
-    val: repeated.int32 = .{},
+    val: RepeatedInt32 = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -440,7 +439,7 @@ pub const Proto3RepeatedIgnoreUnspecified = struct {
 };
 
 pub const Proto3RepeatedIgnoreEmpty = struct {
-    val: repeated.int32 = .{},
+    val: RepeatedInt32 = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -466,7 +465,7 @@ pub const Proto3RepeatedIgnoreEmpty = struct {
 };
 
 pub const Proto3RepeatedIgnoreAlways = struct {
-    val: repeated.int32 = .{},
+    val: RepeatedInt32 = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -492,7 +491,7 @@ pub const Proto3RepeatedIgnoreAlways = struct {
 };
 
 pub const Proto3MapIgnoreUnspecified = struct {
-    val: repeated.message_Proto3MapIgnoreUnspecified_ValEntry = .{},
+    val: RepeatedProto3MapIgnoreUnspecifiedValEntry = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -537,7 +536,7 @@ pub const Proto3MapIgnoreUnspecified = struct {
 };
 
 pub const Proto3MapIgnoreEmpty = struct {
-    val: repeated.message_Proto3MapIgnoreEmpty_ValEntry = .{},
+    val: RepeatedProto3MapIgnoreEmptyValEntry = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -582,7 +581,7 @@ pub const Proto3MapIgnoreEmpty = struct {
 };
 
 pub const Proto3MapIgnoreAlways = struct {
-    val: repeated.message_Proto3MapIgnoreAlways_ValEntry = .{},
+    val: RepeatedProto3MapIgnoreAlwaysValEntry = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -627,7 +626,7 @@ pub const Proto3MapIgnoreAlways = struct {
 };
 
 pub const Proto3RepeatedItemIgnoreUnspecified = struct {
-    val: repeated.int32 = .{},
+    val: RepeatedInt32 = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -649,7 +648,7 @@ pub const Proto3RepeatedItemIgnoreUnspecified = struct {
 };
 
 pub const Proto3RepeatedItemIgnoreEmpty = struct {
-    val: repeated.int32 = .{},
+    val: RepeatedInt32 = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -671,7 +670,7 @@ pub const Proto3RepeatedItemIgnoreEmpty = struct {
 };
 
 pub const Proto3RepeatedItemIgnoreAlways = struct {
-    val: repeated.int32 = .{},
+    val: RepeatedInt32 = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -693,7 +692,7 @@ pub const Proto3RepeatedItemIgnoreAlways = struct {
 };
 
 pub const Proto3MapKeyIgnoreUnspecified = struct {
-    val: repeated.message_Proto3MapKeyIgnoreUnspecified_ValEntry = .{},
+    val: RepeatedProto3MapKeyIgnoreUnspecifiedValEntry = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -734,7 +733,7 @@ pub const Proto3MapKeyIgnoreUnspecified = struct {
 };
 
 pub const Proto3MapKeyIgnoreEmpty = struct {
-    val: repeated.message_Proto3MapKeyIgnoreEmpty_ValEntry = .{},
+    val: RepeatedProto3MapKeyIgnoreEmptyValEntry = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -775,7 +774,7 @@ pub const Proto3MapKeyIgnoreEmpty = struct {
 };
 
 pub const Proto3MapKeyIgnoreAlways = struct {
-    val: repeated.message_Proto3MapKeyIgnoreAlways_ValEntry = .{},
+    val: RepeatedProto3MapKeyIgnoreAlwaysValEntry = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -816,7 +815,7 @@ pub const Proto3MapKeyIgnoreAlways = struct {
 };
 
 pub const Proto3MapValueIgnoreUnspecified = struct {
-    val: repeated.message_Proto3MapValueIgnoreUnspecified_ValEntry = .{},
+    val: RepeatedProto3MapValueIgnoreUnspecifiedValEntry = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -857,7 +856,7 @@ pub const Proto3MapValueIgnoreUnspecified = struct {
 };
 
 pub const Proto3MapValueIgnoreEmpty = struct {
-    val: repeated.message_Proto3MapValueIgnoreEmpty_ValEntry = .{},
+    val: RepeatedProto3MapValueIgnoreEmptyValEntry = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -898,7 +897,7 @@ pub const Proto3MapValueIgnoreEmpty = struct {
 };
 
 pub const Proto3MapValueIgnoreAlways = struct {
-    val: repeated.message_Proto3MapValueIgnoreAlways_ValEntry = .{},
+    val: RepeatedProto3MapValueIgnoreAlwaysValEntry = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {

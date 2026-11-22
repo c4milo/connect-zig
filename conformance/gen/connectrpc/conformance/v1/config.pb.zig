@@ -3,21 +3,20 @@
 //! The build gives this file the modules protobuf.
 const proto = @import("protobuf");
 
-/// The type of each repeated field, declared once: the compiler counts each call in the
-/// types of a struct's fields against one branch quota.
-const repeated = struct {
-    const message_ConfigCase = proto.Repeated(ConfigCase, .message);
-    const enum_HTTPVersion = proto.Repeated(HTTPVersion, .@"enum");
-    const enum_Protocol = proto.Repeated(Protocol, .@"enum");
-    const enum_Codec = proto.Repeated(Codec, .@"enum");
-    const enum_Compression = proto.Repeated(Compression, .@"enum");
-    const enum_StreamType = proto.Repeated(StreamType, .@"enum");
-};
+// Each repeated field's type, declared once. Zig counts every function call in a struct's
+// field types against one branch quota, so a message with more than about 1,000 repeated
+// fields would not compile if each field called `proto.Repeated` itself.
+const RepeatedConfigCase = proto.Repeated(ConfigCase, .message);
+const RepeatedHTTPVersion = proto.Repeated(HTTPVersion, .@"enum");
+const RepeatedProtocol = proto.Repeated(Protocol, .@"enum");
+const RepeatedCodec = proto.Repeated(Codec, .@"enum");
+const RepeatedCompression = proto.Repeated(Compression, .@"enum");
+const RepeatedStreamType = proto.Repeated(StreamType, .@"enum");
 
 pub const Config = struct {
     features: ?Features = null,
-    include_cases: repeated.message_ConfigCase = .{},
-    exclude_cases: repeated.message_ConfigCase = .{},
+    include_cases: RepeatedConfigCase = .{},
+    exclude_cases: RepeatedConfigCase = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -37,11 +36,11 @@ pub const Config = struct {
 };
 
 pub const Features = struct {
-    versions: repeated.enum_HTTPVersion = .{},
-    protocols: repeated.enum_Protocol = .{},
-    codecs: repeated.enum_Codec = .{},
-    compressions: repeated.enum_Compression = .{},
-    stream_types: repeated.enum_StreamType = .{},
+    versions: RepeatedHTTPVersion = .{},
+    protocols: RepeatedProtocol = .{},
+    codecs: RepeatedCodec = .{},
+    compressions: RepeatedCompression = .{},
+    stream_types: RepeatedStreamType = .{},
     supports_h2c: ?bool = null,
     supports_tls: ?bool = null,
     supports_tls_client_certs: ?bool = null,

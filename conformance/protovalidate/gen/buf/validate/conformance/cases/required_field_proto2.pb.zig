@@ -4,13 +4,12 @@
 const proto = @import("protobuf");
 const validate = @import("protovalidate");
 
-/// The type of each repeated field, declared once: the compiler counts each call in the
-/// types of a struct's fields against one branch quota.
-const repeated = struct {
-    const unvalidated_string = proto.Repeated([]const u8, .unvalidated_string);
-    const message_RequiredProto2Map_ValEntry = proto.Repeated(RequiredProto2Map.ValEntry, .message);
-    const message_RequiredProto2MapIgnoreAlways_ValEntry = proto.Repeated(RequiredProto2MapIgnoreAlways.ValEntry, .message);
-};
+// Each repeated field's type, declared once. Zig counts every function call in a struct's
+// field types against one branch quota, so a message with more than about 1,000 repeated
+// fields would not compile if each field called `proto.Repeated` itself.
+const RepeatedUnvalidatedString = proto.Repeated([]const u8, .unvalidated_string);
+const RepeatedRequiredProto2MapValEntry = proto.Repeated(RequiredProto2Map.ValEntry, .message);
+const RepeatedRequiredProto2MapIgnoreAlwaysValEntry = proto.Repeated(RequiredProto2MapIgnoreAlways.ValEntry, .message);
 
 pub const RequiredProto2ScalarOptional = struct {
     val: ?[]const u8 = null,
@@ -253,7 +252,7 @@ pub const RequiredProto2OneofIgnoreAlways = struct {
 };
 
 pub const RequiredProto2Repeated = struct {
-    val: repeated.unvalidated_string = .{},
+    val: RepeatedUnvalidatedString = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -275,7 +274,7 @@ pub const RequiredProto2Repeated = struct {
 };
 
 pub const RequiredProto2RepeatedIgnoreAlways = struct {
-    val: repeated.unvalidated_string = .{},
+    val: RepeatedUnvalidatedString = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -297,7 +296,7 @@ pub const RequiredProto2RepeatedIgnoreAlways = struct {
 };
 
 pub const RequiredProto2Map = struct {
-    val: repeated.message_RequiredProto2Map_ValEntry = .{},
+    val: RepeatedRequiredProto2MapValEntry = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -338,7 +337,7 @@ pub const RequiredProto2Map = struct {
 };
 
 pub const RequiredProto2MapIgnoreAlways = struct {
-    val: repeated.message_RequiredProto2MapIgnoreAlways_ValEntry = .{},
+    val: RepeatedRequiredProto2MapIgnoreAlwaysValEntry = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {

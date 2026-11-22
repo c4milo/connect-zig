@@ -4,12 +4,11 @@
 const proto = @import("protobuf");
 const validate = @import("protovalidate");
 
-/// The type of each repeated field, declared once: the compiler counts each call in the
-/// types of a struct's fields against one branch quota.
-const repeated = struct {
-    const int32 = proto.Repeated(i32, .int32);
-    const message_IgnoreEmptyEditionsMap_ValEntry = proto.Repeated(IgnoreEmptyEditionsMap.ValEntry, .message);
-};
+// Each repeated field's type, declared once. Zig counts every function call in a struct's
+// field types against one branch quota, so a message with more than about 1,000 repeated
+// fields would not compile if each field called `proto.Repeated` itself.
+const RepeatedInt32 = proto.Repeated(i32, .int32);
+const RepeatedIgnoreEmptyEditionsMapValEntry = proto.Repeated(IgnoreEmptyEditionsMap.ValEntry, .message);
 
 pub const IgnoreEmptyEditionsScalarExplicitPresence = struct {
     val: ?i32 = null,
@@ -298,7 +297,7 @@ pub const IgnoreEmptyEditionsOneof = struct {
 };
 
 pub const IgnoreEmptyEditionsRepeated = struct {
-    val: repeated.int32 = .{},
+    val: RepeatedInt32 = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -324,7 +323,7 @@ pub const IgnoreEmptyEditionsRepeated = struct {
 };
 
 pub const IgnoreEmptyEditionsRepeatedExpanded = struct {
-    val: repeated.int32 = .{},
+    val: RepeatedInt32 = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -350,7 +349,7 @@ pub const IgnoreEmptyEditionsRepeatedExpanded = struct {
 };
 
 pub const IgnoreEmptyEditionsMap = struct {
-    val: repeated.message_IgnoreEmptyEditionsMap_ValEntry = .{},
+    val: RepeatedIgnoreEmptyEditionsMapValEntry = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {

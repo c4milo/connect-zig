@@ -3,20 +3,19 @@
 //! The build gives this file the modules protobuf.
 const proto = @import("protobuf");
 
-/// The type of each repeated field, declared once: the compiler counts each call in the
-/// types of a struct's fields against one branch quota.
-const repeated = struct {
-    const int64 = proto.Repeated(i64, .int64);
-    const string = proto.Repeated([]const u8, .string);
-    const message_Medium_CountersEntry = proto.Repeated(Medium.CountersEntry, .message);
-    const message_Address = proto.Repeated(Address, .message);
-    const sint32 = proto.Repeated(i32, .sint32);
-    const message_Record = proto.Repeated(Record, .message);
-    const message_Tree = proto.Repeated(Tree, .message);
-    const int32 = proto.Repeated(i32, .int32);
-    const uint64 = proto.Repeated(u64, .uint64);
-    const double = proto.Repeated(f64, .double);
-};
+// Each repeated field's type, declared once. Zig counts every function call in a struct's
+// field types against one branch quota, so a message with more than about 1,000 repeated
+// fields would not compile if each field called `proto.Repeated` itself.
+const RepeatedInt64 = proto.Repeated(i64, .int64);
+const RepeatedString = proto.Repeated([]const u8, .string);
+const RepeatedMediumCountersEntry = proto.Repeated(Medium.CountersEntry, .message);
+const RepeatedAddress = proto.Repeated(Address, .message);
+const RepeatedSint32 = proto.Repeated(i32, .sint32);
+const RepeatedRecord = proto.Repeated(Record, .message);
+const RepeatedTree = proto.Repeated(Tree, .message);
+const RepeatedInt32 = proto.Repeated(i32, .int32);
+const RepeatedUint64 = proto.Repeated(u64, .uint64);
+const RepeatedDouble = proto.Repeated(f64, .double);
 
 pub const Small = struct {
     id: i32 = 0,
@@ -76,10 +75,10 @@ pub const Medium = struct {
     name: []const u8 = "",
     status: Status = @enumFromInt(0),
     home: ?Address = null,
-    samples: repeated.int64 = .{},
-    tags: repeated.string = .{},
-    counters: repeated.message_Medium_CountersEntry = .{},
-    previous: repeated.message_Address = .{},
+    samples: RepeatedInt64 = .{},
+    tags: RepeatedString = .{},
+    counters: RepeatedMediumCountersEntry = .{},
+    previous: RepeatedAddress = .{},
     checksum: u64 = 0,
     ratio: f32 = 0,
     delta: i32 = 0,
@@ -151,7 +150,7 @@ pub const Record = struct {
     id: u64 = 0,
     key: []const u8 = "",
     payload: []const u8 = "",
-    values: repeated.sint32 = .{},
+    values: RepeatedSint32 = .{},
     weight: f64 = 0,
     status: Status = @enumFromInt(0),
     _unknown: proto.Unknown = .{},
@@ -180,7 +179,7 @@ pub const Record = struct {
 
 pub const Large = struct {
     name: []const u8 = "",
-    records: repeated.message_Record = .{},
+    records: RepeatedRecord = .{},
     description: []const u8 = "",
     _unknown: proto.Unknown = .{},
 
@@ -330,7 +329,7 @@ pub const Strings = struct {
 };
 
 pub const Tree = struct {
-    children: repeated.message_Tree = .{},
+    children: RepeatedTree = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -346,10 +345,10 @@ pub const Tree = struct {
 };
 
 pub const Packed = struct {
-    small: repeated.int32 = .{},
-    wide: repeated.uint64 = .{},
-    zigzag: repeated.sint32 = .{},
-    reals: repeated.double = .{},
+    small: RepeatedInt32 = .{},
+    wide: RepeatedUint64 = .{},
+    zigzag: RepeatedSint32 = .{},
+    reals: RepeatedDouble = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {

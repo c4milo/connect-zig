@@ -3,36 +3,35 @@
 //! The build gives this file the modules protobuf.
 const proto = @import("protobuf");
 
-/// The type of each repeated field, declared once: the compiler counts each call in the
-/// types of a struct's fields against one branch quota.
-const repeated = struct {
-    const int32 = proto.Repeated(i32, .int32);
-    const group_Everything_Item = proto.Repeated(Everything.Item, .group);
-    const message_Everything_CountsEntry = proto.Repeated(Everything.CountsEntry, .message);
-    const enum_Size = proto.Repeated(Size, .@"enum");
-    const message_Everything_SizesByNameEntry = proto.Repeated(Everything.SizesByNameEntry, .message);
-    const unvalidated_string = proto.Repeated([]const u8, .unvalidated_string);
-};
+// Each repeated field's type, declared once. Zig counts every function call in a struct's
+// field types against one branch quota, so a message with more than about 1,000 repeated
+// fields would not compile if each field called `proto.Repeated` itself.
+const RepeatedInt32 = proto.Repeated(i32, .int32);
+const RepeatedGroupEverythingItem = proto.Repeated(Everything.Item, .group);
+const RepeatedEverythingCountsEntry = proto.Repeated(Everything.CountsEntry, .message);
+const RepeatedSize = proto.Repeated(Size, .@"enum");
+const RepeatedEverythingSizesByNameEntry = proto.Repeated(Everything.SizesByNameEntry, .message);
+const RepeatedUnvalidatedString = proto.Repeated([]const u8, .unvalidated_string);
 
 pub const Everything = struct {
     count: ?i32 = null,
     label: ?[]const u8 = null,
     id: ?i64 = null,
-    unpacked: repeated.int32 = .{},
-    @"packed": repeated.int32 = .{},
+    unpacked: RepeatedInt32 = .{},
+    @"packed": RepeatedInt32 = .{},
     inner: ?Everything.Inner = null,
-    item: repeated.group_Everything_Item = .{},
+    item: RepeatedGroupEverythingItem = .{},
     child: proto.Lazy(Everything) = .{},
-    counts: repeated.message_Everything_CountsEntry = .{},
+    counts: RepeatedEverythingCountsEntry = .{},
     size: ?Size = null,
-    sizes: repeated.enum_Size = .{},
-    packed_sizes: repeated.enum_Size = .{},
-    sizes_by_name: repeated.message_Everything_SizesByNameEntry = .{},
+    sizes: RepeatedSize = .{},
+    packed_sizes: RepeatedSize = .{},
+    sizes_by_name: RepeatedEverythingSizesByNameEntry = .{},
     pick: ?union(enum) {
         picked_size: Size,
         picked_label: []const u8,
     } = null,
-    labels: repeated.unvalidated_string = .{},
+    labels: RepeatedUnvalidatedString = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {

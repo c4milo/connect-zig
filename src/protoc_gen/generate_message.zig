@@ -167,7 +167,7 @@ fn zig_type(out: *Out, container: []const u8, field: pb.FieldDescriptorProto) Er
         const value = try value_type(out, container, field);
         const kind = try field_kind(out, field);
         const call = try std.fmt.allocPrint(out.arena, "proto.Repeated({s}, .{s})", .{ value, kind });
-        return .{ .text = try out.repeated(call, try repeated_name(out.arena, field, value, kind)), .default = ".{}" };
+        return .{ .text = try out.repeated(call, try repeated_name(out, field, kind)), .default = ".{}" };
     }
     if (field.type == .message or field.type == .group) {
         const target = index_file.strip_dot(field.type_name orelse "");
@@ -187,23 +187,44 @@ fn zig_type(out: *Out, container: []const u8, field: pb.FieldDescriptorProto) Er
     } };
 }
 
-/// The name the file's `repeated` struct declares a field's type under: the kind of a scalar,
-/// such as `string`, and for a message or an enum the kind and the element's path, joined by
-/// `_`, such as `message_Node_LabelsEntry`. The kind keeps the name apart from the element's.
-fn repeated_name(arena: Allocator, field: pb.FieldDescriptorProto, value: []const u8, kind: []const u8) Allocator.Error![]const u8 {
-    const kind_text = generate_out.unescaped(kind);
-    switch (field.type.?) {
-        .message, .group, .@"enum" => {},
-        else => return kind_text,
-    }
+/// The word each repeated type's name starts with, as the runtime's `proto.Repeated` does.
+const repeated_prefix = "Repeated";
+
+/// The name a file declares a repeated type under: `Repeated` and the element, as a Zig type
+/// name. A scalar is named by its kind, as `RepeatedString` and `RepeatedSint32` are, and a
+/// message or an enum by its path in its own file, as `RepeatedNodeLabelsEntry` is. A message
+/// written as a group is `RepeatedGroupNote`, as proto2 writes `repeated group Note`.
+fn repeated_name(out: *Out, field: pb.FieldDescriptorProto, kind: []const u8) Error![]const u8 {
     var name: std.ArrayList(u8) = .empty;
-    try name.appendSlice(arena, kind_text);
-    var parts = std.mem.splitScalar(u8, value, '.');
-    while (parts.next()) |part| {
-        try name.append(arena, '_');
-        try name.appendSlice(arena, generate_out.unescaped(part));
+    try name.appendSlice(out.arena, repeated_prefix);
+    switch (field.type.?) {
+        .message, .group, .@"enum" => {
+            if (std.mem.eql(u8, kind, kind_name(.group))) try append_title_case(out.arena, &name, kind);
+            var parts = std.mem.splitScalar(u8, try element_path(out, field), '.');
+            while (parts.next()) |part| try append_title_case(out.arena, &name, generate_out.unescaped(part));
+        },
+        else => try append_title_case(out.arena, &name, kind),
     }
     return name.items;
+}
+
+/// A message's or an enum's path in the file that declares it, as `Node.LabelsEntry`, or a
+/// well-known type's name, as `Timestamp`.
+fn element_path(out: *const Out, field: pb.FieldDescriptorProto) Error![]const u8 {
+    const target = index_file.strip_dot(field.type_name orelse "");
+    if (index_file.wkt_reference(target)) |short| return short;
+    return (try out.index.get(target)).zig_path;
+}
+
+/// Appends `word` in TitleCase: each part between underscores starts with a capital letter, and
+/// the underscores go. So `foo_bar` becomes `FooBar`, and `LabelsEntry` stays as it is.
+fn append_title_case(arena: Allocator, name: *std.ArrayList(u8), word: []const u8) Allocator.Error!void {
+    var parts = std.mem.splitScalar(u8, word, '_');
+    while (parts.next()) |part| {
+        if (part.len == 0) continue;
+        try name.append(arena, std.ascii.toUpper(part[0]));
+        try name.appendSlice(arena, part[1..]);
+    }
 }
 
 /// Whether a scalar field has explicit presence: proto3 `optional`, or a proto2 singular field

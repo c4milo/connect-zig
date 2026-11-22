@@ -5,16 +5,15 @@ const proto = @import("protobuf");
 const google_protobuf_descriptor = @import("google_protobuf_descriptor");
 const buf_validate_validate = @import("buf_validate_validate");
 
-/// The type of each repeated field, declared once: the compiler counts each call in the
-/// types of a struct's fields against one branch quota.
-const repeated = struct {
-    const message_TestConformanceRequest_CasesEntry = proto.Repeated(TestConformanceRequest.CasesEntry, .message);
-    const message_TestConformanceResponse_ResultsEntry = proto.Repeated(TestConformanceResponse.ResultsEntry, .message);
-};
+// Each repeated field's type, declared once. Zig counts every function call in a struct's
+// field types against one branch quota, so a message with more than about 1,000 repeated
+// fields would not compile if each field called `proto.Repeated` itself.
+const RepeatedTestConformanceRequestCasesEntry = proto.Repeated(TestConformanceRequest.CasesEntry, .message);
+const RepeatedTestConformanceResponseResultsEntry = proto.Repeated(TestConformanceResponse.ResultsEntry, .message);
 
 pub const TestConformanceRequest = struct {
     fdset: ?google_protobuf_descriptor.FileDescriptorSet = null,
-    cases: repeated.message_TestConformanceRequest_CasesEntry = .{},
+    cases: RepeatedTestConformanceRequestCasesEntry = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -51,7 +50,7 @@ pub const TestConformanceRequest = struct {
 };
 
 pub const TestConformanceResponse = struct {
-    results: repeated.message_TestConformanceResponse_ResultsEntry = .{},
+    results: RepeatedTestConformanceResponseResultsEntry = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {

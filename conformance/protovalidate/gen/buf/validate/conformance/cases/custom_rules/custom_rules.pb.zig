@@ -4,26 +4,25 @@
 const proto = @import("protobuf");
 const validate = @import("protovalidate");
 
-/// The type of each repeated field, declared once: the compiler counts each call in the
-/// types of a struct's fields against one branch quota.
-const repeated = struct {
-    const message_FieldExpressionMapInt32_ValEntry = proto.Repeated(FieldExpressionMapInt32.ValEntry, .message);
-    const message_FieldExpressionMapInt64_ValEntry = proto.Repeated(FieldExpressionMapInt64.ValEntry, .message);
-    const message_FieldExpressionMapUint32_ValEntry = proto.Repeated(FieldExpressionMapUint32.ValEntry, .message);
-    const message_FieldExpressionMapUint64_ValEntry = proto.Repeated(FieldExpressionMapUint64.ValEntry, .message);
-    const message_FieldExpressionMapBool_ValEntry = proto.Repeated(FieldExpressionMapBool.ValEntry, .message);
-    const message_FieldExpressionMapString_ValEntry = proto.Repeated(FieldExpressionMapString.ValEntry, .message);
-    const message_FieldExpressionMapEnum_ValEntry = proto.Repeated(FieldExpressionMapEnum.ValEntry, .message);
-    const message_FieldExpressionMapMessage_ValEntry = proto.Repeated(FieldExpressionMapMessage.ValEntry, .message);
-    const message_FieldExpressionMapKeys_ValEntry = proto.Repeated(FieldExpressionMapKeys.ValEntry, .message);
-    const message_FieldExpressionMapScalarValues_ValEntry = proto.Repeated(FieldExpressionMapScalarValues.ValEntry, .message);
-    const message_FieldExpressionMapEnumValues_ValEntry = proto.Repeated(FieldExpressionMapEnumValues.ValEntry, .message);
-    const message_FieldExpressionMapMessageValues_ValEntry = proto.Repeated(FieldExpressionMapMessageValues.ValEntry, .message);
-    const int32 = proto.Repeated(i32, .int32);
-    const enum_Enum = proto.Repeated(Enum, .@"enum");
-    const message_FieldExpressionRepeatedMessage_Msg = proto.Repeated(FieldExpressionRepeatedMessage.Msg, .message);
-    const message_FieldExpressionRepeatedMessageItems_Msg = proto.Repeated(FieldExpressionRepeatedMessageItems.Msg, .message);
-};
+// Each repeated field's type, declared once. Zig counts every function call in a struct's
+// field types against one branch quota, so a message with more than about 1,000 repeated
+// fields would not compile if each field called `proto.Repeated` itself.
+const RepeatedFieldExpressionMapInt32ValEntry = proto.Repeated(FieldExpressionMapInt32.ValEntry, .message);
+const RepeatedFieldExpressionMapInt64ValEntry = proto.Repeated(FieldExpressionMapInt64.ValEntry, .message);
+const RepeatedFieldExpressionMapUint32ValEntry = proto.Repeated(FieldExpressionMapUint32.ValEntry, .message);
+const RepeatedFieldExpressionMapUint64ValEntry = proto.Repeated(FieldExpressionMapUint64.ValEntry, .message);
+const RepeatedFieldExpressionMapBoolValEntry = proto.Repeated(FieldExpressionMapBool.ValEntry, .message);
+const RepeatedFieldExpressionMapStringValEntry = proto.Repeated(FieldExpressionMapString.ValEntry, .message);
+const RepeatedFieldExpressionMapEnumValEntry = proto.Repeated(FieldExpressionMapEnum.ValEntry, .message);
+const RepeatedFieldExpressionMapMessageValEntry = proto.Repeated(FieldExpressionMapMessage.ValEntry, .message);
+const RepeatedFieldExpressionMapKeysValEntry = proto.Repeated(FieldExpressionMapKeys.ValEntry, .message);
+const RepeatedFieldExpressionMapScalarValuesValEntry = proto.Repeated(FieldExpressionMapScalarValues.ValEntry, .message);
+const RepeatedFieldExpressionMapEnumValuesValEntry = proto.Repeated(FieldExpressionMapEnumValues.ValEntry, .message);
+const RepeatedFieldExpressionMapMessageValuesValEntry = proto.Repeated(FieldExpressionMapMessageValues.ValEntry, .message);
+const RepeatedInt32 = proto.Repeated(i32, .int32);
+const RepeatedEnum = proto.Repeated(Enum, .@"enum");
+const RepeatedFieldExpressionRepeatedMessageMsg = proto.Repeated(FieldExpressionRepeatedMessage.Msg, .message);
+const RepeatedFieldExpressionRepeatedMessageItemsMsg = proto.Repeated(FieldExpressionRepeatedMessageItems.Msg, .message);
 
 pub const NoExpressions = struct {
     a: i32 = 0,
@@ -372,7 +371,7 @@ pub const FieldExpressionMessage = struct {
 };
 
 pub const FieldExpressionMapInt32 = struct {
-    val: repeated.message_FieldExpressionMapInt32_ValEntry = .{},
+    val: RepeatedFieldExpressionMapInt32ValEntry = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -413,7 +412,7 @@ pub const FieldExpressionMapInt32 = struct {
 };
 
 pub const FieldExpressionMapInt64 = struct {
-    val: repeated.message_FieldExpressionMapInt64_ValEntry = .{},
+    val: RepeatedFieldExpressionMapInt64ValEntry = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -454,7 +453,7 @@ pub const FieldExpressionMapInt64 = struct {
 };
 
 pub const FieldExpressionMapUint32 = struct {
-    val: repeated.message_FieldExpressionMapUint32_ValEntry = .{},
+    val: RepeatedFieldExpressionMapUint32ValEntry = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -495,7 +494,7 @@ pub const FieldExpressionMapUint32 = struct {
 };
 
 pub const FieldExpressionMapUint64 = struct {
-    val: repeated.message_FieldExpressionMapUint64_ValEntry = .{},
+    val: RepeatedFieldExpressionMapUint64ValEntry = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -536,7 +535,7 @@ pub const FieldExpressionMapUint64 = struct {
 };
 
 pub const FieldExpressionMapBool = struct {
-    val: repeated.message_FieldExpressionMapBool_ValEntry = .{},
+    val: RepeatedFieldExpressionMapBoolValEntry = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -577,7 +576,7 @@ pub const FieldExpressionMapBool = struct {
 };
 
 pub const FieldExpressionMapString = struct {
-    val: repeated.message_FieldExpressionMapString_ValEntry = .{},
+    val: RepeatedFieldExpressionMapStringValEntry = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -618,7 +617,7 @@ pub const FieldExpressionMapString = struct {
 };
 
 pub const FieldExpressionMapEnum = struct {
-    val: repeated.message_FieldExpressionMapEnum_ValEntry = .{},
+    val: RepeatedFieldExpressionMapEnumValEntry = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -659,7 +658,7 @@ pub const FieldExpressionMapEnum = struct {
 };
 
 pub const FieldExpressionMapMessage = struct {
-    val: repeated.message_FieldExpressionMapMessage_ValEntry = .{},
+    val: RepeatedFieldExpressionMapMessageValEntry = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -716,7 +715,7 @@ pub const FieldExpressionMapMessage = struct {
 };
 
 pub const FieldExpressionMapKeys = struct {
-    val: repeated.message_FieldExpressionMapKeys_ValEntry = .{},
+    val: RepeatedFieldExpressionMapKeysValEntry = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -757,7 +756,7 @@ pub const FieldExpressionMapKeys = struct {
 };
 
 pub const FieldExpressionMapScalarValues = struct {
-    val: repeated.message_FieldExpressionMapScalarValues_ValEntry = .{},
+    val: RepeatedFieldExpressionMapScalarValuesValEntry = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -798,7 +797,7 @@ pub const FieldExpressionMapScalarValues = struct {
 };
 
 pub const FieldExpressionMapEnumValues = struct {
-    val: repeated.message_FieldExpressionMapEnumValues_ValEntry = .{},
+    val: RepeatedFieldExpressionMapEnumValuesValEntry = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -839,7 +838,7 @@ pub const FieldExpressionMapEnumValues = struct {
 };
 
 pub const FieldExpressionMapMessageValues = struct {
-    val: repeated.message_FieldExpressionMapMessageValues_ValEntry = .{},
+    val: RepeatedFieldExpressionMapMessageValuesValEntry = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -896,7 +895,7 @@ pub const FieldExpressionMapMessageValues = struct {
 };
 
 pub const FieldExpressionRepeatedScalar = struct {
-    val: repeated.int32 = .{},
+    val: RepeatedInt32 = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -918,7 +917,7 @@ pub const FieldExpressionRepeatedScalar = struct {
 };
 
 pub const FieldExpressionRepeatedEnum = struct {
-    val: repeated.enum_Enum = .{},
+    val: RepeatedEnum = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -940,7 +939,7 @@ pub const FieldExpressionRepeatedEnum = struct {
 };
 
 pub const FieldExpressionRepeatedMessage = struct {
-    val: repeated.message_FieldExpressionRepeatedMessage_Msg = .{},
+    val: RepeatedFieldExpressionRepeatedMessageMsg = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -978,7 +977,7 @@ pub const FieldExpressionRepeatedMessage = struct {
 };
 
 pub const FieldExpressionRepeatedScalarItems = struct {
-    val: repeated.int32 = .{},
+    val: RepeatedInt32 = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -1000,7 +999,7 @@ pub const FieldExpressionRepeatedScalarItems = struct {
 };
 
 pub const FieldExpressionRepeatedEnumItems = struct {
-    val: repeated.enum_Enum = .{},
+    val: RepeatedEnum = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -1022,7 +1021,7 @@ pub const FieldExpressionRepeatedEnumItems = struct {
 };
 
 pub const FieldExpressionRepeatedMessageItems = struct {
-    val: repeated.message_FieldExpressionRepeatedMessageItems_Msg = .{},
+    val: RepeatedFieldExpressionRepeatedMessageItemsMsg = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {

@@ -4,13 +4,12 @@
 const proto = @import("protobuf");
 const validate = @import("protovalidate");
 
-/// The type of each repeated field, declared once: the compiler counts each call in the
-/// types of a struct's fields against one branch quota.
-const repeated = struct {
-    const string = proto.Repeated([]const u8, .string);
-    const message_RequiredEditionsMap_ValEntry = proto.Repeated(RequiredEditionsMap.ValEntry, .message);
-    const message_RequiredEditionsMapIgnoreAlways_ValEntry = proto.Repeated(RequiredEditionsMapIgnoreAlways.ValEntry, .message);
-};
+// Each repeated field's type, declared once. Zig counts every function call in a struct's
+// field types against one branch quota, so a message with more than about 1,000 repeated
+// fields would not compile if each field called `proto.Repeated` itself.
+const RepeatedString = proto.Repeated([]const u8, .string);
+const RepeatedRequiredEditionsMapValEntry = proto.Repeated(RequiredEditionsMap.ValEntry, .message);
+const RepeatedRequiredEditionsMapIgnoreAlwaysValEntry = proto.Repeated(RequiredEditionsMapIgnoreAlways.ValEntry, .message);
 
 pub const RequiredEditionsScalarExplicitPresence = struct {
     val: ?[]const u8 = null,
@@ -449,7 +448,7 @@ pub const RequiredEditionsOneofIgnoreAlways = struct {
 };
 
 pub const RequiredEditionsRepeated = struct {
-    val: repeated.string = .{},
+    val: RepeatedString = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -471,7 +470,7 @@ pub const RequiredEditionsRepeated = struct {
 };
 
 pub const RequiredEditionsRepeatedIgnoreAlways = struct {
-    val: repeated.string = .{},
+    val: RepeatedString = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -493,7 +492,7 @@ pub const RequiredEditionsRepeatedIgnoreAlways = struct {
 };
 
 pub const RequiredEditionsRepeatedExpanded = struct {
-    val: repeated.string = .{},
+    val: RepeatedString = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -515,7 +514,7 @@ pub const RequiredEditionsRepeatedExpanded = struct {
 };
 
 pub const RequiredEditionsRepeatedExpandedIgnoreAlways = struct {
-    val: repeated.string = .{},
+    val: RepeatedString = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -537,7 +536,7 @@ pub const RequiredEditionsRepeatedExpandedIgnoreAlways = struct {
 };
 
 pub const RequiredEditionsMap = struct {
-    val: repeated.message_RequiredEditionsMap_ValEntry = .{},
+    val: RepeatedRequiredEditionsMapValEntry = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -578,7 +577,7 @@ pub const RequiredEditionsMap = struct {
 };
 
 pub const RequiredEditionsMapIgnoreAlways = struct {
-    val: repeated.message_RequiredEditionsMapIgnoreAlways_ValEntry = .{},
+    val: RepeatedRequiredEditionsMapIgnoreAlwaysValEntry = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {

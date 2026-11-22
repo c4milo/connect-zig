@@ -3,17 +3,16 @@
 //! The build gives this file the modules protobuf.
 const proto = @import("protobuf");
 
-/// The type of each repeated field, declared once: the compiler counts each call in the
-/// types of a struct's fields against one branch quota.
-const repeated = struct {
-    const int32 = proto.Repeated(i32, .int32);
-    const sint64 = proto.Repeated(i64, .sint64);
-    const group_Note = proto.Repeated(Note, .group);
-    const message_Record_NotesEntry = proto.Repeated(Record.NotesEntry, .message);
-    const enum_Tone = proto.Repeated(Tone, .@"enum");
-    const message_Delimited_ByNumberEntry = proto.Repeated(Delimited.ByNumberEntry, .message);
-    const message_Record = proto.Repeated(Record, .message);
-};
+// Each repeated field's type, declared once. Zig counts every function call in a struct's
+// field types against one branch quota, so a message with more than about 1,000 repeated
+// fields would not compile if each field called `proto.Repeated` itself.
+const RepeatedInt32 = proto.Repeated(i32, .int32);
+const RepeatedSint64 = proto.Repeated(i64, .sint64);
+const RepeatedGroupNote = proto.Repeated(Note, .group);
+const RepeatedRecordNotesEntry = proto.Repeated(Record.NotesEntry, .message);
+const RepeatedTone = proto.Repeated(Tone, .@"enum");
+const RepeatedDelimitedByNumberEntry = proto.Repeated(Delimited.ByNumberEntry, .message);
+const RepeatedRecord = proto.Repeated(Record, .message);
 
 pub const Note = struct {
     a: ?i32 = null,
@@ -40,19 +39,19 @@ pub const Record = struct {
     shade: ?Shade = null,
     total: i64 = 0,
     title: []const u8 = "",
-    expanded: repeated.int32 = .{},
-    @"packed": repeated.sint64 = .{},
+    expanded: RepeatedInt32 = .{},
+    @"packed": RepeatedSint64 = .{},
     note: ?Note = null,
     delimited_note: ?Note = null,
-    delimited_notes: repeated.group_Note = .{},
-    notes: repeated.message_Record_NotesEntry = .{},
+    delimited_notes: RepeatedGroupNote = .{},
+    notes: RepeatedRecordNotesEntry = .{},
     choice: ?union(enum) {
         pick_number: i32,
         pick_note: Note,
     } = null,
     child: proto.Lazy(Record) = .{},
     tone: ?Tone = null,
-    tones: repeated.enum_Tone = .{},
+    tones: RepeatedTone = .{},
     raw: ?[]const u8 = null,
     _unknown: proto.Unknown = .{},
 
@@ -121,8 +120,8 @@ pub const Record = struct {
 
 pub const Delimited = struct {
     first: ?Note = null,
-    rest: repeated.group_Note = .{},
-    by_number: repeated.message_Delimited_ByNumberEntry = .{},
+    rest: RepeatedGroupNote = .{},
+    by_number: RepeatedDelimitedByNumberEntry = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -163,7 +162,7 @@ pub const Delimited = struct {
 pub const Everything = struct {
     record: ?Record = null,
     delimited: ?Delimited = null,
-    records: repeated.message_Record = .{},
+    records: RepeatedRecord = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {

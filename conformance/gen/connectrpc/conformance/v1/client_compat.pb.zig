@@ -5,14 +5,13 @@ const proto = @import("protobuf");
 const connectrpc_conformance_v1_config = @import("connectrpc_conformance_v1_config");
 const connectrpc_conformance_v1_service = @import("connectrpc_conformance_v1_service");
 
-/// The type of each repeated field, declared once: the compiler counts each call in the
-/// types of a struct's fields against one branch quota.
-const repeated = struct {
-    const message_connectrpc_conformance_v1_service_Header = proto.Repeated(connectrpc_conformance_v1_service.Header, .message);
-    const message_proto_wkt_Any = proto.Repeated(proto.wkt.Any, .message);
-    const message_connectrpc_conformance_v1_service_ConformancePayload = proto.Repeated(connectrpc_conformance_v1_service.ConformancePayload, .message);
-    const string = proto.Repeated([]const u8, .string);
-};
+// Each repeated field's type, declared once. Zig counts every function call in a struct's
+// field types against one branch quota, so a message with more than about 1,000 repeated
+// fields would not compile if each field called `proto.Repeated` itself.
+const RepeatedHeader = proto.Repeated(connectrpc_conformance_v1_service.Header, .message);
+const RepeatedAny = proto.Repeated(proto.wkt.Any, .message);
+const RepeatedConformancePayload = proto.Repeated(connectrpc_conformance_v1_service.ConformancePayload, .message);
+const RepeatedString = proto.Repeated([]const u8, .string);
 
 pub const ClientCompatRequest = struct {
     test_name: []const u8 = "",
@@ -29,8 +28,8 @@ pub const ClientCompatRequest = struct {
     method: ?[]const u8 = null,
     stream_type: connectrpc_conformance_v1_config.StreamType = @enumFromInt(0),
     use_get_http_method: bool = false,
-    request_headers: repeated.message_connectrpc_conformance_v1_service_Header = .{},
-    request_messages: repeated.message_proto_wkt_Any = .{},
+    request_headers: RepeatedHeader = .{},
+    request_messages: RepeatedAny = .{},
     timeout_ms: ?u32 = null,
     request_delay_ms: u32 = 0,
     cancel: ?ClientCompatRequest.Cancel = null,
@@ -136,13 +135,13 @@ pub const ClientCompatResponse = struct {
 };
 
 pub const ClientResponseResult = struct {
-    response_headers: repeated.message_connectrpc_conformance_v1_service_Header = .{},
-    payloads: repeated.message_connectrpc_conformance_v1_service_ConformancePayload = .{},
+    response_headers: RepeatedHeader = .{},
+    payloads: RepeatedConformancePayload = .{},
     @"error": ?connectrpc_conformance_v1_service.Error = null,
-    response_trailers: repeated.message_connectrpc_conformance_v1_service_Header = .{},
+    response_trailers: RepeatedHeader = .{},
     num_unsent_requests: i32 = 0,
     http_status_code: ?i32 = null,
-    feedback: repeated.string = .{},
+    feedback: RepeatedString = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {
@@ -188,7 +187,7 @@ pub const ClientErrorResult = struct {
 pub const WireDetails = struct {
     actual_status_code: i32 = 0,
     connect_error_raw: ?proto.wkt.Struct = null,
-    actual_http_trailers: repeated.message_connectrpc_conformance_v1_service_Header = .{},
+    actual_http_trailers: RepeatedHeader = .{},
     actual_grpcweb_trailers: ?[]const u8 = null,
     _unknown: proto.Unknown = .{},
 

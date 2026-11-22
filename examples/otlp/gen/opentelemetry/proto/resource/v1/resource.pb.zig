@@ -4,17 +4,16 @@
 const proto = @import("protobuf");
 const opentelemetry_proto_common_v1_common = @import("opentelemetry_proto_common_v1_common");
 
-/// The type of each repeated field, declared once: the compiler counts each call in the
-/// types of a struct's fields against one branch quota.
-const repeated = struct {
-    const message_opentelemetry_proto_common_v1_common_KeyValue = proto.Repeated(opentelemetry_proto_common_v1_common.KeyValue, .message);
-    const message_opentelemetry_proto_common_v1_common_EntityRef = proto.Repeated(opentelemetry_proto_common_v1_common.EntityRef, .message);
-};
+// Each repeated field's type, declared once. Zig counts every function call in a struct's
+// field types against one branch quota, so a message with more than about 1,000 repeated
+// fields would not compile if each field called `proto.Repeated` itself.
+const RepeatedKeyValue = proto.Repeated(opentelemetry_proto_common_v1_common.KeyValue, .message);
+const RepeatedEntityRef = proto.Repeated(opentelemetry_proto_common_v1_common.EntityRef, .message);
 
 pub const Resource = struct {
-    attributes: repeated.message_opentelemetry_proto_common_v1_common_KeyValue = .{},
+    attributes: RepeatedKeyValue = .{},
     dropped_attributes_count: u32 = 0,
-    entity_refs: repeated.message_opentelemetry_proto_common_v1_common_EntityRef = .{},
+    entity_refs: RepeatedEntityRef = .{},
     _unknown: proto.Unknown = .{},
 
     pub const FieldNumber = enum(u29) {

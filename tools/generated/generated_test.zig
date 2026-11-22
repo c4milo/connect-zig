@@ -130,7 +130,8 @@ test "a message of 1,100 repeated and map fields round-trips and is checked agai
     var storage: [protovalidate.constants.report_bytes_default]u8 align(@alignOf(protovalidate.Violation)) = undefined;
     var report: protovalidate.Report = .init(&storage);
     try protovalidate.validate(wide.Lists, &back, .{}, &report);
-    // The first list has more items than its rule takes, and the last list's message breaks its own.
+    // The first list has more items than its rule allows, and the message in the last list breaks
+    // its own rule.
     const invalid: wide.Lists = .{ .f1 = .of(&past_max_items), .f1099 = .of(&.{.{}}) };
     try testing.expectError(error.Invalid, protovalidate.validate(wide.Lists, &invalid, .{}, &report));
     try testing.expectEqual(@as(usize, 2), report.violations().len);
