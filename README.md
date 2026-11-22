@@ -217,7 +217,7 @@ pub const route_options: rpc.RouteOptions = .{ .interceptors = &.{Validate} };
 - The rules, CEL included, compile with your program. No rule is parsed and no expression is
   interpreted at run time.
 - It passes all 2872 cases of protovalidate's conformance suite. It decodes and validates 13
-  to 58 times as fast as protovalidate-go.
+  to 48 times as fast as protovalidate-go.
 
 [docs/protovalidate.md](docs/protovalidate.md) covers CEL rules, predefined rules, patterns,
 what stops the build, and the limits.

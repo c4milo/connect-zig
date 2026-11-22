@@ -1626,11 +1626,15 @@ ran on Linux x86-64 with Zig 0.16.0.
     was faster in it this time. Its validation alone stays faster, 34 ns to 109. A CEL index
     of a map, `this[k]`, reads the entries from the last one until it finds the key, so `all`
     over a map reads its entries once for each key. "Work not done yet" names it.
-  - The README's chart comes from CI's run 201, at a36988d, on an AMD EPYC 9V45. That commit
+  - The chart came from CI's run 201, at a36988d, on an AMD EPYC 9V45. That commit
     is c06c45d on main, the same files with the author's name fixed. There
     connect-zig decoded and validated 13 to 58 times as fast as protovalidate-go, and was the
     fastest in all six. Validation alone, protovalidate-buffa was faster in two: the valid
-    `Medium`, 177 ns to 190, and the valid `Rules`, 20 ns to 71.
+    `Medium`, 177 ns to 190, and the valid `Rules`, 20 ns to 71. Run 223 drew it again,
+    after `Medium`'s name took a `pattern` and each thread kept its searchers: 13 to 48 times
+    as fast as protovalidate-go, on an AMD EPYC 9V74. Validation alone, connect-zig took the
+    valid `Medium`, 305 ns to 314, and protovalidate-buffa kept the valid `Rules`, 31 ns to
+    93.
 
 - **Step 35, patterns** (decision 47 as amended). `pattern` of a string and of bytes, and CEL's
   `matches`, run on stdx's `regex` at commit 85d3fe7, pinned as `stdx_regex`.
