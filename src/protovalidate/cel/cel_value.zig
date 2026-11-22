@@ -6,6 +6,8 @@ const type_file = @import("cel_type.zig");
 const number = @import("cel_number.zig");
 const Bytes = type_file.Bytes;
 const TypeValue = @import("cel_type_value.zig").TypeValue;
+const duration_file = @import("cel_duration.zig");
+const timestamp_file = @import("cel_timestamp.zig");
 const Null = type_file.Null;
 const Timestamp = proto.wkt.Timestamp;
 const Duration = proto.wkt.Duration;
@@ -56,7 +58,9 @@ pub fn equal(left: anytype, right: anytype) bool {
         []const u8 => std.mem.eql(u8, left, right),
         Bytes => std.mem.eql(u8, left.octets, right.octets),
         Null => true,
-        Timestamp, Duration => left.seconds == right.seconds and left.nanos == right.nanos,
+        // cel-go compares a timestamp as Go's time, whose nanoseconds carry into its seconds,
+        // and a duration as Go's count of nanoseconds (`cel_duration.zig`).
+        Timestamp, Duration => order_time(left, right) == .eq,
         TypeValue => std.mem.eql(u8, left.name, right.name),
         else => comptime unreachable,
     };
@@ -85,10 +89,15 @@ pub fn order(left: anytype, right: anytype) ?std.math.Order {
     };
 }
 
+/// How two timestamps or two durations stand, as cel-go orders them: a message's duration whose
+/// seconds and nanoseconds have unlike signs, as -3s and 0.5s, is -2.5s.
 fn order_time(left: anytype, right: anytype) std.math.Order {
-    const by_seconds = std.math.order(left.seconds, right.seconds);
+    if (comptime @TypeOf(left) == Duration) return std.math.order(duration_file.nanos_of(left), duration_file.nanos_of(right));
+    const earlier: timestamp_file.Instant = .of(left);
+    const later: timestamp_file.Instant = .of(right);
+    const by_seconds = std.math.order(earlier.seconds, later.seconds);
     if (by_seconds != .eq) return by_seconds;
-    return std.math.order(left.nanos, right.nanos);
+    return std.math.order(earlier.nanos, later.nanos);
 }
 
 const testing = std.testing;
@@ -144,5 +153,11 @@ test "values of one type stand in their type's order" {
     try testing.expectEqual(@as(?Order, .lt), order(Timestamp{ .seconds = 1 }, Timestamp{ .seconds = 2 }));
     try testing.expectEqual(@as(?Order, .gt), order(Duration{ .seconds = 1, .nanos = 2 }, Duration{ .seconds = 1, .nanos = 1 }));
     try testing.expectEqual(@as(?Order, .eq), order(Duration{ .seconds = 1 }, Duration{ .seconds = 1 }));
+    // A message may hold seconds and nanoseconds of unlike signs, which add up.
+    const mixed: Duration = .{ .seconds = -3, .nanos = 500_000_000 };
+    try testing.expect(equal(mixed, Duration{ .seconds = -2, .nanos = -500_000_000 }));
+    try testing.expectEqual(@as(?Order, .gt), order(mixed, Duration{ .seconds = -3 }));
+    try testing.expect(equal(Timestamp{ .seconds = 1, .nanos = 1_500_000_000 }, Timestamp{ .seconds = 2, .nanos = 500_000_000 }));
+    try testing.expectEqual(@as(?Order, .lt), order(Timestamp{ .seconds = 2, .nanos = -1 }, Timestamp{ .seconds = 2 }));
     try testing.expectEqual(@as(?Order, null), order(std.math.nan(f64), @as(i64, 1)));
 }

@@ -152,6 +152,9 @@ change the public API, and the entry marks each change that does.
   declares each repeated type once, at the top, as `const RepeatedSpan = proto.Repeated(Span,
   .message);`, and each field uses that name. The field types are the same as before. Before,
   Zig stopped at the branch quota of the struct that held the fields.
+- In CEL, a message's duration whose seconds and nanoseconds have unlike signs, as -3s and
+  0.5s, compares as their sum, -2.5s, and a timestamp's nanoseconds past a second carry into
+  its seconds, as in cel-go. Before, such a value compared by its seconds first.
 - In CEL, a conversion of a conversion of a constant that fails, such as `uint(double(-100))`,
   stops the build, as protovalidate-go refuses the rule. Before, only a conversion of a literal
   did, and the rule failed each time it ran.

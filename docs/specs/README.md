@@ -57,7 +57,9 @@ the module takes cel-go's answer, and the code says so where it does:
   `Minutes()` and `Seconds()` do, which may round a sum up to the next unit
   (`cel_duration.zig`).
 - A duration past an int64 of nanoseconds, in a message. protobuf-go's `AsDuration` gives
-  cel-go the greatest or the least duration, and so does the module (`cel_duration.zig`).
+  cel-go the greatest or the least duration, and so does the module (`cel_duration.zig`). A
+  duration whose seconds and nanoseconds have unlike signs is their sum, so -3s and 0.5s
+  equal -2.5s (`cel_value.zig`).
 - The least int's remainder by -1. "Overflow" makes an operation fail when "the results exceed
   the range", and the remainder, 0, does not. cel-go fails it, as the division it would take
   overflows (`cel_number.zig`).
