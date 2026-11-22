@@ -18,6 +18,12 @@ change the public API, and the entry marks each change that does.
   and `filter` and `map` of such a literal, stop your build, because their result has no one
   type. cel-spec's conformance suite passes 1,174 tests, where it passed 1,142.
 
+### Changed
+
+- `protovalidate`'s `all` and `exists` over a map field search the map for a repeated key only
+  when a key's result would end the macro or fail it. The valid `Rules` message of the
+  validation benchmark takes 580 instructions, where it took 722.
+
 ## v0.3.0 (2026-11-22)
 
 It builds on colibri v0.19.0 and on stdx v0.1.2, the tag colibri pins, with Zig 0.16.0.

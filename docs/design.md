@@ -2002,6 +2002,31 @@ ran on Linux x86-64 with Zig 0.16.0.
     scope, `%s` that takes no mixed list or writes no comma, `type` of a list as a map, a key
     of any type, no constant keys, and a literal of two types read as one. Each was `CAUGHT`.
 
+- **A repeated key searched for after its result** (decision 47). `all` and `exists` over a
+  map whose expression reads the map at the key searched the entries after each key for a
+  repeat before the expression ran. In the valid `Rules`, three such searches took 148 of its
+  722 instructions. An earlier entry of a repeated key holds a value that is not the map's. But
+  a result that does not end the macro changes nothing, since the key's last entry runs too. So
+  the search now runs only for the absorbing value or a failure, and a valid message runs none.
+  `exists_one` still searches before each key: no benchmark holds such a rule.
+  - `tools/perf_check.sh`: validate rules valid took 580 instructions, where it took 722, and
+    rules invalid 831, where it took 872. Decode and validate rules valid took 2,299, where it
+    took 2,441. With the search first again, three rows failed the check, and
+    docs/performance.md lists by how much. A form that searched from two places in the loop
+    counted 574 and 872, and the tree holds the form of one place.
+  - A loop over a stored map's entries beside the map's iterator counted 651. The compiler
+    built the expression a second time, and that copy cost more than the iterator it spared.
+    The tree does not hold it.
+  - `tools/protovalidate_conformance_check.sh` printed `PASS (failed: 0, skipped: 0, passed:
+    2872, total: 2872)`, `tools/cel_conformance_check.sh` the counts it printed before, and
+    `tools/cel_differential_check.sh 15 16` agreed on each of its 16,000 verdicts.
+  - `tools/compile_time_check.sh` printed 4.45 and 4.63, in turns with the tree before the
+    change, which printed 4.42 and 4.49: about 3% more, for the map rules of its schema. The
+    check's limit is 12% over 4.12, and CI's runner printed 4.06 for the tree before.
+  - Mutations against `zig build test-protovalidate`, 4: no search for the absorbing value, no
+    search for a failure, a search for every result, and a failure kept for a repeated key.
+    Each was `CAUGHT`.
+
 ### Work not done yet
 
 - A stream that waits for an event of the program once its request ended (colibri issue 130).
@@ -2030,8 +2055,9 @@ ran on Linux x86-64 with Zig 0.16.0.
 - For `protovalidate`, the valid `Rules` of the validation benchmark, which protovalidate-buffa
   validated in 24.1 ns to connect-zig's 69.0 in run 228. "Stored lists read inline" took its
   count from 1,169 instructions to 722, and in run 231 it took 77.5 ns to protovalidate-buffa's
-  39.2, on another machine. A profile shows the rest spread thin: each macro's
-  iterator, each rule's `Env`, and the calls between the parts of each expression.
+  39.2, on another machine. "A repeated key searched for after its result" took it to 580. A
+  profile shows the rest spread thin: each macro's iterator and its steps, each rule's `Env`,
+  and each result that an expression stores and reads back.
 - For `protovalidate`, `filter` and `map` over a map that bind each entry's value, as `all`,
   `exists` and `exists_one` do ("A map's entry in a macro"). Their expressions still search
   the map for each key.

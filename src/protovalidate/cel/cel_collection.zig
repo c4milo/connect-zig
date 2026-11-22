@@ -306,6 +306,10 @@ inline fn read_of(comptime binds: bool, element: anytype, elements: anytype) if 
 /// `all`, whose absorbing value is false, and `exists`, whose is true. As `&&` and `||` do,
 /// a macro gives its absorbing value when an element has it, even if another element's
 /// expression fails; with none, a failure fails the macro (CEL language definition, "Macros").
+/// In a macro that binds each entry's value, an entry whose key a later entry holds again
+/// gives no verdict: the last entry, which holds the map's value, gives it. Its other result
+/// changes nothing, so the entries after a key are searched only for a result that would end
+/// the macro or fail it.
 fn every(collection: anytype, comptime absorbing: bool, comptime binds: bool, comptime body: *const Node, comptime inner: Scope, values: anytype, env: *Env) Error!bool {
     var failure: ?Error = null;
     var elements = list_file.iterate(collection);
@@ -314,13 +318,16 @@ fn every(collection: anytype, comptime absorbing: bool, comptime binds: bool, co
         const written = text_file.mark_element(@TypeOf(collection), env);
         defer text_file.free_element(@TypeOf(collection), env, written);
         const element = try elements.next(env) orelse return failure orelse !absorbing;
-        // A key that a later entry holds is read at that entry, with its value.
+        const result = evaluation.eval_as(bool, body, inner, values ++ read_of(binds, element, &elements), env);
+        if (result) |value| {
+            if (value != absorbing) continue;
+        } else |_| {}
         if (binds and try list_file.key_again(@TypeOf(collection), elements, element, env)) continue;
-        const result = evaluation.eval_as(bool, body, inner, values ++ read_of(binds, element, &elements), env) catch |failed| {
+        _ = result catch |failed| {
             failure = failure orelse failed;
             continue;
         };
-        if (result == absorbing) return absorbing;
+        return absorbing;
     }
     unreachable;
 }

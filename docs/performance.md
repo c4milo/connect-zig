@@ -174,6 +174,7 @@ failed (the owner's ruling of 2026-11-09). A new fast path joins this list the s
 | A stored list's size inline, a read list's in a call of its own | `cel_list.zig`, `count` | validate rules valid +11.36%, rules invalid +9.06%, decode and validate rules invalid +3.41% |
 | A stored list's index inline, a read list's in a call of its own | `cel_list.zig`, `at` | validate rules valid +3.19%, rules invalid +2.98% |
 | Two ints, or two uints, compared with no order made first | `cel_eval.zig`, `compare` | validate rules valid +14.54%, rules invalid +6.19%, decode and validate rules valid +4.30% |
+| A map's later entries searched for a key only when its result would end or fail `all` or `exists` | `cel_collection.zig`, `every` | validate rules valid +24.48%, decode and validate rules valid +6.18%, validate rules invalid +4.93% |
 
 ## The compiler's time
 

@@ -78,6 +78,9 @@ test "a macro reads the value of each key's last entry" {
     try expect("this.counts.all(k, this.counts[k] <= 2)", &sample, &second, true);
     try expect("this.counts.exists(k, this.counts[k] == 4)", &sample, &second, false);
     try expect("this.counts.exists_one(k, this.counts[k] == 2) && this.counts.exists_one(k, this.counts[k] < 3) == false", &sample, &second, true);
+    // An earlier entry of a key that fails gives no verdict either.
+    const zero_first: Message = .{ .counts = .of(&.{ .{ .key = "b", .value = 0 }, .{ .key = "b", .value = two } }) };
+    try expect("this.counts.all(k, 4 / this.counts[k] > 1) && !this.counts.exists(k, 4 / this.counts[k] > 2)", &zero_first, &second, true);
     // A value that is not set is the message's default.
     try expect("this.items.all(k, this.items[k].a != 1) && this.items.exists(k, this.items[k].a == 0)", &sample, &second, true);
 }
@@ -105,14 +108,17 @@ test "an index reads the binding of its own map and variable alone" {
     try expect("['a', 'b'].all(k, this.counts[k] < 3)", &sample, &second, true);
 }
 
-test "the macro reads each entry once, and each entry after it once in search of the key" {
+test "the macro reads each entry once, and the entries after a key whose result ends the macro" {
     const three: Message = .{ .counts = .of(&.{ .{ .key = "a", .value = 1 }, .{ .key = "b", .value = 1 }, .{ .key = "c", .value = 1 } }) };
-    // Three keys and the end, then two entries after the first key and one after the second.
-    const reads = 4 + 2 + 1;
-    try testing.expect(try run("this.counts.all(k, this.counts[k] > 0)", &three, &second, reads));
-    try testing.expectError(error.TooManyItems, run("this.counts.all(k, this.counts[k] > 0)", &three, &second, reads - 1));
-    // An expression that reads no index of the map reads its keys and the end alone.
+    // Three keys and the end.
     const keys = 4;
+    try testing.expect(try run("this.counts.all(k, this.counts[k] > 0)", &three, &second, keys));
+    try testing.expectError(error.TooManyItems, run("this.counts.all(k, this.counts[k] > 0)", &three, &second, keys - 1));
+    // The first key's false is read, then the two entries after it, which do not hold its key.
+    const ended = 1 + 2;
+    try testing.expect(!try run("this.counts.all(k, this.counts[k] > 1)", &three, &second, ended));
+    try testing.expectError(error.TooManyItems, run("this.counts.all(k, this.counts[k] > 1)", &three, &second, ended - 1));
+    // An expression that reads no index of the map reads its keys and the end alone.
     try testing.expect(try run("this.counts.all(k, k != '')", &three, &second, keys));
     // An index at another name searches from the last entry back: three, two and one reads,
     // after the keys, and the element and the end of each list.
