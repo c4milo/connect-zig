@@ -10,6 +10,8 @@ change the public API, and the entry marks each change that does.
 
 ## Unreleased
 
+It builds on colibri v0.19.1, with Zig 0.16.0.
+
 ### Added
 
 - `protovalidate` reads a CEL list or map literal of two element types, such as `[1, 'a']` and
@@ -23,6 +25,14 @@ change the public API, and the entry marks each change that does.
 - `protovalidate`'s `all` and `exists` over a map field search the map for a repeated key only
   when a key's result would end the macro or fail it. The valid `Rules` message of the
   validation benchmark takes 580 instructions, where it took 722.
+
+### Fixed
+
+- A server over h11 no longer closes a new connection with no response. colibri v0.19.1 waits for
+  a staged close's shutdown to complete before it closes the socket. A shutdown still in flight
+  could end the write side of the next connection that took the same descriptor, and that
+  connection's client read "unexpected EOF". connectrpc's conformance suite read it in about one
+  run of three.
 
 ## v0.3.0 (2026-11-22)
 
