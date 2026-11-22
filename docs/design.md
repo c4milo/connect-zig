@@ -2040,6 +2040,25 @@ ran on Linux x86-64 with Zig 0.16.0.
     search for a failure, a search for every result, and a failure kept for a repeated key.
     Each was `CAUGHT`.
 
+- **The right side of `&&` and `||` unwrapped** (decision 47). `bench-validate --counters` gave
+  no counts on GitHub's x86-64 runners, and on its arm64 one it gave valid `Rules` 2.72
+  instructions a cycle and no branch miss, so the time went to waits. Its disassembly showed
+  each element of a macro write the right side's result as a 16-bit error and an 8-bit bool,
+  then load the four octets as one, which store forwarding on x86-64 does not serve.
+  `eval_logic` passed the side's error union on with `return`; it unwraps it with `try` now.
+  The disassembly of `bench-validate` holds no such pair of stores.
+  - `zig build bench-validate`, eight rounds in turns on this tree's x86-64 machine: validate
+    rules valid took 43.6 ns, where it took 68.7, and rules invalid 56.5, where it took 78.2.
+    Decode and validate rules valid took 164.3 ns, where it took 189.4. Each other case moved
+    within the spread of its rounds.
+  - `tools/perf_check.sh`: validate rules valid took 561 instructions, where it took 580. With
+    the side passed on again, it failed the check by 3.39%.
+  - `tools/protovalidate_conformance_check.sh` printed `PASS (failed: 0, skipped: 0, passed:
+    2872, total: 2872)`, `tools/cel_conformance_check.sh` the counts it printed before,
+    `tools/cel_differential_check.sh 19 20` agreed on each of its 16,000 verdicts, and
+    `tools/compile_time_check.sh` printed a ratio of 4.41, +6.9% over its baseline of 4.12.
+  - No behaviour changed, so no mutation applies.
+
 ### Work not done yet
 
 - A stream that waits for an event of the program once its request ended (colibri issue 130).
@@ -2068,9 +2087,9 @@ ran on Linux x86-64 with Zig 0.16.0.
 - For `protovalidate`, the valid `Rules` of the validation benchmark, which protovalidate-buffa
   validated in 24.1 ns to connect-zig's 69.0 in run 228. "Stored lists read inline" took its
   count from 1,169 instructions to 722, and in run 231 it took 77.5 ns to protovalidate-buffa's
-  39.2, on another machine. "A repeated key searched for after its result" took it to 580. A
-  profile shows the rest spread thin: each macro's iterator and its steps, each rule's `Env`,
-  and each result that an expression stores and reads back. Three changes moved the count by
+  39.2, on another machine. "A repeated key searched for after its result" took it to 580, and
+  "The right side of `&&` and `||` unwrapped" took its time on this tree's machine from 68.7 ns
+  to 43.6, in turns. Three changes moved the count by
   3 instructions or none: `eval_side` inline and `eval_as` inline, which LLVM inlines already,
   and the time copied only into a rule whose text names `now`, which counted 577. With no step
   for a macro inside no other macro, nor for a list's index, it counted 539, and timed 67.1 ns to

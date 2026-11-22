@@ -25,6 +25,9 @@ It builds on colibri v0.19.1, with Zig 0.16.0.
 - `protovalidate`'s `all` and `exists` over a map field search the map for a repeated key only
   when a key's result would end the macro or fail it. The valid `Rules` message of the
   validation benchmark takes 580 instructions, where it took 722.
+- `protovalidate` validates the valid `Rules` message in 43.6 ns on an x86-64 machine, where it
+  took 68.7. Each element of a macro read its expression's result back from memory in a way
+  that x86-64 waits on, and it reads it from registers now.
 
 ### Fixed
 

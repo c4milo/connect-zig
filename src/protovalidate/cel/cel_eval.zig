@@ -160,7 +160,10 @@ inline fn eval_logic(comptime binary: Node.Binary, comptime absorbing: bool, com
         return failure;
     };
     if (left == absorbing) return absorbing;
-    return eval_side(binary.right, scope, values, env);
+    // `try`, not the side's error union passed on: passed on, the side wrote its error and its
+    // bool into the caller's memory as two stores, which the caller read back as one load. On
+    // x86-64 such a load waits for the stores to reach the cache (docs/performance.md).
+    return try eval_side(binary.right, scope, values, env);
 }
 
 /// A side of `&&` or `||`. A side that holds no bool, which `dyn` lets the checker take, fails.
