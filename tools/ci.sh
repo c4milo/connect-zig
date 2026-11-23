@@ -88,7 +88,8 @@ check() {
         # one in the code (docs/specs/README.md).
         citations) tools/citations_check.sh ;;
         # ruff's lint and format check over the Python scripts, and shellcheck over the shell
-        # scripts, each tool pinned by version and SHA-256 (docs/testing.md).
+        # scripts, each tool pinned by version and SHA-256, then the scripts' unit tests
+        # (docs/testing.md).
         scripts) tools/scripts_check.sh ;;
         # Cognitive complexity 15 over the Python, Go, Rust, and JavaScript of bench/ and tools/,
         # the limit of the Zig (decision 49).

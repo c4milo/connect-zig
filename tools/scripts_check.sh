@@ -1,6 +1,7 @@
 #!/bin/sh
 # Lints the Python and shell scripts of this tree (docs/testing.md): ruff's lint and
-# its format check under ruff.toml, and shellcheck under .shellcheckrc.
+# its format check under ruff.toml, and shellcheck under .shellcheckrc. Then it runs the scripts'
+# unit tests, tools/scripts_test.sh.
 #
 #   tools/scripts_check.sh
 #
@@ -11,7 +12,7 @@
 #
 # It downloads ruff 0.17.6 and ShellCheck 0.11.0 into a cache, each checked against a pinned
 # SHA-256, for x86-64 and arm64 Linux, unless RUFF and SHELLCHECK name installed ones. It then
-# needs curl, tar, xz, and git.
+# needs curl, tar, xz, and git, and the tests need python3 and awk.
 set -eu
 cd "$(dirname "$0")/.."
 ruff_version="0.17.6"
@@ -119,4 +120,5 @@ if "${shellcheck}" ${shell_files}; then
 else
     status=1
 fi
+tools/scripts_test.sh || status=1
 exit "${status}"

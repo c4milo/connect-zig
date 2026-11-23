@@ -224,8 +224,11 @@ confirm a test fails. Report `CAUGHT` or `NOT CAUGHT` per mutation in the commit
   `.shellcheckrc`. It skips `docs/specs`, `conformance/`, `zig-pkg/`, and each `gen/`.
   `ruff format` rewrites a file that the format check refuses. A disabled check states its reason
   on its line. The script downloads ruff 0.17.6 and ShellCheck 0.11.0 for x86-64 and arm64
-  Linux, each pinned by SHA-256, unless `RUFF` and `SHELLCHECK` name installed ones. It is the
-  check `scripts` of `tools/ci.sh`, and needs curl, tar, xz, and git.
+  Linux, each pinned by SHA-256, unless `RUFF` and `SHELLCHECK` name installed ones. Then it runs
+  `tools/scripts_test.sh [test.py...]`: the unit tests of the scripts, each a file
+  `<script>_test.py` beside its script, under Python's `unittest`, with no package. A test of a
+  shell script sources the script in sh, with `work` a folder of its own. It is the check
+  `scripts` of `tools/ci.sh`, and needs curl, tar, xz, git, python3, and awk.
 - Complexity: `tools/complexity_check.sh` holds each function of the Python, Go, Rust, and
   JavaScript of `bench/` and `tools/` to cognitive complexity 15 (decision 49). It runs
   complexipy, gocognit, rust-code-analysis, and eslint's sonarjs plugin, each pinned in

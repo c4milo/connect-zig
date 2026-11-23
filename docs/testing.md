@@ -37,7 +37,12 @@ pull request. `tools/ci.sh` runs them all, as CI does, and writes a report.
   format check under `ruff.toml`, and ShellCheck under `.shellcheckrc`. It skips the code that
   other projects or a generator wrote. It downloads ruff and ShellCheck, each pinned by version
   and SHA-256, unless `RUFF` and `SHELLCHECK` name installed ones. `ruff format` rewrites a file
-  that the format check refuses.
+  that the format check refuses. Then it runs `tools/scripts_test.sh`: the unit tests of the
+  scripts, each a file `<script>_test.py` beside its script, under Python's `unittest`. They
+  cover the climbs, the steps, and the reports of the full stack, the benchmark's median, and the
+  reading of each chart. A test of a shell script sources it in sh: production.sh's climbs run
+  there against a stub step. Each rule a test covers was broken on purpose to prove the test
+  catches it.
 - `tools/complexity_check.sh` holds each function of the Python, Go, Rust, and JavaScript of
   `bench/` and `tools/` to cognitive complexity 15, as `zig build lint` holds the Zig. It also
   refuses control flow at a Python module's top level, where no function's score counts it.
@@ -62,6 +67,7 @@ tools/interop_languages_check.sh  # Go, TypeScript, Python and Rust clients agai
 tools/interop_servers_check.sh    # the client against Go, TypeScript, Python and Rust servers
 tools/perf_check.sh       # instructions of each benchmark operation against the baseline
 tools/bench_check.sh      # the benchmark beside Go's and Rust's
-tools/scripts_check.sh    # ruff and ShellCheck over the Python and shell scripts
+tools/scripts_check.sh    # ruff and ShellCheck over the Python and shell scripts, then their tests
+tools/scripts_test.sh     # the unit tests of the Python and shell scripts alone
 tools/complexity_check.sh # cognitive complexity 15 over the Python, Go, Rust and JavaScript
 ```
