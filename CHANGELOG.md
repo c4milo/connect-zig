@@ -8,9 +8,11 @@ are in [docs/decisions.md](docs/decisions.md), and the steps and their measureme
 connect-zig follows [Semantic Versioning](https://semver.org/). Before 1.0, a minor version may
 change the public API, and the entry marks each change that does.
 
-## Unreleased
+## v0.4.0 (2026-11-23)
 
-It builds on colibri v0.19.2, with Zig 0.16.0.
+It builds on colibri v0.19.2 and on stdx v0.1.2, the tag colibri pins, with Zig 0.16.0.
+`protovalidate` takes `regex` from stdx at 44615ef, as v0.3.0 did. No change below breaks a program
+that builds on v0.3.0: each adds a name, or a field with a default.
 
 ### Added
 
