@@ -140,8 +140,11 @@ The router holds the memory of each call it answers at once, and gives no size a
 - `response_bytes` holds a reply with its headers. A longer reply gets 500.
 - `header_bytes` is 0, since each route reads its header at the head.
 
-Set the first two above the routes' `message_bytes`. Each call also holds storage of
+Set the first two above the routes' `message_bytes`. Each call also holds storage of 4 times
 `message_bytes`, into which a binary request's repeated fields are read once ([decision 37](decisions.md)).
+A decoded message takes more room than its octets. A request whose lists do not fit is still
+answered, but each read of such a list parses it again: give your context a field
+`messages_past_storage: u64` to count them, and raise the route's `storage_bytes` when it grows.
 `rpc.Refusals` answers 405 with an Allow header to a method Connect does not serve, such as
 DELETE, as connect-go does. To give methods options of their own, list each route by hand with
 `rpc.post(App, Service.say, say, options)` and `rpc.get`.
@@ -159,7 +162,7 @@ const State = struct {
 };
 
 const state = try init.arena.allocator().create(State);
-state.router = .{};
+state.router.init();
 state.app = .{};
 try state.http_server.init(&.{
     .port = 8443,
@@ -171,6 +174,9 @@ try state.http_server.init(&.{
 defer state.http_server.deinit();
 try state.http_server.run();
 ```
+
+`init` starts the router where it lies. `state.router = .{}` would copy the router's whole
+default value, which the program's image then holds: in the OTLP sink of the benchmarks, 155 MB.
 
 It serves h11 and h2 over TLS on a TCP socket, and h3 on the UDP socket of the same port.
 `chain_pem` and `key_pem` are your certificate chain and its key, as PEM text, and `cpu` is what
