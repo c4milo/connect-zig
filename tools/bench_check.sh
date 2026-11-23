@@ -5,14 +5,20 @@
 # connect-go and connect-rust, answers with the same octets. It prints the tables side by side.
 # `--quick` passes on to every program. It needs go on the path, or GO naming it; the Rust
 # program also needs buf, or BUF naming it, for the descriptor set its build compiles.
+#
+# The programs run in `rounds` rounds, each in an order rotated by one, so a runner that drifts
+# does not always slow the same language. Each cell of the table is the round whose time is the
+# median (tools/bench_median.py). Each program checks its octets in the first round alone.
 set -eu
 cd "$(dirname "$0")/.."
 go="${GO:-go}"
 cargo="${CARGO:-cargo}"
 buf="${BUF:-buf}"
 quick=""
+rounds=3
 if [ "${1:-}" = "--quick" ]; then
     quick="--quick"
+    rounds=1
 fi
 scratch="$(mktemp -d)"
 trap 'rm -rf "${scratch}"' EXIT
@@ -52,11 +58,10 @@ if [ "$(uname -s)-$(uname -m)" = "Linux-aarch64" ]; then
     cpu_option="-Dcpu=${zig_cpu%%+*}"
     echo "Zig builds for: ${zig_cpu%%+*}, the model's features"
 fi
-zig build bench ${cpu_option} -- ${quick} --write "${scratch}/zig" >"${scratch}/zig.md"
 # Go builds for the highest level of this CPU that it names, as Zig and Rust build for the CPU.
 . tools/host_cpu.sh
 go_build="$(go_level)"
-(cd bench/go && env ${go_build} "${go}" run . ${quick} --write "${scratch}/go") >"${scratch}/go.md"
+(cd bench/go && env ${go_build} "${go}" build -o "${scratch}/bench-go" .)
 baselines="go"
 if command -v "${cargo}" >/dev/null 2>&1; then
     "${buf}" build bench/proto --as-file-descriptor-set -o "${scratch}/bench.binpb"
@@ -68,12 +73,39 @@ if command -v "${cargo}" >/dev/null 2>&1; then
     target="${XDG_CACHE_HOME:-${HOME}/.cache}/connect-zig/bench-rust-target-${cpu_features}"
     (cd bench/rust && BENCH_DESCRIPTORS="${scratch}/bench.binpb" CARGO_TARGET_DIR="${target}" \
         "${cargo}" build --quiet --locked --release)
-    "${target}/release/bench-rust" ${quick} --write "${scratch}/rust" >"${scratch}/rust.md"
+    bench_rust="${target}/release/bench-rust"
     baselines="go rust"
 else
     echo "cargo is not on the path: the Rust columns read absent" >&2
-    : >"${scratch}/rust.md"
 fi
+
+# One language's program in a round, into `<language>-<round>.md`; the first round also writes
+# the octets each check compares.
+run_bench() {
+    write=""
+    [ "$2" -eq 1 ] && write="--write ${scratch}/$1"
+    case "$1" in
+        zig) zig build bench ${cpu_option} -- ${quick} ${write} ;;
+        go) "${scratch}/bench-go" ${quick} ${write} ;;
+        rust) "${bench_rust}" ${quick} ${write} ;;
+    esac >"${scratch}/$1-$2.md"
+}
+for round in $(seq 1 "${rounds}"); do
+    # The languages rotated left by one more each round: zig go rust, then go rust zig.
+    order="$(echo zig ${baselines} | awk -v by="$((round - 1))" \
+        '{ for (i = 0; i < NF; i++) printf "%s ", $((i + by) % NF + 1) }')"
+    for language in ${order}; do
+        echo "bench: round ${round}, ${language}" >&2
+        run_bench "${language}" "${round}"
+    done
+done
+for language in zig go rust; do
+    if [ -f "${scratch}/${language}-1.md" ]; then
+        python3 tools/bench_median.py "${scratch}/${language}"-*.md >"${scratch}/${language}.md"
+    else
+        : >"${scratch}/${language}.md"
+    fi
+done
 
 status=0
 for baseline in ${baselines}; do
@@ -127,6 +159,7 @@ fi
 echo
 echo "Machine: $(uname -m), $(cpu_model), $(getconf _NPROCESSORS_ONLN 2>/dev/null || echo "?") CPUs, features ${cpu_features}"
 echo "Builds: Zig and Rust for this CPU, Go with ${go_build:-its defaults}."
+echo "Rounds: ${rounds}, each in an order rotated by one; each time is the median round's."
 echo
 
 # Each table row is "| message | operation | bytes | ns/op | MB/s |". The Zig row and the Go and

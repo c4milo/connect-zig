@@ -102,7 +102,7 @@ port_of() {
         connect-zig | connect-zig-validate | connect-zig-generic) echo "${sink_port}" ;;
         collector) echo "${collector_port}" ;;
         vector) echo "${vector_port}" ;;
-        connect-go | connect-go-validate) echo "${connect_go_port}" ;;
+        connect-go | connect-go-validate | connect-go-memory) echo "${connect_go_port}" ;;
         connect-rust | connect-rust-validate) echo "${connect_rust_port}" ;;
         rotel) echo "${rotel_port}" ;;
     esac
@@ -129,6 +129,15 @@ words_of() {
     [ "${transport}" = tls ] || printf 'cleartext'
 }
 
+# The memory connect-go may hold when it runs as connect-go-memory: about what connect-zig's sink
+# holds at its peak, 321 MiB in CI's run 256, all of it set aside when it starts
+# (tools/otlp_sink/constants.zig). Go's collector then runs only as the heap nears it.
+go_memory_limit=320MiB
+# The environment of connect-go-memory: no collection by the heap's growth, and the limit above.
+go_memory() {
+    [ "$1" = connect-go-memory ] && echo "env GOGC=off GOMEMLIMIT=${go_memory_limit}"
+}
+
 # Starts a server on its core, and waits until it answers.
 start() {
     case "$1" in
@@ -146,7 +155,7 @@ start() {
         vector) ${server_pin} "${vector}" --threads 1 --quiet --config "${work}/vector.yaml" \
             >"${work}/server.log" 2>&1 & ;;
         # Go's runtime and tokio take as many threads as there are cores, unless told one.
-        connect-go | connect-go-validate) GOMAXPROCS=1 ${server_pin} "${connect_go}" \
+        connect-go | connect-go-validate | connect-go-memory) GOMAXPROCS=1 $(go_memory "$1") ${server_pin} "${connect_go}" \
             "${connect_go_port}" "$(pwd)/examples/harness/tls/chain.pem" \
             "$(pwd)/examples/harness/tls/key.pem" $(words_of "$1") >"${work}/server.log" 2>&1 & ;;
         connect-rust | connect-rust-validate)
@@ -221,7 +230,7 @@ probe_refused() {
 # The spans a server says it took and refused. Vector counts one event for each span.
 counted() {
     case "$1" in
-        connect-zig | connect-zig-validate | connect-zig-generic | connect-go | connect-go-validate) curl -sS $(reach) "$(url_of "$1" /sink/count)" |
+        connect-zig | connect-zig-validate | connect-zig-generic | connect-go | connect-go-validate | connect-go-memory) curl -sS $(reach) "$(url_of "$1" /sink/count)" |
             awk '{ print $4, 0 }' ;;
         # connect-rust's server has no plain route, so its counts come from a port of their own.
         connect-rust | connect-rust-validate) curl -sS "http://127.0.0.1:${connect_rust_count_port}/" | awk '{ print $4, 0 }' ;;

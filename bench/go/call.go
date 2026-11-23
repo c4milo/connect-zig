@@ -1,7 +1,9 @@
 // The routed calls: the counterpart of bench/call.zig. One unary call of a message through an
-// http.ServeMux that routes it to connect-go's handler, in memory: ServeHTTP on a request that
-// httptest builds, with a recorder for the response. No socket, no framing and no TLS, as on the
-// Zig side.
+// http.ServeMux that routes it to connect-go's handler, in memory, with no socket, no framing and
+// no TLS, as on the Zig side. The Zig side replays a request head it built once, into storage it
+// reuses. So the timed calls here copy a request httptest built once, give it a new reader of the
+// body, and write into one response writer whose header and body each call clears. The check of
+// each reply runs a whole request and httptest's recorder, outside the timed calls.
 //
 // The mux holds 1, 16 or 256 routes, as bench/call.zig's tables do: the echo method's, then more
 // methods of its service, then more services of as many methods. The calls never reach the other
@@ -18,6 +20,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"io"
 	"math"
 	"net/http"
 	"net/http/httptest"
@@ -96,12 +99,16 @@ func echoMux[T any](name string, routes int) (string, http.Handler) {
 	return procedure, mux
 }
 
-// A routed call of one message in one protocol.
+// A routed call of one message in one protocol, with the request the timed calls copy, the
+// reader of its body and the response writer they reuse.
 type routedCall struct {
 	protocol  callProtocol
 	procedure string
 	handler   http.Handler
 	body      []byte
+	template  *http.Request
+	reader    *bytes.Reader
+	writer    *reusedWriter
 }
 
 func newRoutedCall(protocol callProtocol, procedure string, handler http.Handler, encoded []byte) *routedCall {
@@ -111,11 +118,15 @@ func newRoutedCall(protocol callProtocol, procedure string, handler http.Handler
 		binary.BigEndian.PutUint32(body[1:prefixLen], uint32(len(encoded)))
 		body = append(body, encoded...)
 	}
-	return &routedCall{protocol: protocol, procedure: procedure, handler: handler, body: body}
+	c := &routedCall{protocol: protocol, procedure: procedure, handler: handler, body: body}
+	c.template = c.request()
+	c.reader = bytes.NewReader(body)
+	c.writer = &reusedWriter{header: http.Header{}}
+	return c
 }
 
-// serve runs one call and returns the recorder that holds its response.
-func (c *routedCall) serve() *httptest.ResponseRecorder {
+// request builds the call's request, as a server would parse it.
+func (c *routedCall) request() *http.Request {
 	request := httptest.NewRequest(http.MethodPost, c.procedure, bytes.NewReader(c.body))
 	request.Header.Set("Content-Type", c.protocol.contentType)
 	if c.protocol.grpc {
@@ -123,9 +134,40 @@ func (c *routedCall) serve() *httptest.ResponseRecorder {
 		request.ProtoMajor, request.ProtoMinor, request.Proto = 2, 0, "HTTP/2.0"
 		request.Header.Set("Te", "trailers")
 	}
+	return request
+}
+
+// serve runs one call on a request of its own and returns the recorder that holds its response.
+func (c *routedCall) serve() *httptest.ResponseRecorder {
 	recorder := httptest.NewRecorder()
-	c.handler.ServeHTTP(recorder, request)
+	c.handler.ServeHTTP(recorder, c.request())
 	return recorder
+}
+
+// reusedWriter is a response writer that each timed call clears and writes again, as the Zig
+// side writes each reply into the storage it reuses.
+type reusedWriter struct {
+	header http.Header
+	body   bytes.Buffer
+	status int
+}
+
+func (w *reusedWriter) Header() http.Header            { return w.header }
+func (w *reusedWriter) WriteHeader(status int)         { w.status = status }
+func (w *reusedWriter) Write(data []byte) (int, error) { return w.body.Write(data) }
+func (w *reusedWriter) Flush()                         {}
+
+// serveReused runs one call on a copy of the request built once, with the body read again from
+// its start, into the reused writer, and returns the writer.
+func (c *routedCall) serveReused() *reusedWriter {
+	request := *c.template
+	c.reader.Reset(c.body)
+	request.Body = io.NopCloser(c.reader)
+	clear(c.writer.header)
+	c.writer.body.Reset()
+	c.writer.status = http.StatusOK
+	c.handler.ServeHTTP(c.writer, &request)
+	return c.writer
 }
 
 // reply runs one call and checks that it answered 200 with its request's octets.
@@ -143,13 +185,18 @@ func (c *routedCall) reply() ([]byte, error) {
 	return recorder.Body.Bytes(), nil
 }
 
-func (c *routedCall) runner() func(n uint64) error {
+// runner times the calls on the reused request and writer, once a call on them has answered 200
+// with the request's octets, as the checked call does.
+func (c *routedCall) runner() (func(n uint64) error, error) {
+	if writer := c.serveReused(); writer.status != http.StatusOK || !bytes.Equal(writer.body.Bytes(), c.body) {
+		return nil, errors.New(c.protocol.label + ": the reused request's reply differs from the request")
+	}
 	return func(n uint64) error {
 		for i := uint64(0); i < n; i++ {
-			sink += uint64(c.serve().Body.Len())
+			sink += uint64(c.serveReused().body.Len())
 		}
 		return nil
-	}
+	}, nil
 }
 
 func (c *routedCall) write(directory, name string) error {
@@ -208,7 +255,11 @@ func runCall(current settings, directory string, m *message, procedure string, h
 			return err
 		}
 	}
-	ns, err := medianNs(current, c.runner())
+	run, err := c.runner()
+	if err != nil {
+		return fmt.Errorf("%s, %s: %w", m.name, label, err)
+	}
+	ns, err := medianNs(current, run)
 	if err != nil {
 		return fmt.Errorf("%s, %s: %w", m.name, label, err)
 	}

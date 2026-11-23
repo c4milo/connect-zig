@@ -4,6 +4,9 @@
 //! side. connect-rust, the `connectrpc` crate, encodes with Buffa. A current-thread Tokio runtime
 //! drives each call's future.
 //!
+//! The Zig side replays a request head it built once. The service takes each request by value,
+//! so each call here clones the head the builder made once, and gives it the body.
+//!
 //! The handler answers the message with itself. A map field is a BTreeMap, so each reply's
 //! octets equal its request's, as Zig's do.
 //!
@@ -57,10 +60,10 @@ pub const CALL_ROUTE_COUNTS: [usize; 3] = [1, 16, 256];
 /// A routed call of one message in one protocol.
 struct RoutedCall {
     protocol: &'static CallProtocol,
-    procedure: String,
     service: ConnectRpcService<Router>,
     runtime: tokio::runtime::Runtime,
     body: Bytes,
+    head: http::request::Parts,
 }
 
 /// What one call answered: its HTTP status, its gRPC status, and its body.
@@ -81,30 +84,33 @@ impl RoutedCall {
         let runtime = tokio::runtime::Builder::new_current_thread()
             .build()
             .expect("a current-thread runtime");
-        RoutedCall {
-            protocol,
-            procedure: format!("/bench.v1.Bench/Echo{name}"),
-            service: ConnectRpcService::new(router),
-            runtime,
-            body: Bytes::from(body),
-        }
-    }
-
-    /// Runs one call and returns what it answered.
-    fn serve(&mut self) -> Result<Reply, String> {
+        let procedure = format!("/bench.v1.Bench/Echo{name}");
         let mut builder = http::Request::builder()
             .method(http::Method::POST)
-            .uri(self.procedure.as_str())
-            .header(http::header::CONTENT_TYPE, self.protocol.content_type);
-        if self.protocol.grpc {
+            .uri(procedure.as_str())
+            .header(http::header::CONTENT_TYPE, protocol.content_type);
+        if protocol.grpc {
             // gRPC runs over HTTP/2 (PROTOCOL-HTTP2.md), and asks for trailers.
             builder = builder
                 .version(http::Version::HTTP_2)
                 .header(http::header::TE, "trailers");
         }
-        let request = builder
-            .body(Full::new(self.body.clone()))
-            .map_err(|error| error.to_string())?;
+        let (head, ()) = builder
+            .body(())
+            .expect("a request of fixed parts")
+            .into_parts();
+        RoutedCall {
+            protocol,
+            service: ConnectRpcService::new(router),
+            runtime,
+            body: Bytes::from(body),
+            head,
+        }
+    }
+
+    /// Runs one call and returns what it answered.
+    fn serve(&mut self) -> Result<Reply, String> {
+        let request = http::Request::from_parts(self.head.clone(), Full::new(self.body.clone()));
         let service = &mut self.service;
         self.runtime.block_on(async move {
             let Ok(response) = service.call(request).await;

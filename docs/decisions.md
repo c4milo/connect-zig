@@ -1253,3 +1253,14 @@ first. Cite an entry by number in code and commits ("decision 6").
       coding is drawn as a share of the same receiver uncompressed, net of the TLS and HTTP/2 a
       smaller export saves. Beaten: one axis for the three libraries, on which connect-go's
       costs hid the differences between connect-zig's codings.
+    - Amended on 2026-11-23, after a review of the method, on three baselines. The peak part runs
+      connect-go a second time with GOGC=off and GOMEMLIMIT=320MiB, about the memory connect-zig's
+      sink sets aside when it starts, so Go's collector runs only as its heap nears that. Without
+      it, connect-go held a tenth of the sink's memory, and its collector paid for the difference.
+      The routed call's Go and Rust programs leave the building of a request out of the timed
+      calls, as the Zig side replays a head it built once: Go copies a request httptest built
+      once into a writer it clears, and Rust clones a head the builder made once. In a 4-CPU
+      container Go's small call fell from 7 to 11 µs to 2 to 4 µs, and Rust's by about 10%.
+      `tools/bench_check.sh` runs Zig, Go and Rust in three rounds, each in an order rotated by
+      one, and gives each cell the median round. Beaten: one run of each language after the other,
+      on which a runner that drifts slows the last.
