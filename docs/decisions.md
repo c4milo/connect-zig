@@ -7,7 +7,7 @@ first. Cite an entry by number in code and commits ("decision 6").
 
 1. **The full stack, in one repository.** connect-zig holds a protobuf runtime (binary and proto3
    JSON), a Connect client and server, and the protoc plugin `protoc-gen-connect-zig`, which
-   `buf generate` runs. It speaks three protocols, as connect-go does: Connect, gRPC and
+   `buf generate` runs. It speaks three protocols, as connect-go does: Connect, gRPC, and
    gRPC-Web. Beaten: a runtime alone, which leaves every user to write the RPC layer; and Connect
    alone, which cannot talk to gRPC servers.
 
@@ -19,7 +19,7 @@ first. Cite an entry by number in code and commits ("decision 6").
 
 3. **No I/O, and no clock.** The library makes no system call and reads no clock. A deadline is
    an instant in nanoseconds that the caller passes, as colibri passes time (colibri
-   non-negotiable 3). The `io`, `determinism` and `heap` lint rules hold `src/` to it. Beaten:
+   non-negotiable 3). The `io`, `determinism`, and `heap` lint rules hold `src/` to it. Beaten:
    reading the clock for `Connect-Timeout-Ms`, which makes a test depend on the machine.
 
 4. **No allocator in `src/`.** Every buffer is the caller's. Sizes are named constants or caller
@@ -29,10 +29,10 @@ first. Cite an entry by number in code and commits ("decision 6").
 
 39. **The package exports the colibri modules a program builds on.** Ruled by the owner on
     2026-11-14.
-    - `build.zig` exports colibri's `server`, `client`, `http`, `tls` and `colibri` modules under
+    - `build.zig` exports colibri's `server`, `client`, `http`, `tls`, and `colibri` modules under
       colibri's own names. A program takes them as it takes `connect_colibri`:
       `dependency.module("server")`.
-    - A program thus builds its router, its server and its client on the one colibri that
+    - A program thus builds its router, its server, and its client on the one colibri that
       `connect_colibri` uses. Two colibri instances in one build fail: Zig finds one file in two
       modules.
     - The build option `rotor` goes to colibri. With `.rotor = true`, a program gets the
@@ -49,11 +49,11 @@ first. Cite an entry by number in code and commits ("decision 6").
       program then repeats connect-zig's request, and a change of that request breaks it.
 
 41. **Each example is a Zig project of its own.** Ruled by the owner on 2026-11-14.
-    - `examples/<name>/` holds `build.zig`, `build.zig.zon`, `buf.gen.yaml`, `proto/`, `gen/` and
+    - `examples/<name>/` holds `build.zig`, `build.zig.zon`, `buf.gen.yaml`, `proto/`, `gen/`, and
       `src/`. Its manifest names connect-zig by path, `../..`. A reader copies the folder, and
       swaps the path for a URL.
     - `examples/harness` is a package, not an example: colibri's in-memory links, the server and
-      client rounds over h11, h2 and h3, the test identity and chapulin's hook. Each project that
+      client rounds over h11, h2, and h3, the test identity, and chapulin's hook. Each project that
       runs in memory depends on it by path. `socket_server` depends by path on the projects
       whose services it serves.
     - `examples/quickstart` is the README's "Use it in your project", as a project.
@@ -62,7 +62,7 @@ first. Cite an entry by number in code and commits ("decision 6").
     - The root's `zig build examples` runs `zig build test` in each project, with the root's
       package folder and cache. So the tree fetches each package once and compiles each module
       once. `zig build example-<name>` and `zig build run-eliza-server` stay.
-    - The coverage converter, the interop client and the test of the generated code are checks,
+    - The coverage converter, the interop client, and the test of the generated code are checks,
       not examples. They move to `tools/`, with the schemas that only they read.
     - Why: a reader copies one folder and has a program that builds. Each project writes the
       build that a dependent writes, so the examples prove decision 39 too.
@@ -70,15 +70,15 @@ first. Cite an entry by number in code and commits ("decision 6").
       of the harness in each project, which repeats about 900 lines in six places.
     - Amended the same day, on the owner's choice: each example owns the schema it is about, and
       no project holds every proto. `demo.proto` splits into one schema for each of streaming,
-      interceptors and errors. A project that builds on another example's service, such as
-      `socket_server`, `std_io` and `sans_io_call`, depends on that project by path and imports
+      interceptors, and errors. A project that builds on another example's service, such as
+      `socket_server`, `std_io`, and `sans_io_call`, depends on that project by path and imports
       its exported modules. The interop service, which only the checks call, moves to
       `tools/interop_server` with a server of its own. `large.proto` stays beside
       `kitchen.proto`, whose `shared.proto` it imports. Beaten: one project of every proto,
       which makes each example depend on schemas it does not use.
     - Amended again the same day, on the owner's choice: each example is also a program to play
       with. `zig build serve -- [port]` serves its service on a real socket, over TLS under the
-      test identity, on h11, h2 and h3, through the harness's `Served`. Each project keeps its
+      test identity, on h11, h2, and h3, through the harness's `Served`. Each project keeps its
       `App` and route table in `src/app.zig`, which the check and the server share.
     - A project that depends on another passes connect-zig the same options, or Zig builds a
       second `connect` module. `eliza` and the harness take a `rotor` option for a project with
@@ -86,9 +86,9 @@ first. Cite an entry by number in code and commits ("decision 6").
 
 42. **Every tree of hand-written Zig takes the library's rules.** Ruled by the owner on
     2026-11-14.
-    - `examples/`, `bench/`, `conformance/` and the programs of `tools/` take every lint rule
+    - `examples/`, `bench/`, `conformance/`, and the programs of `tools/` take every lint rule
       that `src/` takes, except the four that state what a library is: no allocator, no I/O, no
-      clock and no Rotor. A program owns its memory, its sockets, its clock and its loop. `tools/`
+      clock, and no Rotor. A program owns its memory, its sockets, its clock, and its loop. `tools/`
       joined when the checks moved there from `examples/` (decision 41).
     - Each tree names its limits in a `constants.zig`, as `src/` does (the `magic-numbers`
       rule).
@@ -158,14 +158,14 @@ first. Cite an entry by number in code and commits ("decision 6").
 ## Connect
 
 10. **Compression comes from stdx.** gzip and zstd encode and decode; brotli decodes only, since
-    stdx has no brotli encoder yet. connect-zig accepts `gzip`, `zstd` and `br`. A program places
+    stdx has no brotli encoder yet. connect-zig accepts `gzip`, `zstd`, and `br`. A program places
     the encoders it compresses with in `connect.Encoders`, and a server answers in the first
     coding the peer lists that it holds an encoder for. The zstd encoder runs at level 1 with a
     128 KiB window, which an RPC message rarely outgrows. connect-zig pins the stdx colibri
     pins, since two stdx in one binary repeat its exported symbols. Beaten: a C codec, which
     stdx exists to replace.
     Amended on 2026-11-10: base64 comes from stdx too, for proto3 JSON's bytes, Connect's error
-    details, gRPC's "-bin" values and a unary GET's message. stdx's decoder reads either alphabet
+    details, gRPC's "-bin" values, and a unary GET's message. stdx's decoder reads either alphabet
     in one pass and refuses a text that mixes them. It refuses pad characters that do not
     complete a quantum of four (RFC 4648 §4), which connect-zig's own reader dropped before.
     Beaten: `std.base64`, which reads one alphabet in a call, so a reader that takes either one
@@ -240,7 +240,7 @@ first. Cite an entry by number in code and commits ("decision 6").
       pieces (colibri decision 153 ruling 7). Its `Sender` writes each message, as the server's
       does, and `close_send` ends the request. The pool holds one piece at a time, so a message
       written meanwhile waits and goes at the next `body_taken` event.
-    - The program passes the pool's `headers`, `body` and `body_taken` events to the call. Each
+    - The program passes the pool's `headers`, `body`, and `body_taken` events to the call. Each
       response piece is copied after the octets not read yet and given back at once, so an
       envelope two pieces split is read whole, and the call's `reader` reads each message.
     - `rpc.full_duplex(protocol)` decides the mode: full-duplex over h2 and h3, half-duplex over
@@ -263,17 +263,17 @@ first. Cite an entry by number in code and commits ("decision 6").
     `on_finish`, which runs in reverse and returns the outcome the client reads. A client's
     `ClientCall` lists `on_request` and `on_response` interceptors the same way, in its options:
     `ClientCall(method, .{ .interceptors = ... })`, as a route takes `RouteOptions`. A handler and
-    an interceptor read the call through `Call`: its protocol, codec, timeout and request
+    an interceptor read the call through `Call`: its protocol, codec, timeout, and request
     headers, and the response headers and trailers they add. Beaten: a runtime list of function
     pointers, which costs an indirect call and loses the `app` type; and, amended 2026-11-07, a
     `ClientCallWith(method, interceptors)` beside `ClientCall(method)`, which named two types for
     one and left no room for a client option but interceptors. Amended 2026-11-11: a server
-    hook takes the call's `Context`, `AnyRequest` and `AnyResponse`, and `Call` goes (decision
+    hook takes the call's `Context`, `AnyRequest`, and `AnyResponse`, and `Call` goes (decision
     36). Amended 2026-11-21: an interceptor may also define `on_message`, which runs in list
     order with each request message once it is decoded, and may refuse the call (decision 47).
 
 20. **Examples share their services.** The programs in `examples/` import the ELIZA and demo
-    services, the in-memory link and its client loop from `examples/services/`, so each program
+    services, the in-memory link, and its client loop from `examples/services/`, so each program
     holds only its calls and its checks. The socket server serves both services. Beaten: one
     copy of the link loop per program.
 
@@ -338,7 +338,7 @@ first. Cite an entry by number in code and commits ("decision 6").
     13). Beaten: colibri's test identity, which colibri does not package; and minting an identity
     at each run, which needs openssl in every build. Amended 2026-11-14 (decision 39):
     `tools/package_check.sh` copies the identity into the project it builds. That project's
-    server presents it over TLS for h11, h2 and h3, and its client and curl trust the CA. The
+    server presents it over TLS for h11, h2, and h3, and its client and curl trust the CA. The
     check is a test too, and the fetched package does not hold the identity.
 
 26. **The conformance suite runs against a server of its own.** `conformance/` holds a program
@@ -350,7 +350,7 @@ first. Cite an entry by number in code and commits ("decision 6").
     client (decision 11). Beaten: the runner's reference server against our client alone, which
     leaves the server untested; and a copy of the loop in each program.
     Amended on 2026-11-09: the client half no longer waits. `conformance/client.zig` runs the
-    runner's client mode against its reference server, over h11, h2 and h3, in cleartext and
+    runner's client mode against its reference server, over h11, h2, and h3, in cleartext and
     over TLS, with the features of `conformance/client_config.yaml`. It drives one
     `client.ConnectionPool` with `poll` over a TCP and a UDP socket, one case at a time
     (decision 32): `colibri.Client` takes no streamed exchange and no cancel. Each case it fails
@@ -389,16 +389,16 @@ first. Cite an entry by number in code and commits ("decision 6").
 29. **Clients in other languages call the server, across the protocol and every type.**
     `interop.v1.InteropService` has each RPC shape once, and each message is a
     `coverage.v1.Everything`. `interop/` holds clients on connect-go and grpc-go, connect-es,
-    grpcio and tonic, each pinned by its lock file, which echo every coverage case in each
-    protocol, codec and compression their library speaks, and run every stream shape, a typed
-    error, a timeout, headers and trailers. Two messages are the same when a runtime writes the
+    grpcio, and tonic, each pinned by its lock file, which echo every coverage case in each
+    protocol, codec, and compression their library speaks, and run every stream shape, a typed
+    error, a timeout, headers, and trailers. Two messages are the same when a runtime writes the
     same octets for both. Beaten: buf curl alone, which is one client; and the conformance
     runner alone, whose reference client is connect-go.
     Amended on 2026-11-09, with the client half the owner approved: the client side runs too,
     on `rpc.ClientCall` over `client.ConnectionPool` (decision 32), not on `colibri.Client`.
-    `interop/` also holds servers on connect-go and grpc-go, connect-node, grpcio and
+    `interop/` also holds servers on connect-go and grpc-go, connect-node, grpcio, and
     connect-rust, each pinned by its client's lock file. `examples/interop_client.zig` runs every
-    scenario against each, in each protocol, codec and HTTP version the server speaks, and
+    scenario against each, in each protocol, codec, and HTTP version the server speaks, and
     `tools/interop_servers_check.sh` runs it. connect-zig writes no map in a deterministic order,
     so where the octets differ the client compares the two messages' proto3 JSON as values.
     Beaten: a third transport, where the conformance client's already drives a pool over TLS.
@@ -413,14 +413,14 @@ first. Cite an entry by number in code and commits ("decision 6").
     colibri v0.14.0 ships `colibri.Server` (colibri decision 150), so `socket_loop.zig` and
     `socket_datagram.zig` go. With an identity, colibri puts TLS on TCP, picks h2 or h11 by ALPN,
     serves h3 on the UDP socket of the same port, and advertises it in Alt-Svc. The example server
-    keeps the test identity of decision 25, so curl, buf curl and the clients of `interop/` trust
+    keeps the test identity of decision 25, so curl, buf curl, and the clients of `interop/` trust
     its CA. The conformance server holds no identity and stays in cleartext, as the runner asks.
     A connection past the socket limit waits in the kernel's backlog until a socket frees, as
     colibri rules. Beaten: a server with no identity, which drops h3; and keeping our loop, a copy
     of colibri's.
 
 32. **The library runs on any event loop.** Ruled by the owner on 2026-11-08. `connect_colibri`
-    builds on colibri's protocol modules alone: `server`, `client` and `http`, which take octets
+    builds on colibri's protocol modules alone: `server`, `client`, and `http`, which take octets
     and give octets back. No file in `src/` names `rotor` or colibri's `colibri` module, whose
     `Server` and `Client` own a Rotor loop. `build.zig` gives the library no such module, and the
     `layering` lint rule reports a reference to either. So `rpc.ClientCall` stays on
@@ -432,7 +432,7 @@ first. Cite an entry by number in code and commits ("decision 6").
 
 33. **A long stream's handler gives one message at a time.** Ruled by the owner on 2026-11-09.
     A type handler of a server or bidirectional stream may declare `next`, which fills one
-    response and answers `rpc.Next`: `.message`, `.wait`, `.end` or `.failure`. A server stream's
+    response and answers `rpc.Next`: `.message`, `.wait`, `.end`, or `.failure`. A server stream's
     type handler takes its one request in `on_request`.
     - The route declares colibri's `on_writable`, and calls `next` while the response memory has
       room. So colibri's `response_bytes` bound the octets in flight, not the stream (colibri
@@ -463,7 +463,7 @@ first. Cite an entry by number in code and commits ("decision 6").
     by the owner on 2026-11-11. A server that takes bearer tokens from an OpenID provider is
     common, so the library holds the check: a `Verifier` with no I/O, and a server interceptor
     that lets the paths a program names through.
-    - The signature check and base64url are chapulin's `jws` calls: RS256, ES256 and EdDSA
+    - The signature check and base64url are chapulin's `jws` calls: RS256, ES256, and EdDSA
       with Ed25519. The module reads the JSON with stdx, and checks the claims itself. It names
       no colibri module, and colibri exports no crypto of chapulin's: the owner refused both a
       path through colibri's `dnssec` module and a signature module in colibri.
@@ -482,10 +482,10 @@ first. Cite an entry by number in code and commits ("decision 6").
       from the verifier's set, never from the token. `VerifierOptions.algorithms` takes all three by
       default, because no token can move a key to another algorithm.
     - The order of the checks is RFC 7519 §7.2's: the form, the header, the signature, then
-      the issuer, the audience, "exp" and "nbf". No claim is read before the signature passed.
+      the issuer, the audience, "exp", and "nbf". No claim is read before the signature passed.
       A token with no "exp" is refused, as OpenID Connect Core 1.0 §2 and RFC 9068 §2.2
       require one.
-    - A name the module reads appears once in its object, in a header, a claims set and a JWK.
+    - A name the module reads appears once in its object, in a header, a claims set, and a JWK.
       The RFCs let a parser refuse a second one, and the refusal leaves no two readings of one
       text.
     - The claims belong to the call (amended 2026-11-11, decision 35). `verify` writes them
@@ -494,13 +494,13 @@ first. Cite an entry by number in code and commits ("decision 6").
       `?oidc.Claims`, which stays null on an excluded path and after a refusal. A handler reads
       `ctx.values(Values).oidc` at any callback of its call, the tenth message of a stream
       included.
-    - A program reads its own claims on demand, with `Claims.string`, `integer` and `holds`
+    - A program reads its own claims on demand, with `Claims.string`, `integer`, and `holds`
       over the payload's copy. A string a lookup returns stays valid until the next lookup on
       the same `Claims`. A claim nobody asks for costs nothing.
     - `Interceptor(.{ .exclude = ... })` takes its list at compile time, because a generated
       `Routes` gives one interceptor list to each method of a service. An entry is a method's
       path, or a service's prefix that ends in "/". Its `on_call` takes any call type with
-      `path`, `request_header` and `add_header`, so the module serves another transport too.
+      `path`, `request_header`, and `add_header`, so the module serves another transport too.
     - A refused call gets `unauthenticated`, which Connect writes as HTTP 401, and RFC 6750
       §3's `WWW-Authenticate: Bearer` challenge, with `error="invalid_token"` when the call
       carried a token.
@@ -511,7 +511,7 @@ first. Cite an entry by number in code and commits ("decision 6").
     `Claims` takes about 4.4 KB of each call's values. A NumericDate with an exponent
     is refused.
     The module reads no "typ",
-    "nonce", "azp" or "at_hash": those belong to the client that ran the login, not to the
+    "nonce", "azp", or "at_hash": those belong to the client that ran the login, not to the
     server that takes the token. Beaten: Zig's `std.crypto`, which the owner refused for
     chapulin; one copy of the JWT code in colibri, which the owner refused for a copy in each
     library; claims in the verifier, valid until its next `verify`, which a later callback of a
@@ -539,7 +539,7 @@ first. Cite an entry by number in code and commits ("decision 6").
     table keyed by type in the call, and gives two interceptors no slot they share; a generic
     `CallWith(T)`, which changes every signature for one type; a hook that takes the values as
     a parameter of its own, which gave each hook two signatures (this decision's first form);
-    and the names `Local`, `Locals` and `RequestContext`, before the call's own object took the
+    and the names `Local`, `Locals`, and `RequestContext`, before the call's own object took the
     name `Context`. The owner chose `Values`, connect-es's word for the same values.
 
     Amended on 2026-11-15, at colibri v0.17.0 (decision 45). The values live in colibri's request
@@ -548,10 +548,10 @@ first. Cite an entry by number in code and commits ("decision 6").
     type. `RouteOptions.Values` goes. A table names one type for all its routes, so a table that
     joins services declares one struct with the fields of each.
 
-36. **A handler takes the call's context, its request and its response.** Ruled by the owner on
+36. **A handler takes the call's context, its request, and its response.** Ruled by the owner on
     2026-11-11 ("ctx, request and response split is cleaner"), as connect-go splits a call
-    into a `context.Context`, a `Request` and a `Response`. `Call` goes; it held all three.
-    - `Context` is the call: its path, protocol, codec and timeout, the counts of the messages
+    into a `context.Context`, a `Request`, and a `Response`. `Call` goes; it held all three.
+    - `Context` is the call: its path, protocol, codec, and timeout, the counts of the messages
       it read and wrote, and `values(T)` (decision 35). A handler's parameter is `ctx`.
     - `Request(T)` holds one message and the request's headers and query. `RequestStream(T)`
       reads a stream's messages with `next`, and holds the headers and query too. It replaces
@@ -572,7 +572,7 @@ first. Cite an entry by number in code and commits ("decision 6").
     - Each of these is a view of the call the route keeps, valid during the callback that
       receives it. A program keeps nothing of it past the callback but what it copies.
 
-    Beaten: one object for the call, its request and its response, as connect-es's
+    Beaten: one object for the call, its request, and its response, as connect-es's
     `HandlerContext`, which the owner found less clean; messages as plain parameters with the
     headers on two more, which gave a unary handler six parameters; and bare messages in a type
     handler's callbacks, which read headers another way than a function handler does.
@@ -611,7 +611,7 @@ first. Cite an entry by number in code and commits ("decision 6").
       default, which a program learns of only from a profile.
     - An iterator gives a message in place (design §8 step 16). `next` returns `?Item`: for a
       message, a pointer that holds until the next call, into `items` or into the iterator's
-      own slot for a message of a view; for a number, a string or an enum, the value. The
+      own slot for a message of a view; for a number, a string, or an enum, the value. The
       owner ruled it on 2026-11-14. It follows TigerStyle's `*const` for a value of more than
       16 octets, and std has iterators whose `next` returns a pointer. No std iterator chooses
       by a compile-time parameter, so the iterator names the choice `Item`. Before, `next`
@@ -623,7 +623,7 @@ first. Cite an entry by number in code and commits ("decision 6").
       through the slot; and a slot the caller passes, which adds a line at each call.
     - Why: a program that reads every field parsed each repeated field twice, once when
       `decode` checked it and once when the program read it. So Buffa's decode with every field
-      read beat connect-zig's on medium, large, tree and packed.
+      read beat connect-zig's on medium, large, tree, and packed.
 
     Beaten: one `decode` that takes storage, `&.{}` for none. The owner chose it first, then
     chose two calls once it was measured: 76 call sites passed no storage, and the empty path
@@ -684,10 +684,10 @@ first. Cite an entry by number in code and commits ("decision 6").
     the plugin writes.** Ruled by the owner on 2026-11-21. A server that checks each request
     against the rules of its schema is common, so the library holds the check:
     [protovalidate](https://github.com/bufbuild/protovalidate) v1.2.2's
-    `(buf.validate.message)`, `(buf.validate.oneof)` and `(buf.validate.field)` options.
+    `(buf.validate.message)`, `(buf.validate.oneof)`, and `(buf.validate.field)` options.
     - It lives in this repository. The rules are read from the plugin's request, and the check
       reads a generated message's fields, which no public contract describes. A second
-      repository needs a second plugin that copies this one's names, index and features.
+      repository needs a second plugin that copies this one's names, index, and features.
     - `protovalidate` imports `protobuf` and the generated code of `validate.proto`, and no
       `connect` module. A program with no RPC validates a message. The owner expects `protobuf`
       to move to stdx one day, and a module that names no `connect` can move with it.
@@ -717,7 +717,7 @@ first. Cite an entry by number in code and commits ("decision 6").
         copied. One expression reads at most `cel_steps_max` elements, the pairs of
         `compared_items_max`, so a macro inside a macro has a bound whatever a message holds.
         Past it `validate` ends with `TooManyItems`.
-      - `&&`, `||`, `all` and `exists` absorb a side or an element that fails when another one
+      - `&&`, `||`, `all`, and `exists` absorb a side or an element that fails when another one
         decides the result, as CEL states them.
       - The grammar is written once, over a builder (`cel_grammar.zig`). The compiler runs it
         with a builder that makes the tree in its own memory, and a test runs the same code
@@ -740,9 +740,9 @@ first. Cite an entry by number in code and commits ("decision 6").
         protovalidate-go's: valid, invalid with the violation's message, a failure as the
         expression runs, and a rule that does not compile. Its first runs found six
         differences, and each follows cel-go now:
-        - `==`, `!=` and `in` take two values of one type: `1 == 1u` stops the build. An
+        - `==`, `!=`, and `in` take two values of one type: `1 == 1u` stops the build. An
           order takes two numbers of any types, as protovalidate's CEL does.
-        - Behind `dyn`, `==`, `!=` and `in` take any two values and compare them as they
+        - Behind `dyn`, `==`, `!=`, and `in` take any two values and compare them as they
           run: two values of unlike types are not equal, and two numbers compare by value.
         - A conversion of a literal that fails, such as `int('x')` and `bool('k')`, stops
           the build: cel-go computes such a conversion once, before the expression runs.
@@ -766,7 +766,7 @@ first. Cite an entry by number in code and commits ("decision 6").
       - A schema of thousands of rules compiles in time that grows with them: about 7.5 ms
         for a rule. The compiler runs comptime code as an interpreter, so the module counts
         its steps (docs/performance.md, "The compiler's time"). An enum names each operator,
-        each keyword and each function once, and an enum that the compiler builds once for a
+        each keyword, and each function once, and an enum that the compiler builds once for a
         message finds a field by its name. The typing of an expression is a constant's
         value, so the compiler computes it once. Tests hold the reading and the typing to a
         count of branches, and `tools/compile_time_check.sh` holds the whole build to a
@@ -797,7 +797,7 @@ first. Cite an entry by number in code and commits ("decision 6").
     - The table holds the generated types of `validate.proto` itself, such as
       `buf.validate.FieldRules`. The plugin reads each option with that type, and writes it as
       a Zig literal from the type's own descriptor, so the plugin names no rule. A violation's
-      rule path takes each rule's number, name and type from the generated descriptor.
+      rule path takes each rule's number, name, and type from the generated descriptor.
     - The package exports that generated code as the module `buf_validate_validate`, the name
       the plugin gives `buf/validate/validate.proto`, and `google_protobuf_descriptor`, which
       it imports. A program's generated code that names `buf.validate.Violations` imports the
@@ -811,7 +811,7 @@ first. Cite an entry by number in code and commits ("decision 6").
     - A message with no rule, in itself or in a message it holds, keeps the code it had. Its
       file imports no `protovalidate`.
     - `validate` writes each violation into a `Report` over storage the caller passes: the
-      field's path, the rule's path, the rule's id and a message, as `buf.validate.Violation`
+      field's path, the rule's path, the rule's id, and a message, as `buf.validate.Violation`
       holds them. A full report ends the walk and says so. A standard rule's message is a
       comptime string.
     - The module holds no set, so it compares the elements of a `unique` list, and the keys of
@@ -895,21 +895,21 @@ first. Cite an entry by number in code and commits ("decision 6").
       on 2026-11-22:
       - The text is a string literal and the list a list literal, so the compiler reads the
         text once and types each value alone. The values may differ in type.
-      - It reads `%s`, `%d`, `%x` and `%X`, which protovalidate's schemas use. `%f`, `%e`, `%o`,
-        `%b` and a precision stop the build.
+      - It reads `%s`, `%d`, `%x`, and `%X`, which protovalidate's schemas use. `%f`, `%e`, `%o`,
+        `%b`, and a precision stop the build.
       - The run writes the text into the free part of the report's storage, and the violation
         keeps it at the storage's end. A text with no room ends `validate` as a full report
         does. So the library holds no buffer of its own.
       - Beaten: a buffer on the stack for each rule, which bounds a message by a constant and
         costs a fill on each call; and a public scratch passed to `validate`, which every
         program would size.
-    - CEL's `filter(x, p)`, `map(x, t)` and `map(x, p, t)` give a lazy list. Amended on
+    - CEL's `filter(x, p)`, `map(x, t)`, and `map(x, p, t)` give a lazy list. Amended on
       2026-11-22:
       - The list holds its source and the values of the expression's names. Each read of an
         element takes the source's next element, or a map's next key, and runs the predicate and
         the transform on it. So the list needs no room, and its length has no bound but the
         expression's count of steps.
-      - `size`, `in`, an index and the macros read it as any other list. Each read runs the
+      - `size`, `in`, an index, and the macros read it as any other list. Each read runs the
         expressions again, so a rule that reads one list twice computes it twice.
       - A key that two entries of a map hold is read once. A failure of the predicate or the
         transform fails the read, as it fails the macro in CEL.
@@ -946,12 +946,12 @@ first. Cite an entry by number in code and commits ("decision 6").
         strings extension other than `format`, and parts of the language the module does not
         build: a map literal, a message literal, an empty list literal, a list of two types,
         and `==` of two lists. 29 turn the type check off, which a rule always has.
-      - The same day the owner asked for the largest of those parts: map literals, `[]` and
+      - The same day the owner asked for the largest of those parts: map literals, `[]`, and
         `==` of two lists. The module builds them, `==` of two maps too, and 1,142 pass.
       - The owner then asked for a list or a map literal of two element types, such as
         `[1, 'a']`, which cel-go types `list(dyn)`. The compiler knows each element's type, so
         such a literal is a Zig tuple (`cel_mixed.zig`). Its size, `in`, `==`, `type`, `%s` of
-        `format`, an index the build knows, and `all`, `exists` and `exists_one` unfold for
+        `format`, an index the build knows, and `all`, `exists`, and `exists_one` unfold for
         each element, and a macro reads its variable as behind `dyn`. An index the build does
         not know, and `filter` and `map` of such a literal, give no one type, and stop the
         build. 1,174 pass. Beaten: a union of CEL's types for each element, whose every read
@@ -959,7 +959,7 @@ first. Cite an entry by number in code and commits ("decision 6").
       - Its first run found four differences, and each follows cel-go now: a double compares
         with an integer as the integer made a double; a side of `&&` or `||` behind `dyn` that
         holds no bool fails and is absorbed; a list takes a uint and a whole double as its
-        index behind `dyn`; and `%s` of `format` writes a timestamp, a duration and a type. A
+        index behind `dyn`; and `%s` of `format` writes a timestamp, a duration, and a type. A
         function that no library declares stops the build behind `dyn` too, and `%%` writes
         one `%`.
       - Beaten: the suite's tests with variables, which a runner would declare one by one, and
@@ -993,7 +993,7 @@ first. Cite an entry by number in code and commits ("decision 6").
 38. **Google's protobuf conformance suite checks the runtime, in binary and in JSON.** Ruled by
     the owner on 2026-11-13 and 2026-11-14.
     - `tools/protobuf_conformance_check.sh` runs the suite's runner against
-      `conformance/protobuf_testee.zig`, for the proto3, proto2 and edition 2023 test messages,
+      `conformance/protobuf_testee.zig`, for the proto3, proto2, and edition 2023 test messages,
       with the recommended cases enforced. The program answers `skipped` for the text format,
       for JSPB, and for a JSON case that asks to ignore unknown members: connect-zig has none
       of the three.
@@ -1071,12 +1071,12 @@ first. Cite an entry by number in code and commits ("decision 6").
       account and a token in the repository's secrets.
 44. **A full-stack benchmark loads whole servers over TLS and h2, beside OpenTelemetry's
     Collector.**
-    - The routed call (design §8 step 23) leaves out the socket, TLS and HTTP/2.
+    - The routed call (design §8 step 23) leaves out the socket, TLS, and HTTP/2.
       `tools/fullstack_check.sh` measures them. h2load sends OTLP's `TraceService/Export` over
-      gRPC, TLS 1.3 and h2 to connect-zig's OTLP sink and to OpenTelemetry's Collector v0.165.0,
+      gRPC, TLS 1.3, and h2 to connect-zig's OTLP sink and to OpenTelemetry's Collector v0.165.0,
       which the script downloads pinned by SHA-256.
     - The Collector runs its OTLP receiver into its `nop` exporter, with no processor. The sink,
-      `tools/otlp_sink`, decodes each export, counts its spans and drops it. So each server reads
+      `tools/otlp_sink`, decodes each export, counts its spans, and drops it. So each server reads
       and checks every octet, and keeps nothing. Beaten: a full Collector in Zig, which is a
       product of its own and not an example of a library.
     - colibri's `.private` server runs one loop on one thread. So each server runs alone on one
@@ -1103,7 +1103,7 @@ first. Cite an entry by number in code and commits ("decision 6").
       the Collector's otlp exporter, on one TLS connection. A gateway tier of 64 cores shares the
       connections, so one core holds 516 of them. 70% send exports of 16 spans, 25% exports of
       128, and 5% exports of 512. The spans carry the attributes of OpenTelemetry's semantic
-      conventions for Kubernetes, HTTP, gRPC, databases and Kafka, and 2% are errors.
+      conventions for Kubernetes, HTTP, gRPC, databases, and Kafka, and 2% are errors.
     - The production part climbs: oha sends at fixed rates with its latency correction, as
       colibri's judge measures latency, so a call's latency holds its time in a queue. A step
       fails when p99 passes 100 ms, a call is refused, or the server takes less than 95% of the
@@ -1129,7 +1129,7 @@ first. Cite an entry by number in code and commits ("decision 6").
       where gzip's held 747,584, and every refusal fell 0.11 to 0.26 s into its step. The report
       gives the held step's refusals in its first seconds in a column of their own.
     - Amended a third time on 2026-11-23, after a review of the method: the climb's load is
-      `tools/fullstack/load`, a program of this repository on h2, tokio and rustls, in place of
+      `tools/fullstack/load`, a program of this repository on h2, tokio, and rustls, in place of
       oha. It opens its 516 connections once and keeps them across the climb, as the agents keep
       theirs. So a step holds no TLS handshake, every call counts, and the 2 s that each step
       left out goes, with its column. It sends each class's 32 variants of its export in turn,
@@ -1175,7 +1175,7 @@ first. Cite an entry by number in code and commits ("decision 6").
       either held: Rotel 9.5 and 7.75 exports a connection a second, Vector 3 and 2.875.
     - Slack, whose fleet the model takes its size from, publishes no rate of spans. So the model
       states each core's rate, and the fleet's rate divided by it gives the cores a tier needs.
-      The 516 connections, the mix and the 100 ms limit were chosen on 2026-11-17.
+      The 516 connections, the mix, and the 100 ms limit were chosen on 2026-11-17.
     - oha v1.16.0 is pinned by SHA-256, the digest GitHub states for each release asset. Removed
       on 2026-11-23 with oha, as amended above: Cargo.lock pins the load's crates.
     - CI runs the check on x86-64 and on GitHub's arm64 runner, as it runs `bench-compare`, so the
@@ -1190,18 +1190,18 @@ first. Cite an entry by number in code and commits ("decision 6").
       arm64 container, it answered 4,400 calls a second of 16 spans where the default answered
       9,400, and 120 of 512 spans where the default answered 390.
     - Rotel v0.2.7, the Rust OpenTelemetry collector, has no TLS on its OTLP receiver. So a second
-      climb runs in cleartext h2, for connect-zig, the Collector and Rotel. Rotel counts its spans
+      climb runs in cleartext h2, for connect-zig, the Collector, and Rotel. Rotel counts its spans
       in its internal metrics, which it sends by OTLP every 10 seconds; its release build has no
       metrics endpoint. A second Collector takes them and shows them to Prometheus. Beaten: a TLS
       proxy before Rotel, which the climb would measure too, and Rotel's log of each call, which
       costs it CPU that the other servers do not pay.
     - Amended on 2026-11-20, ruled by the owner: CI runs on GitHub's Ubuntu 26.04 images,
-      `ubuntu-26.04` and `ubuntu-26.04-arm`, as colibri, stdx and chapulin do. The image moves
+      `ubuntu-26.04` and `ubuntu-26.04-arm`, as colibri, stdx, and chapulin do. The image moves
       the numbers of `bench-compare` and `fullstack`, so a lab branch ran one commit on both
       arm64 images, each a Neoverse-N2 on kernel 7.0 (run 44664572054). connect-zig did not
       move: its codec's median time was 1.001 times 24.04's, and it held 729,722 spans a second
       over TLS against 729,752. The other servers gained on 26.04: connect-go 10%, the Collector
-      9%, Vector 7% and connect-rust 3.5% in the climb over TLS, and connect-rust's routed call
+      9%, Vector 7%, and connect-rust 3.5% in the climb over TLS, and connect-rust's routed call
       took 11% less time. So the charts' ratios to them shrink a little. Each chart after this
       names a run on 26.04. Python 3.14 on 26.04 also needed the cp314 wheels of grpcio and
       grpcio-tools in `interop/python/requirements.txt`, and the coverage check now names its
@@ -1210,13 +1210,13 @@ first. Cite an entry by number in code and commits ("decision 6").
 46. **The full-stack benchmark loads receivers on connect-go and connect-rust beside the sink.**
     Ruled by the owner on 2026-11-18, for issue 7.
     - The routed call (design §8 step 23) compares connect-zig with connect-go and connect-rust in
-      memory, with no socket, TLS or HTTP/2. The full stack (decision 44) puts sockets, TLS and
+      memory, with no socket, TLS, or HTTP/2. The full stack (decision 44) puts sockets, TLS, and
       HTTP/2 in, beside OTLP products with pipelines of their own. Neither shows how much of the
       library's lead survives the transport.
     - So two receivers join the full-stack check: `tools/fullstack/connect-go`, on connect-go
       and `net/http`, and `tools/fullstack/connect-rust`, on connect-rust's `connectrpc` server,
-      hyper and rustls. Each serves TraceService/Export over TLS with the test identity, counts
-      each export's spans and drops it, as `tools/otlp_sink` does. connect-go decodes each export
+      hyper, and rustls. Each serves TraceService/Export over TLS with the test identity, counts
+      each export's spans, and drops it, as `tools/otlp_sink` does. connect-go decodes each export
       into Go's structs; connect-rust into Buffa's view of the request's octets.
     - Each runs alone on one core: connect-go with GOMAXPROCS=1, and connect-rust with
       TOKIO_WORKER_THREADS=1. Both join the peak part and the climb over TLS, under the probes and
@@ -1241,7 +1241,7 @@ first. Cite an entry by number in code and commits ("decision 6").
       protovalidate in connect-zig alone, which gives its cost and no scale to read it on.
     - Amended again on 2026-11-23, ruled by the owner: connect-go joins with protovalidate-go
       v1.4.1, the third pair of the chart. The three Connect receivers also run both loads with
-      exports in no coding and in gzip, zstd and brotli, over TLS and in cleartext h2, in two
+      exports in no coding and in gzip, zstd, and brotli, over TLS and in cleartext h2, in two
       checks of their own, `fullstack-compression` and `fullstack-compression-cleartext`: the two
       transports in one job pass the 60 minutes a CI job had. stdx's encoders write every export,
       as a connect-zig client places them. connect-go reads zstd with klauspost/compress and
@@ -1264,6 +1264,6 @@ first. Cite an entry by number in code and commits ("decision 6").
       calls, as the Zig side replays a head it built once: Go copies a request httptest built
       once into a writer it clears, and Rust clones a head the builder made once. In a 4-CPU
       container Go's small call fell from 7 to 11 µs to 2 to 4 µs, and Rust's by about 10%.
-      `tools/bench_check.sh` runs Zig, Go and Rust in three rounds, each in an order rotated by
+      `tools/bench_check.sh` runs Zig, Go, and Rust in three rounds, each in an order rotated by
       one, and gives each cell the median round. Beaten: one run of each language after the other,
       on which a runner that drifts slows the last.
