@@ -84,16 +84,16 @@ call, in nanoseconds:
 
 ## Whole servers on a socket
 
-From CI's [run 256](https://github.com/c4milo/connect-zig/actions/runs/45171587471), on an Arm Neoverse-N2 core; the x86-64 chart is under it. An OTLP receiver on one core, over TLS and h2, takes the traffic of one gateway
-core for 33,000 servers. connect-zig holds 8.0 times connect-go's spans a second and 2.8 times
+From CI's [run 266](https://github.com/c4milo/connect-zig/actions/runs/45246119951), on an Arm Neoverse-N2 core; the x86-64 chart is under it. An OTLP receiver on one core, over TLS and h2, takes the traffic of one gateway
+core for 33,000 servers. connect-zig holds 7.0 times connect-go's spans a second and 2.7 times
 connect-rust's, in 321 MiB that it takes at start.
 
-![Bars of the spans a second one core holds with p99 under 100 ms over TLS, and lines of p99 as the rate climbs, on arm64: connect-zig holds 760,998 spans a second, 8.0 times connect-go's 95,668, 2.8 times connect-rust's 275,894, 3.6 times the OpenTelemetry Collector's 213,600 and 11.4 times Vector's 66,748](images/fullstack-arm64.svg)
+![Bars of the spans a second one core holds with p99 under 100 ms over TLS, the median of three rounds with their range, and lines of p99 as the rate climbs, on arm64: connect-zig holds 711,570 spans a second, 7.0 times connect-go's 101,213, 2.7 times connect-rust's 263,440, 3.3 times the OpenTelemetry Collector's 215,818 and 8.6 times Vector's 82,310](images/fullstack-arm64.svg)
 
 <details>
-<summary>On x86-64, connect-zig passed every step of the climb, so it holds at least 6.1 times connect-go's spans a second, 2.3 times connect-rust's, 3.4 times the Collector's and 10.8 times Vector's.</summary>
+<summary>On x86-64, connect-zig holds 6.2 times connect-go's spans a second, 2.1 times connect-rust's, 3.0 times the Collector's and 7.5 times Vector's.</summary>
 
-![Bars of the spans a second one core holds with p99 under 100 ms over TLS, and lines of p99 as the rate climbs, on x86-64: connect-zig passed every step, to at least 1,139,240 spans a second, at least 6.1 times connect-go's 186,900, 2.3 times connect-rust's 493,950, 3.4 times the OpenTelemetry Collector's 335,886 and 10.8 times Vector's 105,646](images/fullstack.svg)
+![Bars of the spans a second one core holds with p99 under 100 ms over TLS, the median of three rounds with their range, and lines of p99 as the rate climbs, on x86-64: connect-zig holds 990,541 spans a second, 6.2 times connect-go's 160,510, 2.1 times connect-rust's 476,179, 3.0 times the OpenTelemetry Collector's 327,675 and 7.5 times Vector's 132,786](images/fullstack.svg)
 
 </details>
 
@@ -106,7 +106,8 @@ OTLP exports. The servers:
   exporter.
 - [Vector](https://vector.dev/) v0.62.0, in Rust, with its `opentelemetry` source and its
   `blackhole` sink. The source converts each span into Vector's own event, its default. Its
-  `otlp` codec keeps OTLP's form, but answered fewer than half the calls a second.
+  `otlp` codec keeps OTLP's form, but answered fewer than half the calls a second. Its gRPC
+  listener speaks TLS 1.2 alone.
 - [Rotel](https://github.com/streamfold/rotel) v0.2.7, the OpenTelemetry collector in Rust, with
   its OTLP receiver and its `blackhole` exporter. Its receiver has no TLS.
 - Receivers on the other Connect libraries:
@@ -117,133 +118,138 @@ OTLP exports. The servers:
 
 Each server decodes and checks every span, counts it and drops it. Each runs on one core, the
 Collector and connect-go with `GOMAXPROCS=1`, Vector with one thread, and connect-rust with one
-tokio worker. The load runs on two other cores. Each run checks every span.
+tokio worker. connect-zig's sink is built for the machine's CPU, connect-go at the highest level
+of the CPU that Go names, and connect-rust with LTO and `target-cpu=native`. The Collector, Vector
+and Rotel run their projects' release builds. Each run checks every span.
 
 The production model stands for one core of a 64-core gateway that 33,000 servers send their traces
 to. Each server holds 516 connections. 70%, 25% and 5% of them send gzip exports of 16, 128 and 512
-spans. [oha](https://github.com/hatoo/oha) sends at fixed rates, and its latency holds the time a
-call waits in a queue. Each step lasts 10 s, and its measure leaves out the first 2 s, where its TLS
-handshakes run. The rate climbs until p99 passes 100 ms, a call is refused, or the server takes
-less than 95% of the spans sent. Then five more steps halve the gap to the last step that passed.
-A bar's whisker reaches the step that failed: it gives the climb's step, not the spread of the rate
-between runs, which the limits below give. oha runs on two CPUs of its own, and the server on a
-CPU that shares no physical core with them (`tools/fullstack/placement.py`). A step that fails while oha's two cores were 90% busy or more ends the
-climb on the load, not on the server: oha corrects its latency for each call it sends late, so a
-load that falls behind would show as the server's p99. The rate held is then a floor. The share
-counts all the work on oha's cores, the kernel's for the traffic oha sends included. CI's two
-`fullstack` jobs of commit `57ec581` ([run
-256](https://github.com/c4milo/connect-zig/actions/runs/45171587471)) ran it on
-colibri v0.19.2 and Ubuntu 26.04, on an Arm Neoverse-N2 core and on an AMD EPYC 9V45 core. The charts show the climb
-over TLS 1.3: one core of connect-zig held 8.0 times connect-go's spans a second on arm64 and at
-least 6.1 times on x86-64, 2.8 and 2.3 times connect-rust's, 3.6 and 3.4 times the Collector's,
-and 11.4 and 10.8 times Vector's.
+spans. The load, `tools/fullstack/load`, opens the 516 connections once and keeps them across the
+climb, as the agents keep theirs. Each connection sends 32 versions of its class's export in turn,
+so a decoder does not read the same octets on every call. It sends at fixed rates, each
+connection on a schedule of its own, and counts each call's latency from the instant its schedule
+set, so a call that waits in a queue counts its wait. It offers AES-128-GCM alone: every server
+runs TLS_AES_128_GCM_SHA256, and Vector ECDHE-ECDSA-AES128-GCM-SHA256 in TLS 1.2. Each step lasts
+10 s, and every call counts. The rate climbs until p99 passes 100 ms, a call is refused, or the
+server takes less than 95% of the spans sent. Then five more steps halve the gap to the last step
+that passed.
 
-Rotel has no TLS on its receiver, so a second climb runs in cleartext h2 for connect-zig, the
-Collector and Rotel. There one core of connect-zig holds 3.6 times Rotel's spans a second and 4.2
-times the Collector's on arm64, and at least 2.6 and 3.5 times on x86-64.
+Each server runs three rounds, each on a new process. The first climbs from the lowest rate. Each
+later round starts from a step at half the rate the first held, then brackets that rate and halves
+the gap four times. Each round runs the servers in an order rotated by one. The chart's bar is the
+median round, and its whisker spans the rates the three rounds held. A ratio of two servers is
+also given round by round, since one round runs both near in time. The load runs on two CPUs of a
+physical core of their own, and the server on a CPU of another core
+(`tools/fullstack/placement.py`). The load's cores were 3% to 23% busy at the rates held, far
+from the 90% at which a step ends as the load's.
 
-<details>
-<summary>The climb in cleartext h2, on arm64 and on x86-64.</summary>
+The rate each core holds over TLS, the median of three rounds, with the range of the rounds:
 
-![Bars of the spans a second one core holds with p99 under 100 ms over cleartext h2, and lines of p99 as the rate climbs, on arm64: connect-zig holds 800,952 spans a second, 3.6 times Rotel's 224,802 and 4.2 times the OpenTelemetry Collector's 191,334](images/fullstack-cleartext-arm64.svg)
-
-![Bars of the spans a second one core holds with p99 under 100 ms over cleartext h2, and lines of p99 as the rate climbs, on x86-64: connect-zig passed every step, to at least 1,139,264 spans a second, at least 2.6 times Rotel's 445,000 and 3.5 times the OpenTelemetry Collector's 327,098](images/fullstack-cleartext.svg)
-
-</details>
-
-The CPU time a span, at each server's highest step, in µs. A span costs less CPU as the rate
-rises: each step's 516 TLS handshakes, and each wake of the core, are shared among more spans. So
-the table favours a server whose highest step is higher. The sections on protovalidate and compression below compare at a common rate:
-
-| Server | arm64, TLS | x86-64, TLS | arm64, cleartext | x86-64, cleartext |
+| Server | arm64 | arm64 range | x86-64 | x86-64 range |
 | --- | ---: | ---: | ---: | ---: |
-| connect-zig | 1.31 | 0.88 | 1.26 | 0.88 |
-| connect-rust | 3.64 | 1.78 | | |
-| connect-go | 9.80 | 5.09 | | |
-| Collector | 4.56 | 2.76 | 5.25 | 3.06 |
-| Vector | 13.34 | 6.41 | | |
-| Rotel | | | 4.46 | 2.16 |
+| connect-zig | 711,570 | 711,570–729,800 | 990,541 | 943,400–1,037,747 |
+| connect-rust | 263,440 | 263,440–284,800 | 476,179 | 464,264–476,179 |
+| Collector | 215,818 | 215,818–215,818 | 327,675 | 304,818–335,312 |
+| connect-go | 101,213 | 98,715–101,213 | 160,510 | 144,053–164,672 |
+| Vector | 82,310 | 80,261–82,310 | 132,786 | 86,782–137,462 |
+
+Round by round, connect-zig held 2.56 to 2.70 times connect-rust's spans a second on arm64 and
+1.98 to 2.24 times on x86-64, 3.30 to 3.38 and 3.02 to 3.09 times the Collector's, 7.03 to 7.21
+and 5.73 to 7.20 times connect-go's, and 8.65 to 8.87 and 7.46 to 10.87 times Vector's.
+
+After its rounds, each server ran one step of 60 s at its median rate, on a new process. On
+arm64, every Connect receiver held it, and the Collector and Vector did not: the Collector's p99
+reached 102 ms, and Vector's 2.7 s. On x86-64, every server but two held it: Vector's p99 reached
+10.5 s, and connect-rust with protovalidate-buffa's 273 ms. In run 265 on other runners, most
+servers failed the long step on x86-64, connect-zig among them. Read a rate held as the edge of
+what a core takes for 10 s, not as a rate to plan a fleet on.
+
+The most spans a second a step of the first round held with p99 at most 10 ms, a latency an
+interactive caller would accept:
+
+| Server | arm64 | x86-64 |
+| --- | ---: | ---: |
+| connect-zig | 569,600 | 569,600 |
+| connect-rust | 284,800 | 284,800 |
+| Collector | 71,200 | 142,400 |
+| connect-go | 53,400 | 71,200 |
+| Vector | 71,200 | 71,200 |
+
+The CPU time a span at each server's median rate, in µs, and its peak memory. A span costs less
+CPU as the rate rises, since each wake of the core serves more calls, so the table favours a
+server whose rate is higher. The sections on protovalidate and compression below compare at a
+common rate:
+
+| Server | arm64, µs | x86-64, µs | arm64, MiB | x86-64, MiB |
+| --- | ---: | ---: | ---: | ---: |
+| connect-zig | 1.41 | 1.01 | 321 | 322 |
+| connect-rust | 3.81 | 2.08 | 54 | 52 |
+| Collector | 4.64 | 2.95 | 484 | 482 |
+| connect-go | 9.83 | 5.69 | 190 | 192 |
+| Vector | 12.16 | 6.32 | 1,484 | 1,479 |
 
 connect-zig takes all its memory when it starts: 321 MiB, for 528 connections and 64 calls at
-once, each call with 1 MiB to decode its export into. Its route's `reply_bytes` of 4 KiB took
-31 MiB off the 352 MiB of run 250 (design §8 step 39). colibri v0.19.2's `Router.init` starts the
-router in place; a router set to `.{}` copied its default value from the program's image, and the
-sink grew to 500 MiB in run 248. Over TLS on arm64, connect-rust grew to 52 MiB, connect-go to
-146 MiB, the Collector to 755 MiB and Vector to 743 MiB; in cleartext, Rotel grew to 324 MiB.
+once, each call with 1 MiB to decode its export into and 4 KiB for its reply (design §8 step 39).
+connect-rust holds a sixth of it. Vector held twice the memory it held in run 256, when the load
+sent one export again and again; no check here measures why.
 
-On arm64, connect-zig's climbs ended when p99 passed 100 ms, with its core busy all the time. On
-x86-64 they passed every step, up to 1,139,200 spans a second sent, the top of run 256's climb.
-There its rate is a floor, and each ratio over it is at least its value. The climb now reaches 48
-exports a connection a second, 1,708,800 spans a second. Every other server's climb ended
-when p99 passed 100 ms. A runner's CPU model changes from run to run on x86-64, so its rates move
-between runs; the arm64 runner has been a Neoverse-N2 in each run.
+Rotel has no TLS on its receiver, so a check of its own, `fullstack-cleartext`, climbs in
+cleartext h2 for connect-zig, the Collector and Rotel, on x86-64 alone. There connect-zig held
+820,142 spans a second, 4.14 times the Collector's 198,018 and 3.41 times Rotel's 240,307, and 3.77
+to 4.36 and 3.41 to 3.59 times round by round. All three held their rate for 60 s. Rotel grew to
+327 MiB, and the Collector to 186 MiB.
 
 Read these numbers with their limits:
 
-- Every server and oha run on one machine, and talk over its loopback device: no network card, no
-  second machine, no lost packet.
-- Each server climbs once in each job. Between runs 250 and 256, on the same AMD EPYC 9V45, the same
-  competitors' rates moved by up to 38% on x86-64. On arm64 the plain servers moved by 3% or less,
-  and connect-rust with protovalidate-buffa by 8%. Read an x86-64 number as one sample, and a
-  difference of a few percent as no difference.
-- Each step opens its 516 connections again, and its measure leaves out the first 2 s, where their
-  TLS handshakes run. Only connect-zig's sink refuses a call there: past its 64 calls at once it
-  answers 503, where the other servers queue the call. In the step it held over TLS on arm64, it
-  refused 88 calls in those 2 s, and none after. The 2 s window came after run 248, whose climbs of
-  connect-zig ended on such refusals. A load that kept its connections open across steps would need
-  no such window.
-- Run 256 ran before the check of oha's cores, so its steps did not measure them. It also pinned
-  the server to CPU 1 and oha to CPUs 2 and 3 without reading which CPUs share a physical core. An
-  x86-64 runner with two threads a core may have run the server and a thread of oha on one core.
-  From the next run the pins follow Linux's CPU topology, and the machine line gives the threads of
-  a core.
-- oha can pin no TLS suite, and Go's server cannot be told one, so each server chose its own from
-  oha's offer. Go's servers likely chose AES-128-GCM, and connect-zig's sink and rustls's
-  AES-256-GCM. From the next run each report names the suite each server chose.
-- In run 256, connect-zig's sink was built for the machine's own CPU, and connect-go,
-  connect-rust and the other servers for their architecture's generic CPU. From the next run,
-  connect-go and connect-rust are built for the machine's CPU too: Go at the highest level of the
-  CPU that it names, and Rust with LTO and `target-cpu=native` (`tools/host_cpu.sh`). The
-  Collector, Vector and Rotel stay their projects' release builds. The peak part also runs
-  connect-zig built for the generic CPU, which shows what the build for the host's CPU gives it.
-- The sink's limits fit this load: 528 connections for its 516, and 64 calls at once, which h2load's
-  16 connections of 4 streams fill at the peak. A core with more connections, or with exports over
-  256 KiB, needs larger limits and more memory.
-- Each class sends one export again and again, so a decoder reads the same octets each time.
+- Every server and the load run on one machine, and talk over its loopback device: no network
+  card, no second machine, no lost packet.
+- Three rounds narrow the spread of one job, not of the runner: an x86-64 runner's CPU model
+  changes from job to job, and this run's x86-64 jobs ran on AMD EPYC 9V45, AMD EPYC 7763 and
+  Intel Xeon 6973P-C and 6975P-C cores. Compare a number only with the numbers of its own table.
+  The arm64 runner has been a Neoverse-N2 in each run.
+- On x86-64 the server's CPU shares its physical core with the CPU where the scripts run, which
+  sleep while a step runs.
+- connect-zig's sink holds 64 calls at once, and answers 503 past them. Its climbs end there when
+  its core falls behind, where the other servers queue the call. The limit fits this load: h2load's
+  16 connections of 4 streams fill it at the peak. A core with more connections, or with exports
+  over 256 KiB, needs larger limits and more memory.
 
-Vector's and Rotel's p99 stays near 40 ms from a low rate. Neither sets `TCP_NODELAY` on the
-sockets it accepts, so Nagle's algorithm waits for Linux's delayed ACK. With `TCP_NODELAY` set
-from outside, their p99 fell to about 5 ms, but neither held a higher rate. So the climb runs them
-as they ship. connect-rust's server sets it.
+In earlier runs, Vector's and Rotel's p99 stayed near 40 ms from a low rate. Neither sets
+`TCP_NODELAY` on the sockets it accepts, so Nagle's algorithm waits for Linux's delayed ACK. With
+`TCP_NODELAY` set from outside, their p99 fell to about 5 ms, but neither held a higher rate. So
+the climb runs them as they ship. connect-rust's server sets it.
 
-The same jobs also load each server over TLS as fast as it answers, with exports of 16 and of 512
-spans, not compressed, on 16 connections of 4 streams. The calls a second:
+The check `fullstack-peak` also loads each server over TLS as fast as it answers, with exports of
+16 and of 512 spans, not compressed, on 16 connections of 4 streams, on x86-64 alone. It runs
+connect-go a second time with `GOGC=off` and `GOMEMLIMIT=320MiB`, about the memory connect-zig's
+sink takes, so Go's collector runs only as its heap nears that, and connect-zig a second time
+built for the generic CPU. The calls a second, the median of three rounds, on an Intel Xeon
+6975P-C core:
 
-| Server | 16 spans, arm64 | 512 spans, arm64 | 16 spans, x86-64 | 512 spans, x86-64 |
-| --- | ---: | ---: | ---: | ---: |
-| connect-zig | 41,871 | 1,613 | 67,235 | 2,663 |
-| connect-rust | 17,789 | 1,076 | 33,039 | 1,857 |
-| connect-go | 5,273 | 363 | 9,652 | 717 |
-| Collector | 13,629 | 757 | 27,020 | 1,442 |
-| Vector | 4,427 | 248 | 13,180 | 395 |
+| Server | 16 spans | 512 spans | Peak MiB |
+| --- | ---: | ---: | ---: |
+| connect-zig | 60,294 | 2,104 | 322 |
+| connect-zig, generic CPU | 56,558 | 1,974 | 322 |
+| connect-rust | 34,493 | 1,731 | 18 |
+| Collector | 21,410 | 1,117 | 160 |
+| Vector | 10,050 | 357 | 306 |
+| connect-go | 8,132 | 529 | 53 |
+| connect-go, 320 MiB | 9,765 | 647 | 315 |
+
+With connect-zig's memory, connect-go answers 20% to 22% more calls a second and spends 17% to 18%
+less CPU a call. connect-zig still answers 6.2 times its calls of 16 spans and 3.3 times its calls
+of 512. Built for the generic CPU, connect-zig answers 93.8% of the calls of its build for this
+CPU.
 
 ### With protovalidate
 
-From the same run, on an Arm Neoverse-N2 core over TLS; the x86-64 chart is under it. Each
-Connect receiver runs a second time, and checks every span of each export against OTLP's span
-rules before it counts it. With validation, one core of connect-zig keeps 86% of its
-spans a second, connect-rust 95% and connect-go 61%. So connect-zig with protovalidate holds 2.5
-times connect-rust's spans a second with protovalidate-buffa, and 11.2 times connect-go's with
-protovalidate-go.
+From the same run, on an Arm Neoverse-N2 core over TLS. Each Connect receiver runs a second time,
+and checks every span of each export against OTLP's span rules before it counts it. With
+validation, one core of connect-zig keeps 87% of its spans a second, connect-rust 94% and
+connect-go 62%. So connect-zig with protovalidate holds 2.5 times connect-rust's spans a second
+with protovalidate-buffa, and 9.8 times connect-go's with protovalidate-go.
 
-![Bars of the spans a second one core holds over TLS with p99 under 100 ms, for each Connect receiver without and with protovalidate, and lines of p99 as the rate climbs, on arm64: connect-zig keeps 86% of its rate with protovalidate, 654,086 spans a second, connect-rust with protovalidate-buffa 95%, 262,530, and connect-go with protovalidate-go 61%, 58,386](images/fullstack-validate-arm64.svg)
-
-<details>
-<summary>On x86-64, connect-zig keeps at most 95% of its spans a second with validation, connect-go 63%, and connect-rust's validating climb held more than its plain one.</summary>
-
-![Bars of the spans a second one core holds over TLS with p99 under 100 ms, for each Connect receiver without and with protovalidate, and lines of p99 as the rate climbs, on x86-64: connect-zig keeps at most 95% of its rate with protovalidate, 1,085,778 spans a second, connect-rust with protovalidate-buffa 107%, 529,582, and connect-go with protovalidate-go 63%, 116,840](images/fullstack-validate.svg)
-
-</details>
+![Bars of the spans a second one core holds over TLS with p99 under 100 ms, for each Connect receiver without and with protovalidate, the median of three rounds, and lines of p99 as the rate climbs, on arm64: connect-zig keeps 87% of its rate with protovalidate, 618,528 spans a second, connect-rust with protovalidate-buffa 94%, 246,982, and connect-go with protovalidate-go 62%, 62,858](images/fullstack-validate-arm64.svg)
 
 The three validating receivers:
 
@@ -261,25 +267,24 @@ time not before the start time, and an attribute key that is not empty. Two of t
 No span of the load breaks a rule. Before each server's climb, the check sends it an export whose
 `trace_id` holds 3 octets, and fails when a validating receiver takes it.
 
-The rate each core holds over TLS, and what validation costs it:
+The rate each core keeps over TLS, the median of the rounds with their range round by round, and
+what validation costs it in CPU a span:
 
 | Receiver | arm64, rate kept | arm64, CPU a span | x86-64, rate kept | x86-64, CPU a span |
 | --- | ---: | ---: | ---: | ---: |
-| connect-zig | 86% | +11% | ≤95% | +6% |
-| connect-rust | 95% | +6% | 107% | +3% |
-| connect-go | 61% | +53% | 63% | +54% |
+| connect-zig | 87% (85% to 87%) | +12% | 91% (87% to 93%) | +4% |
+| connect-rust | 94% (87% to 94%) | +9% | 94% (89% to 96%) | +6% |
+| connect-go | 62% (62% to 64%) | +53% | 59% (53% to 74%) | +60% |
 
-The CPU a span compares each receiver with its twin at the highest rate both climbs held, since a
-span costs less CPU as the rate rises. On arm64 that rate was 569,600 spans a second for
-connect-zig, 249,200 for connect-rust and 53,400 for connect-go, and on x86-64 it was 854,400,
-427,200 and 71,200. It is the measure to read: the rate kept moves with one step of a climb. On
-x86-64, connect-zig's plain climb passed every step, so it kept at most 95%. connect-rust's plain
-climb failed at 498,400 spans a second with a p99 of 597 ms, a step its validating twin passed
-with a p99 of 2.66 ms.
+The CPU a span compares each receiver with its twin at the highest rate both first rounds held,
+since a span costs less CPU as the rate rises. On arm64 that rate was 569,600 spans a second for
+connect-zig, 213,600 for connect-rust and 53,400 for connect-go, and on x86-64 it was 854,400,
+356,000 and 71,200. On x86-64, connect-zig's two rates overlap over the rounds, so the rounds
+cannot tell its rate with validation from its rate without.
 
-At the peak, with one export sent again and again, validation costs connect-zig 3.0 µs a call of
-16 spans and 90.0 µs a call of 512 spans on arm64: 0.18 to 0.19 µs a span. It costs connect-rust 7.0
-and 90.0 µs, 0.18 to 0.44 µs a span, and connect-go 127 and 2,708 µs, 5.3 to 7.9 µs a span.
+At the peak on x86-64, with one export sent again and again, validation costs connect-zig 1.8 µs a
+call of 16 spans and 60.0 µs a call of 512 spans: 0.11 to 0.12 µs a span. It costs connect-rust 1.5
+and 35.0 µs, 0.07 to 0.09 µs a span, and connect-go 61.8 and 1,840 µs, 3.6 to 3.9 µs a span.
 
 connect-zig decodes each export into storage that its route owns, 1 MiB a call in the sink
 (decision 37). A list that does not fit is parsed again by each read, and validation reads every
@@ -290,41 +295,21 @@ did not fit. The check fails when the sink counts one.
 
 ### With compression
 
-From the same run, on an Arm Neoverse-N2 core over TLS; the other three charts are under it.
-connect-zig, connect-go and connect-rust each take the production model's exports uncompressed and
-in gzip, zstd and brotli. Over TLS, one core of connect-zig holds 15% more spans a second in gzip
-than uncompressed, 18% more in zstd and 2% more in brotli. connect-go holds 19% to 24% fewer, and
-connect-rust between 10% fewer and 1% more.
+From the same run, on an Arm Neoverse-N2 core over TLS. connect-zig, connect-go and connect-rust
+each take the production model's exports uncompressed and in gzip, zstd and brotli. Over TLS, one
+core of connect-zig holds 7% more spans a second in gzip than uncompressed, 10% more in zstd and 8%
+fewer in brotli. connect-go holds 18% to 24% fewer, and connect-rust 9% to 21% fewer.
 
-![Bars of the spans a second each Connect receiver holds over TLS with exports in gzip, zstd and brotli, as a share of the same receiver with uncompressed exports, and of its calls a second at peak, on arm64: connect-zig holds 115%, 118% and 102%, connect-go 76%, 81% and 80%, and connect-rust 95%, 101% and 90%](images/fullstack-compression-arm64.svg)
-
-<details>
-<summary>In cleartext h2 on arm64, connect-zig holds 110%, 112% and 95% of its uncompressed rate, connect-go 73%, 84% and 77%, and connect-rust 86%, 90% and 81%.</summary>
-
-![Bars of the spans a second each Connect receiver holds over cleartext h2 with exports in gzip, zstd and brotli, as a share of the same receiver with uncompressed exports, and of its calls a second at peak, on arm64: connect-zig holds 110%, 112% and 95%, connect-go 73%, 84% and 77%, and connect-rust 86%, 90% and 81%](images/fullstack-compression-cleartext-arm64.svg)
-
-</details>
-
-<details>
-<summary>Over TLS on x86-64, connect-zig holds 121%, 125% and 98% of its uncompressed rate, connect-go 81%, 93% and 87%, and connect-rust 85%, 92% and 79%.</summary>
-
-![Bars of the spans a second each Connect receiver holds over TLS with exports in gzip, zstd and brotli, as a share of the same receiver with uncompressed exports, and of its calls a second at peak, on x86-64: connect-zig holds 121%, 125% and 98%, connect-go 81%, 93% and 87%, and connect-rust 85%, 92% and 79%](images/fullstack-compression.svg)
-
-</details>
-
-<details>
-<summary>In cleartext h2 on x86-64, connect-zig holds 101%, 104% and 85% of its uncompressed rate, connect-go 70%, 83% and 74%, and connect-rust 70%, 89% and 75%.</summary>
-
-![Bars of the spans a second each Connect receiver holds over cleartext h2 with exports in gzip, zstd and brotli, as a share of the same receiver with uncompressed exports, and of its calls a second at peak, on x86-64: connect-zig holds 101%, 104% and 85%, connect-go 70%, 83% and 74%, and connect-rust 70%, 89% and 75%](images/fullstack-compression-cleartext.svg)
-
-</details>
+![Bars of the spans a second each Connect receiver holds over TLS with exports in gzip, zstd and brotli, as a share of the same receiver with uncompressed exports in the same round, and of its calls a second at peak, on arm64: connect-zig holds 107%, 110% and 92%, connect-go 76%, 82% and 78%, and connect-rust 86%, 91% and 79%](images/fullstack-compression-arm64.svg)
 
 `tools/fullstack/compression.sh` runs the climb and the peak of the production model on the three
-Connect receivers, once for each coding. stdx's encoders write each export as a connect-zig client
-does: gzip at stdx's default level, and zstd and brotli at level 1. Each receiver decodes with its
-library's own decoders, at their defaults: connect-zig with stdx's, connect-go with compress/gzip,
-klauspost/compress and andybalholm/brotli, and connect-rust with flate2, zstd and brotli. Every
-span is checked. The octets of each export:
+Connect receivers, in three rounds of each coding. Each round gives each receiver its codings in
+an order of its own, and a coding's share compares it with the receiver uncompressed in the same
+round. stdx's encoders write each export as a connect-zig client does: gzip at stdx's default
+level, and zstd and brotli at level 1. Each receiver decodes with its library's own decoders, at
+their defaults: connect-zig with stdx's, connect-go with compress/gzip, klauspost/compress and
+andybalholm/brotli, and connect-rust with flate2, zstd and brotli. Every span is checked. The
+octets of each class's first export:
 
 | Export | Uncompressed | gzip | zstd | brotli |
 | --- | ---: | ---: | ---: | ---: |
@@ -339,42 +324,56 @@ and the HTTP/2 work on the octets it removes, and each share holds both.
 
 The compression parts run `otlp-sink-compression`, connect-zig's sink with room for 256 calls at
 once, where the other parts' sink holds 64. An uncompressed export holds its call longer while its
-octets arrive. In run 250, with 64 calls, each uncompressed climb of connect-zig ended on a refused
-call while its p99 stayed near 3 ms. With 256, each ended when p99 passed 100 ms, with its core
-busy, as every other climb here did. The 256 calls take the sink to about 666 MiB.
+octets arrive.
 
-The CPU a span, at the highest rate that a receiver's four climbs all held, against uncompressed:
+The rate kept against uncompressed, the median of the rounds, on arm64 over TLS and on x86-64 over
+TLS and in cleartext h2:
 
-| Receiver | Coding | arm64, TLS | x86-64, TLS | arm64, cleartext | x86-64, cleartext |
-| --- | --- | ---: | ---: | ---: | ---: |
-| connect-zig | gzip | -7% | -7% | +2% | +8% |
-| connect-zig | zstd | -8% | -12% | +0% | +3% |
-| connect-zig | brotli | +3% | +10% | +15% | +28% |
-| connect-go | gzip | +25% | +26% | +31% | +33% |
-| connect-go | zstd | +16% | +5% | +18% | +16% |
-| connect-go | brotli | +21% | +15% | +22% | +27% |
-| connect-rust | gzip | +4% | +17% | +15% | +16% |
-| connect-rust | zstd | +3% | +17% | +12% | +13% |
-| connect-rust | brotli | +13% | +27% | +23% | +30% |
+| Receiver | Coding | arm64, TLS | x86-64, TLS | x86-64, cleartext |
+| --- | --- | ---: | ---: | ---: |
+| connect-zig | gzip | 107% | 105% | 93% |
+| connect-zig | zstd | 110% | 110% | 100% |
+| connect-zig | brotli | 92% | 87% | 79% |
+| connect-go | gzip | 76% | 77% | 76% |
+| connect-go | zstd | 82% | 85% | 81% |
+| connect-go | brotli | 78% | 79% | 76% |
+| connect-rust | gzip | 86% | 79% | 70% |
+| connect-rust | zstd | 91% | 98% | 89% |
+| connect-rust | brotli | 79% | 83% | 72% |
 
-Over TLS, gzip and zstd save connect-zig more CPU than its decoders spend: a span of a gzip export
-costs it 7% less CPU than an uncompressed one, and of a zstd export 8% to 12% less. In cleartext
-there is no TLS to save, and gzip and zstd cost it 0% to 8% more. Brotli costs it 3% to 28% more.
-Each coding costs connect-go 5% to 33% more CPU a span, and connect-rust 3% to 30% more.
+The CPU a span, at the highest rate that a receiver's first rounds all held, against
+uncompressed:
+
+| Receiver | Coding | arm64, TLS | x86-64, TLS | x86-64, cleartext |
+| --- | --- | ---: | ---: | ---: |
+| connect-zig | gzip | -5% | -2% | +9% |
+| connect-zig | zstd | -5% | -6% | +7% |
+| connect-zig | brotli | +13% | +13% | +25% |
+| connect-go | gzip | +22% | +18% | +22% |
+| connect-go | zstd | +16% | +8% | +17% |
+| connect-go | brotli | +21% | +15% | +24% |
+| connect-rust | gzip | +4% | +13% | +30% |
+| connect-rust | zstd | +5% | +1% | +16% |
+| connect-rust | brotli | +13% | +9% | +24% |
+
+Over TLS, gzip and zstd save connect-zig more CPU than its decoders spend: a span of a gzip or a
+zstd export costs it 2% to 6% less CPU than an uncompressed one. In cleartext there is no TLS to
+save, and they cost it 7% to 9% more. Brotli costs it 13% to 25% more. Each coding costs
+connect-go 8% to 24% more CPU a span, and connect-rust 1% to 30% more.
 
 Read the charts with three limits:
 
-- The two x86-64 jobs ran on an Intel Xeon 6975P-C, where the other x86-64 jobs of the run ran on
-  AMD EPYC cores. Compare a share only with the shares of its own chart.
+- The x86-64 compression jobs ran on AMD EPYC 7763 cores, where the other x86-64 jobs of the run
+  ran on other models. Compare a share only with the shares of its own table.
 - No OpenTelemetry exporter sends brotli.
-- A receiver's own climb can move by a step between codings, as connect-rust's zstd climb over TLS
-  on arm64 shows: 101% of its uncompressed rate, at 3% more CPU a span. The CPU a span at a common
-  rate does not move so.
+- connect-rust's zstd climbs and its uncompressed climbs overlap over the rounds on both machines,
+  as do connect-zig's zstd and uncompressed climbs in cleartext: the rounds cannot tell those two
+  rates apart.
 
 At the peak, with one export sent again and again, an export of 16 spans costs each receiver more
-in every coding: connect-zig answers 78% to 88% of its uncompressed calls a second over TLS on
-arm64. An export of 512 spans saves connect-zig more than it costs over TLS: it answers 121% in
-gzip and in zstd on arm64. The run's summary holds every table.
+in every coding: connect-zig answers 77% to 89% of its uncompressed calls a second over TLS on
+arm64. An export of 512 spans saves connect-zig more than it costs over TLS: it answers 118% in
+gzip and 120% in zstd on arm64. The run's summary holds every table.
 
 ## Validation
 

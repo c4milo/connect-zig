@@ -1520,6 +1520,25 @@ ran on Linux x86-64 with Zig 0.16.0.
     their own, and each ran again in a form that compiles.
   - pepegrillo moved to `e94a349`. Its commit linter still holds a subject to 72 columns, so
     `b6f90a1` still fails `zig build lint-commits`.
+- **The method review's fixes in CI** (`a69e377` and `1a541bd`, decisions 44 and 46 as
+  amended). CI's [run 265](https://github.com/c4milo/connect-zig/actions/runs/45231244610) and
+  [run 266](https://github.com/c4milo/connect-zig/actions/runs/45246119951).
+  - Run 265 failed both `fullstack` jobs. Vector's gRPC listener speaks TLS 1.2 alone, and
+    refused the new load's offer of TLS 1.3 alone; and `tools/fullstack_chart.py` read the long
+    step's table as the table of rates held. `1a541bd` fixed both, and every job of run 266
+    passed. The longest full-stack job took 70 minutes of its 90.
+  - Run 265's micro benchmarks ran in three rounds in rotated order. With Go's and Rust's
+    request built outside the timed calls, connect-zig's routed call was 9.6 to 12.4 times as
+    fast as connect-go's on arm64, where run 256 gave 14.9 to 22.9.
+  - Run 266 climbed each server in three rounds on the load that keeps its connections. On arm64,
+    connect-zig held 711,570 spans a second over TLS, from 711,570 to 729,800 over the rounds:
+    7.0 times connect-go, 2.7 times connect-rust, 3.3 times the Collector and 8.6 times Vector.
+    With protovalidate it kept 87%, at 12% more CPU a span.
+  - In the step of 60 s at the median rate, every Connect receiver held on arm64, and the
+    Collector and Vector did not. On x86-64 Vector and connect-rust with protovalidate-buffa did
+    not, and in run 265 on other runners most servers did not, connect-zig among them.
+  - In the peak, connect-go with GOGC=off and GOMEMLIMIT=320MiB answered 20% to 22% more calls
+    than connect-go as it ships, and connect-zig 6.2 and 3.3 times its calls of 16 and 512 spans.
 - **Step 39 and the compression parts' sink in CI** (`57ec581`). CI's
   [run 256](https://github.com/c4milo/connect-zig/actions/runs/45171587471). Every job passed.
   - The sink's peak memory was 321 MiB on arm64 and 322 MiB on x86-64, where run 250 gave 352 and

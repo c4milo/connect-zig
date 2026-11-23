@@ -240,25 +240,26 @@ const Auth = oidc.Interceptor(Values, .{ .exclude = &.{"/grpc.health.v1.Health/"
 ## Performance
 
 An OTLP trace receiver on one core, over TLS and h2, takes the traffic of one gateway core for
-33,000 servers. The load runs on two other cores of the same machine, over its loopback device:
+33,000 servers. The load runs on another core of the same machine, over its loopback device. Each
+bar is the median of three rounds, and its whisker spans them:
 
-![Bars of the spans a second one core holds with p99 under 100 ms over TLS, and lines of p99 as the rate climbs, on arm64: connect-zig holds 760,998 spans a second, 8.0 times connect-go's 95,668, 2.8 times connect-rust's 275,894, 3.6 times the OpenTelemetry Collector's 213,600 and 11.4 times Vector's 66,748](docs/images/fullstack-arm64.svg)
+![Bars of the spans a second one core holds with p99 under 100 ms over TLS, the median of three rounds with their range, and lines of p99 as the rate climbs, on arm64: connect-zig holds 711,570 spans a second, 7.0 times connect-go's 101,213, 2.7 times connect-rust's 263,440, 3.3 times the OpenTelemetry Collector's 215,818 and 8.6 times Vector's 82,310](docs/images/fullstack-arm64.svg)
 
-On an Arm Neoverse-N2 core, in CI's [run 256](https://github.com/c4milo/connect-zig/actions/runs/45171587471):
+On an Arm Neoverse-N2 core, in CI's [run 266](https://github.com/c4milo/connect-zig/actions/runs/45246119951) and
+[run 265](https://github.com/c4milo/connect-zig/actions/runs/45231244610):
 
-- **A whole server** takes 8.0 times connect-go's spans a second, 2.8 times connect-rust's and
-  3.6 times the OpenTelemetry Collector's. It reserves 321 MiB at start, for at most 528
-  connections and 64 calls at once. Each step of the climb leaves out its first 2 s, where its 516
-  connections open again; there connect-zig refused 88 calls, and the other servers none.
-- **With protovalidate** checking every span, it spends 11% more CPU a span, where connect-rust
-  spends 6% more and connect-go 53%. It keeps 86% of its spans a second: 2.5 times connect-rust's
-  with protovalidate-buffa, and 11.2 times connect-go's with protovalidate-go.
-- **gzip and zstd exports** cost it 7% and 8% less CPU a span than uncompressed ones over TLS, for
-  the production mix of exports. A lone export of 16 spans costs it more in either coding.
-- **A routed unary call** is 14.9 to 22.9 times as fast as connect-go's, and 3.4 to 6.5 times as
-  fast as connect-rust's. Its benchmark replays a request head already parsed, where Go's and
-  Rust's build a request on each call.
-- **The codec** encodes and decodes 3.2 to 20.8 times as fast as Go's protobuf runtime.
+- **A whole server** takes 7.0 times connect-go's spans a second, 2.7 times connect-rust's and
+  3.3 times the OpenTelemetry Collector's, and spends 1.41 µs of CPU a span. It held that rate for
+  a step of 60 s too. It reserves 321 MiB at start, for at most 528 connections and 64 calls at
+  once; connect-rust grew to 54 MiB.
+- **With protovalidate** checking every span, it spends 12% more CPU a span, where connect-rust
+  spends 9% more and connect-go 53%. It keeps 87% of its spans a second: 2.5 times connect-rust's
+  with protovalidate-buffa, and 9.8 times connect-go's with protovalidate-go.
+- **gzip and zstd exports** cost it 5% less CPU a span than uncompressed ones over TLS, for the
+  production mix of exports. In cleartext, with no TLS to save, they cost it 7% to 9% more.
+- **A routed unary call** is 9.6 to 12.4 times as fast as connect-go's, and 3.3 to 5.6 times as
+  fast as connect-rust's, with each library's request built outside the timed calls.
+- **The codec** encodes and decodes 3.2 to 18.9 times as fast as Go's protobuf runtime.
 
 [docs/benchmarks.md](docs/benchmarks.md) holds every chart, the x86-64 results, how each number
 is measured, and the limits of each.
