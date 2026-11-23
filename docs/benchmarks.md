@@ -68,7 +68,10 @@ TLS and no HTTP/2 framing. connect-go's router is an `http.ServeMux`, as a serve
 `bench-compare` jobs of commit `57ec581` ([run 256](https://github.com/c4milo/connect-zig/actions/runs/45171587471)) timed them on
 colibri v0.19.2 and Ubuntu 26.04, on an AMD EPYC 7763 core and on an Arm Neoverse-N2 core. The
 charts draw a speed in multiples of connect-go's, and connect-zig's bar also gives its time
-for one call, in a table of one route.
+for one call, in a table of one route. The three calls do close to the same work, not the same
+work: connect-zig's benchmark replays a request head that colibri has already parsed, where
+connect-go's builds an `httptest` request and recorder on each call, and connect-rust's an
+`http::Request`. Part of each ratio is that work (docs/performance.md).
 
 The small message's call also runs in tables of 16 and 256 routes: 4 and 16 services of as many
 methods, with the call's route among them. colibri finds a route by a binary search over each path
@@ -129,14 +132,16 @@ to. Each server holds 516 connections. 70%, 25% and 5% of them send gzip exports
 spans. [oha](https://github.com/hatoo/oha) sends at fixed rates, and its latency holds the time a
 call waits in a queue. Each step lasts 10 s, and its measure leaves out the first 2 s, where its TLS
 handshakes run. The rate climbs until p99 passes 100 ms, a call is refused, or the server takes
-less than 95% of the spans sent. oha runs on two cores of its own, and the server on a third that
-oha never uses. A step that fails while oha's two cores were 90% busy or more ends the climb on the
-load, not on the server: oha corrects its latency for each call it sends late, so a load that falls
-behind would show as the server's p99. The rate held is then a floor. The share counts all the work
-on oha's cores, the kernel's for the traffic oha sends included. Then five
-more steps halve the gap to the last step that passed, so each rate is known within 1/64 of it. CI's two `fullstack` jobs of commit `57ec581` ([run
-256](https://github.com/c4milo/connect-zig/actions/runs/45171587471)) ran it on colibri v0.19.2 and
-Ubuntu 26.04, on an Arm Neoverse-N2 core and on an AMD EPYC 9V45 core. The charts show the climb
+less than 95% of the spans sent. Then five more steps halve the gap to the last step that passed.
+A bar's whisker reaches the step that failed: it gives the climb's step, not the spread of the rate
+between runs, which the limits below give. oha runs on two cores of its own, and the server on a
+third that oha never uses. A step that fails while oha's two cores were 90% busy or more ends the
+climb on the load, not on the server: oha corrects its latency for each call it sends late, so a
+load that falls behind would show as the server's p99. The rate held is then a floor. The share
+counts all the work on oha's cores, the kernel's for the traffic oha sends included. CI's two
+`fullstack` jobs of commit `57ec581` ([run
+256](https://github.com/c4milo/connect-zig/actions/runs/45171587471)) ran it on
+colibri v0.19.2 and Ubuntu 26.04, on an Arm Neoverse-N2 core and on an AMD EPYC 9V45 core. The charts show the climb
 over TLS 1.3: one core of connect-zig held 8.0 times connect-go's spans a second on arm64 and at
 least 6.1 times on x86-64, 2.8 and 2.3 times connect-rust's, 3.6 and 3.4 times the Collector's,
 and 11.4 and 10.8 times Vector's.
@@ -155,8 +160,8 @@ times the Collector's on arm64, and at least 2.6 and 3.5 times on x86-64.
 </details>
 
 The CPU time a span, at each server's highest step, in µs. A span costs less CPU as the rate
-rises, since each wake of the core serves more calls. So the table favours a server whose highest
-step is higher. The sections on protovalidate and compression below compare at a common rate:
+rises: each step's 516 TLS handshakes, and each wake of the core, are shared among more spans. So
+the table favours a server whose highest step is higher. The sections on protovalidate and compression below compare at a common rate:
 
 | Server | arm64, TLS | x86-64, TLS | arm64, cleartext | x86-64, cleartext |
 | --- | ---: | ---: | ---: | ---: |
@@ -180,6 +185,28 @@ There its rate is a floor, and each ratio over it is at least its value. The cli
 exports a connection a second, 1,708,800 spans a second. Every other server's climb ended
 when p99 passed 100 ms. A runner's CPU model changes from run to run on x86-64, so its rates move
 between runs; the arm64 runner has been a Neoverse-N2 in each run.
+
+Read these numbers with their limits:
+
+- Every server and oha run on one machine, and talk over its loopback device: no network card, no
+  second machine, no lost packet.
+- Each server climbs once in each job. Between runs 250 and 256, on the same AMD EPYC 9V45, the same
+  competitors' rates moved by up to 38% on x86-64. On arm64 the plain servers moved by 3% or less,
+  and connect-rust with protovalidate-buffa by 8%. Read an x86-64 number as one sample, and a
+  difference of a few percent as no difference.
+- Each step opens its 516 connections again, and its measure leaves out the first 2 s, where their
+  TLS handshakes run. Only connect-zig's sink refuses a call there: past its 64 calls at once it
+  answers 503, where the other servers queue the call. In the step it held over TLS on arm64, it
+  refused 88 calls in those 2 s, and none after. The 2 s window came after run 248, whose climbs of
+  connect-zig ended on such refusals. A load that kept its connections open across steps would need
+  no such window.
+- Run 256 ran before the check of oha's cores, so its steps did not measure them.
+- connect-zig's sink is built for the machine's own CPU. connect-go, connect-rust and the other
+  servers are built for their architecture's generic CPU.
+- The sink's limits fit this load: 528 connections for its 516, and 64 calls at once, which h2load's
+  16 connections of 4 streams fill at the peak. A core with more connections, or with exports over
+  256 KiB, needs larger limits and more memory.
+- Each class sends one export again and again, so a decoder reads the same octets each time.
 
 Vector's and Rotel's p99 stays near 40 ms from a low rate. Neither sets `TCP_NODELAY` on the
 sockets it accepts, so Nagle's algorithm waits for Linux's delayed ACK. With `TCP_NODELAY` set
