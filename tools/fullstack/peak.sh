@@ -92,6 +92,6 @@ peak_part() {
     python3 tools/fullstack/peak_report.py "${work}" "$(getconf CLK_TCK)" "${loader}" \
         "${collector}" "${vector_text}" "${connect_go_text}" "${connect_rust_text}" "${commit}" \
         "${placement}" "${peak_rounds}" "${peak_connections}" "${peak_streams}" \
-        "${tls_suite}, or ${tls12_cipher} in TLS 1.2 for Vector"
+        "${tls_suite}, or ${tls12_cipher} in TLS 1.2 for Vector" "${go_memory_limit}"
     echo
 }

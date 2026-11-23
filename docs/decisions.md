@@ -1283,6 +1283,8 @@ first. Cite an entry by number in code and commits ("decision 6").
       connect-go a second time with GOGC=off and GOMEMLIMIT=320MiB, about the memory connect-zig's
       sink sets aside when it starts, so Go's collector runs only as its heap nears that. Without
       it, connect-go held a tenth of the sink's memory, and its collector paid for the difference.
+      Decision 48 then cut the sink's peak in that part to 75 MiB, and the limit followed it to
+      75MiB.
       The routed call's Go and Rust programs leave the building of a request out of the timed
       calls, as the Zig side replays a head it built once: Go copies a request httptest built
       once into a writer it clears, and Rust clones a head the builder made once. In a 4-CPU

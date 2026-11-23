@@ -130,9 +130,9 @@ words_of() {
 }
 
 # The memory connect-go may hold when it runs as connect-go-memory: about what connect-zig's sink
-# holds at its peak, 321 MiB in CI's run 256, all of it set aside when it starts
-# (tools/otlp_sink/constants.zig). Go's collector then runs only as the heap nears it.
-go_memory_limit=320MiB
+# holds at its peak, 75 MiB in the peak part on an x86-64 machine, now that its pages take memory
+# only once written (decision 48). Go's collector then runs only as the heap nears it.
+go_memory_limit=75MiB
 # The environment of connect-go-memory: no collection by the heap's growth, and the limit above.
 go_memory() {
     [ "$1" = connect-go-memory ] && echo "env GOGC=off GOMEMLIMIT=${go_memory_limit}"

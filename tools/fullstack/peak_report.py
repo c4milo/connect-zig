@@ -3,13 +3,13 @@
 
     tools/fullstack/peak_report.py <work> <ticks> <h2load> <otelcol> <vector> <connect-go>
                                    <connect-rust> <commit> <placement> <rounds> <connections>
-                                   <streams> <suite>
+                                   <streams> <suite> <go-memory>
 
 <work>/peak-results holds a line for each round of a server and an export: the spans, the server, the
 calls a second, the latency at p50 and p99 in microseconds, the server's CPU ticks over the
 measured calls, the measured calls, and the server's peak memory in KiB. <ticks> is the ticks of a
 second of CPU time. Each cell of the table is the median of the rounds, taken for each measure
-alone.
+alone. <go-memory> is the GOMEMLIMIT of connect-go-memory, such as 75MiB.
 """
 import os
 import statistics
@@ -17,12 +17,14 @@ import sys
 
 from machine import machine
 
-work, ticks, h2load, otelcol, vector, connect_go, connect_rust, commit, placement, rounds, connections, streams, suite = sys.argv[1:14]
+work, ticks, h2load, otelcol, vector, connect_go, connect_rust, commit, placement, rounds, connections, streams, suite, go_memory = sys.argv[1:15]
 ticks = int(ticks)
+# The limit as the report names it: 75 MiB.
+go_memory_label = go_memory.replace("MiB", " MiB")
 servers = [("connect-zig", "connect-zig"), ("connect-zig-generic", "connect-zig, generic CPU"),
            ("connect-zig-validate", "connect-zig + protovalidate"),
            ("collector", "Collector"), ("vector", "Vector"), ("connect-go", "connect-go"),
-           ("connect-go-memory", "connect-go, 320 MiB"),
+           ("connect-go-memory", f"connect-go, {go_memory_label}"),
            ("connect-go-validate", "connect-go + protovalidate-go"),
            ("connect-rust", "connect-rust"), ("connect-rust-validate", "connect-rust + protovalidate-buffa")]
 # Each receiver that validates, and its twin that does not.
@@ -85,7 +87,7 @@ for spans in spans_list:
     rate, cpu = median(spans, "connect-go-memory", "rate"), median(spans, "connect-go-memory", "cpu")
     go_rate, go_cpu = median(spans, "connect-go", "rate"), median(spans, "connect-go", "cpu")
     if None not in (rate, cpu, go_rate, go_cpu, zig_rate):
-        print(f"- {spans} spans: connect-go with 320 MiB and its collector off below it answers {rate / go_rate * percent:.1f}% "
+        print(f"- {spans} spans: connect-go with {go_memory_label} and its collector off below it answers {rate / go_rate * percent:.1f}% "
               f"of connect-go's calls a second, and spends {(cpu / go_cpu - 1) * percent:+.0f}% CPU time a call; connect-zig "
               f"answers {zig_rate / rate:.2f} times its calls a second.")
     for server, twin in validating:
@@ -102,8 +104,8 @@ print(f"Servers: connect-zig {commit} in ReleaseSafe for this CPU, `tools/otlp_s
       f"{otelcol}, GOMAXPROCS=1, its OTLP")
 print(f"receiver into its nop exporter; {vector}, one thread, its opentelemetry source into its blackhole sink;")
 print(f"{connect_go}, GOMAXPROCS=1, and {connect_rust}, one tokio worker, each a receiver that counts spans")
-print("(`tools/fullstack/connect-go`, `tools/fullstack/connect-rust`). \"connect-go, 320 MiB\" runs with GOGC=off and")
-print("GOMEMLIMIT=320MiB, about what connect-zig's sink holds, so its collector runs only as its heap nears that.")
+print(f"(`tools/fullstack/connect-go`, `tools/fullstack/connect-rust`). \"connect-go, {go_memory_label}\" runs with GOGC=off and")
+print(f"GOMEMLIMIT={go_memory}, about what connect-zig's sink holds, so its collector runs only as its heap nears that.")
 print("connect-zig + protovalidate is `otlp-sink-validate`,")
 print("and connect-go + protovalidate-go and connect-rust + protovalidate-buffa the same receivers with `validate`: each")
 print("checks every export against the rules of `tools/fullstack/validate` before it counts its spans.")
