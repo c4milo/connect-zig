@@ -1153,6 +1153,12 @@ first. Cite an entry by number in code and commits ("decision 6").
       climb alone steps up from the lowest rate. To hold the 90 minutes of a CI job, the climbs in
       cleartext run in a check of their own, `fullstack-cleartext`, which draws no chart. Beaten:
       three whole climbs, which do not fit a job, and three runs of the job, whose runners differ.
+    - Amended a fifth time on 2026-11-23: after its rounds, each server runs one step of 60 s at
+      the median rate it held, on a new process, after a step at half of it, and the report says
+      whether it held. A rate that a step of 10 s held by chance then shows. The report also gives
+      the most spans a second a step of the first round held with p99 at most 10 ms, a latency an
+      interactive caller would accept, beside the rate at the climb's 100 ms. The compression part
+      runs no long step: its rates compare codings, and its 90 minutes hold no more.
     - Amended on 2026-11-17: the `fullstack` and `bench-compare` checks draw the README's charts
       from their own output, and CI keeps them with the run for 90 days, as `charts-<check>-<arch>`.
       A person copies a chosen run's charts to `docs/images`, so the README still names one run.

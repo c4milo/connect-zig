@@ -4,7 +4,7 @@ standard output.
 
     tools/fullstack/production_report.py <results> <transport> <ticks> <load> <otelcol> <vector>
                                          <rotel> <connect-go> <connect-rust> <commit> <placement>
-                                         <seconds> <variants> <limit_ms> <rounds>
+                                         <seconds> <variants> <limit_ms> <rounds> <confirm_seconds>
                                          <spans:connections>...
 
 <results> holds the lines of each server's climb, as tools/fullstack/climb.py reads them. The
@@ -16,9 +16,11 @@ import sys
 import climb
 from machine import machine
 
-results, transport, ticks, load_text, otelcol, vector, rotel, connect_go, connect_rust, commit, placement, seconds, variants, limit_ms, round_count = sys.argv[1:16]
-ticks, seconds, variants, limit_ms, round_count = int(ticks), float(seconds), int(variants), float(limit_ms), int(round_count)
-classes = [tuple(int(part) for part in item.split(":")) for item in sys.argv[16:]]
+(results, transport, ticks, load_text, otelcol, vector, rotel, connect_go, connect_rust, commit, placement, seconds, variants,
+ limit_ms, round_count, confirm_seconds) = sys.argv[1:17]
+ticks, seconds, variants, limit_ms = int(ticks), float(seconds), int(variants), float(limit_ms)
+round_count, confirm_seconds = int(round_count), float(confirm_seconds)
+classes = [tuple(int(part) for part in item.split(":")) for item in sys.argv[17:]]
 names = {"connect-zig": "connect-zig", "connect-zig-validate": "connect-zig + protovalidate",
          "collector": "Collector", "vector": "Vector", "rotel": "Rotel", "connect-go": "connect-go",
          "connect-go-validate": "connect-go + protovalidate-go",
@@ -36,6 +38,9 @@ setups = {
     "connect-go-validate": "connect-go + protovalidate-go, the same receiver with `validate`, which checks each export against the same rules",
     "connect-rust-validate": "connect-rust + protovalidate-buffa, the same receiver with `validate`, which checks each export against the same rules",
 }
+# A p99 an interactive caller would accept, beside the limit of the climb: the report gives the
+# rate each server held under it too.
+low_limit_ms = 10
 # The fleet the model stands for, and the gateway cores that share its connections.
 fleet_servers = 33_000
 gateway_cores = 64
@@ -67,10 +72,11 @@ print("of the step held. The table gives the round whose rate held is the median
 print("rounds held. The load runs on two cores of its own, which the server never runs on. A step that fails while")
 print("they were 90% busy or more ends the round on the load's cores, and its rate held is then a floor, with no")
 print("resolution. \"load busy\" is their share at the step held: all their work, the kernel's for the traffic the")
-print("load sends included.")
+print(f"load sends included. \"p99 ≤ {low_limit_ms} ms\" gives the most spans a second a step of the first round held with")
+print(f"p99 at most {low_limit_ms} ms.")
 print()
-print("| server | spans/s held | range | resolution | calls/s | p50 ms | p99 ms | core busy | load busy | CPU µs a span | peak MiB | the next step |")
-print("|---|--:|--:|--:|--:|--:|--:|--:|--:|--:|--:|---|")
+print(f"| server | spans/s held | range | resolution | calls/s | p50 ms | p99 ms | core busy | load busy | CPU µs a span | peak MiB | p99 ≤ {low_limit_ms} ms | the next step |")
+print("|---|--:|--:|--:|--:|--:|--:|--:|--:|--:|--:|--:|---|")
 
 
 def validation_line(server, twin):
@@ -97,18 +103,21 @@ held, best, above = {}, {}, {}
 for server in servers:
     result, verdict = climb.summary(steps.get(server, []))
     if result is None:
-        print(f"| {names[server]} | none | | | | | | | | | | {ended_by.get(verdict, verdict)} |")
+        print(f"| {names[server]} | none | | | | | | | | | | | {ended_by.get(verdict, verdict)} |")
         continue
     held[server], best[server], above[server] = result, result["best"], result["above"]
     step = result["best"]
     gap = climb.resolution(step, result["above"])
     # A run with no core pinned measures no load's share.
     load = "" if step["load"] < 0 else f"{step['load'] * percent:.0f}%"
+    quick = climb.low_latency(steps[server], low_limit_ms)
+    quick_text = "" if quick is None else f"{quick['spans']:,.0f}"
     print(f"| {names[server]} | {step['spans']:,.0f} | {result['low']:,.0f}–{result['high']:,.0f} | "
           f"{'' if gap is None else f'+{gap * percent:.1f}%'} | "
           f"{step['calls']:,.0f} | {step['p50']:.2f} | {step['p99']:.2f} | "
           f"{step['busy'] * percent:.0f}% | {load} | "
-          f"{step['cpu']:.2f} | {memory.get(server, 0):.0f} | {ended_by.get(verdict, verdict)} |")
+          f"{step['cpu']:.2f} | {memory.get(server, 0):.0f} | {quick_text} | "
+          f"{ended_by.get(verdict, verdict)} |")
 print()
 # A server that closed connections under load: the load opened them again before its next step.
 closed = [(server, sum(step["reopened"] for step in steps.get(server, []))) for server in servers]
@@ -131,6 +140,22 @@ if "connect-zig" in best:
             print(f"- {validation_line(server, twin)}")
     carried = ", ".join(f"{names[server]} {best[server]['spans'] * gateway_cores / fleet_servers:,.0f}" for server in servers if server in best)
     print(f"- At {gateway_cores} cores, the spans a second each server carries for each of the {fleet_servers:,} servers: {carried}.")
+    print()
+# The long step of each server after its rounds: the step at the median rate held, the one with
+# the most spans a second, and not the step at half of it before.
+confirms = climb.read(results, transport, ticks, seconds, "confirm")[1]
+if confirms:
+    print(f"Each server then ran one step of {confirm_seconds:.0f} s at the median rate its rounds held, on a new process, after a step")
+    print("at half of it.")
+    print()
+    print("| server | spans/s sent | spans/s taken | p99 ms | core busy | the step |")
+    print("|---|--:|--:|--:|--:|---|")
+    for server in servers:
+        if server not in confirms:
+            continue
+        step = max(confirms[server], key=lambda item: item["rate"])
+        print(f"| {names[server]} | {step['rate'] * spans_per_rate:,.0f} | {step['spans']:,.0f} | {step['p99']:.2f} | "
+              f"{step['busy'] * percent:.0f}% | {'held' if step['verdict'] == 'pass' else ended_by.get(step['verdict'], step['verdict'])} |")
     print()
 print("The first round's climb, one row for each step: p99 in milliseconds and the share of its core each server kept")
 print("busy.")

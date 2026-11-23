@@ -20,9 +20,10 @@ milliseconds = 1000
 kib = 1024
 
 
-def read(path, transport, ticks, seconds):
+def read(path, transport, ticks, seconds, kind="step"):
     """The servers in the order the file names them, each server's steps, and each server's peak
-    memory in MiB, for the lines of `transport`."""
+    memory in MiB, for the lines of `transport`. `kind` picks the lines of the steps: "step" for
+    the rounds, or "confirm" for the long step at the rate a server held."""
     servers, steps, memory = [], {}, {}
     for line in open(path):
         fields = line.split()
@@ -34,7 +35,7 @@ def read(path, transport, ticks, seconds):
         if fields[0] == "memory":
             memory[server] = max(memory.get(server, 0), int(fields[3]) / kib)
             continue
-        if fields[0] != "step":
+        if fields[0] != kind:
             continue
         rate, taken, calls, spans, p50, p99, refused, verdict, load, cpu, wall_ms, reopened, round_number = fields[3:16]
         steps.setdefault(server, []).append({
@@ -115,6 +116,13 @@ def round_ratios(top, bottom):
     return [top["spans"][number] / bottom["spans"][number] for number in top["spans"] if number in bottom["spans"]]
 
 
+def low_latency(steps, limit_ms):
+    """The step of the first round with the most spans a second that passed with p99 at most
+    `limit_ms`, or None."""
+    under = [step for step in first_round(steps) if step["verdict"] == "pass" and step["p99"] <= limit_ms]
+    return max(under, key=lambda step: step["spans"]) if under else None
+
+
 def overlap(first, second):
     """Whether two servers' summaries cannot be told apart: their intervals of rates overlap."""
     return first["bottom"] < second["top"] and second["bottom"] < first["top"]
@@ -164,3 +172,16 @@ def apart(first, first_above, second, second_above):
     low_first, high_first = interval(first, first_above)
     low_second, high_second = interval(second, second_above)
     return high_first <= low_second or high_second <= low_first
+
+
+if __name__ == "__main__":
+    # tools/fullstack/climb.py <results> <transport> <server>: the median round's rate held, in
+    # exports a connection a second, for tools/fullstack/production.sh. Nothing when no round held
+    # a step.
+    import sys
+
+    results_path, results_transport, results_server = sys.argv[1:4]
+    # The ticks and the seconds set only the CPU shares, which this reads none of.
+    result, _ = summary(read(results_path, results_transport, 1, 1)[1].get(results_server, []))
+    if result is not None:
+        print(f"{result['best']['rate']:g}")

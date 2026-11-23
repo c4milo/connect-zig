@@ -49,6 +49,11 @@ search_moves=4
 search_halvings=4
 rest_seconds=5
 step_seconds=10
+# The long step of each server after its rounds, at the median rate it held: six steps, so a rate
+# a step of 10 s held by chance shows. Each step line's first word: `step` for the rounds, and
+# `confirm` for the long step and the step at half its rate that warms the server before it.
+confirm_seconds=60
+step_kind=step
 # Variants of each class's export, which the load sends in turn.
 production_variants=32
 # Calls in flight on one connection at most, as the otlp exporter's queue sends them.
@@ -134,31 +139,32 @@ production_load() {
     rm -f "${work}"/step-*.csv
     # A write to a FIFO whose reader is gone would end this script with SIGPIPE.
     kill -0 "${load_pid}" 2>/dev/null || { echo "fullstack: the load ended on $1" >&2; return 1; }
-    echo "step $2 ${step_seconds} ${work}" >&7
+    echo "step $2 ${3:-${step_seconds}} ${work}" >&7
     read -r word _ reopened <&8 || word=""
     [ "${word}" = done ] && return 0
     echo "fullstack: the load ended on $1: $(cat "${work}/load.log")" >&2
     return 1
 }
 
-# One step of the server at a rate: a line of its results. It adds the spans the server took to
-# `sent`, and sets `verdict`. It fails when the load ends.
+# One step of the server at a rate, for `step_seconds` or the seconds of the third argument: a
+# line of its results. It adds the spans the server took to `sent`, and sets `verdict`. It fails
+# when the load ends.
 production_step() {
-    step_rate="$2"
-    echo "fullstack: production, ${transport}, $1, round ${round}, ${step_rate} a connection a second" >&2
+    step_rate="$2" step_length="${3:-${step_seconds}}"
+    echo "fullstack: production, ${transport}, $1, ${step_kind} ${round}, ${step_rate} a connection a second" >&2
     before="$(cpu_ticks "${server_pid}")"
     load_before="$(load_ticks)"
     started_ns="$(date +%s%N)"
-    production_load "$1" "${step_rate}" || return 1
+    production_load "$1" "${step_rate}" "${step_length}" || return 1
     ended_ns="$(date +%s%N)"
     after="$(cpu_ticks "${server_pid}")"
     load_after="$(load_ticks)"
-    set -- $(python3 tools/fullstack/production_step.py "${work}" "${step_seconds}" \
+    set -- $(python3 tools/fullstack/production_step.py "${work}" "${step_length}" \
         "${p99_limit_ms}" "${step_rate}" "${load_before}" "${load_after}" ${production_classes})
     sent=$((sent + $1))
     # The step's wall time, in milliseconds, over which the server's CPU ticks count, the
     # connections the load opened again before it, and the round.
-    echo "step ${transport} ${server} ${step_rate} $* $((after - before)) $(((ended_ns - started_ns) / 1000000)) ${reopened} ${round}"
+    echo "${step_kind} ${transport} ${server} ${step_rate} $* $((after - before)) $(((ended_ns - started_ns) / 1000000)) ${reopened} ${round}"
     verdict="$7"
 }
 
@@ -194,9 +200,7 @@ production_steps_climb() {
 # `search_low` of it, which moves down while it fails, and one at `search_high` of it, which moves
 # up while it passes, each `search_moves` times at most. Then `search_halvings` halvings.
 production_search() {
-    warm="$(echo ${production_steps} | awk -v guess="$1" \
-        '{ warm = 0; for (i = 1; i <= NF; i++) if ($i <= guess / 2) warm = $i; print warm }')"
-    [ "${warm}" = 0 ] || production_try "${warm}" || return 1
+    production_warm "$1" || return 1
     passed="" failed=""
     rate="$(awk "BEGIN { print $1 * ${search_low} }")"
     for _ in $(seq 1 "${search_moves}"); do
@@ -215,12 +219,41 @@ production_search() {
     production_halve "${search_halvings}"
 }
 
+# A step at the highest rate of `production_steps` at or below half of the argument, when one is.
+production_warm() {
+    warm="$(echo ${production_steps} | awk -v rate="$1" \
+        '{ warm = 0; for (i = 1; i <= NF; i++) if ($i <= rate / 2) warm = $i; print warm }')"
+    [ "${warm}" = 0 ] || production_try "${warm}"
+}
+
 # The rate a server held in an earlier round, for the transport and the tag: in that coding if
 # a round climbed it, or else in any coding. Empty when no round held a step.
 production_guess() {
     for file in "${work}/held-${transport}-$1${production_tag}" "${work}/held-${transport}-$1"; do
         [ -s "${file}" ] && { cat "${file}"; return; }
     done
+}
+
+# Starts the server, checks its probes, and starts the load. `sent` counts the spans it was sent.
+production_begin() {
+    start "$1" || { stop; return 1; }
+    sent=0
+    for class in ${production_classes}; do
+        probe "$1" "${work}/production-${class%%:*}.grpc.json" || { stop; return 1; }
+        sent=$((sent + ${class%%:*}))
+    done
+    probe_refused "$1" || { stop; return 1; }
+    load_start "$1" || { stop; return 1; }
+    passed="" failed="" verdict=pass
+}
+
+# Stops the load, gives the server's peak memory, checks its counts, and stops it.
+production_end() {
+    load_stop
+    echo "memory ${transport} $1 $(peak_kb "${server_pid}")"
+    check_count "$1" "${sent}" || { stop; return 1; }
+    check_storage "$1" || { stop; return 1; }
+    stop
 }
 
 # One round of a server: a line of the results for each step, and the server's peak memory. The
@@ -230,31 +263,33 @@ production_guess() {
 production_climb() {
     server="$1" round="$2"
     guess="$(production_guess "${server}")"
-    start "${server}" || { stop; return 1; }
-    sent=0
-    for class in ${production_classes}; do
-        probe "${server}" "${work}/production-${class%%:*}.grpc.json" || { stop; return 1; }
-        sent=$((sent + ${class%%:*}))
-    done
-    probe_refused "${server}" || { stop; return 1; }
-    load_start "${server}" || { stop; return 1; }
-    passed="" failed="" verdict=pass
+    production_begin "${server}" || return 1
     if [ -z "${guess}" ]; then
         production_steps_climb || { load_stop; stop; return 1; }
     else
         production_search "${guess}" || { load_stop; stop; return 1; }
     fi
-    load_stop
     # The rate held, for the later rounds: in this coding, and for the server's other codings.
     if [ -n "${passed}" ]; then
         for file in "${work}/held-${transport}-${server}${production_tag}" "${work}/held-${transport}-${server}"; do
             [ -s "${file}" ] || echo "${passed}" >"${file}"
         done
     fi
-    echo "memory ${transport} ${server} $(peak_kb "${server_pid}")"
-    check_count "${server}" "${sent}" || { stop; return 1; }
-    check_storage "${server}" || { stop; return 1; }
-    stop
+    production_end "${server}"
+}
+
+# The long step of a server, on a new process, at the median rate its rounds held, after a step
+# at half of it that warms the server: `confirm` lines.
+production_confirm() {
+    server="$1" round=0
+    rate="$(python3 tools/fullstack/climb.py "${work}/production-results" "${transport}" "${server}")"
+    [ -n "${rate}" ] || return 0
+    production_begin "${server}" || return 1
+    step_kind=confirm
+    { production_warm "${rate}" && production_step "${server}" "${rate}" "${confirm_seconds}"; } ||
+        { step_kind=step; load_stop; stop; return 1; }
+    step_kind=step
+    production_end "${server}"
 }
 
 # The production climbs over the transport, the argument: `production_rounds` rounds of each
@@ -273,11 +308,14 @@ production_part() {
             production_climb "${server}" "${round}" >>"${work}/production-results" || status=1
         done
     done
+    for server in ${servers}; do
+        production_confirm "${server}" >>"${work}/production-results" || status=1
+    done
     python3 tools/fullstack/production_report.py "${work}/production-results" "${transport}" \
         "$(getconf CLK_TCK)" "${load_text}" "${collector}" "${vector_text}" \
         "${rotel_text}" "${connect_go_text}" "${connect_rust_text}" "${commit}" "${placement}" \
         "${step_seconds}" "${production_variants}" "${p99_limit_ms}" "${production_rounds}" \
-        ${production_classes}
+        "${confirm_seconds}" ${production_classes}
     echo
     transport=tls
 }
