@@ -62,7 +62,11 @@ const State = struct {
 pub fn main(init: std.process.Init) !void {
     if (builtin.os.tag != .linux) return error.LinuxOnly;
     const allocator = init.arena.allocator();
-    const state = try allocator.create(State);
+    // Not `create`, which fills all of State with the undefined pattern and so makes
+    // each of its pages resident at the start (decision 48).
+    const state_memory = allocator.rawAlloc(@sizeOf(State), .of(State), @returnAddress()) orelse
+        return error.OutOfMemory;
+    const state: *State = @ptrCast(@alignCast(state_memory));
     state.buffers = .{
         .hit = try allocator.alloc(usize, limits.hit_buffer_len / @sizeOf(usize)),
         .memory = try allocator.alloc(usize, limits.memory_buffer_len / @sizeOf(usize)),

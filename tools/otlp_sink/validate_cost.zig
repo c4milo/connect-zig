@@ -78,7 +78,11 @@ pub fn main(init: std.process.Init) !void {
     _ = args.skip();
     const path = args.next() orelse return error.Usage;
     const iterations = try std.fmt.parseInt(u64, args.next() orelse return error.Usage, decimal);
-    const state = try init.arena.allocator().create(State);
+    // Not `create`, which fills all of State with the undefined pattern and so makes
+    // each of its pages resident at the start (decision 48).
+    const state_memory = init.arena.allocator().rawAlloc(@sizeOf(State), .of(State), @returnAddress()) orelse
+        return error.OutOfMemory;
+    const state: *State = @ptrCast(@alignCast(state_memory));
     const bytes = try std.Io.Dir.cwd().readFile(init.io, path, &state.message);
     const features = Features.detect();
     const spans = try once(state, bytes, storages[0], false, features);

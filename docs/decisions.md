@@ -93,7 +93,8 @@ first. Cite an entry by number in code and commits ("decision 6").
     - Each tree names its limits in a `constants.zig`, as `src/` does (the `magic-numbers`
       rule).
     - A program holds no container-level `var` (the `global-state` rule). Its `main` allocates
-      one `State` from `init.arena` before the first call, and hands a pointer to each function.
+      one `State` from `init.arena` before the first call, with `rawAlloc` (decision 48), and
+      hands a pointer to each function.
       TigerStyle allocates once, at startup, in the same way. The allocator gives the type's
       alignment, which Zig 0.16's x86_64 backend does not always give a static.
     - Why: a reader copies an example into a program, so the rules that hold the library to its
@@ -102,6 +103,28 @@ first. Cite an entry by number in code and commits ("decision 6").
     - Beaten: one aligned static `State` that the rule allows by name, since pepegrillo's rule
       has no such option; and `threadlocal` statics, which break `std_io_server`'s queue, which
       its tasks share across threads.
+
+48. **A program takes its `State` from `rawAlloc`, so a page holds memory only once it is
+    written.** The owner asked on 2026-11-23 for the sink to hold less memory: in CI's run 266 it
+    peaked at 321 MiB, where connect-rust grew to 54 MiB.
+    - In Debug and ReleaseSafe, `Allocator.create` writes the undefined pattern over the whole
+      value it returns. A program's `State` holds every buffer it will use (decision 42), so that
+      write puts each page of it in memory at the start. The sink's `State` is 331 MB: 137 MB of
+      server, 123 MB of router with its calls' storage, 44 MB of TLS buffers, and 28 MB of zstd and
+      brotli decoders. It was 318 MiB in memory before its first connection.
+    - So each program calls `rawAlloc` on its arena and casts the result to `*State`. The pages
+      stay unmapped until the program first writes them. The sink starts in 6 MiB, and under the
+      peak part's 64 calls of 512 spans it grew to 75 MiB on an x86-64 machine. What it holds now
+      is what its connections and calls write.
+    - The lint rule `state-fill` (`tools/lint/state_fill.zig`) refuses `.create(State)` in every
+      tree of hand-written Zig, so a new program cannot bring the fill back.
+    - What it costs: a read of a field that `main` never wrote gives zeros, not the pattern, so
+      Debug no longer shows such a read as `0xaa`. Every program writes each field it reads
+      before it reads it, and the tests that serve and call each example pass.
+    - Beaten: building the programs ReleaseFast, which drops the fill and every safety check
+      with it, where `-Drelease` builds ReleaseSafe; a smaller `State`, which would only cut the
+      cost of a fill that need not happen; and a helper in the library, which would name an
+      allocator in `src/` (decision 4).
 
 ## Protobuf
 

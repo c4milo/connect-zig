@@ -269,8 +269,9 @@ These results come from an Arm Neoverse-N2 core in CI. The first three come from
 
 - **A whole server.** connect-zig takes 7.0 times as many spans a second as connect-go, 2.7 times
   as many as connect-rust, and 3.3 times as many as the OpenTelemetry Collector. It spends 1.41 µs
-  of CPU a span, and it held its rate for a 60-second step. It reserves 321 MiB when it starts, for
-  at most 528 connections and 64 calls at once. connect-rust grew to 54 MiB.
+  of CPU a span, and it held its rate for a 60-second step. In that run it took 321 MiB when it
+  started, where connect-rust grew to 54 MiB. It now starts in 6 MiB, and holds only the memory its
+  connections and calls write ([decision 48](docs/decisions.md)).
 - **Validation.** With protovalidate checking every span, connect-zig spends 12% more CPU a span,
   connect-rust 9% more, and connect-go 53% more. connect-zig keeps 87% of its rate, which is 2.5
   times connect-rust's rate with protovalidate-buffa and 9.8 times connect-go's with

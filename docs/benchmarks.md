@@ -86,7 +86,7 @@ call, in nanoseconds:
 
 From CI's [run 266](https://github.com/c4milo/connect-zig/actions/runs/45246119951), on an Arm Neoverse-N2 core; the x86-64 chart is under it. An OTLP receiver on one core, over TLS and h2, takes the traffic of one gateway
 core for 33,000 servers. connect-zig holds 7.0 times connect-go's spans a second and 2.7 times
-connect-rust's, in 321 MiB that it takes at start.
+connect-rust's. In this run it took 321 MiB at start; it now starts in 6 MiB (decision 48).
 
 ![Bars of the spans a second one core holds with p99 under 100 ms over TLS, the median of three rounds with their range, and lines of p99 as the rate climbs, on arm64: connect-zig holds 711,570 spans a second, 7.0 times connect-go's 101,213, 2.7 times connect-rust's 263,440, 3.3 times the OpenTelemetry Collector's 215,818, and 8.6 times Vector's 82,310](images/fullstack-arm64.svg)
 
@@ -188,9 +188,11 @@ common rate:
 | connect-go | 9.83 | 5.69 | 190 | 192 |
 | Vector | 12.16 | 6.32 | 1,484 | 1,479 |
 
-connect-zig takes all its memory when it starts: 321 MiB, for 528 connections and 64 calls at
-once, each call with 1 MiB to decode its export into and 4 KiB for its reply (design §8 step 39).
-connect-rust holds a sixth of it. Vector held twice the memory it held in run 256, when the load
+In this run connect-zig took all its memory when it started: 321 MiB, for 528 connections and 64
+calls at once, each call with 1 MiB to decode its export into and 4 KiB for its reply (design §8
+step 39). connect-rust held a sixth of it. Since [decision 48](decisions.md), a page of the sink's
+memory is taken only when the sink first writes it: it starts in 6 MiB, and under the peak part's
+64 calls of 512 spans it grew to 75 MiB on an x86-64 machine. Vector held twice the memory it held in run 256, when the load
 sent one export again and again; no check here measures why.
 
 Rotel has no TLS on its receiver, so a check of its own, `fullstack-cleartext`, climbs in

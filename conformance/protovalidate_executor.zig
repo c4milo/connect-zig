@@ -31,7 +31,11 @@ const Entry = harness.TestConformanceResponse.ResultsEntry;
 pub const Error = error{ RequestTooLarge, TooManyCases };
 
 pub fn main(init: std.process.Init) !void {
-    const state = try init.arena.allocator().create(State);
+    // Not `create`, which fills all of State with the undefined pattern and so makes
+    // each of its pages resident at the start (decision 48).
+    const state_memory = init.arena.allocator().rawAlloc(@sizeOf(State), .of(State), @returnAddress()) orelse
+        return error.OutOfMemory;
+    const state: *State = @ptrCast(@alignCast(state_memory));
     state.cpu_features = .detect();
     var stdin = std.Io.File.stdin().reader(init.io, &state.in_buffer);
     const len = try stdin.interface.readSliceShort(&state.request_bytes);

@@ -163,7 +163,9 @@ const State = struct {
     tls_buffer: [server.Config.tls_buffer_len(64)]u8,
 };
 
-const state = try init.arena.allocator().create(State);
+const state_memory = init.arena.allocator().rawAlloc(@sizeOf(State), .of(State), @returnAddress()) orelse
+    return error.OutOfMemory;
+const state: *State = @ptrCast(@alignCast(state_memory));
 state.router.init();
 state.app = .{};
 try state.http_server.init(&.{
@@ -176,6 +178,11 @@ try state.http_server.init(&.{
 defer state.http_server.deinit();
 try state.http_server.run();
 ```
+
+Take the `State` from `rawAlloc`, not from `create`. In Debug and ReleaseSafe, `create` writes
+the undefined pattern over all of it, so each of its pages is in memory before the first
+connection: 318 MiB of the OTLP sink's 331 MB. With `rawAlloc`, a page takes memory only when
+the program first writes it, and the sink starts in 6 MiB ([decision 48](decisions.md)).
 
 `init` starts the router where it lies. `state.router = .{}` would copy the router's whole
 default value, which the program's image then holds: in the OTLP sink of the benchmarks, 155 MB.

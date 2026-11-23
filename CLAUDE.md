@@ -100,7 +100,8 @@ confirm a test fails. Report `CAUGHT` or `NOT CAUGHT` per mutation in the commit
 - Lint: `zig build lint`: the cognitive-complexity score, then the rules of `tools/lint/main.zig`:
   heap, io, determinism, layering, unbounded-loop, file-length, markdown, relative-import,
   magic-numbers, global-state, static-alignment, defer-order, undefined-fill, unreleased-acquire, and
-  denied-words, all from pepegrillo. The rules read `conformance/` as they read `examples/`, and
+  denied-words, all from pepegrillo. The rule state-fill is this tree's own: a program takes its
+  `State` from `rawAlloc` (decision 48). The rules read `conformance/` as they read `examples/`, and
   each `gen/` as generated code; `conformance/proto` holds connectrpc's copy and
   protobuf's test protos, which denied-words skips, as it skips protovalidate's schemas in
   `src/protovalidate/proto` and `conformance/protovalidate`. `zig build test` also requires `.githooks/pre-push` to equal pepegrillo's

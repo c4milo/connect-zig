@@ -168,10 +168,19 @@ pub const denied_words = rules.denied_words.Rule(.{
     .word_label = "unresolved marker",
 });
 
+/// Decision 48: a program allocates its `State` without the undefined pattern, which would make
+/// each of its pages resident at the start. The rule reads every program of this tree, but its
+/// own file, which spells the call it refuses.
+pub const state_fill = @import("state_fill.zig").Rule(.{
+    .extensions = &.{lint.paths.zig_extension},
+    .include_directories = &.{ "src", "examples", "tools", "build", "bench", "conformance" },
+    .exclude_paths = &.{"tools/lint/state_fill.zig"},
+});
+
 const Linter = lint.Linter(.{
     heap,        io,              determinism,             unbounded_loop, file_length,  markdown,
     layering,    relative_import, relative_import_outside, magic_numbers,  global_state, static_alignment,
-    defer_order, undefined_fill,  unreleased_acquire,      denied_words,
+    defer_order, undefined_fill,  unreleased_acquire,      denied_words,   state_fill,
 });
 
 pub fn main(init: std.process.Init) !void {
@@ -180,6 +189,10 @@ pub fn main(init: std.process.Init) !void {
 
 const testing = std.testing;
 const harness = lint.harness;
+
+test {
+    _ = @import("state_fill.zig");
+}
 
 test "the heap rule refuses an allocator in the library and not in the plugin" {
     var arena_state = std.heap.ArenaAllocator.init(testing.allocator);

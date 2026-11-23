@@ -33,7 +33,11 @@ const State = struct {
 };
 
 pub fn main(init: std.process.Init) !void {
-    const state = try init.arena.allocator().create(State);
+    // Not `create`, which fills all of State with the undefined pattern and so makes
+    // each of its pages resident at the start (decision 48).
+    const state_memory = init.arena.allocator().rawAlloc(@sizeOf(State), .of(State), @returnAddress()) orelse
+        return error.OutOfMemory;
+    const state: *State = @ptrCast(@alignCast(state_memory));
     state.app = .{};
     // The verifier starts with the issuer's first key and the time of the real clock. A real
     // program fetches the JWK Set from its provider. This program sets the time once, at the

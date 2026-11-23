@@ -37,7 +37,11 @@ pub fn main(init: std.process.Init) !void {
     const in_path = args.next() orelse return error.Usage;
     const out_path = args.next() orelse return error.Usage;
     const coding = connect.Coding.from_name(coding_name) orelse return error.CodingUnknown;
-    const state = try init.arena.allocator().create(State);
+    // Not `create`, which fills all of State with the undefined pattern and so makes
+    // each of its pages resident at the start (decision 48).
+    const state_memory = init.arena.allocator().rawAlloc(@sizeOf(State), .of(State), @returnAddress()) orelse
+        return error.OutOfMemory;
+    const state: *State = @ptrCast(@alignCast(state_memory));
     const message = try std.Io.Dir.cwd().readFile(init.io, in_path, &state.message);
     // readFile stops at the buffer's end, so a full buffer may have left octets unread.
     if (message.len == state.message.len) return error.MessageTooLarge;

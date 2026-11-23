@@ -121,7 +121,11 @@ pub fn main(init: std.process.Init) !void {
     _ = args.skip();
     const port = try std.fmt.parseInt(u16, args.next() orelse return error.ArgumentMissing, constants.decimal);
     const ca_path = args.next() orelse return error.ArgumentMissing;
-    const state = try init.arena.allocator().create(State);
+    // Not `create`, which fills all of State with the undefined pattern and so makes
+    // each of its pages resident at the start (decision 48).
+    const state_memory = init.arena.allocator().rawAlloc(@sizeOf(State), .of(State), @returnAddress()) orelse
+        return error.OutOfMemory;
+    const state: *State = @ptrCast(@alignCast(state_memory));
     const ca = try std.Io.Dir.cwd().readFile(init.io, ca_path, &state.ca_pem);
     // The client judges the server's chain at this instant (RFC 5280 §4.1.2.5).
     const unix_seconds: u64 = @intCast(@max(std.Io.Clock.real.now(init.io).toSeconds(), 0));

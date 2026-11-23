@@ -8,6 +8,16 @@ are in [docs/decisions.md](docs/decisions.md), and the steps and their measureme
 connect-zig follows [Semantic Versioning](https://semver.org/). Before 1.0, a minor version may
 change the public API, and the entry marks each change that does.
 
+## Unreleased
+
+### Changed
+
+- **Memory.** The guide and every example take the program's `State` from `rawAlloc`, not from
+  `create`. In Debug and ReleaseSafe, `create` writes the undefined pattern over all of it, so
+  each page is in memory from the start. The OTLP sink of the benchmarks took 318 MiB before its
+  first connection, and now takes 6 MiB. Take yours from `rawAlloc` too
+  ([decision 48](docs/decisions.md)).
+
 ## v0.4.0 (2026-11-23)
 
 It builds on colibri v0.19.2 and on stdx v0.1.2, the tag colibri pins, with Zig 0.16.0.
