@@ -17,7 +17,6 @@ import pathlib
 import subprocess
 import sys
 
-buf, spans, out = sys.argv[1], int(sys.argv[2]), sys.argv[3]
 # The start of the first span, in nanoseconds since 1970: 2026-11-16 00:00:00 UTC.
 start_ns = 1_794_787_200_000_000_000
 # Each span starts 1 ms after the one before it, and lasts 250 µs past its index's share.
@@ -69,49 +68,64 @@ def span(index):
     }
 
 
-request = {
-    "resourceSpans": [
-        {
-            "resource": {
-                "attributes": [
-                    text("service.name", "checkout"),
-                    text("service.version", "1.4.2"),
-                    text("host.name", "node-7"),
-                    text("telemetry.sdk.language", "go"),
-                    text("telemetry.sdk.name", "opentelemetry"),
-                    text("telemetry.sdk.version", "1.38.0"),
-                ]
-            },
-            "scopeSpans": [
-                {
-                    "scope": {
-                        "name": "go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp",
-                        "version": "0.63.0",
-                    },
-                    "spans": [span(index) for index in range(spans)],
-                }
-            ],
-        }
-    ],
-}
-with open(out + ".json", "w") as file:
-    json.dump(request, file)
-subprocess.run(
-    [
-        buf,
-        "convert",
-        "examples/otlp/proto",
-        "--type",
-        "opentelemetry.proto.collector.trace.v1.ExportTraceServiceRequest",
-        "--from",
-        out + ".json#format=json",
-        "--to",
-        out + ".binpb#format=binpb",
-    ],
-    check=True,
-)
-encoded = pathlib.Path(out + ".binpb").read_bytes()
-# gRPC over HTTP/2, "Requests": a Length-Prefixed-Message is a Compressed-Flag of 0, then the
-# Message-Length in four octets, big-endian, then the message.
-with open(out, "wb") as file:
-    file.write(b"\0" + len(encoded).to_bytes(4, "big") + encoded)
+def request_of(spans):
+    """The export's request in proto3 JSON: one resource, one scope, and `spans` spans."""
+    return {
+        "resourceSpans": [
+            {
+                "resource": {
+                    "attributes": [
+                        text("service.name", "checkout"),
+                        text("service.version", "1.4.2"),
+                        text("host.name", "node-7"),
+                        text("telemetry.sdk.language", "go"),
+                        text("telemetry.sdk.name", "opentelemetry"),
+                        text("telemetry.sdk.version", "1.38.0"),
+                    ]
+                },
+                "scopeSpans": [
+                    {
+                        "scope": {
+                            "name": "go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp",
+                            "version": "0.63.0",
+                        },
+                        "spans": [span(index) for index in range(spans)],
+                    }
+                ],
+            }
+        ],
+    }
+
+
+def write(buf, out, request):
+    """Writes the request in proto3 JSON, in protobuf's binary form, and as a gRPC message."""
+    with open(out + ".json", "w") as file:
+        json.dump(request, file)
+    subprocess.run(
+        [
+            buf,
+            "convert",
+            "examples/otlp/proto",
+            "--type",
+            "opentelemetry.proto.collector.trace.v1.ExportTraceServiceRequest",
+            "--from",
+            out + ".json#format=json",
+            "--to",
+            out + ".binpb#format=binpb",
+        ],
+        check=True,
+    )
+    encoded = pathlib.Path(out + ".binpb").read_bytes()
+    # gRPC over HTTP/2, "Requests": a Length-Prefixed-Message is a Compressed-Flag of 0, then the
+    # Message-Length in four octets, big-endian, then the message.
+    with open(out, "wb") as file:
+        file.write(b"\0" + len(encoded).to_bytes(4, "big") + encoded)
+
+
+def main():
+    buf, spans, out = sys.argv[1], int(sys.argv[2]), sys.argv[3]
+    write(buf, out, request_of(spans))
+
+
+if __name__ == "__main__":
+    main()

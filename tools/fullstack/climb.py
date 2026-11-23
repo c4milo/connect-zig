@@ -15,6 +15,7 @@ every server.
 """
 
 import statistics
+import sys
 
 microseconds = 1_000_000
 milliseconds = 1000
@@ -198,14 +199,16 @@ def apart(first, first_above, second, second_above):
     return high_first <= low_second or high_second <= low_first
 
 
-if __name__ == "__main__":
-    # tools/fullstack/climb.py <results> <transport> <server>: the median round's rate held, in
-    # exports a connection a second, for tools/fullstack/production.sh. Nothing when no round held
-    # a step.
-    import sys
-
+def main():
+    """tools/fullstack/climb.py <results> <transport> <server>: the median round's rate held, in
+    exports a connection a second, for tools/fullstack/production.sh. Nothing when no round held
+    a step."""
     results_path, results_transport, results_server = sys.argv[1:4]
     # The ticks and the seconds set only the CPU shares, which this reads none of.
     result, _ = summary(read(results_path, results_transport, 1, 1)[1].get(results_server, []))
     if result is not None:
         print(f"{result['best']['rate']:g}")
+
+
+if __name__ == "__main__":
+    main()

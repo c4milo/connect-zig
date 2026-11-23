@@ -28,25 +28,37 @@ def verdicts(path):
     return table
 
 
-def main():
-    schema, zig_path, go_path, refused_path, known_path = sys.argv[1:6]
+def read_expressions(schema):
+    """Each rule's expression, in the order the schema declares them."""
     expressions = re.findall(r'expression: "((?:[^"\\]|\\.)*)"', pathlib.Path(schema).read_text(encoding="utf-8"))
-    expressions = [text.replace('\\"', '"').replace("\\\\", "\\") for text in expressions]
+    return [text.replace('\\"', '"').replace("\\\\", "\\") for text in expressions]
+
+
+def read_reasons(refused_path):
+    """Why this library refused each rule it refused, by the rule's number."""
     reasons = {}
     with open(refused_path, encoding="utf-8") as lines:
         for line in lines:
             found = re.match(r"M(\d+) is refused: (.*)", line.rstrip("\n"))
             if found:
                 reasons[int(found.group(1))] = found.group(2)
+    return reasons
+
+
+def read_known(known_path):
+    """Each line of known.txt: a pattern of a refusal's reason, and why the difference passes."""
     known = []
     with open(known_path, encoding="utf-8") as lines:
         for line in lines:
             if line.strip() and not line.startswith("#"):
                 pattern, reason = line.rstrip("\n").split("\t", 1)
                 known.append((re.compile(pattern), reason))
-    zig, go = verdicts(zig_path), verdicts(go_path)
-    if zig.keys() != go.keys():
-        sys.exit(f"the two sides hold verdicts of different pairs: {len(zig)} and {len(go)}")
+    return known
+
+
+def sort_pairs(zig, go, reasons, known):
+    """The verdicts both sides gave, by kind; the differences known.txt excuses, by reason; and the
+    differences it does not, by rule."""
     agreed = collections.Counter()
     excused = collections.Counter()
     unknown = {}
@@ -60,13 +72,11 @@ def main():
             excused[excuse] += 1
         else:
             unknown.setdefault(pair[0], []).append((pair[1], zig[pair], go[pair]))
-    print(
-        f"{len(zig)} verdicts of {len(expressions)} rules: "
-        + ", ".join(f"{count} {name}" for name, count in sorted(agreed.items()))
-        + " on both sides"
-    )
-    for excuse, count in sorted(excused.items()):
-        print(f"{count} known differences: {excuse}")
+    return agreed, excused, unknown
+
+
+def write_unknown(unknown, expressions, reasons):
+    """Each rule whose verdicts differ with no reason known.txt gives, with its first message."""
     for rule, pairs in sorted(unknown.items()):
         message, ours, theirs = pairs[0]
         print(f"DIFFERENT rule {rule}: `{expressions[rule]}`")
@@ -75,8 +85,28 @@ def main():
         )
         if rule in reasons:
             print(f"  refused: {reasons[rule]}")
+
+
+def main():
+    schema, zig_path, go_path, refused_path, known_path = sys.argv[1:6]
+    expressions = read_expressions(schema)
+    reasons = read_reasons(refused_path)
+    known = read_known(known_path)
+    zig, go = verdicts(zig_path), verdicts(go_path)
+    if zig.keys() != go.keys():
+        sys.exit(f"the two sides hold verdicts of different pairs: {len(zig)} and {len(go)}")
+    agreed, excused, unknown = sort_pairs(zig, go, reasons, known)
+    print(
+        f"{len(zig)} verdicts of {len(expressions)} rules: "
+        + ", ".join(f"{count} {name}" for name, count in sorted(agreed.items()))
+        + " on both sides"
+    )
+    for excuse, count in sorted(excused.items()):
+        print(f"{count} known differences: {excuse}")
+    write_unknown(unknown, expressions, reasons)
     if unknown:
         sys.exit(1)
 
 
-main()
+if __name__ == "__main__":
+    main()

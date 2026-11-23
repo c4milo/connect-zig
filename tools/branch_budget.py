@@ -51,4 +51,5 @@ def main():
     print(f"{name}: the least value that builds lies above {low}, at most {high}")
 
 
-main()
+if __name__ == "__main__":
+    main()

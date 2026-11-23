@@ -154,25 +154,39 @@ def read_known(path):
     return known
 
 
-def main():
-    expected = json.loads(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"))
-    known = read_known(sys.argv[3])
+def read_results(path):
+    """Each test's result, by its full name, from the runner's lines."""
     results = {}
-    with open(sys.argv[2], encoding="utf-8") as lines:
+    with open(path, encoding="utf-8") as lines:
         for line in lines:
             name, text = line.rstrip("\n").split("\t", 1)
             results[name] = json.loads(text)
+    return results
+
+
+def group_of(name, want, results, known):
+    """The group of a test that the suite does not skip, and what differs, or the reason of the
+    line of known.txt that names it, whose count it adds to."""
+    group, detail = verdict(want, results[name]) if name in results else ("wrong", "no result")
+    if group in ("pass", "unchecked"):
+        return group, detail
+    entry = next((entry for entry in known if entry[0].fullmatch(name) and entry[1].search(detail)), None)
+    if entry is None:
+        return group, detail
+    entry[3] += 1
+    return "known", entry[2]
+
+
+def main():
+    expected = json.loads(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"))
+    known = read_known(sys.argv[3])
+    results = read_results(sys.argv[2])
     groups = {"pass": [], "known": [], "unchecked": [], "refused": [], "wrong": [], "skipped": []}
     for name, want in sorted(expected.items()):
         if "skip" in want:
             groups["skipped"].append((name, want["skip"]))
             continue
-        group, detail = verdict(want, results[name]) if name in results else ("wrong", "no result")
-        if group not in ("pass", "unchecked"):
-            entry = next((entry for entry in known if entry[0].fullmatch(name) and entry[1].search(detail)), None)
-            if entry is not None:
-                entry[3] += 1
-                group, detail = "known", entry[2]
+        group, detail = group_of(name, want, results, known)
         groups[group].append((name, detail))
     for group in ("refused", "wrong"):
         for name, detail in groups[group]:
@@ -184,4 +198,5 @@ def main():
     return 1 if groups["refused"] or groups["wrong"] or unused else 0
 
 
-sys.exit(main())
+if __name__ == "__main__":
+    sys.exit(main())

@@ -10,111 +10,24 @@ digits of its protobuf encoding. A seed gives the same files each time.
 """
 
 import random
-import struct
 import sys
 
-FIELDS = """  string s = 1;
-  string t = 2;
-  int32 i = 3;
-  int64 j = 4;
-  uint32 u = 5;
-  uint64 v = 6;
-  double d = 7;
-  bool b = 8;
-  bytes y = 9;
-  repeated string rs = 10;
-  repeated int32 ri = 11;
-  map<string, int32> msi = 12;
-  google.protobuf.Duration dur = 13;
-  Leaf leaf = 14;
-"""
-
-STRINGS = [
-    "",
-    "a",
-    "b",
-    "ab",
-    "x1",
-    "foo@example.com",
-    "example.com",
-    "1.2.3.4",
-    "::1",
-    "héllo",
-    "https://a.example/b",
-    "10",
-    "-7",
-    "true",
-    "k",
-]
-# RE2 patterns that Go's regexp and stdx's regex both read, and that match texts of STRINGS in
-# different ways: anchors, classes, ASCII's case folding, repetition, alternation and `.` over
-# a character of two octets.
-PATTERNS = [
-    "^a",
-    "b$",
-    "^[a-z]+$",
-    "(?i)^A",
-    "\\d+",
-    "^\\w+@\\w+\\.com$",
-    "x|1",
-    "^(ab)*$",
-    "[^a-z]",
-    "^.{2,5}$",
-    "é",
-    "^$",
-    "\\.",
-    "^[0-9a-f:.]+$",
-    "^-?[0-9]+$",
-]
-INTS = [0, 1, -1, 2, 3, 7, 10, 100, -100, 2**31 - 1, -(2**31)]
-LONGS = INTS + [2**62, -(2**62), 2**63 - 1, -(2**63)]
-UINTS = [0, 1, 2, 5, 100, 2**32 - 1]
-ULONGS = UINTS + [2**63, 2**64 - 1]
-DOUBLES = ["0.0", "1.5", "2.0", "-2.25", "100.0", "1e300"]
-DURATIONS = ["0s", "1s", "5s", "90s", "1h", "-3s", "1.5s"]
-# Timestamps in UTC: cel-go writes a timestamp read with an offset in that offset, where this
-# library writes UTC (docs/specs/README.md), so `string` of one would differ on purpose.
-TIMESTAMPS = [
-    "2023-12-25T12:30:45.678Z",
-    "2000-02-29T23:59:59Z",
-    "1970-01-01T00:00:00Z",
-    "0001-01-01T00:00:00Z",
-    "9999-12-31T23:59:59.999999999Z",
-    "2024-03-01T08:00:00Z",
-]
-# Zones cel-go and this library both read: UTC and fixed offsets, no names.
-ZONES = ["UTC", "+05:30", "-08:00", "-00:30", "+14:00", "-12:45", "5:00", "+23:59"]
-TIMESTAMP_PARTS = [
-    "getFullYear",
-    "getMonth",
-    "getDate",
-    "getDayOfMonth",
-    "getDayOfYear",
-    "getDayOfWeek",
-    "getHours",
-    "getMinutes",
-    "getSeconds",
-    "getMilliseconds",
-]
-DURATION_PARTS = ["getHours", "getMinutes", "getSeconds", "getMilliseconds"]
-# The names of types an expression may write: CEL's own, a message's, and two well-known types'.
-TYPE_NAMES = [
-    "int",
-    "uint",
-    "double",
-    "string",
-    "bytes",
-    "bool",
-    "list",
-    "map",
-    "null_type",
-    "type",
-    "diff.v1.Leaf",
-    "google.protobuf.Duration",
-    "google.protobuf.Timestamp",
-]
-# The texts of STRINGS that are identifiers, so a map's key may be selected as a field: `m.ab`.
-KEYS = ["a", "b", "ab", "x1", "k"]
+from generate_messages import message
+from generate_values import (
+    DOUBLES,
+    DURATION_PARTS,
+    DURATIONS,
+    FIELDS,
+    INTS,
+    KEYS,
+    PATTERNS,
+    STRINGS,
+    TIMESTAMP_PARTS,
+    TIMESTAMPS,
+    TYPE_NAMES,
+    UINTS,
+    ZONES,
+)
 
 
 class Generator:
@@ -171,12 +84,23 @@ class Generator:
         if depth <= 0 or self.rng.random() < 0.4:
             return self.pick(leaves)
         kind = self.rng.randrange(14)
+        if kind < 6:
+            return self.int_arithmetic(kind, depth)
+        if kind < 13:
+            return self.int_of_value(kind, depth)
+        return self.pick(leaves)
+
+    def int_arithmetic(self, kind, depth):
+        """An int of the kinds 0 to 5 of `int`: an operator on two ints, a negation, or a size."""
         if kind < 4:
             return f"({self.int(depth - 1)} {self.pick(['+', '-', '*', '/', '%'])} {self.int(depth - 1)})"
         if kind == 4:
             return f"-{self.pick(['this.i', 'this.j', '(' + self.int(depth - 1) + ')'])}"
-        if kind == 5:
-            return f"{self.string(depth - 1)}.size()"
+        return f"{self.string(depth - 1)}.size()"
+
+    def int_of_value(self, kind, depth):
+        """An int of the kinds 6 to 12 of `int`: a size, a conversion, an element, a choice, a
+        derived int, or a part of a time."""
         if kind == 6:
             return self.pick(
                 [
@@ -201,12 +125,14 @@ class Generator:
             return f"({self.bool(depth - 1)} ? {self.int(depth - 1)} : {self.int(depth - 1)})"
         if kind == 11:
             return self.derived_int(depth)
-        if kind == 12:
-            if self.rng.random() < 0.3:
-                return f"{self.duration(depth - 1)}.{self.pick(DURATION_PARTS)}()"
-            zone = self.pick(["", self.literal(self.pick(ZONES))])
-            return f"{self.timestamp(depth - 1)}.{self.pick(TIMESTAMP_PARTS)}({zone})"
-        return self.pick(leaves)
+        return self.time_part(depth)
+
+    def time_part(self, depth):
+        """An int part of a duration or of a timestamp, in a zone or in UTC."""
+        if self.rng.random() < 0.3:
+            return f"{self.duration(depth - 1)}.{self.pick(DURATION_PARTS)}()"
+        zone = self.pick(["", self.literal(self.pick(ZONES))])
+        return f"{self.timestamp(depth - 1)}.{self.pick(TIMESTAMP_PARTS)}({zone})"
 
     def derived(self, depth):
         """A list that `filter` or `map` gives, the type of its elements, and whether its order
@@ -329,31 +255,49 @@ class Generator:
         if depth <= 0:
             return self.pick(["true", "false", "this.b", self.comparison(0)])
         kind = self.rng.randrange(16)
+        if kind < 9:
+            return self.bool_logic(kind, depth)
+        if kind == 9:
+            return self.bool_text(depth)
+        if kind == 10:
+            return self.membership(depth)
+        return self.bool_of_value(kind, depth)
+
+    def bool_logic(self, kind, depth):
+        """A bool of the kinds 0 to 8 of `bool`: a comparison, two bools joined, a negation, or a
+        choice."""
         if kind < 5:
             return self.comparison(depth - 1)
         if kind < 7:
             return f"({self.bool(depth - 1)} {self.pick(['&&', '||'])} {self.bool(depth - 1)})"
         if kind == 7:
             return f"!({self.bool(depth - 1)})"
-        if kind == 8:
-            return f"({self.bool(depth - 1)} ? {self.bool(depth - 1)} : {self.bool(depth - 1)})"
-        if kind == 9:
-            # `matches` takes a literal pattern, which this library reads as it compiles.
-            if self.rng.random() < 0.3:
-                return f"{self.string(depth - 1)}.matches({self.literal(self.pick(PATTERNS))})"
-            return f"{self.string(depth - 1)}.{self.pick(['startsWith', 'endsWith', 'contains'])}({self.string(depth - 1)})"
-        if kind == 10:
-            if self.rng.random() < 0.25:
-                collection, kind, _ = self.derived(depth - 1)
-                return f"{self.string(0) if kind == 'string' else self.int(0)} in {collection}"
-            return self.pick(
-                [
-                    f"{self.string(depth - 1)} in this.rs",
-                    f"{self.int(depth - 1)} in this.ri",
-                    f"{self.string(depth - 1)} in this.msi",
-                    f"{self.int(depth - 1)} in [1, 2, 3]",
-                ]
-            )
+        return f"({self.bool(depth - 1)} ? {self.bool(depth - 1)} : {self.bool(depth - 1)})"
+
+    def bool_text(self, depth):
+        """A test of a string: a match of a pattern, or a start, an end, or a part."""
+        # `matches` takes a literal pattern, which this library reads as it compiles.
+        if self.rng.random() < 0.3:
+            return f"{self.string(depth - 1)}.matches({self.literal(self.pick(PATTERNS))})"
+        return f"{self.string(depth - 1)}.{self.pick(['startsWith', 'endsWith', 'contains'])}({self.string(depth - 1)})"
+
+    def membership(self, depth):
+        """A test of a value's membership in a derived collection, a list, or a map."""
+        if self.rng.random() < 0.25:
+            collection, kind, _ = self.derived(depth - 1)
+            return f"{self.string(0) if kind == 'string' else self.int(0)} in {collection}"
+        return self.pick(
+            [
+                f"{self.string(depth - 1)} in this.rs",
+                f"{self.int(depth - 1)} in this.ri",
+                f"{self.string(depth - 1)} in this.msi",
+                f"{self.int(depth - 1)} in [1, 2, 3]",
+            ]
+        )
+
+    def bool_of_value(self, kind, depth):
+        """A bool of the kinds 11 to 15 of `bool`: a macro, a presence, a test of a string or of a
+        double, or a type check or a conversion."""
         if kind == 11:
             return self.macro(depth)
         if kind == 12:
@@ -452,71 +396,6 @@ class Generator:
         return self.bool(depth)
 
 
-def varint(value):
-    value &= (1 << 64) - 1
-    out = bytearray()
-    while True:
-        low = value & 0x7F
-        value >>= 7
-        if value:
-            out.append(low | 0x80)
-        else:
-            out.append(low)
-            return bytes(out)
-
-
-def tag(number, wire):
-    return varint(number << 3 | wire)
-
-
-def delimited(number, payload):
-    return tag(number, 2) + varint(len(payload)) + payload
-
-
-def message(rng):
-    """One random message, encoded. A field is left out about one time in three."""
-    out = bytearray()
-
-    def maybe():
-        return rng.random() < 0.67
-
-    if maybe():
-        out += delimited(1, rng.choice(STRINGS).encode())
-    if maybe():
-        out += delimited(2, rng.choice(STRINGS).encode())
-    if maybe():
-        out += tag(3, 0) + varint(rng.choice(INTS))
-    if maybe():
-        out += tag(4, 0) + varint(rng.choice(LONGS))
-    if maybe():
-        out += tag(5, 0) + varint(rng.choice(UINTS))
-    if maybe():
-        out += tag(6, 0) + varint(rng.choice(ULONGS))
-    if maybe():
-        out += tag(7, 1) + struct.pack(
-            "<d", rng.choice([0.0, 1.5, -2.25, 100.0, 1e300, float("inf"), float("-inf"), float("nan")])
-        )
-    if maybe():
-        out += tag(8, 0) + varint(rng.randrange(2))
-    if maybe():
-        out += delimited(9, rng.choice([b"", b"a", b"\x00\xff", "héllo".encode()]))
-    for _ in range(rng.choice([0, 0, 1, 2, 3])):
-        out += delimited(10, rng.choice(STRINGS).encode())
-    if maybe():
-        out += delimited(11, b"".join(varint(rng.choice(INTS)) for _ in range(rng.randrange(4))))
-    for _ in range(rng.choice([0, 0, 1, 2, 3])):
-        entry = delimited(1, rng.choice(STRINGS).encode()) + tag(2, 0) + varint(rng.choice(INTS))
-        out += delimited(12, entry)
-    if maybe():
-        out += delimited(
-            13,
-            tag(1, 0) + varint(rng.choice([0, 1, 5, 90, 3600, -3])) + tag(2, 0) + varint(rng.choice([0, 0, 500000000])),
-        )
-    if maybe():
-        out += delimited(14, delimited(1, rng.choice(STRINGS).encode()) + tag(2, 0) + varint(rng.choice(INTS)))
-    return bytes(out)
-
-
 def main():
     seed, rules, messages, out = int(sys.argv[1]), int(sys.argv[2]), int(sys.argv[3]), sys.argv[4]
     rng = random.Random(seed)
@@ -549,4 +428,5 @@ def main():
         file.writelines(message(rng).hex() + "\n" for _ in range(messages))
 
 
-main()
+if __name__ == "__main__":
+    main()

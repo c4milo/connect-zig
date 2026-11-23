@@ -25,10 +25,6 @@ import random
 import subprocess
 import sys
 
-buf, spans, out = sys.argv[1], int(sys.argv[2]), sys.argv[3]
-variant = int(sys.argv[4]) if len(sys.argv) > 4 else 0
-# Python seeds a generator from a string by its SHA-512, the same on every host.
-draw = random.Random(spans if variant == 0 else f"{spans}-{variant}")
 # Pods in one export: one for each 64 spans, from 1 to 8.
 pods_per_spans = 64
 pods_max = 8
@@ -55,12 +51,22 @@ agents = [
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0",
     "com.tinyspeck.chatlyio/24.11.10 (iPhone; iOS 18.1.1; Scale/3.00)",
 ]
-stack = "".join(
-    f"main.(*Handler).serve{n}(0xc000{n:04x}, 0x{n * 4096:x})\n\t/src/app/handler.go:{100 + n}\n" for n in range(12)
-)
+# The frames of an error's stack trace.
+stack_frames = 12
 
 
-def octets(length):
+def stack_of(frames):
+    """A Go stack trace of `frames` frames."""
+    return "".join(
+        f"main.(*Handler).serve{n}(0xc000{n:04x}, 0x{n * 4096:x})\n\t/src/app/handler.go:{100 + n}\n"
+        for n in range(frames)
+    )
+
+
+stack = stack_of(stack_frames)
+
+
+def octets(draw, length):
     return base64.b64encode(bytes(draw.randrange(256) for _ in range(length))).decode()
 
 
@@ -73,7 +79,7 @@ def number(key, value):
     return {"key": key, "value": {"intValue": str(value)}}
 
 
-def resource(pod):
+def resource(draw, pod):
     service = services[pod % len(services)]
     name = f"{service}-{draw.randrange(16**9):09x}-{draw.randrange(36**5):05x}"
     return {
@@ -81,16 +87,16 @@ def resource(pod):
             text("service.name", service),
             text("service.namespace", "slack"),
             text("service.version", f"2026.11.{draw.randrange(1, 17)}"),
-            text("service.instance.id", octets(12)),
+            text("service.instance.id", octets(draw, 12)),
             text("deployment.environment.name", "production"),
             text("k8s.cluster.name", "prod-us-east-1-c7"),
             text("k8s.namespace.name", service),
             text("k8s.node.name", "ip-10-24-118-37.ec2.internal"),
             text("k8s.pod.name", name),
-            text("k8s.pod.uid", octets(16)),
+            text("k8s.pod.uid", octets(draw, 16)),
             text("k8s.deployment.name", service),
             text("container.name", service),
-            text("container.id", octets(24)),
+            text("container.id", octets(draw, 24)),
             text("host.name", "ip-10-24-118-37.ec2.internal"),
             text("host.arch", "amd64"),
             text("os.type", "linux"),
@@ -105,7 +111,7 @@ def resource(pod):
     }
 
 
-def http_server():
+def http_server(draw):
     route = draw.choice(routes)
     return (
         "SPAN_KIND_SERVER",
@@ -127,7 +133,7 @@ def http_server():
     )
 
 
-def http_client():
+def http_client(draw):
     service = draw.choice(services)
     return (
         "SPAN_KIND_CLIENT",
@@ -143,7 +149,7 @@ def http_client():
     )
 
 
-def grpc_call():
+def grpc_call(draw):
     service = draw.choice(services)
     method = draw.choice(["Get", "List", "BatchGet", "Update"])
     return (
@@ -160,7 +166,7 @@ def grpc_call():
     )
 
 
-def database():
+def database(draw):
     table = draw.choice(tables)
     system = draw.choice(["mysql", "mysql", "redis"])
     query = (
@@ -186,7 +192,7 @@ def database():
     )
 
 
-def kafka():
+def kafka(draw):
     topic = draw.choice(topics)
     return (
         "SPAN_KIND_PRODUCER",
@@ -209,12 +215,12 @@ def kafka():
 kinds = [http_server] * 7 + [database] * 5 + [grpc_call] * 3 + [http_client] * 3 + [kafka] * 2
 
 
-def span(index, trace, parent, begin):
-    kind, name, attributes = (http_server if index % spans_per_trace == 0 else draw.choice(kinds))()
+def span(draw, index, trace, parent, begin):
+    kind, name, attributes = (http_server if index % spans_per_trace == 0 else draw.choice(kinds))(draw)
     duration = draw.randrange(200_000, 40_000_000)
     item = {
         "traceId": trace,
-        "spanId": octets(8),
+        "spanId": octets(draw, 8),
         "parentSpanId": parent,
         "name": name,
         "kind": kind,
@@ -248,53 +254,72 @@ def span(index, trace, parent, begin):
     return item
 
 
-pods = max(1, min(pods_max, spans // pods_per_spans))
-resource_spans = []
-for pod in range(pods):
-    share = spans // pods + (1 if pod < spans % pods else 0)
-    items, trace, parent = [], "", ""
-    for index in range(share):
-        if index % spans_per_trace == 0:
-            trace, parent = octets(16), ""
-        begin = start_ns + draw.randrange(5_000_000_000)
-        items.append(span(index, trace, parent, begin))
-        parent = items[-1]["spanId"]
-    resource_spans.append(
-        {
-            "resource": resource(pod),
-            "scopeSpans": [
-                {
-                    "scope": {
-                        "name": "go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp",
-                        "version": "0.63.0",
-                    },
-                    "spans": items,
-                }
-            ],
-        }
-    )
+def export_of(draw, spans):
+    """Each pod's spans, as the export's `resourceSpans`."""
+    pods = max(1, min(pods_max, spans // pods_per_spans))
+    resource_spans = []
+    for pod in range(pods):
+        share = spans // pods + (1 if pod < spans % pods else 0)
+        items, trace, parent = [], "", ""
+        for index in range(share):
+            if index % spans_per_trace == 0:
+                trace, parent = octets(draw, 16), ""
+            begin = start_ns + draw.randrange(5_000_000_000)
+            items.append(span(draw, index, trace, parent, begin))
+            parent = items[-1]["spanId"]
+        resource_spans.append(
+            {
+                "resource": resource(draw, pod),
+                "scopeSpans": [
+                    {
+                        "scope": {
+                            "name": "go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp",
+                            "version": "0.63.0",
+                        },
+                        "spans": items,
+                    }
+                ],
+            }
+        )
+    return resource_spans
 
-with open(out + ".json", "w") as file:
-    json.dump({"resourceSpans": resource_spans}, file)
-subprocess.run(
-    [
-        buf,
-        "convert",
-        "examples/otlp/proto",
-        "--type",
-        "opentelemetry.proto.collector.trace.v1.ExportTraceServiceRequest",
-        "--from",
-        out + ".json#format=json",
-        "--to",
-        out + ".binpb#format=binpb",
-    ],
-    check=True,
-)
-encoded = pathlib.Path(out + ".binpb").read_bytes()
-# gzip at Go's default level, with no time in its header, so each run writes the same octets.
-compressed = gzip.compress(encoded, compresslevel=6, mtime=0)
-# gRPC over HTTP/2, "Requests": a Compressed-Flag of 1, the Message-Length in four octets,
-# big-endian, then the compressed message.
-with open(out, "wb") as file:
-    file.write(b"\1" + len(compressed).to_bytes(4, "big") + compressed)
-print(f"{spans} {len(encoded)} {len(compressed)}")
+
+def write(buf, out, spans, resource_spans):
+    """Writes the export in proto3 JSON, in protobuf's binary form, and as a gRPC message in gzip,
+    and prints the spans, the message's octets, and the octets in gzip."""
+    with open(out + ".json", "w") as file:
+        json.dump({"resourceSpans": resource_spans}, file)
+    subprocess.run(
+        [
+            buf,
+            "convert",
+            "examples/otlp/proto",
+            "--type",
+            "opentelemetry.proto.collector.trace.v1.ExportTraceServiceRequest",
+            "--from",
+            out + ".json#format=json",
+            "--to",
+            out + ".binpb#format=binpb",
+        ],
+        check=True,
+    )
+    encoded = pathlib.Path(out + ".binpb").read_bytes()
+    # gzip at Go's default level, with no time in its header, so each run writes the same octets.
+    compressed = gzip.compress(encoded, compresslevel=6, mtime=0)
+    # gRPC over HTTP/2, "Requests": a Compressed-Flag of 1, the Message-Length in four octets,
+    # big-endian, then the compressed message.
+    with open(out, "wb") as file:
+        file.write(b"\1" + len(compressed).to_bytes(4, "big") + compressed)
+    print(f"{spans} {len(encoded)} {len(compressed)}")
+
+
+def main():
+    buf, spans, out = sys.argv[1], int(sys.argv[2]), sys.argv[3]
+    variant = int(sys.argv[4]) if len(sys.argv) > 4 else 0
+    # Python seeds a generator from a string by its SHA-512, the same on every host.
+    draw = random.Random(spans if variant == 0 else f"{spans}-{variant}")
+    write(buf, out, spans, export_of(draw, spans))
+
+
+if __name__ == "__main__":
+    main()

@@ -64,22 +64,35 @@ def expected_of(test):
     return {"skip": "expects an unknown value"}
 
 
-def main():
-    out, paths = pathlib.Path(sys.argv[1]), sys.argv[2:]
+def result_of(test):
+    """What a test expects, or why the check skips it, and whether the test turns the type check
+    off."""
+    skipped = next((why for field, why in SKIPPED.items() if test.get(field)), None)
+    result = {"skip": skipped} if skipped else expected_of(test)
+    # The suite runs such a test with no check of its types, which a rule always has.
+    if test.get("disableCheck") and "skip" not in result:
+        result["unchecked"] = True
+    return result
+
+
+def read_suites(paths):
+    """The cases the runner compiles, each test's name and expression, and what each test
+    expects, by its full name."""
     cases, expected = [], {}
     for path in sorted(paths):
         suite = json.loads(pathlib.Path(path).read_text(encoding="utf-8"))
         for section in suite.get("section", []):
             for test in section.get("test", []):
                 name = f"{suite['name']}/{section['name']}/{test['name']}"
-                skipped = next((why for field, why in SKIPPED.items() if test.get(field)), None)
-                result = {"skip": skipped} if skipped else expected_of(test)
-                # The suite runs such a test with no check of its types, which a rule always has.
-                if test.get("disableCheck") and "skip" not in result:
-                    result["unchecked"] = True
-                expected[name] = result
-                if "skip" not in result:
+                expected[name] = result_of(test)
+                if "skip" not in expected[name]:
                     cases.append((name, test["expr"]))
+    return cases, expected
+
+
+def main():
+    out, paths = pathlib.Path(sys.argv[1]), sys.argv[2:]
+    cases, expected = read_suites(paths)
     lines = [
         "//! Written by tools/cel_conformance/generate.py from cel-spec's conformance suite. DO NOT EDIT.",
         "pub const Case = struct { name: []const u8, expr: []const u8 };",
@@ -93,4 +106,5 @@ def main():
     print(f"{len(cases)} cases of {len(expected)} tests")
 
 
-main()
+if __name__ == "__main__":
+    main()

@@ -229,6 +229,67 @@ def stop(server):
     server.wait()
 
 
+def run_step(name, cwd, env):
+    """The step `zig build run`, which must succeed."""
+    done = subprocess.run(
+        zig(cwd, "run", []),
+        cwd=cwd,
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=COMMAND_WAIT_S,
+        check=False,
+    )
+    if done.returncode != 0:
+        raise SystemExit(f"{name}: zig build run failed:\n{done.stderr}")
+    return {"command": "zig build run", "output": shown((done.stdout + done.stderr).splitlines())}
+
+
+def serve_step(cwd, env, servers):
+    """The step `zig build serve &`: the server runs on, and a token it prints joins the
+    environment of the steps after it."""
+    lines, server = serve(cwd, env, zig(cwd, "serve", ["--", PORT]))
+    servers.append(server)
+    for line in lines:
+        if line.startswith("token: "):
+            env["TOKEN"] = line[len("token: ") :]
+    return {"command": "zig build serve &", "output": shown(lines)}
+
+
+def command_step(name, cwd, env, text):
+    """A command of the README, which must succeed."""
+    done = subprocess.run(
+        ["sh", "-c", actual(text)],
+        cwd=cwd,
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=COMMAND_WAIT_S,
+        check=False,
+    )
+    output = done.stdout + done.stderr
+    # Go's HTTP/2 client logs a frame type it does not know, which a peer must
+    # ignore (RFC 9113 §4.1); the log line is not the call's output.
+    output = "\n".join(line for line in output.splitlines() if "unhandled response frame type" not in line)
+    if done.returncode != 0:
+        raise SystemExit(f"{name}: {text} failed:\n{output}")
+    return {"command": text, "output": shown(output.splitlines())}
+
+
+def step_of(name, cwd, env, servers, step):
+    """One step of the session, with its output: a server that runs on joins `servers`."""
+    kind, text = step
+    if kind == "run":
+        return run_step(name, cwd, env)
+    if kind == "serve":
+        return serve_step(cwd, env, servers)
+    if text.endswith("&"):
+        lines, server = serve(cwd, env, ["sh", "-c", actual(text[:-1])])
+        servers.append(server)
+        return {"command": text, "output": shown(lines)}
+    return command_step(name, cwd, env, text)
+
+
 def record(name):
     """Runs the example's session for real, and returns its steps with their output."""
     cwd = ROOT / "examples" / name
@@ -236,48 +297,8 @@ def record(name):
     steps = []
     servers = []
     try:
-        for kind, text in EXAMPLES[name]:
-            if kind == "run":
-                done = subprocess.run(
-                    zig(cwd, "run", []),
-                    cwd=cwd,
-                    env=env,
-                    capture_output=True,
-                    text=True,
-                    timeout=COMMAND_WAIT_S,
-                    check=False,
-                )
-                if done.returncode != 0:
-                    raise SystemExit(f"{name}: zig build run failed:\n{done.stderr}")
-                steps.append({"command": "zig build run", "output": shown((done.stdout + done.stderr).splitlines())})
-            elif kind == "serve":
-                lines, server = serve(cwd, env, zig(cwd, "serve", ["--", PORT]))
-                servers.append(server)
-                for line in lines:
-                    if line.startswith("token: "):
-                        env["TOKEN"] = line[len("token: ") :]
-                steps.append({"command": "zig build serve &", "output": shown(lines)})
-            elif text.endswith("&"):
-                lines, server = serve(cwd, env, ["sh", "-c", actual(text[:-1])])
-                servers.append(server)
-                steps.append({"command": text, "output": shown(lines)})
-            else:
-                done = subprocess.run(
-                    ["sh", "-c", actual(text)],
-                    cwd=cwd,
-                    env=env,
-                    capture_output=True,
-                    text=True,
-                    timeout=COMMAND_WAIT_S,
-                    check=False,
-                )
-                output = done.stdout + done.stderr
-                # Go's HTTP/2 client logs a frame type it does not know, which a peer must
-                # ignore (RFC 9113 §4.1); the log line is not the call's output.
-                output = "\n".join(line for line in output.splitlines() if "unhandled response frame type" not in line)
-                if done.returncode != 0:
-                    raise SystemExit(f"{name}: {text} failed:\n{output}")
-                steps.append({"command": text, "output": shown(output.splitlines())})
+        for step in EXAMPLES[name]:
+            steps.append(step_of(name, cwd, env, servers, step))
     finally:
         for server in servers:
             stop(server)

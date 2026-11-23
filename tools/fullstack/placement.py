@@ -14,7 +14,6 @@ fewer than 4 CPUs it prints `- - <threads>`, and nothing is pinned.
 import os
 import sys
 
-root = sys.argv[1] if len(sys.argv) > 1 else "/sys/devices/system/cpu"
 cpus_needed = 4
 load_cpus = 2
 
@@ -28,18 +27,27 @@ def cpus_of(text):
     return found
 
 
-def read(path):
+def read(root, path):
     with open(os.path.join(root, path)) as file:
         return file.read()
 
 
-online = cpus_of(read("online"))
-core0 = cpus_of(read("cpu0/topology/thread_siblings_list"))
-if len(online) < cpus_needed:
-    print(f"- - {len(core0)}")
-elif len(core0) > 1:
-    server = min(cpu for cpu in core0 if cpu != 0)
-    load = [cpu for cpu in online if cpu not in core0][:load_cpus]
-    print(server, ",".join(map(str, load)), len(core0))
-else:
-    print(1, "2,3", 1)
+def placement(online, core0):
+    """The line the script prints, from the CPUs online and the threads of CPU 0's core."""
+    if len(online) < cpus_needed:
+        return f"- - {len(core0)}"
+    if len(core0) > 1:
+        server = min(cpu for cpu in core0 if cpu != 0)
+        load = [cpu for cpu in online if cpu not in core0][:load_cpus]
+        return f"{server} {','.join(map(str, load))} {len(core0)}"
+    return "1 2,3 1"
+
+
+def main():
+    root = sys.argv[1] if len(sys.argv) > 1 else "/sys/devices/system/cpu"
+    online = cpus_of(read(root, "online"))
+    print(placement(online, cpus_of(read(root, "cpu0/topology/thread_siblings_list"))))
+
+
+if __name__ == "__main__":
+    main()
