@@ -177,10 +177,13 @@ spans, not compressed, on 16 connections of 4 streams. The calls a second:
 
 One decode of a request message and one validation of it against the rules of
 its schema, beside protovalidate-go, protovalidate-es on Node.js, protovalidate-buffa and
-prost-protovalidate. From CI's [run 231](https://github.com/c4milo/connect-zig/actions/runs/45055634693), on an AMD EPYC 7763 core: connect-zig is 13 to
-58 times as fast as protovalidate-go, and the fastest of the five in all six cases.
+prost-protovalidate. From CI's [run 242](https://github.com/c4milo/connect-zig/actions/runs/45085140006), on an AMD EPYC 9V74 core: connect-zig is 12 to 58
+times as fast as protovalidate-go, and the fastest of the five in all six cases. On a Neoverse-N2
+core it is 14 to 68 times as fast, and the fastest in all six too.
 
-![Bars of the speed of a decode with a validation through connect-zig, protovalidate-buffa, prost-protovalidate and protovalidate-es, in multiples of protovalidate-go's, on x86-64: connect-zig is 13 to 58 times as fast as protovalidate-go and the fastest in 6 of 6 cases](images/validate-vs-go.svg)
+![Bars of the speed of a decode with a validation through connect-zig, protovalidate-buffa, prost-protovalidate and protovalidate-es, in multiples of protovalidate-go's, on x86-64: connect-zig is 12 to 58 times as fast as protovalidate-go and the fastest in 6 of 6 cases](images/validate-vs-go.svg)
+
+![Bars of the speed of a decode with a validation through connect-zig, protovalidate-buffa, prost-protovalidate and protovalidate-es, in multiples of protovalidate-go's, on arm64: connect-zig is 14 to 68 times as fast as protovalidate-go and the fastest in 6 of 6 cases](images/validate-vs-go-arm64.svg)
 
 `tools/validate_compare_check.sh` times five implementations of protovalidate on one schema,
 `bench/validate/proto`, and requires each to give each message the same verdict:
@@ -203,7 +206,7 @@ typical request of an API: a standard rule of each kind, among them `uuid`, `ema
 duration, and two CEL rules of the message. `Rules` holds CEL rules alone, over lists, a map
 and two fields. `bench/validate/cases` holds a valid and an invalid message of each as JSON, and
 `buf convert` encodes them. Since step 35, `Medium`'s name takes a `pattern`, which its invalid
-message breaks. Run 201 below ran before that.
+message breaks.
 
 Each program keeps one validator for every call, as a server does, and times as
 bench/measure.zig does: the median of 11 batches of about 20 ms. It times two things for each
@@ -223,32 +226,52 @@ embedded descriptor.
 Each verdict is "valid", or "invalid:" and the rule ids of the violations in order. The check
 fails when two implementations give one message different verdicts.
 
-CI's [run 231](https://github.com/c4milo/connect-zig/actions/runs/45055634693) ran the check at
-commit 4c471a9, v0.3.0, on an AMD EPYC 7763, x86-64. The schema's `Medium` name holds a `pattern`, which
-each of the five searches. Each of the five gave each message the same verdict. The nanoseconds
-of one decode and one validation, which the chart draws:
+CI's [run 242](https://github.com/c4milo/connect-zig/actions/runs/45085140006) ran the check at commit 48bb3e1, on an AMD EPYC 9V74, x86-64, and on a
+Neoverse-N2, arm64. Each of the five gave each message the same verdict on both. The nanoseconds of
+one decode and one validation on x86-64, which the chart draws:
 
 | Message | connect-zig | protovalidate-go | protovalidate-es | protovalidate-buffa | prost-protovalidate |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| `Small`, valid | 47.0 | 964.3 | 1,396.5 | 119.1 | 918.5 |
-| `Small`, invalid | 58.7 | 2,836.4 | 5,439.8 | 154.8 | 2,901.9 |
-| `Medium`, valid | 696.7 | 9,030.8 | 54,486.2 | 1,171.3 | 36,922.0 |
-| `Medium`, invalid | 572.8 | 16,913.4 | 62,303.9 | 1,435.6 | 50,725.2 |
-| `Rules`, valid | 217.3 | 11,575.3 | 26,669.3 | 348.1 | 23,971.9 |
-| `Rules`, invalid | 217.1 | 12,565.9 | 30,705.4 | 470.5 | 23,040.9 |
+| `Small`, valid | 39.9 | 671.7 | 1,081.9 | 98.9 | 655.2 |
+| `Small`, invalid | 68.2 | 2,008.6 | 3,990.0 | 123.5 | 2,312.0 |
+| `Medium`, valid | 523.5 | 6,495.1 | 30,773.4 | 885.6 | 28,618.3 |
+| `Medium`, invalid | 451.0 | 11,658.9 | 34,090.2 | 1,171.8 | 37,633.1 |
+| `Rules`, valid | 157.2 | 8,182.2 | 20,634.6 | 286.1 | 18,952.3 |
+| `Rules`, invalid | 153.3 | 8,964.3 | 21,588.4 | 364.0 | 17,716.5 |
 
-The nanoseconds of one validation of a message decoded before:
+The nanoseconds of one validation of a message decoded before, on x86-64:
 
 | Message | connect-zig | protovalidate-go | protovalidate-es | protovalidate-buffa | prost-protovalidate |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| `Small`, valid | 20.9 | 583.3 | 660.2 | 46.1 | 792.3 |
-| `Small`, invalid | 28.4 | 2,580.0 | 4,297.7 | 105.4 | 2,740.5 |
-| `Medium`, valid | 397.1 | 6,252.2 | 51,131.5 | 405.6 | 34,631.1 |
-| `Medium`, invalid | 341.6 | 14,467.0 | 53,080.3 | 827.5 | 48,269.2 |
-| `Rules`, valid | 77.5 | 9,534.1 | 26,937.1 | 39.2 | 22,945.3 |
-| `Rules`, invalid | 94.7 | 10,834.8 | 27,716.6 | 176.9 | 22,499.3 |
+| `Small`, valid | 17.1 | 415.9 | 452.6 | 36.9 | 586.4 |
+| `Small`, invalid | 32.6 | 1,761.9 | 3,912.2 | 84.1 | 2,156.9 |
+| `Medium`, valid | 314.8 | 4,572.9 | 30,209.9 | 318.9 | 27,118.5 |
+| `Medium`, invalid | 306.2 | 9,949.8 | 31,440.5 | 666.0 | 35,702.5 |
+| `Rules`, valid | 41.7 | 6,808.9 | 21,125.0 | 31.2 | 18,204.1 |
+| `Rules`, invalid | 54.9 | 7,692.9 | 20,448.8 | 132.9 | 17,407.4 |
 
-protovalidate-buffa validates one message faster: the valid `Rules`, 39.2 ns to 77.5. Its plugin
-writes Rust code for each rule, as connect-zig's compiler does. A profile shows connect-zig's time
-there spread thin, over each macro's iterator, each rule's `Env` and the calls between the parts
-of each expression (docs/design.md, "Work not done yet").
+The same two on arm64:
+
+| Message | connect-zig | protovalidate-go | protovalidate-es | protovalidate-buffa | prost-protovalidate |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| `Small`, valid | 41.1 | 761.5 | 1,298.3 | 102.8 | 861.2 |
+| `Small`, invalid | 44.9 | 2,717.0 | 4,432.7 | 151.3 | 2,645.5 |
+| `Medium`, valid | 550.5 | 7,875.3 | 41,931.4 | 842.7 | 32,559.3 |
+| `Medium`, invalid | 475.2 | 15,697.8 | 51,034.5 | 1,195.1 | 41,965.5 |
+| `Rules`, valid | 160.8 | 10,376.3 | 23,241.8 | 278.9 | 21,946.6 |
+| `Rules`, invalid | 167.1 | 11,338.0 | 24,959.0 | 376.1 | 20,261.3 |
+
+| Message | connect-zig | protovalidate-go | protovalidate-es | protovalidate-buffa | prost-protovalidate |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| `Small`, valid | 18.3 | 512.9 | 747.5 | 46.7 | 798.1 |
+| `Small`, invalid | 24.8 | 2,502.1 | 4,726.3 | 109.4 | 2,452.6 |
+| `Medium`, valid | 313.5 | 5,408.9 | 35,384.4 | 343.6 | 30,927.7 |
+| `Medium`, invalid | 284.9 | 13,748.3 | 44,322.1 | 755.3 | 40,389.1 |
+| `Rules`, valid | 38.7 | 8,451.3 | 21,859.1 | 43.4 | 21,347.7 |
+| `Rules`, invalid | 67.3 | 10,072.0 | 22,939.5 | 179.3 | 19,781.7 |
+
+protovalidate-buffa validates one message faster, on x86-64 alone: the valid `Rules`, 31.2 ns to
+41.7. Its plugin writes Rust code for each rule, as connect-zig's compiler does. Before 48bb3e1,
+each element of a macro in that message waited for its result to reach the cache on x86-64, and
+connect-zig took 55.4 ns to protovalidate-buffa's 26.2 in run 240 (docs/performance.md, "The
+pitfalls").

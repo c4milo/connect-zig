@@ -1653,7 +1653,11 @@ ran on Linux x86-64 with Zig 0.16.0.
     `Rules`, 24.1 ns to 69.0. Run 231, at 4c471a9, v0.3.0, after the stored lists read inline,
     drew it again on an AMD EPYC 7763: 13 to 58 times as fast, and the fastest in all six.
     Validation alone, connect-zig took the valid `Medium`, 397.1 ns to 405.6, and
-    protovalidate-buffa kept the valid `Rules`, 39.2 ns to 77.5.
+    protovalidate-buffa kept the valid `Rules`, 39.2 ns to 77.5. Run 242, at 48bb3e1, after the
+    right side of `&&` and `||` was unwrapped, drew it on an AMD EPYC 9V74 and, for the first
+    time, on a Neoverse-N2: 12 to 58 and 14 to 68 times as fast, and the fastest in all six on
+    each. Validation alone, protovalidate-buffa kept the valid `Rules` on x86-64, 31.2 ns to
+    41.7, and connect-zig took it on arm64, 38.7 ns to 43.4.
 
 - **Step 35, patterns** (decision 47 as amended). `pattern` of a string and of bytes, and CEL's
   `matches`, run on stdx's `regex` at commit 85d3fe7, pinned as `stdx_regex`.
@@ -2084,17 +2088,15 @@ ran on Linux x86-64 with Zig 0.16.0.
   would run the grammar of `cel_grammar.zig` as a program and write each tree beside its
   text, and a table written by hand would keep its text alone. It changes what a generated
   file holds, and a tree that differs from its text needs a check, so the owner rules first.
-- For `protovalidate`, the valid `Rules` of the validation benchmark, which protovalidate-buffa
-  validated in 24.1 ns to connect-zig's 69.0 in run 228. "Stored lists read inline" took its
-  count from 1,169 instructions to 722, and in run 231 it took 77.5 ns to protovalidate-buffa's
-  39.2, on another machine. "A repeated key searched for after its result" took it to 580, and
-  "The right side of `&&` and `||` unwrapped" took its time on this tree's machine from 68.7 ns
-  to 43.6, in turns. Three changes moved the count by
-  3 instructions or none: `eval_side` inline and `eval_as` inline, which LLVM inlines already,
-  and the time copied only into a rule whose text names `now`, which counted 577. With no step
-  for a macro inside no other macro, nor for a list's index, it counted 539, and timed 67.1 ns to
-  the tree's 67.8 in turns, within their spread, so the tree does not hold that change either.
-  `bench-validate --counters` reads the cycles and the branch misses a time waits on.
+- For `protovalidate`, the valid `Rules` of the validation benchmark, validated alone on x86-64,
+  where protovalidate-buffa took 31.2 ns to connect-zig's 41.7 in run 242. On arm64 connect-zig
+  took 38.7 ns to its 43.4. "Stored lists read inline", "A repeated key searched for after its
+  result" and "The right side of `&&` and `||` unwrapped" took the count from 1,169
+  instructions to 561. The last one took the most time: a load that waited for two stores, which
+  no instruction count shows. Four changes moved the count by 3 instructions or none, or saved
+  no time: `eval_side` inline and `eval_as` inline, which LLVM inlines already, the time copied
+  only into a rule whose text names `now`, and no step for a macro inside no other macro, which
+  counted 539 and timed within the spread of the tree's rounds.
 - For `protovalidate`, `filter` and `map` over a map that bind each entry's value, as `all`,
   `exists` and `exists_one` do ("A map's entry in a macro"). Their expressions still search
   the map for each key.
