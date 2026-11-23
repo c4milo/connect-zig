@@ -180,6 +180,7 @@ start() {
                 --enable-internal-telemetry >"${work}/server.log" 2>&1 & ;;
     esac
     server_pid=$!
+    server_port="$(port_of "$1")"
     for _ in $(seq 1 100); do
         # shellcheck disable=SC2046 # reach prints curl's options, one argument each
         curl -s -o /dev/null $(reach) "$(url_of "$1" /)" && return 0
@@ -190,13 +191,34 @@ start() {
     return 1
 }
 
+# The tries, 50 ms apart, that stop waits for the port of the server it stopped to be free. The
+# sink's UDP socket for h3 sets neither SO_REUSEADDR nor SO_REUSEPORT, and the kernel closes it a
+# few milliseconds after the process ends, as it tears down the process's io_uring ring. A server
+# started on the port before then cannot bind it. The sink exits sooner since decision 48, and the
+# next server met the socket.
+port_free_tries=100
+
+# Whether a UDP socket of this machine holds the port: the local address of a line of
+# /proc/net/udp or /proc/net/udp6 ends in the port, in hexadecimal. A machine with no IPv6 has no
+# /proc/net/udp6.
+udp_port_held() {
+    cat /proc/net/udp /proc/net/udp6 2>/dev/null |
+        awk -v port=":$(printf '%04X' "$1")" 'substr($2, length($2) - 4) == port { found = 1 } END { exit !found }'
+}
+
 stop() {
     for pid in ${server_pid} ${counter_pid:-}; do
         kill "${pid}" 2>/dev/null || true
         wait "${pid}" 2>/dev/null || true
     done
+    tries=0
+    while [ -n "${server_port:-}" ] && [ "${tries}" -lt "${port_free_tries}" ] && udp_port_held "${server_port}"; do
+        tries=$((tries + 1))
+        sleep 0.05
+    done
     server_pid=""
     counter_pid=""
+    server_port=""
 }
 
 # One export, the proto3 JSON that the second argument names, through buf curl. It must answer
