@@ -64,7 +64,8 @@ confirm a test fails. Report `CAUGHT` or `NOT CAUGHT` per mutation in the commit
   there.
 - Names spell words out. One-letter names only for loop indices. `_len` counts bytes.
 - Functions stay at cognitive complexity 15 or less, `test` blocks included. Split the function;
-  never raise the threshold.
+  never raise the threshold. The Python, Go, Rust, and JavaScript of `bench/` and `tools/` keep
+  the same limit (decision 49).
 - A file stays at or under 500 lines, its tests included. Generated `.pb.zig` code is one file per
   .proto file, whatever its length, and keeps every other limit, cognitive complexity included
   (decision 17).
@@ -223,6 +224,13 @@ confirm a test fails. Report `CAUGHT` or `NOT CAUGHT` per mutation in the commit
   on its line. The script downloads ruff 0.17.6 and ShellCheck 0.11.0 for x86-64 and arm64
   Linux, each pinned by SHA-256, unless `RUFF` and `SHELLCHECK` name installed ones. It is the
   check `scripts` of `tools/ci.sh`, and needs curl, tar, xz, and git.
+- Complexity: `tools/complexity_check.sh` holds each function of the Python, Go, Rust, and
+  JavaScript of `bench/` and `tools/` to cognitive complexity 15 (decision 49). It runs
+  complexipy, gocognit, rust-code-analysis, and eslint's sonarjs plugin, each pinned in
+  `tools/complexity`, and skips each `gen/`. complexipy scores functions alone, so
+  `tools/complexity/top_level.py` also refuses control flow at a Python module's top level. No
+  tool scores shell. It is the check `complexity` of `tools/ci.sh`, and needs python3 with venv,
+  go, cargo, and node with npm.
 - CEL differential: `tools/cel_differential_check.sh [seed...]` writes a schema of random CEL
   rules and a file of random messages for each seed, 1 when none is given
   (`tools/cel_differential/generate.py`). It builds `zig build cel-differential-runner

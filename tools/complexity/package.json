@@ -1,0 +1,9 @@
+{
+  "name": "connect-zig-complexity",
+  "private": true,
+  "description": "eslint and its sonarjs plugin, which score the cognitive complexity of the JavaScript of bench/ and tools/ (tools/complexity_check.sh).",
+  "devDependencies": {
+    "eslint": "9.39.5",
+    "eslint-plugin-sonarjs": "4.2.2"
+  }
+}

@@ -12,7 +12,7 @@
 # `--list` as a job of its own, so each shows apart in GitHub.
 set -eu
 cd "$(dirname "$0")/.."
-checks="format citations scripts commits test release package bench costs bench-compare fullstack fullstack-peak fullstack-cleartext fullstack-compression fullstack-compression-cleartext perf generated interop interop-languages interop-servers coverage line-coverage conformance protobuf-conformance protovalidate-conformance cel-differential cel-conformance compile-time validate-compare lean"
+checks="format citations scripts complexity commits test release package bench costs bench-compare fullstack fullstack-peak fullstack-cleartext fullstack-compression fullstack-compression-cleartext perf generated interop interop-languages interop-servers coverage line-coverage conformance protobuf-conformance protovalidate-conformance cel-differential cel-conformance compile-time validate-compare lean"
 only=""
 case "${1:-}" in
     --list)
@@ -90,6 +90,9 @@ check() {
         # ruff's lint and format check over the Python scripts, and shellcheck over the shell
         # scripts, each tool pinned by version and SHA-256 (docs/testing.md).
         scripts) tools/scripts_check.sh ;;
+        # Cognitive complexity 15 over the Python, Go, Rust, and JavaScript of bench/ and tools/,
+        # the limit of the Zig (decision 49).
+        complexity) tools/complexity_check.sh ;;
         # The commit messages of the change: origin/main..HEAD, or COMMIT_RANGE as CI sets it.
         commits) zig build install-commit-lint && zig-out/bin/commit_lint --range "${COMMIT_RANGE:-origin/main..HEAD}" ;;
         # The lint, every module's tests, the examples and the hook check.

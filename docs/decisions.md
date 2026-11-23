@@ -1292,3 +1292,22 @@ first. Cite an entry by number in code and commits ("decision 6").
       `tools/bench_check.sh` runs Zig, Go, and Rust in three rounds, each in an order rotated by
       one, and gives each cell the median round. Beaten: one run of each language after the other,
       on which a runner that drifts slows the last.
+
+49. **The Python, Go, Rust, and JavaScript of `bench/` and `tools/` keep cognitive complexity 15.**
+    Asked for by the owner on 2026-11-23.
+    - `zig build lint` holds each Zig function to 15, in `bench/` and `tools/` too. The programs
+      and scripts that run the benchmarks and the checks are in four more languages, and no check
+      read them. Eleven functions were over 15: a chart's reader scored 35, and the Go validation
+      benchmark's `run` scored 27.
+    - `tools/complexity_check.sh` scores each function of `bench/` and `tools/` by SonarSource's
+      method, as the Zig scorer does: complexipy for Python, gocognit for Go, rust-code-analysis
+      for Rust, and eslint's sonarjs plugin for JavaScript. Each tool is pinned in
+      `tools/complexity`. It skips each `gen/`.
+    - complexipy scores functions alone, so a script that does its work at its top level escapes
+      it. `tools/complexity/top_level.py` refuses control flow there, and each script runs its work
+      from `main()`.
+    - No tool scores a shell script, so ShellCheck alone reads them (`tools/scripts_check.sh`).
+    - Beaten: clippy's `cognitive_complexity` lint, which scored 7 for a Rust function that the
+      other tools score 17 and 18 in their languages, and which needs each crate built with its
+      descriptor sets and protoc. Ruff's rule C901, which counts paths and not nesting. The clients
+      and servers of `interop/` stay outside the check: they test interoperability, not speed.

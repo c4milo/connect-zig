@@ -38,6 +38,9 @@ pull request. `tools/ci.sh` runs them all, as CI does, and writes a report.
   other projects or a generator wrote. It downloads ruff and ShellCheck, each pinned by version
   and SHA-256, unless `RUFF` and `SHELLCHECK` name installed ones. `ruff format` rewrites a file
   that the format check refuses.
+- `tools/complexity_check.sh` holds each function of the Python, Go, Rust, and JavaScript of
+  `bench/` and `tools/` to cognitive complexity 15, as `zig build lint` holds the Zig. It also
+  refuses control flow at a Python module's top level, where no function's score counts it.
 
 Each job writes its results to its summary. The tests and the comparison with Go and Rust run a
 second time on an arm64 runner.
@@ -60,4 +63,5 @@ tools/interop_servers_check.sh    # the client against Go, TypeScript, Python an
 tools/perf_check.sh       # instructions of each benchmark operation against the baseline
 tools/bench_check.sh      # the benchmark beside Go's and Rust's
 tools/scripts_check.sh    # ruff and ShellCheck over the Python and shell scripts
+tools/complexity_check.sh # cognitive complexity 15 over the Python, Go, Rust and JavaScript
 ```
