@@ -8,9 +8,16 @@ its start in seconds after the load began, its duration with oha's latency corre
 HTTP status. The step's calls that start after <warm> seconds are its measure, over the rest of
 its <seconds>. The script prints, on one line: the spans of every call answered 200, which the
 server's count must hold; the measured calls a second and spans a second; p50 and p99 in
-milliseconds over every class; the calls answered with another status; and the verdict. The
-verdict is "pass", or names what failed: "refused", "p99" past <limit_ms>, or "rate" when the
-measured spans fall short of 95% of the step's.
+milliseconds over every class; the measured calls answered with another status; the verdict;
+and the calls answered with another status in the first <warm> seconds. The verdict is "pass",
+or names what failed: "refused", "p99" past <limit_ms>, or "rate" when the measured spans fall
+short of 95% of the step's.
+
+A step opens its 516 connections again, and a server takes their TLS handshakes and the calls
+queued behind them at once. The measure leaves those first seconds out, for latency and for
+refusals alike: a server that queues them shows it as latency there, and one that refuses
+calls past a fixed count, as connect-zig's sink does past its 64, shows it as refusals there
+(decision 44 as amended). The report counts those refusals apart.
 """
 import csv
 import os
@@ -21,16 +28,20 @@ classes = [tuple(int(part) for part in item.split(":")) for item in sys.argv[6:]
 reach = 0.95
 milliseconds = 1000
 
-taken, measured_calls, measured_spans, refused, latencies, target = 0, 0, 0, 0, [], 0
+taken, measured_calls, measured_spans, refused, warm_refused, latencies, target = 0, 0, 0, 0, 0, [], 0
 for spans, connections in classes:
     target += rate * connections * spans
     with open(os.path.join(work, f"step-{spans}.csv")) as file:
         for row in csv.DictReader(file):
+            early = float(row["request-start"]) < warm
             if row["status"] != "200":
-                refused += 1
+                if early:
+                    warm_refused += 1
+                else:
+                    refused += 1
                 continue
             taken += spans
-            if float(row["request-start"]) < warm:
+            if early:
                 continue
             measured_calls += 1
             measured_spans += spans
@@ -56,4 +67,4 @@ elif p99 > limit_ms:
     verdict = "p99"
 elif spans_per_second < reach * target:
     verdict = "rate"
-print(f"{taken} {measured_calls / window:.0f} {spans_per_second:.0f} {p50:.2f} {p99:.2f} {refused} {verdict}")
+print(f"{taken} {measured_calls / window:.0f} {spans_per_second:.0f} {p50:.2f} {p99:.2f} {refused} {verdict} {warm_refused}")

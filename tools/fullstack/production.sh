@@ -16,9 +16,10 @@
 # so the latency holds the time a call waited in a queue. The rate climbs one step at a time. A
 # step fails when its p99 passes 100 ms, when a call is refused, or when the core takes less than
 # 95% of the step's spans. Then five more steps halve the gap between the last step that passed
-# and the step that failed. Each step opens its connections again, so the report leaves out its
-# first 2 seconds, where the TLS handshakes fall. The server runs once for the whole climb, and
-# its count of spans must equal what it was sent.
+# and the step that failed. Each step opens its connections again, so the measure leaves out its
+# first 2 seconds, where the TLS handshakes fall, for latency and refusals alike; the report counts
+# the calls refused then (tools/fullstack/production_step.py). The server runs once for the whole
+# climb, and its count of spans must equal what it was sent.
 
 # Each class: the spans of its export, and the connections that send it.
 production_classes="16:361 128:129 512:26"

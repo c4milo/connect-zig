@@ -93,7 +93,7 @@ kept = [f"{climb_share('connect-zig', coding)[0]:.0f}%" for coding in coded]
 if coded:
     names = coded[0] if len(coded) == 1 else f"{', '.join(coded[:-1])} and {coded[-1]}"
     shares = kept[0] if len(kept) == 1 else f"{', '.join(kept[:-1])} and {kept[-1]}"
-    title = f"In {names}, connect-zig keeps {shares} of its uncompressed rate"
+    title = f"In {names}, connect-zig holds {shares} of its uncompressed rate"
 else:
     title = f"connect-zig's spans a second {over}, uncompressed"
 

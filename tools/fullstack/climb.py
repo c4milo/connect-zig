@@ -2,8 +2,9 @@
 
 A climb's results hold a line for each step of each server: "step", the transport, the server,
 the exports a connection a second, the spans of the calls answered 200, the measured calls a
-second and spans a second, p50 and p99 in milliseconds, the calls refused, the verdict, and the
-server's CPU ticks over the step. A line "memory" gives the transport, the server and its peak
+second and spans a second, p50 and p99 in milliseconds, the measured calls refused, the verdict,
+the calls refused in the step's first seconds, which the measure leaves out, and the server's CPU
+ticks over the step. A line "memory" gives the transport, the server and its peak
 memory in KiB.
 """
 microseconds = 1_000_000
@@ -24,10 +25,11 @@ def read(path, transport, ticks, seconds):
         if fields[0] == "memory":
             memory[server] = int(fields[3]) / kib
             continue
-        rate, taken, calls, spans, p50, p99, refused, verdict, cpu = fields[3:12]
+        rate, taken, calls, spans, p50, p99, refused, verdict, warm_refused, cpu = fields[3:13]
         steps.setdefault(server, []).append({
             "rate": float(rate), "taken": int(taken), "calls": float(calls), "spans": float(spans),
             "p50": float(p50), "p99": float(p99), "refused": int(refused), "verdict": verdict,
+            "warm_refused": int(warm_refused),
             "busy": int(cpu) / ticks / seconds, "cpu": int(cpu) * microseconds / ticks / max(int(taken), 1),
         })
     return servers, steps, memory

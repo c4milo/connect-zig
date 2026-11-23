@@ -76,19 +76,19 @@ climbs = {coding: climb.read(os.path.join(work, f"compression-climb-{coding}"), 
 
 
 def write_climb():
-    print("| server | coding | spans/s held | resolution | p99 ms | the next step |")
-    print("|---|---|--:|--:|--:|---|")
+    print("| server | coding | spans/s held | resolution | p99 ms | refused at its start | the next step |")
+    print("|---|---|--:|--:|--:|--:|---|")
     held = {}
     for server in servers:
         for coding in codings:
             step, above, verdict = climb.held(climbs[coding].get(server, []))
             if step is None:
-                print(f"| {server} | {coding_names[coding]} | no step | | | {ended_by.get(verdict, verdict)} |")
+                print(f"| {server} | {coding_names[coding]} | no step | | | | {ended_by.get(verdict, verdict)} |")
                 continue
             held[(server, coding)] = (step, above)
             gap = climb.resolution(step, above)
             print(f"| {server} | {coding_names[coding]} | {step['spans']:,.0f} | "
-                  f"{'' if gap is None else f'+{gap * percent:.1f}%'} | {step['p99']:.2f} | "
+                  f"{'' if gap is None else f'+{gap * percent:.1f}%'} | {step['p99']:.2f} | {step['warm_refused']:,} | "
                   f"{ended_by.get(verdict, verdict)} |")
     print()
     for server in servers:
@@ -181,8 +181,9 @@ write_octets()
 print(f"### The climb {over}")
 print()
 print(f"Each receiver holds {connections} connections, as one core of a 64-core gateway for 33,000 servers, and the rate")
-print(f"climbs until p99 passes {limit_ms:.0f} ms or a call is refused. Each step lasts {seconds:.0f} s. The rate a core holds lies")
-print("between the step it held and the next step, which failed; the resolution gives that gap as a share of the step held.")
+print(f"climbs until p99 passes {limit_ms:.0f} ms or a measured call is refused. Each step lasts {seconds:.0f} s, and its measure leaves")
+print("out its first seconds, where the TLS handshakes fall. The rate a core holds lies between the step it held and")
+print("the next step, which failed; the resolution gives that gap as a share of the step held.")
 print()
 write_climb()
 print(f"### The peak {over}")

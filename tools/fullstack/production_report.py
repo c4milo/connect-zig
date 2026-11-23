@@ -53,13 +53,15 @@ print(f"Each server holds {connections} connections {over}, as one core of a {ga
 print(f"when {fleet_servers:,} servers each run a Collector agent. "
       + ", ".join(f"{count} connections send gzip exports of {spans} spans" for spans, count in classes) + ".")
 print(f"oha sends at fixed rates with its latency correction, and the rate climbs until p99 passes {limit_ms:.0f} ms or a")
-print(f"call is refused. Each step lasts {seconds:.0f} s, and its measure leaves out the first {warm:.0f} s. Every span was checked.")
+print(f"measured call is refused. Each step lasts {seconds:.0f} s, and its measure leaves out the first {warm:.0f} s, where each step's")
+print("TLS handshakes fall. Every span was checked.")
 print()
 print("The rate a core holds lies between the step it held and the next step, which failed; the resolution gives")
-print("that gap as a share of the step held.")
+print("that gap as a share of the step held. A server that refuses calls past a fixed count, as connect-zig's sink")
+print("does past 64, refuses some of those queued behind the handshakes: the held step's calls refused then.")
 print()
-print("| server | spans/s held | resolution | calls/s | p50 ms | p99 ms | core busy | CPU µs a span | peak MiB | the next step |")
-print("|---|--:|--:|--:|--:|--:|--:|--:|--:|---|")
+print("| server | spans/s held | resolution | calls/s | p50 ms | p99 ms | core busy | CPU µs a span | peak MiB | refused at its start | the next step |")
+print("|---|--:|--:|--:|--:|--:|--:|--:|--:|--:|---|")
 
 
 def validation_line(server, twin):
@@ -82,14 +84,14 @@ best, above = {}, {}
 for server in servers:
     step, failed, verdict = climb.held(steps.get(server, []))
     if step is None:
-        print(f"| {names[server]} | none | | | | | | | | {ended_by.get(verdict, verdict)} |")
+        print(f"| {names[server]} | none | | | | | | | | | {ended_by.get(verdict, verdict)} |")
         continue
     best[server], above[server] = step, failed
     gap = climb.resolution(step, failed)
     print(f"| {names[server]} | {step['spans']:,.0f} | {'' if gap is None else f'+{gap * percent:.1f}%'} | "
           f"{step['calls']:,.0f} | {step['p50']:.2f} | {step['p99']:.2f} | "
           f"{step['busy'] * percent:.0f}% | {step['cpu']:.2f} | {memory.get(server, 0):.0f} | "
-          f"{ended_by.get(verdict, verdict)} |")
+          f"{step['warm_refused']:,} | {ended_by.get(verdict, verdict)} |")
 print()
 if "connect-zig" in best:
     zig = best["connect-zig"]["spans"]

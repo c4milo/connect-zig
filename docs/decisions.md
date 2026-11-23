@@ -1121,6 +1121,13 @@ first. Cite an entry by number in code and commits ("decision 6").
       compared as CPU a span at the highest rate both servers held: a span costs less CPU as
       the rate rises, 2.25 µs on connect-zig at 35,600 spans a second and 1.36 µs at 712,000 in
       run 243.
+    - Amended again on 2026-11-23: a call refused in a step's first 2 s fails no step, as a
+      latency there counts in no p99. Each step opens its 516 connections again, and the calls
+      queued behind their TLS handshakes arrive at once. A server that queues them shows it as
+      latency there; connect-zig's sink, which refuses a call past its 64, showed it as refusals,
+      and run 248's climbs ended there: 229,202 spans a second over TLS with uncompressed exports,
+      where gzip's held 747,584, and every refusal fell 0.11 to 0.26 s into its step. The report
+      gives the held step's refusals in its first seconds in a column of their own.
     - Amended on 2026-11-17: the `fullstack` and `bench-compare` checks draw the README's charts
       from their own output, and CI keeps them with the run for 90 days, as `charts-<check>-<arch>`.
       A person copies a chosen run's charts to `docs/images`, so the README still names one run.
