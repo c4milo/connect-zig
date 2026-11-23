@@ -3,36 +3,40 @@
 [![CI](https://github.com/c4milo/connect-zig/actions/workflows/main.yml/badge.svg)](https://github.com/c4milo/connect-zig/actions/workflows/main.yml)
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 [![Zig 0.16](https://img.shields.io/badge/zig-0.16.0-f7a41d.svg)](https://ziglang.org/download/#release-0.16.0)
-[![Connect conformance: 3714 of 3714 server cases, 10711 of 10711 client cases](https://img.shields.io/badge/connect_conformance-passing-brightgreen.svg)](https://github.com/c4milo/connect-zig/actions/runs/44007655863)
+[![Connect conformance: 3,714 of 3,714 server cases, 10,711 of 10,711 client cases](https://img.shields.io/badge/connect_conformance-passing-brightgreen.svg)](https://github.com/c4milo/connect-zig/actions/runs/44007655863)
 [![Line coverage: 97.7%](https://img.shields.io/badge/line_coverage-97.7%25-brightgreen.svg)](https://github.com/c4milo/connect-zig/actions/runs/44007655863)
 
 **[Connect RPC](https://connectrpc.com/) for Zig.** Write a `.proto` file, run `buf generate`,
 and serve the same handlers to Connect, gRPC and gRPC-Web clients, in binary protobuf or JSON.
 
 - **Conformant.** It passes [connectrpc's conformance suite](https://github.com/connectrpc/conformance)
-  v1.0.7 in Connect, gRPC and gRPC-Web: all 3714 server cases, and all 10711 client cases.
+  v1.0.7 in Connect, gRPC and gRPC-Web: all 3,714 server cases and all 10,711 client cases.
 - **No allocator in the library.** Every buffer is yours, and every size is a constant you can
   read.
 - **Few copies.** Decoded strings and bytes point into the input. A repeated field is read once,
   into storage you pass, and each message is encoded straight into the HTTP body that sends it.
 - **No hidden I/O.** The protocol core reads bytes you give it and writes bytes you send. It
   reads no clock, so every test is deterministic.
-- **Fast.** On one core, an OpenTelemetry trace gateway takes 8.0 times as many spans a second
-  as one built on connect-go, and 2.7 times as many as one built on connect-rust. See
-  [Performance](#performance).
-- **HTTP from [colibri](https://github.com/c4milo/colibri).** Servers and clients run over h11,
-  h2 and h3, in cleartext or over TLS.
+- **Fast.** On one core, an OpenTelemetry trace receiver built on connect-zig takes 7.0 times as
+  many spans a second as one built on connect-go, and 2.7 times as many as one built on
+  connect-rust. See [Performance](#performance).
+- **HTTP from [colibri](https://github.com/c4milo/colibri).** Servers and clients run over
+  HTTP/1.1, HTTP/2 and HTTP/3, which colibri and this README call h11, h2 and h3, in cleartext or
+  over TLS.
 
-## Try it in 30 seconds
+## Try it
 
-You need [Zig 0.16.0](https://ziglang.org/download/#release-0.16.0) and curl.
+You need [Zig 0.16.0](https://ziglang.org/download/#release-0.16.0) and curl 7.82 or later, the
+first release with `--json`. Clone the repository and start the example server:
 
 ```sh
 git clone https://github.com/c4milo/connect-zig && cd connect-zig
 zig build run-eliza-server -- 8080
 ```
 
-In a second terminal, talk to [ELIZA](https://en.wikipedia.org/wiki/ELIZA):
+The first build downloads and compiles the dependencies, so it takes longer than later builds.
+When the server prints `listening on port 8080`, call [ELIZA](https://en.wikipedia.org/wiki/ELIZA)
+from a second terminal:
 
 ```sh
 curl --cacert examples/harness/tls/ca.pem --json '{"sentence":"I feel tired"}' \
@@ -43,8 +47,9 @@ curl --cacert examples/harness/tls/ca.pem --json '{"sentence":"I feel tired"}' \
 {"sentence":"You said \"I feel tired\". How does that make you feel?"}
 ```
 
-The same server answers [`buf curl`](https://buf.build/docs/reference/cli/buf/curl) in every
-protocol, over h2 or, with `--http3`, h3. Try `--protocol grpc` or `--protocol grpcweb`:
+If you have the [Buf CLI](https://buf.build/docs/cli/), call the same server with
+[`buf curl`](https://buf.build/docs/reference/cli/buf/curl) in any protocol. Set `--protocol` to
+`connect`, `grpc` or `grpcweb`, and add `--http3` to call it over h3:
 
 ```sh
 buf curl --cacert examples/harness/tls/ca.pem --protocol grpc --schema examples/eliza/proto \
@@ -52,6 +57,8 @@ buf curl --cacert examples/harness/tls/ca.pem --protocol grpc --schema examples/
 ```
 
 ## What's inside
+
+connect-zig has six parts:
 
 | Module | What it does |
 | --- | --- |
@@ -61,6 +68,8 @@ buf curl --cacert examples/harness/tls/ca.pem --protocol grpc --schema examples/
 | `protovalidate` | Checks a message against the [protovalidate](https://github.com/bufbuild/protovalidate) rules of its schema. |
 | `oidc` | Checks an OpenID Connect bearer token, with a server interceptor that requires one. |
 | `protoc-gen-connect-zig` | The plugin `buf generate` runs to write your `.pb.zig` files. |
+
+Each protocol supports the same features, except Unary GET:
 
 | | Connect | gRPC | gRPC-Web |
 | --- | :---: | :---: | :---: |
@@ -174,8 +183,10 @@ memory the router holds.
 
 ### 5. Call it
 
-A client call is a `connect_colibri.ClientCall(method, .{})`. `.protocol` picks Connect, gRPC
-or gRPC-Web, and the rest of the call stays the same:
+A client call is a `connect_colibri.ClientCall(method, .{})`. Its `.protocol` option picks
+Connect, gRPC or gRPC-Web, and the rest of the call stays the same. In this example, `pool` is
+colibri's client connection pool, and `buffers` and `storage` are memory that your program owns.
+[docs/guide.md](docs/guide.md) shows how to set up each one:
 
 ```zig
 try say.init({}, &.{ .protocol = .grpc }, &.{.{ .sentence = "I feel tired" }}, &buffers);
@@ -190,36 +201,40 @@ interceptors, error details, bearer tokens and an OpenTelemetry trace receiver.
 
 ## Validate requests
 
-The `protovalidate` module checks each message against the rules its schema states with
-[protovalidate](https://github.com/bufbuild/protovalidate):
+The `protovalidate` module checks each message against the rules that its schema states with
+[protovalidate](https://github.com/bufbuild/protovalidate). To validate every request:
 
-```proto
-import "buf/validate/validate.proto";
+1. Add rules to your schema:
 
-message User {
-  string email = 1 [(buf.validate.field).string.email = true];
-  int32 age = 2 [(buf.validate.field).int32 = {gte: 18, lt: 150}];
-}
-```
+   ```proto
+   import "buf/validate/validate.proto";
 
-One interceptor checks every request message before its handler runs:
+   message User {
+     string email = 1 [(buf.validate.field).string.email = true];
+     int32 age = 2 [(buf.validate.field).int32 = {gte: 18, lt: 150}];
+   }
+   ```
 
-```zig
-pub const Values = struct {
-    protovalidate: protovalidate.InterceptorRoom(connect, .{}) = .{},
-};
-const Validate = protovalidate.Interceptor(connect, Values, .{});
-pub const route_options: rpc.RouteOptions = .{ .interceptors = &.{Validate} };
-```
+2. Add the interceptor, which checks each request message before its handler runs:
 
-- A message that breaks a rule ends its call with `invalid_argument`, and a detail that lists
-  each violation.
-- Your `App` holds the CPU features, in a field `cpu_features` that your program sets once as it
-  starts, from stdx's `codec.Features.detect()`.
-- The rules, CEL included, compile with your program. No rule is parsed and no expression is
-  interpreted at run time.
-- It passes all 2872 cases of protovalidate's conformance suite. It decodes and validates 12
-  to 58 times as fast as protovalidate-go on x86-64, and 14 to 68 times on arm64.
+   ```zig
+   pub const Values = struct {
+       protovalidate: protovalidate.InterceptorRoom(connect, .{}) = .{},
+   };
+   const Validate = protovalidate.Interceptor(connect, Values, .{});
+   pub const route_options: rpc.RouteOptions = .{ .interceptors = &.{Validate} };
+   ```
+
+3. Give your `App` a field `cpu_features: codec.Features`, and set it once when your program
+   starts, with stdx's `codec.Features.detect()`. The build fails without it.
+
+A message that breaks a rule ends its call with `invalid_argument`, and with an error detail that
+lists each violation.
+
+The rules compile with your program, CEL expressions included. Nothing parses a rule or
+interprets an expression at run time. The module passes all 2,872 cases of protovalidate's
+conformance suite. A decode with a validation runs 15 to 65 times as fast as protovalidate-go on
+arm64, and 13 to 57 times as fast on x86-64.
 
 [docs/protovalidate.md](docs/protovalidate.md) covers CEL rules, predefined rules, patterns,
 what stops the build, and the limits.
@@ -239,49 +254,57 @@ const Auth = oidc.Interceptor(Values, .{ .exclude = &.{"/grpc.health.v1.Health/"
 
 ## Performance
 
-An OTLP trace receiver on one core, over TLS and h2, takes the traffic of one gateway core for
-33,000 servers. The load runs on another core of the same machine, over its loopback device. Each
-bar is the median of three rounds, and its whisker spans them:
+The benchmark serves OpenTelemetry traces: a receiver takes the OpenTelemetry Protocol (OTLP)
+over TLS and h2, on one core, and counts each span, the record of one operation in a trace. Its
+load is the traffic that one core of a gateway receives from a fleet of 33,000 servers. The load
+generator runs on another core of the same machine, over its loopback device. Each bar shows the
+highest rate a server held with its 99th-percentile latency (p99) under 100 ms. The bar is the
+median of three rounds, and its whisker spans the three:
 
 ![Bars of the spans a second one core holds with p99 under 100 ms over TLS, the median of three rounds with their range, and lines of p99 as the rate climbs, on arm64: connect-zig holds 711,570 spans a second, 7.0 times connect-go's 101,213, 2.7 times connect-rust's 263,440, 3.3 times the OpenTelemetry Collector's 215,818 and 8.6 times Vector's 82,310](docs/images/fullstack-arm64.svg)
 
-On an Arm Neoverse-N2 core, in CI's [run 266](https://github.com/c4milo/connect-zig/actions/runs/45246119951) and
+These results come from an Arm Neoverse-N2 core in CI. The first three come from
+[run 266](https://github.com/c4milo/connect-zig/actions/runs/45246119951), and the last two from
 [run 265](https://github.com/c4milo/connect-zig/actions/runs/45231244610):
 
-- **A whole server** takes 7.0 times connect-go's spans a second, 2.7 times connect-rust's and
-  3.3 times the OpenTelemetry Collector's, and spends 1.41 µs of CPU a span. It held that rate for
-  a step of 60 s too. It reserves 321 MiB at start, for at most 528 connections and 64 calls at
-  once; connect-rust grew to 54 MiB.
-- **With protovalidate** checking every span, it spends 12% more CPU a span, where connect-rust
-  spends 9% more and connect-go 53%. It keeps 87% of its spans a second: 2.5 times connect-rust's
-  with protovalidate-buffa, and 9.8 times connect-go's with protovalidate-go.
-- **gzip and zstd exports** cost it 5% less CPU a span than uncompressed ones over TLS, for the
-  production mix of exports. In cleartext, with no TLS to save, they cost it 7% to 9% more.
-- **A routed unary call** is 9.6 to 12.4 times as fast as connect-go's, and 3.3 to 5.6 times as
-  fast as connect-rust's, with each library's request built outside the timed calls.
-- **The codec** encodes and decodes 3.2 to 18.9 times as fast as Go's protobuf runtime.
+- **A whole server.** connect-zig takes 7.0 times as many spans a second as connect-go, 2.7 times
+  as many as connect-rust, and 3.3 times as many as the OpenTelemetry Collector. It spends 1.41 µs
+  of CPU a span, and it held its rate for a 60-second step. It reserves 321 MiB when it starts, for
+  at most 528 connections and 64 calls at once. connect-rust grew to 54 MiB.
+- **Validation.** With protovalidate checking every span, connect-zig spends 12% more CPU a span,
+  connect-rust 9% more, and connect-go 53% more. connect-zig keeps 87% of its rate, which is 2.5
+  times connect-rust's rate with protovalidate-buffa and 9.8 times connect-go's with
+  protovalidate-go.
+- **Compression.** Over TLS, a gzip or zstd export costs connect-zig 5% less CPU a span than an
+  uncompressed one, because the smaller export saves more TLS work than decompression costs. In
+  cleartext, with no TLS work to save, it costs 7% to 9% more.
+- **A routed unary call.** A call through connect-zig's router, protocol and codec, in memory, is
+  9.6 to 12.4 times as fast as connect-go's and 3.3 to 5.6 times as fast as connect-rust's.
+- **The codec.** connect-zig encodes and decodes protobuf messages 3.2 to 18.9 times as fast as
+  Go's protobuf runtime.
 
 [docs/benchmarks.md](docs/benchmarks.md) holds every chart, the x86-64 results, how each number
 is measured, and the limits of each.
 
 ## How it is tested
 
-- [connectrpc's conformance suite](https://github.com/connectrpc/conformance): all 3714 server
-  cases over h11 and h2, and all 10711 client cases over h11, h2 and h3.
+- [connectrpc's conformance suite](https://github.com/connectrpc/conformance): all 3,714 server
+  cases over h11 and h2, and all 10,711 client cases over h11, h2 and h3.
 - [Google's protobuf conformance suite](https://github.com/protocolbuffers/protobuf/tree/main/conformance):
-  5707 cases pass. Each of the 35 that fail is listed with its reason.
+  5,707 cases pass. A list in the repository names each of the 35 cases that fail, with its
+  reason.
 - [protovalidate's conformance suite](https://github.com/bufbuild/protovalidate/blob/main/docs/conformance.md):
-  all 2872 cases.
+  all 2,872 cases.
 - Clients and servers in Go, TypeScript, Python and Rust call connect-zig, and connect-zig calls
   them, in every protocol.
-- Each check in the library was broken on purpose, to prove that a test catches it.
+- Mutation tests: each check in the library was broken on purpose, and a test failed each time.
 
 [docs/testing.md](docs/testing.md) lists every check and how to run it.
 
 ## Known limits
 
 - Over h11, a stream is half-duplex: the whole request goes before the response is read.
-- A function handler writes its whole stream in one call. A long stream takes a type handler,
+- A function handler writes its whole stream in one call. A long stream needs a type handler,
   which [docs/guide.md](docs/guide.md) describes.
 - The library does not report a missing `required` field.
 - A server stream cannot yet wait for your program's own events once its request has ended
@@ -289,9 +312,10 @@ is measured, and the limits of each.
 
 ## Contributing
 
-[CONTRIBUTING.md](CONTRIBUTING.md) is the summary, and [SECURITY.md](SECURITY.md) says where to
-report a vulnerability. [docs/design.md](docs/design.md) holds the design, and
-[docs/decisions.md](docs/decisions.md) each choice with what it beat.
+[CONTRIBUTING.md](CONTRIBUTING.md) explains how to propose a change, and
+[SECURITY.md](SECURITY.md) explains how to report a vulnerability. [docs/design.md](docs/design.md)
+describes the design, and [docs/decisions.md](docs/decisions.md) records each choice with the
+options it beat.
 
 ## Changelog
 
