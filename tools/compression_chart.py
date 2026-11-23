@@ -108,9 +108,13 @@ subtitle = [
     f"Each receiver runs on one core {over}, on its library's own decoders. stdx's encoders wrote each export as a",
     "connect-zig client does: gzip at stdx's default level, zstd and brotli at level 1. Each bar is a share of the",
     f"same receiver uncompressed, net of {saved} a smaller export saves. A whisker reaches the step that",
-    "failed in the climb, and spans the rounds at peak; ≥ marks a climb whose every step passed, and \"slots full\"",
-    "one that ended on a call refused because every slot for a call in flight was taken.",
+    "failed in the climb, and spans the rounds at peak.",
 ]
+# Each mark a label can carry, explained on a line of its own only when a label carries it.
+if any(item["gap"] is None for item in held.values()):
+    subtitle.append("≥ marks a climb whose every step passed.")
+if any(item["refused"] for item in held.values()):
+    subtitle.append("\"slots full\" marks a climb that ended on a call refused, every slot for a call in flight taken.")
 line_h = 18
 top = 56 + (len(subtitle) + 1) * line_h + 40
 row_h, row_gap, group_gap, heading_h = 18, 8, 14, 22

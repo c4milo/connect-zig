@@ -101,8 +101,23 @@ others = [name for name in servers if name != "connect-zig"]
 # Four ratios do not fit one title, so a table with the Connect libraries names them alone, and
 # each bar gives its own ratio.
 titled = [name for name in others if name in libraries] or others
-ratios = [f"{held['connect-zig']['spans'] / held[name]['spans']:.1f} times {'the ' if name == 'Collector' else ''}{name}'s"
-          for name in titled]
+
+
+def bound(top, bottom):
+    """How a ratio of two rates held reads: a rate whose climb passed every step is a floor, so
+    a ratio over it is at most its value, and a ratio of it at least. Two floors bound nothing,
+    and the ratio is marked so."""
+    if held[top]["floor"] and held[bottom]["floor"]:
+        return "?", "about "
+    if held[top]["floor"]:
+        return "≥", "at least "
+    if held[bottom]["floor"]:
+        return "≤", "at most "
+    return "", ""
+
+
+ratios = [f"{bound('connect-zig', name)[1]}{held['connect-zig']['spans'] / held[name]['spans']:.1f} times "
+          f"{'the ' if name == 'Collector' else ''}{name}'s" for name in titled]
 # The longest title the chart's width holds at its font: a longer one leaves out the limit, which
 # the subtitle states.
 title_len_max = 90
@@ -110,7 +125,7 @@ title = f"One core holds {' and '.join(ratios)} spans a second, with p99 under {
 if len(title) > title_len_max:
     title = f"One core holds {' and '.join(ratios)} spans a second"
 if validate:
-    kept = [f"{twin} {held[name]['spans'] / held[twin]['spans'] * 100:.0f}%" for name, twin in twins.items()
+    kept = [f"{twin} {bound(name, twin)[0]}{held[name]['spans'] / held[twin]['spans'] * 100:.0f}%" for name, twin in twins.items()
             if name in held and twin in held]
     title = f"Rate kept with protovalidate: {', '.join(kept)}"
 
@@ -144,8 +159,11 @@ for name in servers:
     legend_x += width
 top = legend_y + 56 + (len(legend_rows) - 1) * legend_row_h
 # The chart grows when its bars pass its foot.
-H = max(340, top + 12 + len(servers) * (bar_h + bar_gap) + 8)
 plot_h = 128
+# The room under the p99 panel for its ticks and the axis's name, so a chart of few servers does
+# not cut them off.
+axis_room = 44
+H = max(340, top + 12 + len(servers) * (bar_h + bar_gap) + 8, top + plot_h + axis_room)
 # The receivers that validate take longer names, so their bars start further right, and the panel
 # of the climb starts further right too.
 bar_left, bar_w = (pad_l + 208, 150) if validate else (pad_l + 104, 210)
@@ -228,10 +246,10 @@ for index, name in enumerate(servers):
         middle = y + bar_h / 2
         a(f'<line x1="{bar_left + width:.1f}" y1="{middle}" x2="{end:.1f}" y2="{middle}" stroke="var(--ink)" stroke-width="1.5"/>')
         a(f'<line x1="{end:.1f}" y1="{middle - 4}" x2="{end:.1f}" y2="{middle + 4}" stroke="var(--ink)" stroke-width="1.5"/>')
-    ratio = "" if name == "connect-zig" else f", connect-zig {held['connect-zig']['spans'] / held[name]['spans']:.1f}×"
+    ratio = "" if name == "connect-zig" else f", connect-zig {bound('connect-zig', name)[0]}{held['connect-zig']['spans'] / held[name]['spans']:.1f}×"
     if validate:
         twin = twins.get(name)
-        ratio = f", {held[name]['spans'] / held[twin]['spans'] * 100:.0f}%" if twin in held else ""
+        ratio = f", {bound(name, twin)[0]}{held[name]['spans'] / held[twin]['spans'] * 100:.0f}%" if twin in held else ""
     floor = "≥" if held[name]["floor"] else ""
     a(f'<text class="val" x="{bar_left + 4:.1f}" y="{y + bar_h + 13}">{floor}{held[name]["spans"]:,.0f} spans/s, '
       f'p99 {held[name]["p99"]:g} ms{ratio}</text>')
