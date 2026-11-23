@@ -6,29 +6,24 @@ time compares only within one job on one machine.
 
 ## The codec
 
-From CI's [run 256](https://github.com/c4milo/connect-zig/actions/runs/45171587471), on an Arm Neoverse-N2 core; the x86-64 chart is under it. Binary and JSON encoding and decoding of eight messages, against Go's protobuf
-runtime and Buffa, connect-rust's codec. connect-zig is 3.2 to 20.8 times faster than Go, and Buffa
-is faster in none of the 16 cells charted.
+From CI's [run 265](https://github.com/c4milo/connect-zig/actions/runs/45231244610), on an Arm Neoverse-N2 core. Binary and JSON encoding and decoding of eight
+messages, against Go's protobuf runtime and Buffa, connect-rust's codec. In the 16 cells the chart
+draws, connect-zig is 3.2 to 18.9 times faster than Go and 1.1 to 2.2 times faster than Buffa.
 
-![Bars of the speed of connect-zig and of Buffa, connect-rust's codec, in multiples of Go's protobuf runtime, connect-go's codec, on arm64: connect-zig is 3.2 to 20.8 times faster than Go's protobuf runtime, and 1.1 to 2.2 times faster than Buffa](images/speed-vs-go-arm64.svg)
-
-<details>
-<summary>On x86-64, connect-zig is 3.7 to 19.9 times faster than Go, and 1.01 to 2.0 times faster than Buffa.</summary>
-
-![Bars of the speed of connect-zig and of Buffa, connect-rust's codec, in multiples of Go's protobuf runtime, connect-go's codec, on x86-64: connect-zig is 3.7 to 19.9 times faster than Go's protobuf runtime, and 1.01 to 2.0 times faster than Buffa](images/speed-vs-go.svg)
-
-</details>
+![Bars of the speed of connect-zig and of Buffa, connect-rust's codec, in multiples of Go's protobuf runtime, connect-go's codec, on arm64: connect-zig is 3.2 to 18.9 times faster than Go's protobuf runtime, and 1.1 to 2.2 times faster than Buffa](images/speed-vs-go-arm64.svg)
 
 `zig build bench` times binary and JSON encoding and decoding of eight messages, then a routed unary
 call. `tools/bench_check.sh` runs the same inputs through Go's `google.golang.org/protobuf`
 v1.36.12, connect-go's codec, and Buffa, connect-rust's codec. It checks that each writes the same
-bytes as connect-zig. The numbers below come from CI's two `bench-compare` jobs of commit `57ec581`
-([run 256](https://github.com/c4milo/connect-zig/actions/runs/45171587471)), on Ubuntu 26.04. One
-ran on an AMD EPYC 7763 core (x86-64) and one on an Arm Neoverse-N2 core (arm64), each with the
-three programs in one job. The run's summary holds every table. An x86-64 runner's CPU model
-changes from run to run: run 250's was an Intel Xeon Platinum 8573C.
+bytes as connect-zig. It runs the three programs in three rounds, each in an order rotated by one,
+so a runner that slows over the job does not always slow the same language. Each cell is the
+round whose time is the median. CI's two `bench-compare` jobs of commit `a69e377` ([run 265](https://github.com/c4milo/connect-zig/actions/runs/45231244610)) ran it
+on Ubuntu 26.04: one on an Arm Neoverse-N2 core, which the chart draws, and one on an Intel Xeon
+Platinum 8573C core (x86-64). There the same 16 cells give 4.5 to 21.7 times Go and 1.0 to 2.0
+times Buffa. An x86-64 runner's CPU model changes from run to run. The run's summary holds every
+table.
 
-Each chart above draws the speed of connect-zig and of Buffa in multiples of Go's. A
+The chart draws the speed of connect-zig and of Buffa in multiples of Go's. A
 longer bar is faster, and Go is the line at 1. The charts time the codecs alone, with no code of
 connect-go or connect-rust. Each decode they draw reads every field. Go's and Buffa's decodes
 build the whole message, and connect-zig's leaves a repeated field to be parsed when it is read,
@@ -36,59 +31,56 @@ so a decode alone would time less work on connect-zig's side. A binary decode wi
 read takes `decode_into`, which reads each repeated field once (decision 37). The table also gives
 each decode alone.
 
-The charts draw 16 of the table's 48 cells. Buffa is faster in none of them, on either machine.
+The chart draws 16 of the table's 48 cells. Buffa is faster in none of them, on either machine.
 
-In the table's 48 cells, connect-zig is 2.3 to 41.3 times faster than Go on arm64, and 2.5 to
-34.7 times on x86-64. Against Buffa, connect-zig is faster in 43 of the 48 cells on arm64 and in
-41 on x86-64, by up to 3.77 and 3.20 times. The two tie within 0.3% in one cell on each machine:
-varints JSON decode on arm64 and tree binary encode on x86-64. Buffa is faster in the other 4 and
-6. On arm64 it wins tree JSON encode by 1.45 times, packed JSON decode with every field read by
-1.12 times, strings JSON encode by 1.11 times, and varints binary decode by 1.02 times. On x86-64
-it wins tree JSON encode by 1.27 times, tree JSON decode with every field read by 1.20 times,
-packed JSON decode with every field read by 1.16 times, and three cells by 1.04 times or less.
+In the table's 48 cells, connect-zig is 2.3 to 40.2 times faster than Go on arm64, and 2.2 to
+36.9 times on x86-64. Against Buffa, connect-zig is faster in 43 of the 48 cells on arm64 and in
+45 on x86-64, by up to 3.83 and 3.35 times. The two tie within 0.3% in one cell on arm64, varints
+JSON decode. Buffa is faster in the other 4 on arm64 and 3 on x86-64. On arm64 it wins tree JSON
+encode by 1.47 times, strings JSON encode by 1.15 times, packed JSON decode with every field read
+by 1.10 times, and varints binary decode by 1.02 times. On x86-64 it wins packed JSON decode with
+every field read by 1.22 times, tree JSON decode with every field read by 1.16 times, and packed
+JSON decode by 1.09 times.
 
 ## The routed call
 
-From CI's [run 256](https://github.com/c4milo/connect-zig/actions/runs/45171587471), on an Arm Neoverse-N2 core; the x86-64 chart is under it. One unary call in memory through each library's router, protocol and codec.
-connect-zig is 14.9 to 22.9 times as fast as connect-go, and 3.4 to 6.5 times as fast as
-connect-rust.
+From CI's [run 265](https://github.com/c4milo/connect-zig/actions/runs/45231244610), on an Arm Neoverse-N2 core. One unary call in memory through each library's
+router, protocol and codec. connect-zig is 9.6 to 12.4 times as fast as connect-go, and 3.3 to 5.6
+times as fast as connect-rust.
 
-![Bars of the speed of a routed unary call through connect-zig and connect-rust, in multiples of connect-go's, on arm64: connect-zig is 14.9 to 22.9 times as fast as connect-go, and 3.4 to 6.5 times as fast as connect-rust](images/call-vs-go-arm64.svg)
-
-<details>
-<summary>On x86-64, connect-zig is 13.1 to 18.6 times as fast as connect-go, and 3.0 to 4.8 times as fast as connect-rust.</summary>
-
-![Bars of the speed of a routed unary call through connect-zig and connect-rust, in multiples of connect-go's, on x86-64: connect-zig is 13.1 to 18.6 times as fast as connect-go, and 3.0 to 4.8 times as fast as connect-rust](images/call-vs-go.svg)
-
-</details>
+![Bars of the speed of a routed unary call through connect-zig and connect-rust, in multiples of connect-go's, on arm64: connect-zig is 9.6 to 12.4 times as fast as connect-go, and 3.3 to 5.6 times as fast as connect-rust](images/call-vs-go-arm64.svg)
 
 The routed calls (`bench/call.zig`) run the same unary call in memory through connect-zig,
 connect-go and connect-rust: the router, the route, the protocol and the codec, with no socket, no
-TLS and no HTTP/2 framing. connect-go's router is an `http.ServeMux`, as a server's is. CI's two
-`bench-compare` jobs of commit `57ec581` ([run 256](https://github.com/c4milo/connect-zig/actions/runs/45171587471)) timed them on
-colibri v0.19.2 and Ubuntu 26.04, on an AMD EPYC 7763 core and on an Arm Neoverse-N2 core. The
-charts draw a speed in multiples of connect-go's, and connect-zig's bar also gives its time
-for one call, in a table of one route. The three calls do close to the same work, not the same
-work: connect-zig's benchmark replays a request head that colibri has already parsed, where
-connect-go's builds an `httptest` request and recorder on each call, and connect-rust's an
-`http::Request`. Part of each ratio is that work (docs/performance.md).
+TLS and no HTTP/2 framing. connect-go's router is an `http.ServeMux`, as a server's is. Each program
+builds its request once and times the calls alone. connect-zig replays a request head that colibri
+has already parsed. connect-go copies a request that `httptest` built once, and writes into one
+response writer that each call clears. connect-rust clones a head that `http::Request::builder`
+made once, since its service takes each request by value. Before run 265, connect-go built an
+`httptest` request and recorder in each timed call, and connect-rust a request: connect-zig was then
+14.9 to 22.9 times as fast as connect-go on arm64, and 3.4 to 6.5 times connect-rust. CI's two
+`bench-compare` jobs of commit `a69e377` ([run 265](https://github.com/c4milo/connect-zig/actions/runs/45231244610)) timed them on colibri v0.19.2 and Ubuntu 26.04,
+on an Arm Neoverse-N2 core and on an Intel Xeon Platinum 8573C core. On x86-64, connect-zig is 9.4
+to 11.6 times as fast as connect-go and 2.9 to 5.0 times connect-rust. The chart's bars give a speed
+in multiples of connect-go's, and connect-zig's bar also gives its time for one call, in a table of
+one route.
 
 The small message's call also runs in tables of 16 and 256 routes: 4 and 16 services of as many
 methods, with the call's route among them. colibri finds a route by a binary search over each path
 segment, 8 octets at a time since colibri v0.19.0, connect-rust by a hash map of the path, and
 Go's `ServeMux` by a tree of maps. So connect-zig's call grows with the table, where the other two
-stay within 3%. On CI's judge it takes 4,237 instructions with one route and 4,460 with 256, 5%
-more. In time it grew 18% on arm64 and 12% on x86-64 in this run. The time of the small Connect
+stay within 2%. On CI's judge it takes 4,237 instructions with one route and 4,460 with 256, 5%
+more. In time it grew 16% on arm64 and 11% on x86-64 in this run. The time of the small Connect
 call, in nanoseconds:
 
 | Router | 1 route | 16 routes | 256 routes |
 | --- | ---: | ---: | ---: |
-| connect-zig, arm64 | 339 | 357 | 398 |
-| connect-rust, arm64 | 1,886 | 1,883 | 1,911 |
-| connect-go, arm64 | 7,163 | 7,188 | 7,315 |
-| connect-zig, x86-64 | 443 | 465 | 496 |
-| connect-rust, x86-64 | 1,783 | 1,805 | 1,793 |
-| connect-go, x86-64 | 7,441 | 7,554 | 7,465 |
+| connect-zig, arm64 | 337 | 351 | 391 |
+| connect-rust, arm64 | 1,766 | 1,767 | 1,788 |
+| connect-go, arm64 | 3,221 | 3,209 | 3,261 |
+| connect-zig, x86-64 | 314 | 320 | 348 |
+| connect-rust, x86-64 | 1,505 | 1,533 | 1,522 |
+| connect-go, x86-64 | 2,938 | 2,912 | 2,925 |
 
 ## Whole servers on a socket
 
@@ -388,13 +380,11 @@ gzip and in zstd on arm64. The run's summary holds every table.
 
 One decode of a request message and one validation of it against the rules of
 its schema, beside protovalidate-go, protovalidate-es on Node.js, protovalidate-buffa and
-prost-protovalidate. From CI's [run 242](https://github.com/c4milo/connect-zig/actions/runs/45085140006), on an AMD EPYC 9V74 core: connect-zig is 12 to 58
-times as fast as protovalidate-go, and the fastest of the five in all six cases. On a Neoverse-N2
-core it is 14 to 68 times as fast, and the fastest in all six too.
+prost-protovalidate. From CI's [run 265](https://github.com/c4milo/connect-zig/actions/runs/45231244610), on an Arm Neoverse-N2 core: connect-zig is 15 to 65
+times as fast as protovalidate-go, and the fastest of the five in all six cases. On an AMD EPYC
+9V74 core it is 13 to 57 times as fast, and the fastest in all six too.
 
-![Bars of the speed of a decode with a validation through connect-zig, protovalidate-buffa, prost-protovalidate and protovalidate-es, in multiples of protovalidate-go's, on x86-64: connect-zig is 12 to 58 times as fast as protovalidate-go and the fastest in 6 of 6 cases](images/validate-vs-go.svg)
-
-![Bars of the speed of a decode with a validation through connect-zig, protovalidate-buffa, prost-protovalidate and protovalidate-es, in multiples of protovalidate-go's, on arm64: connect-zig is 14 to 68 times as fast as protovalidate-go and the fastest in 6 of 6 cases](images/validate-vs-go-arm64.svg)
+![Bars of the speed of a decode with a validation through connect-zig, protovalidate-buffa, prost-protovalidate and protovalidate-es, in multiples of protovalidate-go's, on arm64: connect-zig is 15 to 65 times as fast as protovalidate-go and the fastest in 6 of 6 cases](images/validate-vs-go-arm64.svg)
 
 `tools/validate_compare_check.sh` times five implementations of protovalidate on one schema,
 `bench/validate/proto`, and requires each to give each message the same verdict:
@@ -437,52 +427,54 @@ embedded descriptor.
 Each verdict is "valid", or "invalid:" and the rule ids of the violations in order. The check
 fails when two implementations give one message different verdicts.
 
-CI's [run 242](https://github.com/c4milo/connect-zig/actions/runs/45085140006) ran the check at commit 48bb3e1, on an AMD EPYC 9V74, x86-64, and on a
-Neoverse-N2, arm64. Each of the five gave each message the same verdict on both. The nanoseconds of
-one decode and one validation on x86-64, which the chart draws:
+CI's [run 265](https://github.com/c4milo/connect-zig/actions/runs/45231244610) ran the check at commit a69e377, on a Neoverse-N2, arm64, which the chart draws, and on
+an AMD EPYC 9V74, x86-64. Each of the five gave each message the same verdict on both. The
+nanoseconds of one decode and one validation on arm64, which the chart draws:
 
 | Message | connect-zig | protovalidate-go | protovalidate-es | protovalidate-buffa | prost-protovalidate |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| `Small`, valid | 39.9 | 671.7 | 1,081.9 | 98.9 | 655.2 |
-| `Small`, invalid | 68.2 | 2,008.6 | 3,990.0 | 123.5 | 2,312.0 |
-| `Medium`, valid | 523.5 | 6,495.1 | 30,773.4 | 885.6 | 28,618.3 |
-| `Medium`, invalid | 451.0 | 11,658.9 | 34,090.2 | 1,171.8 | 37,633.1 |
-| `Rules`, valid | 157.2 | 8,182.2 | 20,634.6 | 286.1 | 18,952.3 |
-| `Rules`, invalid | 153.3 | 8,964.3 | 21,588.4 | 364.0 | 17,716.5 |
+| `Small`, valid | 40.4 | 803.2 | 1,272.1 | 105.5 | 892.8 |
+| `Small`, invalid | 44.4 | 2,658.9 | 4,417.2 | 145.7 | 2,676.9 |
+| `Medium`, valid | 543.8 | 8,008.0 | 41,656.8 | 869.6 | 32,386.1 |
+| `Medium`, invalid | 457.0 | 15,683.5 | 53,551.2 | 1,215.3 | 42,165.5 |
+| `Rules`, valid | 163.7 | 10,539.2 | 23,272.4 | 283.0 | 21,555.7 |
+| `Rules`, invalid | 174.9 | 11,419.3 | 24,849.2 | 395.6 | 19,970.5 |
 
-The nanoseconds of one validation of a message decoded before, on x86-64:
-
-| Message | connect-zig | protovalidate-go | protovalidate-es | protovalidate-buffa | prost-protovalidate |
-| --- | ---: | ---: | ---: | ---: | ---: |
-| `Small`, valid | 17.1 | 415.9 | 452.6 | 36.9 | 586.4 |
-| `Small`, invalid | 32.6 | 1,761.9 | 3,912.2 | 84.1 | 2,156.9 |
-| `Medium`, valid | 314.8 | 4,572.9 | 30,209.9 | 318.9 | 27,118.5 |
-| `Medium`, invalid | 306.2 | 9,949.8 | 31,440.5 | 666.0 | 35,702.5 |
-| `Rules`, valid | 41.7 | 6,808.9 | 21,125.0 | 31.2 | 18,204.1 |
-| `Rules`, invalid | 54.9 | 7,692.9 | 20,448.8 | 132.9 | 17,407.4 |
-
-The same two on arm64:
+The nanoseconds of one validation of a message decoded before, on arm64:
 
 | Message | connect-zig | protovalidate-go | protovalidate-es | protovalidate-buffa | prost-protovalidate |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| `Small`, valid | 41.1 | 761.5 | 1,298.3 | 102.8 | 861.2 |
-| `Small`, invalid | 44.9 | 2,717.0 | 4,432.7 | 151.3 | 2,645.5 |
-| `Medium`, valid | 550.5 | 7,875.3 | 41,931.4 | 842.7 | 32,559.3 |
-| `Medium`, invalid | 475.2 | 15,697.8 | 51,034.5 | 1,195.1 | 41,965.5 |
-| `Rules`, valid | 160.8 | 10,376.3 | 23,241.8 | 278.9 | 21,946.6 |
-| `Rules`, invalid | 167.1 | 11,338.0 | 24,959.0 | 376.1 | 20,261.3 |
+| `Small`, valid | 18.2 | 508.9 | 692.1 | 45.3 | 816.3 |
+| `Small`, invalid | 23.2 | 2,410.1 | 4,092.9 | 103.2 | 2,504.4 |
+| `Medium`, valid | 323.0 | 5,490.4 | 34,641.7 | 357.4 | 31,029.0 |
+| `Medium`, invalid | 284.2 | 13,410.1 | 43,027.5 | 744.4 | 40,356.2 |
+| `Rules`, valid | 38.8 | 8,750.7 | 22,090.7 | 41.1 | 20,865.3 |
+| `Rules`, invalid | 66.4 | 9,870.5 | 22,944.9 | 164.4 | 19,461.3 |
+
+The same two on x86-64:
 
 | Message | connect-zig | protovalidate-go | protovalidate-es | protovalidate-buffa | prost-protovalidate |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| `Small`, valid | 18.3 | 512.9 | 747.5 | 46.7 | 798.1 |
-| `Small`, invalid | 24.8 | 2,502.1 | 4,726.3 | 109.4 | 2,452.6 |
-| `Medium`, valid | 313.5 | 5,408.9 | 35,384.4 | 343.6 | 30,927.7 |
-| `Medium`, invalid | 284.9 | 13,748.3 | 44,322.1 | 755.3 | 40,389.1 |
-| `Rules`, valid | 38.7 | 8,451.3 | 21,859.1 | 43.4 | 21,347.7 |
-| `Rules`, invalid | 67.3 | 10,072.0 | 22,939.5 | 179.3 | 19,781.7 |
+| `Small`, valid | 49.9 | 835.3 | 1,393.3 | 141.3 | 883.4 |
+| `Small`, invalid | 64.8 | 2,704.8 | 5,171.3 | 156.9 | 2,899.2 |
+| `Medium`, valid | 624.8 | 8,398.6 | 43,887.6 | 1,165.0 | 37,535.5 |
+| `Medium`, invalid | 535.6 | 15,580.9 | 45,959.9 | 1,423.4 | 49,045.6 |
+| `Rules`, valid | 210.0 | 10,967.5 | 26,706.5 | 354.0 | 25,703.2 |
+| `Rules`, invalid | 207.0 | 11,770.3 | 27,607.3 | 450.3 | 23,695.8 |
 
-protovalidate-buffa validates one message faster, on x86-64 alone: the valid `Rules`, 31.2 ns to
-41.7. Its plugin writes Rust code for each rule, as connect-zig's compiler does. Before 48bb3e1,
-each element of a macro in that message waited for its result to reach the cache on x86-64, and
-connect-zig took 55.4 ns to protovalidate-buffa's 26.2 in run 240 (docs/performance.md, "The
-pitfalls").
+| Message | connect-zig | protovalidate-go | protovalidate-es | protovalidate-buffa | prost-protovalidate |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| `Small`, valid | 23.3 | 541.5 | 569.8 | 51.4 | 782.3 |
+| `Small`, invalid | 26.3 | 2,429.9 | 4,298.6 | 102.3 | 2,658.2 |
+| `Medium`, valid | 407.9 | 5,768.5 | 48,798.8 | 366.2 | 35,453.1 |
+| `Medium`, invalid | 379.4 | 13,220.4 | 43,751.1 | 764.4 | 46,062.0 |
+| `Rules`, valid | 51.2 | 9,073.6 | 25,761.3 | 37.0 | 24,226.3 |
+| `Rules`, invalid | 72.7 | 10,356.4 | 25,293.8 | 163.1 | 23,084.8 |
+
+On x86-64, protovalidate-buffa validates two messages decoded before faster than connect-zig: the
+valid `Rules`, 37.0 ns to 51.2, and the valid `Medium`, 366.2 ns to 407.9. Its plugin writes Rust
+code for each rule, as connect-zig's compiler does. A decode and a validation together, which a
+server runs for each request, take connect-zig less time in all six cases on both machines. Before
+48bb3e1, each element of a macro in the `Rules` message waited for its result to reach the cache
+on x86-64, and connect-zig took 55.4 ns to protovalidate-buffa's 26.2 in run 240
+(docs/performance.md, "The pitfalls").
