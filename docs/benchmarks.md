@@ -13,9 +13,9 @@ is faster in none of the 16 cells charted.
 ![Bars of the speed of connect-zig and of Buffa, connect-rust's codec, in multiples of Go's protobuf runtime, connect-go's codec, on arm64: connect-zig is 3.2 to 20.8 times faster than Go's protobuf runtime, and 1.1 to 2.2 times faster than Buffa](images/speed-vs-go-arm64.svg)
 
 <details>
-<summary>On x86-64, connect-zig is 3.7 to 19.9 times faster than Go, and 1.01 to 2.4 times faster than Buffa.</summary>
+<summary>On x86-64, connect-zig is 3.7 to 19.9 times faster than Go, and 1.01 to 2.0 times faster than Buffa.</summary>
 
-![Bars of the speed of connect-zig and of Buffa, connect-rust's codec, in multiples of Go's protobuf runtime, connect-go's codec, on x86-64: connect-zig is 3.7 to 19.9 times faster than Go's protobuf runtime, and 1.01 to 2.4 times faster than Buffa](images/speed-vs-go.svg)
+![Bars of the speed of connect-zig and of Buffa, connect-rust's codec, in multiples of Go's protobuf runtime, connect-go's codec, on x86-64: connect-zig is 3.7 to 19.9 times faster than Go's protobuf runtime, and 1.01 to 2.0 times faster than Buffa](images/speed-vs-go.svg)
 
 </details>
 
@@ -30,8 +30,11 @@ changes from run to run: run 250's was an Intel Xeon Platinum 8573C.
 
 Each chart above draws the speed of connect-zig and of Buffa in multiples of Go's. A
 longer bar is faster, and Go is the line at 1. The charts time the codecs alone, with no code of
-connect-go or connect-rust. A binary decode with every field read takes `decode_into`, which
-reads each repeated field once (decision 37).
+connect-go or connect-rust. Each decode they draw reads every field. Go's and Buffa's decodes
+build the whole message, and connect-zig's leaves a repeated field to be parsed when it is read,
+so a decode alone would time less work on connect-zig's side. A binary decode with every field
+read takes `decode_into`, which reads each repeated field once (decision 37). The table also gives
+each decode alone.
 
 The charts draw 16 of the table's 48 cells. Buffa is faster in none of them, on either machine.
 

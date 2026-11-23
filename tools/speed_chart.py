@@ -21,8 +21,11 @@ import sys
 
 table_path, run, commit = sys.argv[1:4]
 out = sys.argv[4] if len(sys.argv) > 4 else "docs/images/speed-vs-go.svg"
-ops = ["Binary encode", "Binary decode, every field read", "JSON encode", "JSON decode"]
-op_keys = ["binary encode", "binary decode+walk", "JSON encode", "JSON decode"]
+# Each decode reads every field: Go's and Buffa's decodes build the whole message, and
+# connect-zig's leaves a repeated field to be parsed when it is read, so a decode alone would
+# time less work on connect-zig's side.
+ops = ["Binary encode", "Binary decode, every field read", "JSON encode", "JSON decode, every field read"]
+op_keys = ["binary encode", "binary decode+walk", "JSON encode", "JSON decode+walk"]
 msgs = ["Small, 40 B", "Medium, 1 KB", "Large, 180 KB", "Deep, 50 levels"]
 msg_keys = ["small", "medium", "large", "deep"]
 # The table's columns the chart reads.
