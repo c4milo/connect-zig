@@ -16,7 +16,7 @@ Each rule in the code cites the document that states it:
 - The proto3 JSON mapping: <https://protobuf.dev/programming-guides/json/>.
 - The gRPC status codes: <https://grpc.github.io/grpc/core/md_doc_statuscodes.html>.
 - For `oidc`: RFC 7515 (JWS), RFC 7517 (JWK), RFC 7518 (JWA), RFC 7519 (JWT), RFC 8037
-  (EdDSA in JOSE), RFC 8725 (JWT best practices), RFC 6750 (bearer tokens) and OpenID Connect
+  (EdDSA in JOSE), RFC 8725 (JWT best practices), RFC 6750 (bearer tokens), and OpenID Connect
   Core 1.0: <https://openid.net/specs/openid-connect-core-1_0.html>.
 - For `protovalidate`: `buf/validate/validate.proto` of protovalidate v1.2.2,
   <https://github.com/bufbuild/protovalidate>, whose comments state each rule and whose
@@ -29,7 +29,7 @@ Each rule in the code cites the document that states it:
 
 ## 2. Rules
 
-The library owns no I/O, reads no clock and holds no allocator (decisions 3 and 4). Every loop
+The library owns no I/O, reads no clock, and holds no allocator (decisions 3 and 4). Every loop
 is bounded, and every bound is a constant in its module's `constants.zig`. Assertions stay on in
 production and cover programmer error alone. Hostile input returns an error value.
 
@@ -56,11 +56,11 @@ imports no `connect` module (decision 47). Its two generated modules are the plu
 
 A generated message is a struct. Its `pub const protobuf: proto.Descriptor` names each field:
 the Zig name, the number, the kind, the JSON name, the .proto name, and the oneof that holds it.
-`encode`, `decode` and `encoded_len` read the table at comptime (decisions 6 and 7).
+`encode`, `decode`, and `encoded_len` read the table at comptime (decisions 6 and 7).
 
 - `decode` copies nothing. Strings and bytes are slices of the input. `Repeated` fields are views,
   read by an iterator that accepts packed and unpacked elements.
-- `decode` checks every element when it reads the message: wire types, UTF-8 and nested
+- `decode` checks every element when it reads the message: wire types, UTF-8, and nested
   messages. An iterator over a decoded view therefore reads only checked bytes.
 - Merge follows "Last One Wins": scalars keep the last value, messages merge, a oneof keeps the
   member read last. A merge that a view cannot hold fails closed (decision 6).
@@ -74,7 +74,7 @@ the Zig name, the number, the kind, the JSON name, the .proto name, and the oneo
 `encode_json` writes a message with stdx's `json.TextWriter`. `decode_json` transcodes JSON into
 the binary encoding in a caller scratch buffer and then calls `decode` (decision 9). Well-known
 types live in `proto.wkt` and have their own JSON forms: Timestamp, Duration, the wrappers,
-Empty, FieldMask, Struct, Value, ListValue and Any. An Any names its type from a comptime list
+Empty, FieldMask, Struct, Value, ListValue, and Any. An Any names its type from a comptime list
 (decision 21).
 
 ## 6. The protocol core
@@ -87,17 +87,17 @@ Empty, FieldMask, Struct, Value, ListValue and Any. An Any names its type from a
   end-stream message, and 0x80 is gRPC-Web's trailers frame.
 - `protocol`: the content types of each protocol and codec, and the request's protocol.
 - `timeout`: `Connect-Timeout-Ms` (at most 10 digits) and `grpc-timeout` (at most 8 digits and a
-  unit of H, M, S, m, u or n), as nanoseconds.
+  unit of H, M, S, m, u, or n), as nanoseconds.
 - `error_json`: the Connect error body `{code, message, details[{type, value}]}`, where `value`
   is unpadded base64.
 - `end_stream`: the end-stream message `{error, metadata}`.
 - `trailers`: `grpc-status`, a percent-encoded `grpc-message`, and `grpc-status-details-bin`, the
   base64 of a `google.rpc.Status`.
 - `get`: a unary GET of a `NO_SIDE_EFFECTS` method: `message`, `encoding`, `base64`,
-  `compression` and `connect=v1`.
+  `compression`, and `connect=v1`.
 - `compression`: the names of the codings and the choice of one, over stdx (decision 10).
 - `Method`: what generated code names for each RPC: the service, the method, the request and
-  response types, the stream type and the idempotency.
+  response types, the stream type, and the idempotency.
 
 ## 7. connect_colibri
 
@@ -110,14 +110,14 @@ at colibri's `next`, so its stream may be longer than the router's response memo
 33). A client's streamed call writes each
 message with its `Sender` and reads each answer as its piece arrives, full-duplex over h2 and h3
 (decision 18 as amended). Interceptors wrap a route's handler and a client's exchange (decision
-19). The client speaks Connect, gRPC-Web and gRPC (decision 11).
+19). The client speaks Connect, gRPC-Web, and gRPC (decision 11).
 
 ## 8. Build plan
 
 Each step names the check that proves it. A step is done when its check passes in CI.
 
 1. **Skeleton.** README, CLAUDE.md, LICENSE, this document, decisions.md, `build.zig`,
-   `build.zig.zon` and CI. Check: `zig build test` runs the lint and the public-names test.
+   `build.zig.zon`, and CI. Check: `zig build test` runs the lint and the public-names test.
 2. **Binary runtime.** `protobuf` with round trips, packed and unpacked input, merge semantics,
    UTF-8, group skipping with a depth bound, and the encoding guide's vectors. Check: `zig build
    test-protobuf`, with each check's mutation caught.
@@ -134,41 +134,41 @@ Each step names the check that proves it. A step is done when its check passes i
    `examples/`, and the output equals the committed code.
 7. **Conformance.** The connectrpc conformance suite against the client and the server. Check:
    the suite's report, pinned to a release, for both halves.
-8. **Calls, interceptors and full-duplex streams.** `Call` exposes the protocol, codec,
-   timeout and request headers, and takes response headers and trailers. Interceptors run on
+8. **Calls, interceptors, and full-duplex streams.** `Call` exposes the protocol, codec,
+   timeout, and request headers, and takes response headers and trailers. Interceptors run on
    both sides, and type handlers stream (decisions 18 and 19). New public names:
-   `ExchangeWith`. Check: `zig build examples` runs `interceptors`, `streaming` and `errors`
+   `ExchangeWith`. Check: `zig build examples` runs `interceptors`, `streaming`, and `errors`
    over the in-memory link; `tools/interop_check.sh` calls the demo service with buf curl in
    each protocol, and requires Chat's first answer before the client's second message.
 9. **Every protobuf type against a reference.** `examples/proto/coverage` holds each scalar in
-   each cardinality, every map key type, oneofs, enums, recursion and each well-known type.
+   each cardinality, every map key type, oneofs, enums, recursion, and each well-known type.
    Check: `tools/coverage_check.sh` converts each case in `examples/testdata/coverage`,
-   `editions` and `legacy` with Zig and with Go, through buf convert, and requires the same
+   `editions`, and `legacy` with Zig and with Go, through buf convert, and requires the same
    message both ways. `editions` and `legacy` hold edition 2023's features and proto2's groups
    (decision 23).
 10. **h3 in memory.** A test-only TLS identity, and a round over h3 in each program over the
     in-memory link, beside its cleartext rounds (decision 25). Check: `zig build examples` runs
-    `eliza`, `streaming`, `interceptors` and `errors` over h3, with the checks of their other
+    `eliza`, `streaming`, `interceptors`, and `errors` over h3, with the checks of their other
     rounds.
 
 11. **OpenID Connect tokens.** The `oidc` module: a `Verifier` of a JWT bearer token on
     chapulin's `jws` calls, and a server interceptor with excluded paths (decision 34). New
     public names, all in `oidc`: `Verifier`, `VerifierOptions`, `Claims`, `Error`, `Interceptor`,
-    `InterceptorOptions`, `bearer_token` and `constants`. Check: `zig build test-oidc` holds the
+    `InterceptorOptions`, `bearer_token`, and `constants`. Check: `zig build test-oidc` holds the
     RFCs' known answers for each algorithm and each refusal, with each check's mutation caught.
 12. **Values for each call.** `RouteOptions.Values`, a struct the program declares, which the
     route keeps for each call; `Context.values` reads it (decision 35, in its final form after
     step 13). `oidc.Claims` holds its own storage,
-    `Verifier.verify` writes into it, and `Claims.string`, `integer` and `holds` read a
+    `Verifier.verify` writes into it, and `Claims.string`, `integer`, and `holds` read a
     program's own claims. New public names: none at a module's root; a field of `RouteOptions`,
     a method of the call, and the methods of `oidc.Claims`. `Verifier.claims` goes. Check: `zig
     build test-connect-colibri` runs two interleaved streams through colibri's router, and each
     callback reads its own call's values; `zig build test-oidc` holds each lookup and each
     claims' owner.
-13. **A handler takes ctx, request and response.** `Call`, `Sender` and `Receiver` go; a handler
-    and an interceptor take `Context`, a request and a response (decision 36). New public names
+13. **A handler takes ctx, request, and response.** `Call`, `Sender`, and `Receiver` go; a handler
+    and an interceptor take `Context`, a request, and a response (decision 36). New public names
     in `connect_colibri`: `Context`, `Request`, `RequestStream`, `Response`, `ResponseStream`,
-    `AnyRequest` and `AnyResponse`. Check: every module's tests, the examples and the
+    `AnyRequest`, and `AnyResponse`. Check: every module's tests, the examples, and the
     conformance server build and pass on the new signatures.
 14. **Decode into the caller's storage.** `decode_into` reads each repeated field's elements,
     and each `Lazy` field's message, into storage the caller passes, once (decision 37).
@@ -197,20 +197,20 @@ Each step names the check that proves it. A step is done when its check passes i
     `tools/ci.sh` holds it as the check `protobuf-conformance` (decision 38). New public
     names: none. `zig build plugin` builds the plugin alone. Check: the runner passes with the
     cases of `conformance/protobuf_known_failing.txt` as its expected failures. At its first
-    run 5629 cases pass, 48 are skipped and 113 are listed. The fixes it led to leave 5635
+    run 5629 cases pass, 48 are skipped, and 113 are listed. The fixes it led to leave 5635
     passing and 107 listed. On 2026-11-17, JSON encode wrote a map key once (decision 38), and
     5707 pass with 35 listed. Runner 37.0.0-rc1 is the npm package's newest; protobuf's rc2 and
     rc3 change no file under `conformance/`.
-18. **Checks out of the examples.** The coverage converter, the interop client and the test of
+18. **Checks out of the examples.** The coverage converter, the interop client, and the test of
     the generated code move to `tools/`, with the schemas that only they read (decision 41).
-    New public names: none. Check: `tools/coverage_check.sh`, `tools/interop_servers_check.sh`
+    New public names: none. Check: `tools/coverage_check.sh`, `tools/interop_servers_check.sh`,
     and `zig build test-generated` pass from their new places.
 19. **Each example a project.** `examples/harness` and one project for each example, each
-    with its own manifest, schema and generated code, and `examples/quickstart`, the README's
+    with its own manifest, schema, and generated code, and `examples/quickstart`, the README's
     steps (decision 41). New public names: none. Check: `zig build examples` runs `zig build
     test` in each project; `tools/package_check.sh` builds `examples/quickstart` against a
     fetched copy and calls it over h2 and h3.
-20. **The library's rules on every tree.** The lint reads `examples/`, `bench/` and
+20. **The library's rules on every tree.** The lint reads `examples/`, `bench/`, and
     `conformance/` with every rule but the four of a library, and each program allocates its
     one `State` at startup (decision 42). New public names: none. Check: `zig build lint`.
 21. **OpenTelemetry's trace export.** `examples/otlp` serves `TraceService`, and
@@ -246,27 +246,27 @@ Each step names the check that proves it. A step is done when its check passes i
     `zig build test-connect`, the conformance suite with `COMPRESSION_BR` in both halves'
     features, and `tools/interop_check.sh`, where curl reads a br answer.
 27. **Route tables in the routed call.** The small message's routed call runs in tables of 1,
-    16 and 256 routes (225 before colibri v0.18.0, whose router compiles a table of 256), in
-    connect-zig, connect-go and connect-rust, each a square of services and methods with the
+    16, and 256 routes (225 before colibri v0.18.0, whose router compiles a table of 256), in
+    connect-zig, connect-go, and connect-rust, each a square of services and methods with the
     same paths. connect-go's call goes through an `http.ServeMux`, as a connect-go server's
     does. New public names: none. Check: `tools/bench_check.sh`, which fails
     when a table size lacks its row, and `tools/routes_chart.py`, which draws each call's time
     against its time with one route.
 28. **The full stack.** `tools/fullstack_check.sh` loads connect-zig's OTLP sink,
     `tools/otlp_sink`, and OpenTelemetry's Collector with the same OTLP exports, over gRPC, TLS
-    1.3 and h2, under h2load. It reports calls a second, latency at p50 and p99, CPU time a call
+    1.3, and h2, under h2load. It reports calls a second, latency at p50 and p99, CPU time a call,
     and peak memory (decision 44). New public names: none. Check: one export through `buf curl`
     answers with OTLP's full success, and each server's count of the spans it took equals the
     spans it was sent, with none refused.
 29. **The production model.** `tools/fullstack/production.sh` loads each server as one gateway
-    core of a fleet of 33,000 servers: 516 TLS connections, gzip exports of 16, 128 and 512
-    spans from 70%, 25% and 5% of them, under oha at rates that climb until p99 passes 100 ms
+    core of a fleet of 33,000 servers: 516 TLS connections, gzip exports of 16, 128, and 512
+    spans from 70%, 25%, and 5% of them, under oha at rates that climb until p99 passes 100 ms
     or a call is refused (decision 44). The sink reads gzip and holds 528 connections. New public
     names: none. Check: the probes and the counts of step 28, over the whole climb. Since
     2026-11-23 `tools/fullstack/load` sends the climb in oha's place, on connections it keeps
     across the climb (decision 44 as amended).
 30. **Servers in Rust.** Vector joins the peak part and the climb over TLS. A second climb, in
-    cleartext h2, loads connect-zig, the Collector and Rotel, whose receiver has no TLS. The sink
+    cleartext h2, loads connect-zig, the Collector, and Rotel, whose receiver has no TLS. The sink
     takes a second argument, `cleartext`, and then serves with no identity (decision 44). New
     public names: none. Check: the probes and the counts of step 28, with Vector's events and
     Rotel's internal metrics.
@@ -276,13 +276,13 @@ Each step names the check that proves it. A step is done when its check passes i
     probes and the counts of step 28.
 32. **protovalidate's standard rules.** The `protovalidate` module, and the tables the plugin
     writes for it (decision 47). The plugin reads `(buf.validate.message)`,
-    `(buf.validate.oneof)` and `(buf.validate.field)` from each descriptor's options, and
+    `(buf.validate.oneof)`, and `(buf.validate.field)` from each descriptor's options, and
     writes `pub const protovalidate` and `RuleNumber` in each message that has a rule or holds
     a message that has one. `validate` checks `required`, `ignore`, a oneof's `required`, a
-    message's `oneof` rules and each type's standard rules, and walks nested messages,
-    repeated fields and maps. New public names, all in `protovalidate`: `constants`, `Rules`,
-    `validate`, `Options`, `Report`, `Violation`, `Error` and `rules_error`. The package gains
-    the modules `protovalidate`, `buf_validate_validate` and `google_protobuf_descriptor`.
+    message's `oneof` rules, and each type's standard rules, and walks nested messages,
+    repeated fields, and maps. New public names, all in `protovalidate`: `constants`, `Rules`,
+    `validate`, `Options`, `Report`, `Violation`, `Error`, and `rules_error`. The package gains
+    the modules `protovalidate`, `buf_validate_validate`, and `google_protobuf_descriptor`.
     Check: `zig build test-protovalidate` and `zig build test-plugin`, with each check's
     mutation caught; `tools/protovalidate_conformance_check.sh` runs protovalidate's
     conformance harness v1.2.2 against `zig build protovalidate-executor`, with the cases that
@@ -296,18 +296,18 @@ Each step names the check that proves it. A step is done when its check passes i
     `invalid_argument`, a message that names the first violation, and a
     `buf.validate.Violations` detail. The call's values hold what that error points to, in a
     field `protovalidate` of the type `protovalidate.InterceptorRoom(connect, options)`. New
-    public names, all in `protovalidate`: `Interceptor`, `InterceptorOptions` and
+    public names, all in `protovalidate`: `Interceptor`, `InterceptorOptions`, and
     `InterceptorRoom`, which a server's program names. `connect_colibri`'s root gains none.
     Check: `zig build test-connect-colibri` runs the hook for a unary call and for each message
     of a stream, by both kinds of handler; `zig build test-protovalidate` runs the interceptor
     over a stand-in for `connect`; the example project `validate` serves methods behind the
-    interceptor over h2, h11 and h3.
+    interceptor over h2, h11, and h3.
 34. **CEL.** The module compiles `cel` and `cel_expression` rules at comptime, from the text
     the table holds (decision 47 as amended on 2026-11-21). The step has four parts, and each
     ends with its conformance cases off the known-failing list.
     - Part a: the tokens, the parser, each part's type from the message's descriptor, and the
       code it unfolds into, for the rules of a message and of a scalar or message field.
-    - Part b: lists and maps, with their macros, and the rules of `repeated.items`, `map.keys`
+    - Part b: lists and maps, with their macros, and the rules of `repeated.items`, `map.keys`,
       and `map.values`.
     - Part c: protovalidate's own functions, such as `isEmail`, over the format checks of step
       32, and `format`.
@@ -320,7 +320,7 @@ Each step names the check that proves it. A step is done when its check passes i
     New public names: `protovalidate.Error` gains `Unevaluable`, for an expression that fails
     at run time. `Rules.Field` gains `predefined`, which the plugin writes. No root name is
     new. Check: `zig build test-protovalidate`, with each check's mutation caught, and the
-    conformance cases of custom rules, of the library's functions and of predefined rules
+    conformance cases of custom rules, of the library's functions, and of predefined rules
     leave the known-failing list. The cases whose expression calls `matches` stay, for step
     35.
 35. **Patterns.** `pattern` rules and CEL's `matches` run on stdx's regular expression module
@@ -333,7 +333,7 @@ Each step names the check that proves it. A step is done when its check passes i
     names: none. Check: the probes and the counts of step 28, and each refuses an export whose
     trace ID is 3 octets with `invalid_argument`.
 37. **Compression in the full stack.** The three Connect receivers run both loads with the
-    production model's exports uncompressed and in gzip, zstd and brotli, over TLS and in
+    production model's exports uncompressed and in gzip, zstd, and brotli, over TLS and in
     cleartext h2, in the parts `compression` and `compression-cleartext`, in an order that each
     round rotates. `zig build otlp-compress` writes each export with stdx's encoders, as a
     connect-zig client places them. The sink holds stdx's zstd and brotli
@@ -375,7 +375,7 @@ ran on Linux x86-64 with Zig 0.16.0.
   mutation of a check's commit was CAUGHT once its test existed; the commits list them.
 - **Step 3.** `zig build test-protobuf` printed 39 of 39 tests passed.
 - **Step 4.** `zig build test-connect` printed 42 of 42 tests passed. `exchange_test.zig` plays
-  a client against a server for each protocol, codec and stream type.
+  a client against a server for each protocol, codec, and stream type.
 - **Step 5.** `zig build example-eliza` printed "every call answered as expected over h2 and
   h11": Connect POST and GET, a gRPC-Web server stream, a Connect bidirectional stream with a
   trailer, and a gRPC Trailers-Only error. `tools/interop_check.sh` with buf 1.74.0 printed 17
@@ -399,7 +399,7 @@ ran on Linux x86-64 with Zig 0.16.0.
   with no side effects as a GET too. Generated code still imports no HTTP library (decision 2).
   `examples/services/eliza.zig` routes ELIZA through it.
 
-- **Step 10.** `zig build examples` printed every call answered over h2, h11 and h3 for `eliza`
+- **Step 10.** `zig build examples` printed every call answered over h2, h11, and h3 for `eliza`
   and `streaming`, and over h2 and h3 for `interceptors` and `errors`. Over h3 that is Connect
   POST and GET, gRPC-Web, gRPC's Trailers-Only errors with their details, and the type handlers
   of Chat and Sum. It found one fault, now fixed: a GET's route read its query from colibri's
@@ -411,11 +411,11 @@ ran on Linux x86-64 with Zig 0.16.0.
   now fixed. A unary request with no message now fails `unimplemented`, as connect-go answers.
   A compressed message with no coding named now fails `internal`, as gRPC's Message-Encoding
   and Connect's Streaming-Request ask. A gRPC error after response headers keeps its own head.
-  `connect_colibri` gains `Call.request_headers`, `Call.request_query` and a context's
+  `connect_colibri` gains `Call.request_headers`, `Call.request_query`, and a context's
   `message_receive_limit`. It also gains 16 KiB of trailer room, for details that echo headers.
 
 - **CI across languages and against a baseline.** `tools/interop_languages_check.sh` printed 507
-  calls passed: Go's connect-go in five modes and grpc-go, connect-es in five, grpcio and tonic
+  calls passed: Go's connect-go in five modes and grpc-go, connect-es in five, grpcio, and tonic
   (decision 29). It found the example server hanging a connection past its eight sockets, which
   it now accepts and closes, and which `tools/interop_check.sh` checks. `tools/perf_check.sh`
   counts 24 operations (decision 30). CI runs each check of `tools/ci.sh --list` as its own job.
@@ -426,37 +426,37 @@ ran on Linux x86-64 with Zig 0.16.0.
   eight of them binary cases checked against upb 5.29.3. Strings of 32 bytes and longer are
   checked with stdx's vector UTF-8 check, shorter ones with the standard library's.
 
-- **`ClientCall`.** `connect_colibri.Exchange`, `ExchangeWith` and `ExchangeBuffers` become
-  `ClientCall`, `ClientCallWith` and `ClientCallBuffers`, so the client's side of a call reads as
+- **`ClientCall`.** `connect_colibri.Exchange`, `ExchangeWith`, and `ExchangeBuffers` become
+  `ClientCall`, `ClientCallWith`, and `ClientCallBuffers`, so the client's side of a call reads as
   the pair of the server's `Call`. The records above keep the names of their day.
 
 - **The gRPC client.** connect-zig pins colibri `2cf693b1`, whose client holds a response's
   headers and trailers in buffers (colibri decision 152). `connect_colibri.Exchange` reads its
   headers through `Headers.get` and a gRPC status through `Trailers.get`, and
   `ExchangeBuffers` takes `headers` and `trailers` in place of `values`. `wanted_names` leaves
-  the root's list. `zig build example-eliza` reads a gRPC unary and server stream over h2, h11
+  the root's list. `zig build example-eliza` reads a gRPC unary and server stream over h2, h11,
   and h3, and `example-github` reads gRPC errors that follow response headers.
 
 - **A GitHub-style example.** `zig build example-github` runs one session against
   `github.v1.RepositoryService` and `IssueService` over h2 and h3: tokens, a rate limit, pages,
-  an update mask, a private repository, a client stream and a server stream.
+  an update mask, a private repository, a client stream, and a server stream.
   `tools/interop_check.sh` calls it with `buf curl` in gRPC and gRPC-Web. It found a fault in
   colibri's h3 client, which panics on a status its enum lacks, such as 429; the rate-limit step
   runs over h2 alone until colibri fixes it.
 
 - **h3 on the socket server.** `tools/interop_check.sh` calls Introduce with `buf curl --http3`
-  in Connect, gRPC and gRPC-Web, under the test identity, beside the h2 and h11 calls (decision
+  in Connect, gRPC, and gRPC-Web, under the test identity, beside the h2 and h11 calls (decision
   28).
 
-- **Compression, later.** `connect` gains `ZstdEncoder`, `ZstdDecoder` and `Encoders`; the gzip
-  `encoder` of `Reply`, `client.Options` and `connect_colibri.Codings` becomes `encoders`,
+- **Compression, later.** `connect` gains `ZstdEncoder`, `ZstdDecoder`, and `Encoders`; the gzip
+  `encoder` of `Reply`, `client.Options`, and `connect_colibri.Codings` becomes `encoders`,
   `accept`'s `can_compress` becomes `encoders`, and `compression.compress_gzip` becomes
   `compression.compress` (decision 10). `tools/interop_check.sh` reads a zstd answer with curl.
 
 - **colibri v0.14.0 and `colibri.Server`.** Both socket servers run on `colibri.Server`; the
   example server serves h11 and h2 over TLS and h3 under the test identity (decision 31).
   `tools/interop_check.sh` calls it over https and passes; `tools/interop_languages_check.sh`
-  runs 507 scenarios across Go, TypeScript, Python and Rust over TLS, all passing.
+  runs 507 scenarios across Go, TypeScript, Python, and Rust over TLS, all passing.
   `zig build example-github` runs the rate-limit step over h3 too, now that colibri's h3 client
   reads 429. The server set the endpoint's `ecn`, since v0.14.0's server read each datagram's
   ECN codepoint and left the endpoint's flag at false.
@@ -464,7 +464,7 @@ ran on Linux x86-64 with Zig 0.16.0.
 - **colibri v0.14.1.** colibri's server sets `ecn` itself, so the example server drops its own.
   The pin moves with colibri's: Rotor v0.9.0 for the examples, chapulin v0.3.0 through colibri.
   `tools/interop_check.sh` passes, h3 calls among them, as do `zig build test`, the 507
-  scenarios across languages, conformance 2714/2714 and the perf gate.
+  scenarios across languages, conformance 2714/2714, and the perf gate.
 
 - **One generated file per .proto file.** The plugin writes each .proto file as one
   `<file>.pb.zig`, and the file-length rule skips `.pb.zig` (decision 17). `coverage.proto`'s 28
@@ -497,7 +497,7 @@ ran on Linux x86-64 with Zig 0.16.0.
   `client.ConnectionPool(.{})`, and `http.Status` as an enum. `connect` keeps the status as a
   number, and `connect_colibri` converts it at colibri's edge. stdx's decoders take methods, and
   `json.Item` is `json.TextReader.Item`. Every check passes, and no instruction count moved:
-  `zig build test`, conformance 2714/2714, the 507 scenarios across languages, coverage and
+  `zig build test`, conformance 2714/2714, the 507 scenarios across languages, coverage, and
   interop. Colibri's client tries TCP first now; the h3 rounds offer h3 alone and check the
   protocol they spoke, so they still run h3.
 
@@ -513,7 +513,7 @@ ran on Linux x86-64 with Zig 0.16.0.
   instructions (-58.30%), large binary decode 1,213,474 to 786,889 (-35.15%), deep binary encode
   21,511 to 13,548 (-37.02%), small binary decode 738 to 525 (-28.86%), large JSON decode
   13,135,358 to 10,832,454 (-17.53%). JSON encode moved by +0.81% at most. `zig build test`,
-  `tools/coverage_check.sh` and `tools/bench_check.sh` pass.
+  `tools/coverage_check.sh`, and `tools/bench_check.sh` pass.
 
 - **Client-side full-duplex.** The owner approved on 2026-11-09 the first of three client
   commits: a streamed `ClientCall` over colibri v0.15.0's pieces (colibri decision 153; decision
@@ -526,23 +526,23 @@ ran on Linux x86-64 with Zig 0.16.0.
     `client.Incoming.streamed`.
 
   No existing name changed. `zig build example-streaming` gains a streamed round over each of
-  h2, h11 and h3. Chat runs in Connect, gRPC and gRPC-Web: over h2 and h3 each answer arrives
+  h2, h11, and h3. Chat runs in Connect, gRPC, and gRPC-Web: over h2 and h3 each answer arrives
   before the next line goes, and over h11 every line goes first. Sum hands each number as a
   piece of its own.
-  `zig build test`, `zig build -Drelease`, `tools/generate_check.sh` and `tools/perf_check.sh`
+  `zig build test`, `zig build -Drelease`, `tools/generate_check.sh`, and `tools/perf_check.sh`
   pass, with no instruction count moved. `tools/interop_check.sh` printed 48 calls answered,
   conformance 2714 of 2714, and `tools/interop_languages_check.sh` 507 calls passed.
 
 - **Step 7, the client half.** `tools/conformance_check.sh` runs runner v1.0.4 in client mode
-  against `zig build conformance-client` (decision 26 as amended): 8264 cases in Connect, gRPC and
-  gRPC-Web, over h11, h2 and h3, in cleartext and over TLS, proto and JSON, identity, gzip and
-  zstd, every stream type, Connect GET, timeouts, cancels and the 1 MiB receive limit. 7349
+  against `zig build conformance-client` (decision 26 as amended): 8264 cases in Connect, gRPC, and
+  gRPC-Web, over h11, h2, and h3, in cleartext and over TLS, proto and JSON, identity, gzip, and
+  zstd, every stream type, Connect GET, timeouts, cancels, and the 1 MiB receive limit. 7349
   pass, and the rest fail on purpose, listed with their reasons in
   `conformance/client_known_failing.txt` and `client_known_flaky.txt`. The server still passes
   2714 of 2714. The suite found these faults in `connect`'s client, now fixed:
   - a program could add 8 headers, and the runner sends 9; `extra_headers_max` is 16;
-  - a compressed end-stream message, trailers frame or Connect error body was read compressed;
-  - an error body's null, missing or unknown code read `unknown`, not the HTTP status's code,
+  - a compressed end-stream message, trailers frame, or Connect error body was read compressed;
+  - an error body's null, missing, or unknown code read `unknown`, not the HTTP status's code,
     and an end-stream's `"error": null` failed the stream;
   - a message past the client's receive limit failed `internal`, not `resource_exhausted`, and a
     Connect unary body was not bounded at all;
@@ -551,7 +551,7 @@ ran on Linux x86-64 with Zig 0.16.0.
 
 - **ELIZA over `std.Io`, with no Rotor.** The owner ruled on 2026-11-09 that it lands before
   v0.1.0, to prove decision 32. `examples/std_io_server.zig` drives colibri's `server.Engine` over
-  Zig 0.16's `std.Io`: one task owns the engine, and an acceptor, a reader for each socket and a
+  Zig 0.16's `std.Io`: one task owns the engine. An acceptor, a reader for each socket, and a
   50 ms ticker send it messages through one bounded `std.Io.Queue`. It serves h11 and h2 in
   cleartext, with no TLS and no h3. `examples/std_io.zig` starts it on port 0 and drives a
   `client.ConnectionPool` over a `std.Io` TCP socket. No public name changed. Check: `zig build
@@ -568,7 +568,7 @@ ran on Linux x86-64 with Zig 0.16.0.
   build interop-client` builds, drives one pool per run with the conformance client's transport
   (decision 32). No public name changed. Check: `tools/interop_servers_check.sh`, which
   `tools/ci.sh` runs as `interop-servers`, printed 782 calls passed: 238 against connect-go, 33
-  against grpc-go, 238 against connect-node, 33 against grpcio and 240 against connect-rust.
+  against grpc-go, 238 against connect-node, 33 against grpcio, and 240 against connect-rust.
   connect-go and connect-node answer chat over HTTP/1.1 with 505, so the client leaves it out
   there. `zig build test` printed 86 of 86 steps and 212 of 212 tests passed;
   `tools/interop_languages_check.sh` still prints 713 calls passed, and `tools/interop_check.sh`
@@ -600,8 +600,8 @@ ran on Linux x86-64 with Zig 0.16.0.
   may take any case. A name with an uppercase letter goes into `ClientCall.names`, a new field of
   `constants.client_header_name_bytes`, 1 KiB, and no allocator; a lowercase one is used as it
   is. The conformance client's copy goes. Conformance's client half still printed 8252 of 8264
-  passed, the server 2714 of 2714, `tools/interop_check.sh` 48 calls and
-  `tools/interop_languages_check.sh` 713, and no instruction count moved.
+  passed, the server 2714 of 2714, `tools/interop_check.sh` 48 calls, and
+  `tools/interop_languages_check.sh` 713. No instruction count moved.
 
 - **The lint reads `conformance/`.** The owner ruled on 2026-11-09 that the conformance programs
   keep the tree's rules. `build/lint.zig` scores `conformance/` and passes it to the rules, which
@@ -610,15 +610,15 @@ ran on Linux x86-64 with Zig 0.16.0.
   (complexity 21) and `unary.zig`'s `server_stream` (18) are split, and the local buffers the
   undefined-fill rule names move to the container, or are written whole. No public name changed.
   Conformance printed 2714 of 2714 and 8252 of 8264, `tools/interop_servers_check.sh` 782 calls,
-  `tools/interop_check.sh` 48 and `tools/interop_languages_check.sh` 713, and no instruction count
+  `tools/interop_check.sh` 48, and `tools/interop_languages_check.sh` 713. No instruction count
   moved.
 
 - **JSON integers as the mapping reads them.** The owner ruled on 2026-11-09 that
   `json_scalar.parse_integer` refuses what the proto3 JSON mapping and Go's protojson refuse. Its
   general path read a string's text with the standard library's parsers, which took "+1",
-  "1_000", "0x10" and "007". It now takes a JSON number alone (RFC 8259 §6), in a string or not,
+  "1_000", "0x10", and "007". It now takes a JSON number alone (RFC 8259 §6), in a string or not,
   and reads its digits exactly once the exponent moves the point, as Go does: "1e2", "1.0",
-  "10e-1" and "-0" are integers, and "9.223372036854775807e18" is maxInt(i64), which the old path
+  "10e-1", and "-0" are integers, and "9.223372036854775807e18" is maxInt(i64), which the old path
   rounded through an f64 to 2^63 and refused. The fast path refuses a leading zero, and the proof
   harness's reference follows the new rules with code of its own. Go 1.24 with protobuf v1.36.12
   gave each verdict. No public name changed. `tools/coverage_check.sh` printed 123 checks passed,
@@ -648,9 +648,9 @@ ran on Linux x86-64 with Zig 0.16.0.
     response as it was. The route then returns from `on_writable` and makes the call again at
     the next one, as colibri's usage guide states for v0.15.2. A test of this route found the
     `error.Full` case on colibri's branch, before the tag.
-  - The demo's Countdown is a handler with `next`. `zig build examples` runs it over h2, h11 and
+  - The demo's Countdown is a handler with `next`. `zig build examples` runs it over h2, h11, and
     h3 in memory, and `tools/interop_check.sh` reads a Countdown from 200000 with buf curl:
-    about 1.6 MiB through 64 KiB of response memory, in Connect, gRPC and gRPC-Web over h2, and
+    about 1.6 MiB through 64 KiB of response memory, in Connect, gRPC, and gRPC-Web over h2, and
     in gRPC over h3.
 
 - **base64 from stdx.** The owner approved on 2026-11-10 the move from `std.base64` to stdx's
@@ -663,7 +663,7 @@ ran on Linux x86-64 with Zig 0.16.0.
     place of longer text. Both accept and refuse the same texts and give the same octets.
   - Connect's error details and gRPC's "-bin" values now refuse a text whose pad characters do
     not complete a quantum, such as `/w=`, and a URL-safe letter, as before.
-  - Mutations, 17, each CAUGHT, on the alphabet, the padding, the room and the input of each
+  - Mutations, 17, each CAUGHT, on the alphabet, the padding, the room, and the input of each
     encoder and decoder.
   - The judge, CI's `perf` job: large JSON decode -7.19% instructions, large decode+walk -5.95%,
     large JSON encode -0.80%. No other operation moved.
@@ -716,7 +716,7 @@ ran on Linux x86-64 with Zig 0.16.0.
   build script. No check saw it: each one built the whole tree.
   - `.paths` names `build`.
   - `tools/package_check.sh`, the `package` check of `tools/ci.sh`, packs the tracked files,
-    fetches them into a new project, and builds it. The project imports `protobuf`, `connect`
+    fetches them into a new project, and builds it. The project imports `protobuf`, `connect`,
     and `connect_colibri`, and installs the plugin.
   - Mutation, 1, CAUGHT: with `build` out of `.paths`, the check fails with
     "unable to load 'lint.zig'".
@@ -732,7 +732,7 @@ ran on Linux x86-64 with Zig 0.16.0.
     item, not an error, so a JWK Set with a certificate chain reads.
   - Known answers: RFC 7515 appendix A.2 (RS256) and A.3 (ES256), and RFC 8037 appendix A.4
     (EdDSA), each through `Verifier.verify` under the RFC's key. `tools/oidc_vectors.py` signs
-    RS256 tokens with OpenSSL under keys of 1024, 2048 and 4096 bits; the verifier does not keep
+    RS256 tokens with OpenSSL under keys of 1024, 2048, and 4096 bits; the verifier does not keep
     the first. The tests sign ES256 and EdDSA tokens with Zig's standard library, so each
     signature chapulin checks comes from another implementation.
   - Tests, 46, for each refusal: the form, the header, the key a header names, the
@@ -763,7 +763,7 @@ ran on Linux x86-64 with Zig 0.16.0.
     string: about 4.4 KB, 1.3% of a call's 326 KB with the default sizes. `verify(token,
     *Claims)` writes into it, and empties it after a refusal. The interceptor verifies into
     `request_context.oidc`, and leaves it null on an excluded path or a refusal.
-  - `Claims.string`, `integer` and `holds` read one member of the payload when asked, and the
+  - `Claims.string`, `integer`, and `holds` read one member of the payload when asked, and the
     last of a name that appears twice (RFC 7519 §4). stdx's typed decoder refuses the members
     a struct does not name, which every token holds, so a struct of claims would need a walker
     of its own.
@@ -771,18 +771,17 @@ ran on Linux x86-64 with Zig 0.16.0.
     callbacks reads its own call's value; each entry of the router serves two calls, and each
     starts with the defaults; a function handler reads the value its interceptor wrote. In
     `oidc`: two calls keep their own claims beside a refused third, and each lookup, its
-    types, its bounds and its duplicates.
-  - Mutations, 29, each CAUGHT by a test: the hooks with and without the request context, the
-    pointer and the type check of `Call.request_context`, each lookup's types, bounds and
-    duplicates,
-    the claims `verify` writes and empties, and the interceptor's clears. A test that puts the
+    types, its bounds, and its duplicates.
+  - Mutations, 29, each CAUGHT by a test: the hooks with and without the request context; the
+    pointer and the type check of `Call.request_context`; each lookup's types, bounds, and
+    duplicates; the claims `verify` writes and empties; and the interceptor's clears. A test that puts the
     value only in a nested array came from the one a first run did not catch.
 
-- **A handler takes ctx, request and response** (step 13, decision 36). The owner found the
+- **A handler takes ctx, request, and response** (step 13, decision 36). The owner found the
   split of connect-go cleaner than one object for the call, and approved each signature by
-  card on 2026-11-11. `Call`, `Sender` and `Receiver` go from the root.
+  card on 2026-11-11. `Call`, `Sender`, and `Receiver` go from the root.
   - `context.zig` holds the views: `Context`, `AnyRequest`, `AnyResponse`, `Request(T)`,
-    `RequestStream(T)`, `Response(T)` and `ResponseStream(T)`. Each holds a pointer to the
+    `RequestStream(T)`, `Response(T)`, and `ResponseStream(T)`. Each holds a pointer to the
     call the route keeps, which `call.zig` still writes, so no write path changed.
   - The per-call values of step 12 move to `ctx.values(T)`, and `RouteOptions.RequestContext`
     becomes `RouteOptions.Values`. A hook takes no extra parameter for them: a library's
@@ -791,10 +790,10 @@ ran on Linux x86-64 with Zig 0.16.0.
     message too, `(app, ctx, state, request, response)`. The conformance server echoes the
     request headers at a client stream's end, one with no message among them, and connect-go
     keeps the request headers readable to the end as well.
-  - The examples, the conformance server and the tests move to the new signatures. The
-    conformance helpers take the context, the request or the response each needs, no longer
+  - The examples, the conformance server, and the tests move to the new signatures. The
+    conformance helpers take the context, the request, or the response each needs, no longer
     the whole call.
-  - `context_test.zig` drives a unary call, a GET, a client stream, a server stream and a type
+  - `context_test.zig` drives a unary call, a GET, a client stream, a server stream, and a type
     handler's `on_end` through colibri's router. Its engine keeps each response header and
     trailer, so each view's reads and writes are checked where the client would see them.
   - Mutations, 24, each CAUGHT by a test: each member of each view, the counts, and the
@@ -809,18 +808,18 @@ ran on Linux x86-64 with Zig 0.16.0.
   `c416354`), so the compiler builds each message's walk once to count and once to write.
   - The judge, CI's `perf` job on `c416354`: binary encode takes 33.24% fewer instructions on
     strings, 28.27% on small, 21.13% on deep, 16.96% on large, 16.25% on varints, 15.09% on
-    medium, 3.02% on tree and 0.30% on packed. No other operation moved past 0.03%.
+    medium, 3.02% on tree, and 0.30% on packed. No other operation moved past 0.03%.
     `bench/instructions.txt` holds the new counts.
   - A second change followed from the same disassembly (commit `764ee37`). Each scalar field
     built its tag at run time: the wire type went to a stack slot and came back before it
     joined the field's number. `Sink.tag` now takes both at compile time, and writes one
     constant varint. The judge on `764ee37`: binary encode takes 5.11% fewer instructions on
-    small, 3.86% on strings, 3.55% on varints, 3.37% on large, 3.28% on deep and 3.00% on
+    small, 3.86% on strings, 3.55% on varints, 3.37% on large, 3.28% on deep, and 3.00% on
     medium; tree did not move. From the baseline before both changes, small went from 382
     to 260 instructions, and strings from 1125 to 722. Mutations, 5 on the two tag paths, each
     CAUGHT.
   - CI's `bench-compare` of that run, on an EPYC 7763: connect-zig's binary encode is faster
-    than Buffa's on small, deep, varints, tree and packed, and slower on medium, large and
+    than Buffa's on small, deep, varints, tree, and packed, and slower on medium, large, and
     strings. The README's tables came from another machine, an EPYC 9V74, so one later run
     refreshed each cell: run 97, on `52fc27a` and an EPYC 7763. Buffa is faster in 6 of the
     README's 16 cells there, and was in 7 in run 86. The three runs of that day ran on three
@@ -836,13 +835,13 @@ ran on Linux x86-64 with Zig 0.16.0.
   copies that request key for key, so a program links one chapulin object.
   - `examples/oidc.zig` runs a client against `services/account.zig`, a generated `Routes`
     behind `oidc.Interceptor`, over h2 and h3. Status answers with no token, since its path is
-    excluded. Whoami is refused with no token, an expired one and one for another audience, each
-    with RFC 6750's challenge, and answers a valid token with its subject, email and role.
+    excluded. Whoami is refused with no token, an expired one, and one for another audience, each
+    with RFC 6750's challenge, and answers a valid token with its subject, email, and role.
     `services/issuer.zig` stands where the provider would be. It changes its key between the
     rounds: the verifier refuses the new key's token, reports its keys stale, takes the new
     JWK Set, and then takes the same token.
   - This is the first program that compiles `oidc.Interceptor` against `rpc.Context`,
-    `rpc.AnyRequest` and `rpc.AnyResponse`. Until now two chapulin objects kept `oidc` and
+    `rpc.AnyRequest`, and `rpc.AnyResponse`. Until now two chapulin objects kept `oidc` and
     `connect_colibri` out of one binary, and the interceptor's tests used views of their own.
   - `tools/package_check.sh` imports `oidc` beside `connect_colibri` in the fetched project,
     and calls `Verifier.init`. `tools/interop_check.sh` reads Status and Whoami's refusals
@@ -862,17 +861,17 @@ ran on Linux x86-64 with Zig 0.16.0.
     encode takes 6.21% fewer instructions, and no other operation moved past 0.1%.
   - Decode, commit `e491ebc`: `decode_into`, which the benchmark takes before its binary
     walk. The judge on `e491ebc`: binary decode+walk takes fewer instructions on medium
-    (41.32%), deep (38.75%), large (33.53%), packed (21.17%) and tree (18.26%). Two counts
+    (41.32%), deep (38.75%), large (33.53%), packed (21.17%), and tree (18.26%). Two counts
     rose past 2%. Medium binary decode took 4.72% more, because the benchmark now calls
     `decode` from fewer places; with the old calls the library counted the same, on an M1.
     Tree's JSON decode+walk took 2.51% more, from the iterator's inline items check.
   - CI's `bench-compare` on `e491ebc` ([run 43441672466](https://github.com/c4milo/connect-zig/actions/runs/43441672466)),
     an EPYC 9V45. Buffa's time over connect-zig's, medium: decode+walk 1.06, from 0.78 in run
     97; decode 1.22; encode 0.74. Decode+walk elsewhere: large 1.18, deep 1.21, tree 0.73,
-    packed 0.64. Buffa still leads binary encode on medium, deep, tree and packed.
+    packed 0.64. Buffa still leads binary encode on medium, deep, tree, and packed.
   - Each fast path, switched off, counted under callgrind in an x86-64 container on the
     owner's Mac, built for x86-64-v2: the flat child, medium binary encode +7.35%; the inline
-    items check, binary decode+walk +86.22% on packed, +26.59% on large, +22.66% on medium
+    items check, binary decode+walk +86.22% on packed, +26.59% on large, +22.66% on medium,
     and +8.35% on tree, with tree's JSON decode+walk 3.18% lower.
   - Tries that lost, each dropped: varints of three to eight octets read and written as one
     word, which took 11% to 15% more cycles to decode on an M1; a copy of short strings with
@@ -892,31 +891,31 @@ ran on Linux x86-64 with Zig 0.16.0.
     8573C, the CPU of `69595b7`'s run: medium binary encode went from 771 to 683 ns, against
     Buffa's 646 ns, so Buffa's time over connect-zig's went from 0.84 to 0.94. It read 1.03 on
     a Xeon 6975P-C in the run before. The judge: binary encode takes fewer instructions on
-    varints (22.52%), packed (15.95%), small (12.69%), strings (9.70%) and medium (7.27%), and
+    varints (22.52%), packed (15.95%), small (12.69%), strings (9.70%), and medium (7.27%), and
     more on large (2.00%) and deep (1.38%). Large's count is the price of the inline writer:
     its packed loop calls no function now, and its walk takes more instructions to set up.
   - Tries that lost on x86-64-v2: the reader's `varint_long` by value, 20% to 44% more
     instructions to decode, since its two-part result came back through memory; and a flat
     child written once behind a one-octet length, 2.8% more on medium.
-  - Varints and the iterator, commits `9e5ce7a`, `b63de14` and `214d579`. A packed record's
+  - Varints and the iterator, commits `9e5ce7a`, `b63de14`, and `214d579`. A packed record's
     varints are read with the position in a local, so no element waits for a stored position.
-    Binary encode writes a varint of three or four octets inline, as samples, counts and ids
+    Binary encode writes a varint of three or four octets inline, as samples, counts, and ids
     are. A field's stored items answer their end with no call.
   - JSON encode, commit `b636a88`. The owner wrote on 2026-11-13 "we also need to win on json
     encode speed over Buffa". The encoder calls each method of stdx's `TextWriter` inline, and
     stdx did not change.
   - The judge on `b63de14`, [run 43604260449](https://github.com/c4milo/connect-zig/actions/runs/43604260449),
     against the baseline before the four commits. Binary encode takes fewer instructions on
-    medium (21.54%), varints (10.24%), large (4.79%), small (3.96%) and packed (2.43%). Binary
-    decode+walk takes fewer on packed (32.86%), medium (13.89%), large (8.14%) and tree
+    medium (21.54%), varints (10.24%), large (4.79%), small (3.96%), and packed (2.43%). Binary
+    decode+walk takes fewer on packed (32.86%), medium (13.89%), large (8.14%), and tree
     (1.35%). JSON encode takes fewer on deep (23.10%), small (20.13%), varints (17.86%), tree
-    (16.47%), strings (15.43%), large (9.68%) and medium (6.00%). The largest rise is 0.95%,
+    (16.47%), strings (15.43%), large (9.68%), and medium (6.00%). The largest rise is 0.95%,
     on deep binary encode. `bench/instructions.txt` holds these counts.
   - The same run's `bench-compare`, on an EPYC 7763, the CPU of run 97. Buffa's time over
     connect-zig's, from run 97 to this run: medium binary encode 0.86 to 1.16, medium
     decode+walk 0.78 to 1.46, and packed decode+walk 0.62 to 1.19. JSON encode: small 0.83 to
     0.87, deep 0.76 to 0.84, and strings 0.88 to 0.92. Buffa still leads JSON encode on those
-    three, on tree (0.47) and on packed (0.96).
+    three, on tree (0.47), and on packed (0.96).
   - Two times rose on x86 while their instructions fell, and an M1 shows neither. Large
     binary encode took 73.2 µs on `b636a88` and 81.5 µs on `b63de14`, on the same CPU, with
     4.79% fewer instructions. Tree's binary decode+walk took 9.6 µs in run 97, before
@@ -974,7 +973,7 @@ ran on Linux x86-64 with Zig 0.16.0.
     binary decode+walk took less time on tree, 55.5% on the EPYC 9V74 and 45.6% on the
     Neoverse-N2, and on large, 27.5% and 15.1%; medium moved less than 5%. On x86-64-v2, the
     change alone takes 21.33% fewer instructions on tree and 3.93% fewer on large. The
-    encoders, the plugin and the conformance server read messages through the pointer; the
+    encoders, the plugin, and the conformance server read messages through the pointer; the
     plugin copies a descriptor where it keeps one. Mutations, 7, each CAUGHT.
   - The judge and the times of both, on `989d740`, [run
     43622491626](https://github.com/c4milo/connect-zig/actions/runs/43622491626). Binary
@@ -989,14 +988,14 @@ ran on Linux x86-64 with Zig 0.16.0.
     owner's Mac, counted both runtimes. JSON encode runs fewer instructions than Buffa on every
     message but tree, so its loss there is in cycles, which callgrind does not show; stdx's
     session measured TextWriter at 4.3 instructions a cycle on an N2. JSON decode ran 13% to
-    32% more instructions than Buffa on small, varints, tree and packed.
+    32% more instructions than Buffa on small, varints, tree, and packed.
   - JSON decode reads the transcoder's binary one level (decision 9, amended). On x86-64-v2 it
-    takes fewer instructions on tree (23.26%), deep (17.07%), large (13.94%) and medium
+    takes fewer instructions on tree (23.26%), deep (17.07%), large (13.94%), and medium
     (8.20%), and on arm64 alike; the largest rise is 0.36%, packed. Tree's JSON decode on arm64
-    now runs 0.91 of Buffa's instructions, from 1.15. Packed, small and varints hold no nested
+    now runs 0.91 of Buffa's instructions, from 1.15. Packed, small, and varints hold no nested
     message and did not move: their cost is in reading numbers, a later step.
   - JSON arrays of numbers transcode packed (decision 9, amended again). The transcoder wrote
-    each element of an array as a record of its own, so the decode read a tag, matched the field
+    each element of an array as a record of its own, so the decode read a tag, matched the field,
     and widened the view once for each element. A field the descriptor packs is now one packed
     record. On x86-64-v2: packed JSON decode takes 17.57% fewer instructions, and 27.57% fewer
     with every field read; medium 7.00% and 10.83%; large 10.02% with every field read. Large's
@@ -1009,12 +1008,12 @@ ran on Linux x86-64 with Zig 0.16.0.
     `bench/instructions.txt` holds these counts. On a Xeon 6975P-C, connect-zig is faster than
     Buffa in each of the README's 16 cells.
   - JSON encode on the N2, with the owner's word, in the lab: stdx main `22f5139`, past stdx's
-    decision 77, makes JSON encode beat Buffa there on small (1.18), deep (1.08) and packed
+    decision 77, makes JSON encode beat Buffa there on small (1.18), deep (1.08), and packed
     (1.13), where connect-zig's pin `89a021c` lost them; strings (0.89) and tree (0.48) still
     trail. It reaches connect-zig when colibri pins it. The numbers went to stdx's session.
   - The judge on `808a25e`, [run
     43642289829](https://github.com/c4milo/connect-zig/actions/runs/43642289829): JSON decode
-    takes fewer instructions on tree (23.07%), deep (17.25%), large (14.92%) and medium
+    takes fewer instructions on tree (23.07%), deep (17.25%), large (14.92%), and medium
     (8.12%), and no count rose past 0.5%. `bench/instructions.txt` holds these counts. Buffa's
     time over connect-zig's for JSON decode, on the Neoverse-N2, from run 119 to this run:
     tree 1.22 to 1.53, deep 1.32 to 1.55, large 1.05 to 1.20, medium 1.51 to 1.61.
@@ -1029,7 +1028,7 @@ ran on Linux x86-64 with Zig 0.16.0.
   - On x86-64-v2 under callgrind, the new stdx alone takes connect-zig's JSON decode 11% to 34%
     fewer instructions (tree 33.78%, deep 30.17%, packed 26.63%) and its JSON encode 3% to 12%
     fewer; no count rises. On the Neoverse-N2, the lab measured JSON encode beating Buffa on
-    small, deep and packed with this stdx.
+    small, deep, and packed with this stdx.
   - connect-zig keeps its own base64 fallback: stdx's `.pad_bits = .drop` costs about 18
     instructions a bytes field on a valid text, and the fallback costs none (owner, 2026-11-14).
   - The JSON encoder opens a `Lazy` child's object with `TextWriter.member_begin_object` (stdx
@@ -1050,7 +1049,7 @@ ran on Linux x86-64 with Zig 0.16.0.
 - **A fetched project serves and calls, on colibri's exported modules** (decision 39). The owner
   chose on 2026-11-14 to prove the package before v0.1.0, and to decide its build API now, not
   at the move to colibri v0.17.0.
-  - `build.zig` exports colibri's `server`, `client`, `http`, `tls` and `colibri` modules, and
+  - `build.zig` exports colibri's `server`, `client`, `http`, `tls`, and `colibri` modules, and
     takes the option `rotor`, which it passes to colibri. A dependent's default stays
     `rotor = false`, so it fetches no Rotor.
   - `tools/package_check.sh` builds the README's steps in a fetched project. It installs the
@@ -1083,16 +1082,16 @@ ran on Linux x86-64 with Zig 0.16.0.
   each example is a Zig project of its own, on a shared harness, and that each owns the schema
   it is about.
   - `examples/harness` holds colibri's in-memory links, `Rounds(App, Router)`, `Call`, `Served`
-    for `zig build serve`, the test identity and chapulin's hook. Its two sides are plain
+    for `zig build serve`, the test identity, and chapulin's hook. Its two sides are plain
     structs, and the route table reaches the server through a type-erased reference, so each
     function scores 15 or less.
   - Eleven projects: quickstart, protobuf_messages, sans_io_call, eliza, streaming,
-    interceptors, errors, github, oidc, std_io and socket_server. `demo.proto` split into the
-    streaming, interceptors and errors schemas. A service is generic over the program's `App`,
+    interceptors, errors, github, oidc, std_io, and socket_server. `demo.proto` split into the
+    streaming, interceptors, and errors schemas. A service is generic over the program's `App`,
     which holds its room in a field named after it, so `socket_server` joins every service
     under one router.
   - Each project's `zig build test` runs its check, and `zig build serve -- [port]` serves its
-    service over TLS on h11, h2 and h3, under the test identity. The owner chose on 2026-11-14
+    service over TLS on h11, h2, and h3, under the test identity. The owner chose on 2026-11-14
     that each example is a program to play with.
   - The root's `zig build examples` runs each project's build as a child, with `--system` on
     the root's `zig-pkg` and the root's cache. A project's own `zig build` fetched 559 MB
@@ -1110,7 +1109,7 @@ ran on Linux x86-64 with Zig 0.16.0.
     program checks each response's status itself.
 
 - **The library's rules on every tree** (step 20, decision 42). `magic-numbers` and
-  `global-state` read `bench/`, `conformance/` and `tools/`, beside `src/`, each `gen/` and each
+  `global-state` read `bench/`, `conformance/`, and `tools/`, beside `src/`, each `gen/`, and each
   example project. Before the change they found 52 and 34 in `bench/`, 4 and 71 in
   `conformance/`, and 32 and 37 in `tools/`; now none.
   - Each program allocates one `State` from `init.arena` before the first call. The
@@ -1125,12 +1124,12 @@ ran on Linux x86-64 with Zig 0.16.0.
 
 - **OpenTelemetry's trace export** (step 21, decision 40). `examples/otlp` serves
   `TraceService/Export` of opentelemetry-proto v1.11.1 and `otlpstore.v1.SpanStore/Received`.
-  Its check exports a checkout trace of three spans over h2 in gRPC, over h11 in Connect and
+  Its check exports a checkout trace of three spans over h2 in gRPC, over h11 in Connect, and
   over h3 in gRPC, and reads every export back each time.
   - `interop/otel` exports spans with OpenTelemetry's Go SDK v1.47.0 and its gRPC exporter, with
     gzip, over TLS under the test CA, through the socket server. Each span comes back equal to
     the one the SDK ended: IDs, parent, name, kind, times, every attribute kind with the slices,
-    events, links and status. `tools/interop_check.sh` runs it.
+    events, links, and status. `tools/interop_check.sh` runs it.
   - The check moved from `tools/interop_languages_check.sh`, as design §8 first said, to
     `tools/interop_check.sh`: the languages check runs the interop server of `tools/`, and the
     receiver is an example, which the socket server serves.
@@ -1141,12 +1140,12 @@ ran on Linux x86-64 with Zig 0.16.0.
     adds to the program's `Tally`, one `State` field, through each call's `*Tally`. The check
     asks for 3 responses a round, each with HTTP 200.
   - Every call that names no context passes `{}`: the examples, the conformance client, the
-    interop client and the README's steps.
+    interop client, and the README's steps.
   - The test of a streamed call reads what its interceptor saw through the call's context, in
     place of two thread-local statics.
 
 - **colibri v0.17.0** (step 24, decision 45). colibri v0.17.0 (`9d17c88a`), with chapulin v0.8.0
-  (`c45f661d`), Rotor `f2890f5` and stdx `22f5139`, the pins colibri names.
+  (`c45f661d`), Rotor `f2890f5`, and stdx `22f5139`, the pins colibri names.
   - The move ran on a branch at each of colibri's sub-step commits, and reported what the API
     left out. colibri took two of the reports before the tag: one stdx pin for colibri and
     connect-zig, since two stdx in one program failed to link, and the kept octets of a body
@@ -1194,9 +1193,9 @@ ran on Linux x86-64 with Zig 0.16.0.
 - **brotli written** (step 26, decision 10 as amended). On colibri v0.17.1 and stdx v0.1.1.
   - `connect.BrotliEncoder` is stdx's encoder at level 1 with WBITS 17. It takes 519 KiB, where
     the gzip encoder takes 293 KiB and the zstd encoder 1.4 MiB. `Encoders.brotli` places it, and
-    `writes`, `compress` and `choose` take br as they take gzip and zstd.
+    `writes`, `compress`, and `choose` take br as they take gzip and zstd.
   - `Encoders` grew from two pointers to three, 24 octets. So `compression.compress`,
-    `compression.choose` and `Encoders.writes` take it as `*const Encoders`, and the server's
+    `compression.choose`, and `Encoders.writes` take it as `*const Encoders`, and the server's
     head passes its options by pointer. By value, a routed call took 5 instructions more in
     Connect and 8 more in gRPC. By pointer it takes 12 and 16 fewer than before the step: small
     Connect 3,934 to 3,922, and small gRPC 4,434 to 4,418, on x86-64-v2 under callgrind. The
@@ -1223,7 +1222,7 @@ ran on Linux x86-64 with Zig 0.16.0.
   - Mutations, 12 of 12 CAUGHT: br written never, always, and when the zstd encoder is placed;
     the window at WBITS 18; level 5; the gzip encoder in br's arm; the export gone; the
     conformance client's refusal of br; and no encoders handed to a POST's choice, to a GET's
-    choice, to a unary reply and to a stream's reply. The GET's was NOT CAUGHT first: no test
+    choice, to a unary reply, and to a stream's reply. The GET's was NOT CAUGHT first: no test
     asked a GET for a compressed answer, and one does now.
 
 - **A message with no member in one call** (a hot-path change, `docs/performance.md`). On stdx
@@ -1232,13 +1231,13 @@ ran on Linux x86-64 with Zig 0.16.0.
     `empty_object` when no field writes a member. An empty `Any` takes the same call. The tree
     benchmark holds 341 messages, and 256 of them write no member.
   - Local judges, under callgrind: tree JSON encode 64,928 to 47,626 instructions on
-    x86-64-v2 (26.65% fewer), and 57,175 to 42,177 on aarch64 (26.23% fewer). Small, strings
+    x86-64-v2 (26.65% fewer), and 57,175 to 42,177 on aarch64 (26.23% fewer). Small, strings,
     and varints JSON encode take 2 more for each message, +0.05% to +0.16%, and large on
     aarch64 2 more for each of its 1000 records, +0.07%. No other count moved.
   - CI's judge on `22b3767`, on x86-64-v3, in
     [run 43982316500](https://github.com/c4milo/connect-zig/actions/runs/43982316500): tree
     JSON encode 64,670 to 47,880 instructions, 25.96% fewer. Small, strings,
-    varints and deep JSON encode took 2 more, large 2,002 more, medium 14 more. The baseline
+    varints, and deep JSON encode took 2 more, large 2,002 more, medium 14 more. The baseline
     now holds these counts, and with them the cost of stdx v0.1.1 below.
   - Mutations, 8 of 9 CAUGHT: the test always true, the test inverted, and each of the five
     kinds of field left out of the test. The one NOT CAUGHT never calls `empty_object`, and
@@ -1301,7 +1300,7 @@ ran on Linux x86-64 with Zig 0.16.0.
 - **Route tables in the routed call** (step 27). On colibri v0.17.3.
   - Each implementation built a router of one route, and connect-go none: its benchmark called
     the handler itself. So the routed call held no routing cost.
-  - The small message's call now runs in tables of 1, 16 and 225 routes: 1, 4 and 15 services,
+  - The small message's call now runs in tables of 1, 16, and 225 routes: 1, 4, and 15 services,
     each of as many methods. The echo method's service holds it and `Filler<j>` methods, and
     each service `bench.v1.Filler<i>` holds `Call<j>` methods. The calls never reach those.
   - colibri finds a route by binary search over each segment's sorted literals, connect-rust by
@@ -1312,13 +1311,13 @@ ran on Linux x86-64 with Zig 0.16.0.
   - A quick local run on an M1 Pro, from 1 to 225 routes: connect-zig's call took 11% to 13%
     more time, connect-rust's 1% more, and connect-go's moved within its noise.
   - The local judge on x86-64-v2, small Connect call: 3,962 instructions with 1 route, 3,988
-    with 16, and 4,203 with 225 (+6.1%); gRPC 4,458, 4,485 and 4,699 (+5.4%). Of the 241 more
+    with 16, and 4,203 with 225 (+6.1%); gRPC 4,458, 4,485, and 4,699 (+5.4%). Of the 241 more
     at 225 routes, about 110 are the binary search's steps, about 13 instructions each, about
     40 a copy that the one-route build left out, and about 30 calls that the compiler no longer
     inlines into the larger router.
   - CI's [run 164](https://github.com/c4milo/connect-zig/actions/runs/44014548420) on `cc20a73`.
     The judge, x86-64-v3: the small Connect call takes 4,224 instructions with 1 route, 4,264
-    with 16 and 4,432 with 225 (+4.9%); gRPC 4,730, 4,770 and 4,937 (+4.4%). The baseline holds
+    with 16, and 4,432 with 225 (+4.9%); gRPC 4,730, 4,770, and 4,937 (+4.4%). The baseline holds
     the new rows. Times, from 1 to 225 routes: connect-zig's call took up to 14% more on the
     EPYC 9V74 and 8% more on the Neoverse-N2, connect-rust's up to 3%, and connect-go's up to 2%.
 - **The full stack** (step 28). On colibri v0.17.3.
@@ -1328,7 +1327,7 @@ ran on Linux x86-64 with Zig 0.16.0.
     620.0 µs, and the Collector 1,275 at 785.0 µs.
   - The check found a copy in colibri's body path whose cost grew with the square of a body's
     pieces (colibri v0.18.1, below).
-- **The production model** (step 29). The 516 connections, the 70/25/5 mix and the 100 ms
+- **The production model** (step 29). The 516 connections, the 70/25/5 mix, and the 100 ms
   limit were chosen on 2026-11-17.
   - A local run on an M1 Pro, in a Linux VM, on colibri's fix `ed40807`: connect-zig held
     712,098 spans a second, at p99 33 ms with its core 99% busy, and the Collector 213,620, at
@@ -1343,8 +1342,8 @@ ran on Linux x86-64 with Zig 0.16.0.
     the README's charts from the job's output.
 - **Servers in Rust** (step 30). CI's
   [run 172](https://github.com/c4milo/connect-zig/actions/runs/44093381647) on `c2c75dd`.
-  - Over TLS, on a Xeon 6975P-C: connect-zig held 854,352 spans a second, the Collector 213,600
-    and Vector 71,200. On a Neoverse-N2: 712,000, 142,400 and 53,400.
+  - Over TLS, on a Xeon 6975P-C: connect-zig held 854,352 spans a second, the Collector 213,600,
+    and Vector 71,200. On a Neoverse-N2: 712,000, 142,400, and 53,400.
   - In cleartext: connect-zig held 854,352 and 712,032, the Collector 213,600 and 142,404, and
     Rotel 284,800 and 213,604.
   - Vector spent 8.99 µs of CPU a span on x86-64 and 13.54 µs on arm64, and grew to 1,471 MiB
@@ -1359,8 +1358,8 @@ ran on Linux x86-64 with Zig 0.16.0.
     and 222,478.
 - **Other Connect libraries** (step 31). CI's
   [run 182](https://github.com/c4milo/connect-zig/actions/runs/44322389021) on `15e6986`.
-  - Over TLS, on a Neoverse-N2: connect-zig held 729,750 spans a second, connect-rust 258,090
-    and connect-go 89,000. On an EPYC 9V74: 622,968, 329,300 and 124,600.
+  - Over TLS, on a Neoverse-N2: connect-zig held 729,750 spans a second, connect-rust 258,090,
+    and connect-go 89,000. On an EPYC 9V74: 622,968, 329,300, and 124,600.
   - connect-rust spent 3.76 µs of CPU a span on arm64 and 3.03 µs on x86-64, and connect-go
     10.30 µs and 7.21 µs, where connect-zig spent 1.37 µs and 1.43 µs. connect-rust grew to 53
     MiB and 55 MiB, and connect-go to 144 MiB and 131 MiB.
@@ -1376,19 +1375,19 @@ ran on Linux x86-64 with Zig 0.16.0.
   - `tools/protovalidate_conformance_check.sh` built the harness from protovalidate's commit
     `4baed765`, the release v1.2.2. With strict messages and strict errors it printed `PASS
     (failed: 0, skipped: 1054, passed: 1818, total: 2872)`. Of the 1,054 listed cases, 796 state
-    a CEL rule, 244 a predefined rule and 14 a `pattern`.
+    a CEL rule, 244 a predefined rule, and 14 a `pattern`.
   - The suites `library/*` are 635 of the CEL cases. They state `string`'s well-known forms as
-    CEL expressions. An executor that called `format_name.zig`, `format_ip.zig` and
+    CEL expressions. An executor that called `format_name.zig`, `format_ip.zig`, and
     `format_uri.zig` in the expressions' place passed all 635. The tree does not keep it.
   - The suite found two faults, now fixed. A map's message values were not read, since an
     entry holds its value as an optional. A timestamp in a rule's message was not written as RFC
     3339 text.
   - Mutations of the plugin, against `zig build test-plugin`: 29 of 29 CAUGHT.
   - Mutations of the library, against `zig build test-protovalidate`: 343. A test caught 336:
-    78 of the walk, the report and the tables, 124 of the rules, and 134 of the formats and
+    78 of the walk, the report, and the tables; 124 of the rules; and 134 of the formats and
     the messages' text. The compiler stopped 4 more: each made a table of the tests' own
     messages one that `rules_error` refuses. 3 are NOT CAUGHT and equivalent: an IPv6 host with
-    no brackets, a userinfo with an "@" and a path with a "?" cannot arrive, because the text
+    no brackets, a userinfo with an "@", and a path with a "?" cannot arrive, because the text
     is split at those characters first.
   - Mutations of the conformance check, 6 of 6 CAUGHT: a validation error answered as success
     failed 754 cases; rules that cannot be checked answered as a run-time error failed 29; a
@@ -1399,7 +1398,7 @@ ran on Linux x86-64 with Zig 0.16.0.
     a map entry's path, equal bounds of a range, a port's and an IPv4 octet's letters and digit
     count, the text after an IPv6 host's bracket, a URI's host and zone, and the fraction and
     leap day of a timestamp's text. Six checks that no input could reach are gone: a hostname's,
-    an email domain's and a Protobuf name's empty text, the end of an IPv4 address inside an
+    an email domain's, and a Protobuf name's empty text, the end of an IPv4 address inside an
     IPv6 one, a prefix's empty length, and a list's reset of its path.
 - **A hook for each request message** (step 33, decision 47). Run on a Xeon at 2.1 GHz, x86-64
   Linux, with buf 1.74.0.
@@ -1437,7 +1436,7 @@ ran on Linux x86-64 with Zig 0.16.0.
 - **CEL, parts a to c** (step 34, decision 47 as amended). Run on a Xeon at 2.1 GHz, x86-64
   Linux.
   - A spike came first: 200 lines that parse an expression at comptime, type it from a
-    message's fields and unfold it, in Zig 0.16. The owner then ruled for the comptime
+    message's fields, and unfold it, in Zig 0.16. The owner then ruled for the comptime
     compiler in the module, in place of functions the plugin writes.
   - `zig build test-protovalidate` printed 148 of 148 tests passed, 65 of them the compiler's,
     in `src/protovalidate/cel/`. `zig build test` passed.
@@ -1456,7 +1455,7 @@ ran on Linux x86-64 with Zig 0.16.0.
     lint-commits` refuses it. A rewrite of a pushed commit needs the owner's word.
 - **CEL, part d** (step 34, decision 47 as amended). Run on a Xeon at 2.1 GHz, x86-64 Linux.
   - The module's side came first, in `e12c39d`: `Rules.Field.predefined`, and the check of
-    each entry's CEL rules, which read the field as `this`, the extension's value as `rule`
+    each entry's CEL rules, which read the field as `this`, the extension's value as `rule`,
     and the rule message as `rules`. Of its 20 mutations a test caught 17 and the compiler
     stopped 3.
   - The plugin's side, in `95ecace`, is `src/protoc_gen/rules_predefined.zig`. It finds each
@@ -1497,7 +1496,7 @@ ran on Linux x86-64 with Zig 0.16.0.
     such a table in a block that raises the quota. One limit stayed: about 1,000 repeated and
     map fields in one message. The record "Repeated types declared once" removes it.
   - `tools/wide` holds one message of 600 fields with rules, and `zig build test-generated`
-    reads it through binary, JSON and `validate`.
+    reads it through binary, JSON, and `validate`.
   - The CEL reader was read against the language definition for the model. Nine things
     differed, and each follows the definition now: a string of three quotes, a bytes literal's
     prefix order, `0X`, a line end in a string of single quotes, the reserved words, a keyword
@@ -1515,7 +1514,7 @@ ran on Linux x86-64 with Zig 0.16.0.
     2822, total: 2872)`. `tools/perf_check.sh` printed no operation past the baseline: the
     small routed Connect call takes 4,177 instructions.
   - Mutations, 64: a test caught 58, and the compiler stopped 6, where the tests' own
-    expressions no longer compiled. The CEL reader took 50 of them, the table 6, the plugin 4
+    expressions no longer compiled. The CEL reader took 50 of them, the table 6, the plugin 4,
     and the protobuf module 4. Three of the first mutants did not compile for a reason of
     their own, and each ran again in a form that compiles.
   - pepegrillo moved to `e94a349`. Its commit linter still holds a subject to 72 columns, so
@@ -1532,7 +1531,7 @@ ran on Linux x86-64 with Zig 0.16.0.
     fast as connect-go's on arm64, where run 256 gave 14.9 to 22.9.
   - Run 266 climbed each server in three rounds on the load that keeps its connections. On arm64,
     connect-zig held 711,570 spans a second over TLS, from 711,570 to 729,800 over the rounds:
-    7.0 times connect-go, 2.7 times connect-rust, 3.3 times the Collector and 8.6 times Vector.
+    7.0 times connect-go, 2.7 times connect-rust, 3.3 times the Collector, and 8.6 times Vector.
     With protovalidate it kept 87%, at 12% more CPU a span.
   - In the step of 60 s at the median rate, every Connect receiver held on arm64, and the
     Collector and Vector did not. On x86-64 Vector and connect-rust with protovalidate-buffa did
@@ -1545,7 +1544,7 @@ ran on Linux x86-64 with Zig 0.16.0.
     354: the route's `reply_bytes` of 4 KiB.
   - On `otlp-sink-compression`, of 256 calls, each uncompressed climb of connect-zig ended when p99
     passed 100 ms, with its core busy, where with 64 calls each ended on a refused call. Over TLS
-    on arm64, connect-zig held 115%, 118% and 102% of its uncompressed rate in gzip, zstd and
+    on arm64, connect-zig held 115%, 118%, and 102% of its uncompressed rate in gzip, zstd, and
     brotli, and spent 7% and 8% less CPU a span in gzip and zstd, and 3% more in brotli.
   - On x86-64, connect-zig's two main climbs passed every step, up to 1,139,200 spans a second,
     the top of the climb. Its rates there are floors.
@@ -1556,9 +1555,9 @@ ran on Linux x86-64 with Zig 0.16.0.
     every span of the load. Over TLS on arm64, connect-zig with protovalidate held 658,600 spans
     a second, 86% of its 765,400. connect-rust with protovalidate-buffa held 242,522, 90%, and
     connect-go with protovalidate-go 58,926, 61%. At the highest rate each pair held, validation
-    cost 11%, 10% and 50% more CPU a span.
+    cost 11%, 10%, and 50% more CPU a span.
   - Step 37: each receiver took every span in every coding, over TLS and in cleartext. Over TLS
-    on arm64, connect-zig held 136%, 137% and 117% of its uncompressed rate in gzip, zstd and
+    on arm64, connect-zig held 136%, 137%, and 117% of its uncompressed rate in gzip, zstd, and
     brotli, and spent 8% and 10% less CPU a span in gzip and zstd, and 3% more in brotli. Each
     uncompressed climb of connect-zig ended on its 64 call slots.
   - Step 38: the sink counted no request past its storage in any part. Its peak memory was 352
@@ -1566,7 +1565,7 @@ ran on Linux x86-64 with Zig 0.16.0.
 - **Ubuntu 26.04** (`fa83b86`, decision 44 as amended on 2026-11-20). CI's
   [run 191](https://github.com/c4milo/connect-zig/actions/runs/44673102412), the first on
   `ubuntu-26.04` and `ubuntu-26.04-arm`. Every job passed. Over TLS on arm64, connect-zig held
-  712,016 spans a second, connect-rust 267,000 and connect-go 89,002: 2.7 and 8.0 times. The
+  712,016 spans a second, connect-rust 267,000, and connect-go 89,002: 2.7 and 8.0 times. The
   first attempt of `bench-compare` on arm64 timed some of connect-zig's cells at twice the lab's
   time, with the same CPU and code; a second attempt matched the lab, and the README takes it.
   valgrind 3.26 counted the routed call's instructions as 3.22 did: 4,177 and 4,430.
@@ -1577,7 +1576,7 @@ ran on Linux x86-64 with Zig 0.16.0.
     image held it. In the OTLP sink, with 64 calls of 1 MiB of decode storage each, that was 155
     MB of `.data.rel.ro`, and the sink's peak memory was 500 MiB in CI's run 248.
   - Every program here that starts a router now calls `init`: the OTLP sink, the interop and
-    conformance servers, the benchmark's routed call, the quickstart, `std_io` and the
+    conformance servers, the benchmark's routed call, the quickstart, `std_io`, and the
     examples' harness.
 - **colibri v0.19.1** (colibri `b785d8eb`). It is v0.19.0 with one fix, colibri's pull request
   [145](https://github.com/c4milo/colibri/pull/145): a socket closes only once its staged
@@ -1597,10 +1596,10 @@ ran on Linux x86-64 with Zig 0.16.0.
   halved each socket's buffers and decision 167 moved each TLS session into a buffer the program
   passes, so the sink's peak fell from 483 MiB to 378 MiB on both machines. The small routed
   Connect call took 4,177 instructions, 1.42% fewer, and 4,430 in 256 routes. Over TLS on arm64,
-  connect-zig held 694,200 spans a second, connect-rust 266,990 and connect-go 97,898: 2.6 and
+  connect-zig held 694,200 spans a second, connect-rust 266,990, and connect-go 97,898: 2.6 and
   7.1 times, where run 182 gave 2.8 and 8.2, within the climb's 1/16.
 - **colibri v0.18.1** (steps 27 to 29, decision 10). colibri v0.18.1 (`0942b20a`) pins the
-  stdx, chapulin and Rotor that v0.17.3 pins, so only colibri moves.
+  stdx, chapulin, and Rotor that v0.17.3 pins, so only colibri moves.
   - v0.18.0's router compiles a table of 256 routes, so the largest route table moves from 225
     routes to 256: 16 services of 16 methods.
   - v0.18.1 fixes the copy that step 28 found. The router copied a body's held octets onto
@@ -1698,7 +1697,7 @@ ran on Linux x86-64 with Zig 0.16.0.
     replay of seed 7 printed `differ on 165`.
 
 - **protovalidate beside the other implementations** (step 34, decision 47). The owner asked for
-  a chart of the popular protovalidate libraries in Go, Zig, Node.js and Rust.
+  a chart of the popular protovalidate libraries in Go, Zig, Node.js, and Rust.
   - `tools/validate_compare_check.sh` runs five, docs/benchmarks.md, "Validation", says how,
     and each gave each of the six messages the same verdict on the first run.
   - On this tree's Xeon at 2.1 GHz, decode with validation: connect-zig took 59 to 932 ns, and
@@ -1720,7 +1719,7 @@ ran on Linux x86-64 with Zig 0.16.0.
   - A profile of `Medium` showed two more costs in string rules. `min_len` and `max_len` counted
     every octet, and the form checks searched one octet a step, since `std.mem.indexOfScalar`
     compares a vector only from 32 octets. A length rule now stops once its count settles it,
-    the form checks search a 64-bit word a step (`octet_search.zig`), and `uuid`, `tuuid` and
+    the form checks search a 64-bit word a step (`octet_search.zig`), and `uuid`, `tuuid`, and
     a hostname's labels read tables. `validate medium valid` fell from 5,112 instructions to
     3,295, and `validate small valid` from 570 to 348. docs/performance.md's table holds what
     the judge reported with each one off. Mutations: 11 more, each `CAUGHT`. A twelfth, of a
@@ -1766,7 +1765,7 @@ ran on Linux x86-64 with Zig 0.16.0.
     there, but about 375 an octet as the text grows, so the module keeps the searcher.
   - `tools/validate_compare_check.sh` on this tree's Xeon: all five gave each message the same
     verdict, `string.pattern` included. Decode with validation of the valid `Medium` took
-    1,112 ns, protovalidate-buffa's 1,193 and protovalidate-go's 12,797. Validation alone took
+    1,112 ns, protovalidate-buffa's 1,193, and protovalidate-go's 12,797. Validation alone took
     847 ns to protovalidate-buffa's 397.
   - Mutations against `zig build test-protovalidate`, 12: each pattern rule's answer inverted,
     its rule taken off the handled list, a bytes value that is not UTF-8 taken, the bytes
@@ -1818,10 +1817,10 @@ ran on Linux x86-64 with Zig 0.16.0.
     file, as in `RepeatedNodeLabelsEntry` and `RepeatedKeyValue`. A message written as a group
     is `RepeatedGroupNote`. A name that the file already gives a type or a service, at any
     depth, or that an earlier repeated type took, gets the next free number: `RepeatedEmbed2`.
-  - `tools/wide` holds a second message, `Lists`, of 1,100 repeated and map fields: a list of
-    int32, of strings and of `Leaf`, and a map, 275 times. With each call written in its field,
+  - `tools/wide` holds a second message, `Lists`, of 1,100 repeated and map fields: 275 times over, a
+    list of int32, a list of strings, a list of `Leaf`, and a map. With each call written in its field,
     the file failed with "evaluation exceeded 1000 backwards branches". With the declarations
-    it compiles, and `zig build test-generated` reads it through binary, JSON and `validate`.
+    it compiles, and `zig build test-generated` reads it through binary, JSON, and `validate`.
   - Mutations against `zig build test-plugin`, 13: a taken name used again, a type declared
     twice, numbers that start at 1, the file's types left out of the taken names, a service
     left out, a nested type taken by its full path, a well-known type looked up in the index,
@@ -1830,11 +1829,11 @@ ran on Linux x86-64 with Zig 0.16.0.
     quoted. Each was `CAUGHT`.
 
 - **`filter` and `map` as lazy lists** (decision 47, amended 2026-11-22). `filter(x, p)`,
-  `map(x, t)` and `map(x, p, t)` take any list or map, and give a list that computes each
+  `map(x, t)`, and `map(x, p, t)` take any list or map, and give a list that computes each
   element as it is read: `cel_lazy_list.zig`. The list holds no element, so it needs no room.
-  `size`, `in`, an index and the macros read it as any other list.
-  - The differential check generates `filter` and `map` over repeated fields, a map and a
-    literal, under `size`, an index, `in` and the macros. Seeds 11 to 14, 21 to 28, 31 and 32
+  `size`, `in`, an index, and the macros read it as any other list.
+  - The differential check generates `filter` and `map` over repeated fields, a map, and a
+    literal, under `size`, an index, `in`, and the macros. Seeds 11 to 14, 21 to 28, 31, and 32
     agreed with protovalidate-go on each of their 112,000 verdicts.
   - Mutations against `zig build test-protovalidate`, 7: a predicate that leaves no element
     out, a predicate that fails and leaves its element out, a map key read once for each
@@ -1851,26 +1850,26 @@ ran on Linux x86-64 with Zig 0.16.0.
     int keys that takes a selection, and a selection that reads another key. Each was `CAUGHT`.
 
 - **Text and lists an expression writes** (decision 47, amended 2026-11-22). `+` joins two
-  strings, two bytes values or two lists, and `string` writes an int, a uint, a double or a
+  strings, two bytes values, or two lists, and `string` writes an int, a uint, a double, or a
   bool (CEL language definition, "Arithmetic Operators" and "Types and Conversions"):
   `cel_text.zig`. A string and a bytes value are written into the room that `format` writes
   into, the report's free storage. A
   `+` whose left side is the last text written writes its right side after it, so `a + b + c`
   writes each part once. A list is joined as it is read, and two list literals join into one.
   - A part whose value holds no text, such as a comparison or a `size`, gives back the text it
-    wrote once its value is known. A macro, `size`, `in` and an index give back each element's
+    wrote once its value is known. A macro, `size`, `in`, and an index give back each element's
     text once they are done with it, and `filter` each element it leaves out. A list cannot do
     that itself: `format` writes between two reads of it. So a rule over a long list writes
     only as much text as one element takes.
   - The checker finds whether a rule writes text from its tree, where it looked for the word
     `format` in its text before.
-  - The differential check writes `+` of strings, bytes and lists, and `string` of each type.
+  - The differential check writes `+` of strings, bytes, and lists, and `string` of each type.
     Seeds 51 to 62 agreed with protovalidate-go on each of their 96,000 verdicts, but one
     verdict of the smallest int's `% -1`, which the next commit fixes. A schema of 108 chosen
-    values of `string` of a double, an int, a uint and a bool agreed too, `+Inf` and `1e+06`
+    values of `string` of a double, an int, a uint, and a bool agreed too, `+Inf` and `1e+06`
     among them.
   - Mutations against `zig build test-protovalidate`, 14: the last text copied again, no text
-    freed, a part that holds no text keeping what it wrote, `all`, an index and `filter`
+    freed, a part that holds no text keeping what it wrote, `all`, an index, and `filter`
     keeping each element's text, a double of 1e6 in fixed form, an exponent of one digit,
     infinity without its sign, a string joined with bytes, lists of two element types joined,
     a joined list without its right side, a `+` not seen to write, and a uint written with a
@@ -1887,11 +1886,11 @@ ran on Linux x86-64 with Zig 0.16.0.
     branch quota for one literal. The typing's own files raise none, so the compiler keeps
     their answers (docs/performance.md, "The compiler's time").
   - Three schemas of chosen values compared the module with protovalidate-go: 3,072 verdicts
-    of texts, zones and durations, 30 of zones and 7 of durations at the int64 range. They
+    of texts, zones, and durations; 30 of zones; and 7 of durations at the int64 range. They
     found three differences: `getMilliseconds` of a duration, which now follows cel-go; a zone
     of minutes past 59, which cel-go refuses and now the module does too; and `string` of a
     timestamp read with an offset, which follows the definition (docs/specs/README.md). The
-    differential check writes timestamps, durations, arithmetic and the `get` functions, and
+    differential check writes timestamps, durations, arithmetic, and the `get` functions, and
     seeds 71 to 86, with 219 such rules, agreed on each of their 128,000 verdicts.
   - Mutations against `zig build test-protovalidate`, 21: every fourth century year a leap
     year, January as month 13, a month of 31 days, a timestamp outside the range read, a
@@ -1948,9 +1947,9 @@ ran on Linux x86-64 with Zig 0.16.0.
     refused 0 wrong 0 skipped 688`, and `tools/cel_differential_check.sh 1 2 3` agreed on each
     of its 24,000 verdicts.
   - Mutations against `zig build test-protovalidate`, 9: a searcher made ready once whatever
-    the features, made ready with no feature, never marked ready, found by its slice and not
-    its octets, `string.pattern`, `bytes.pattern` and `matches` each with no feature, the
-    interceptor that ignores the App's features, and an App's features of any type. Each was
+    the features; made ready with no feature; never marked ready; found by its slice and not
+    its octets; `string.pattern`, `bytes.pattern`, and `matches` each with no feature; the
+    interceptor that ignores the App's features; and an App's features of any type. Each was
     `CAUGHT`.
 
 - **cel-spec's conformance suite** (decision 47, amended 2026-11-22).
@@ -1972,7 +1971,7 @@ ran on Linux x86-64 with Zig 0.16.0.
     no bool as false, a uint index past the list wrapped, a double index with a fraction read,
     a uint index taken without `dyn`, `%s` of a type refused, `%%` written as nothing, and an
     undeclared function compiled behind `dyn`. Each was `CAUGHT`. Against the check: a line of
-    `known.txt` that names no test, a line taken away, a value changed and a value made a
+    `known.txt` that names no test, a line taken away, a value changed, and a value made a
     failure each made `compare.py` exit 1.
 
 - **A map's entry in a macro** (decision 47). A macro over a map whose
@@ -2021,8 +2020,8 @@ ran on Linux x86-64 with Zig 0.16.0.
 - **Map literals** (decision 47). The grammar reads `{k: v, ...}` ("'{' [MapInits] [','] '}'",
   CEL language definition, "Syntax"), and the Lean model reads it too: its vector file holds
   6,671 expressions, 16 of them new texts for the map's rules. A map literal is a
-  `MapLiteral(K, V, n)` (`cel_map_literal.zig`): its keys are of one type, an int, a uint, a
-  bool or a string ("Aggregate Values"), and its values of one type. It computes each key and
+  `MapLiteral(K, V, n)` (`cel_map_literal.zig`): its keys are all of one type, and its values
+  are all of one type. A key is an int, a uint, a bool, or a string ("Aggregate Values"). It computes each key and
   each value in the order of the text, and fails when two keys are equal. `==` compares two
   maps, a map field's too, key by key, and reads a message map's repeated key at its last
   entry. `{}` holds `NoElement` keys and values.
@@ -2055,9 +2054,9 @@ ran on Linux x86-64 with Zig 0.16.0.
 
 - **Stored lists read inline** (decision 37). In the valid `Rules`, the six rules together took
   about 190 instructions more than the sum of each alone. With all six in one function, the
-  compiler stopped inlining a stored list's `Iterator.next`, `count` and `at`, and made each a
+  compiler stopped inlining a stored list's `Iterator.next`, `count`, and `at`, and made each a
   call. Each now reads a stored list inline and a view in a call of its own: the fast path
-  first, as docs/performance.md asks. `<`, `<=`, `>` and `>=` of two ints, or of two uints, now
+  first, as docs/performance.md asks. `<`, `<=`, `>`, and `>=` of two ints, or of two uints, now
   compare the two values, where they made a `?std.math.Order` of them first.
   - `tools/perf_check.sh`: validate rules valid took 722 instructions, where it took 1,169,
     and rules invalid 872, where it took 1,118. Decode and validate rules valid took 2,441,
@@ -2073,7 +2072,7 @@ ran on Linux x86-64 with Zig 0.16.0.
 
 - **Unicode in a pattern** (decision 47). The `stdx_regex` pin, and the validate example's
   stdx, moved from `d925231` to `44615ef`. stdx's `regex` reads Unicode 17.0.0's properties,
-  `\pL`, `\p{Greek}`, `\P{Lu}` and `\p{^Lu}`, with Go's loose names, and folds `(?i)` by
+  `\pL`, `\p{Greek}`, `\P{Lu}`, and `\p{^Lu}`, with Go's loose names, and folds `(?i)` by
   Unicode's simple case folding, as Go's regexp does. A `\p` that names nothing is
   `InvalidProperty`, which the test of a refused pattern now names. At `d925231` the new tests
   stopped the build with `UnsupportedProperty` and `UnsupportedCaseFolding`.
@@ -2184,14 +2183,14 @@ ran on Linux x86-64 with Zig 0.16.0.
 - For `protovalidate`, the valid `Rules` of the validation benchmark, validated alone on x86-64,
   where protovalidate-buffa took 31.2 ns to connect-zig's 41.7 in run 242. On arm64 connect-zig
   took 38.7 ns to its 43.4. "Stored lists read inline", "A repeated key searched for after its
-  result" and "The right side of `&&` and `||` unwrapped" took the count from 1,169
+  result", and "The right side of `&&` and `||` unwrapped" took the count from 1,169
   instructions to 561. The last one took the most time: a load that waited for two stores, which
   no instruction count shows. Four changes moved the count by 3 instructions or none, or saved
   no time: `eval_side` inline and `eval_as` inline, which LLVM inlines already, the time copied
   only into a rule whose text names `now`, and no step for a macro inside no other macro, which
   counted 539 and timed within the spread of the tree's rounds.
 - For `protovalidate`, `filter` and `map` over a map that bind each entry's value, as `all`,
-  `exists` and `exists_one` do ("A map's entry in a macro"). Their expressions still search
+  `exists`, and `exists_one` do ("A map's entry in a macro"). Their expressions still search
   the map for each key.
 - For `protovalidate`, the parts of CEL that cel-spec's conformance suite tests and the module
   does not build: a message literal, an index the build does not know of a list or a map
