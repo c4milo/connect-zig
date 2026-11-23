@@ -267,15 +267,17 @@ confirm a test fails. Report `CAUGHT` or `NOT CAUGHT` per mutation in the commit
   openssl.
 - Guide: `zig build guide` installs pepegrillo's performance method and API guide to
   `zig-out/docs`, at the commit `build.zig.zon` pins.
-- Full stack: `tools/fullstack_check.sh [peak] [production] [compression] [compression-cleartext]`
-  loads connect-zig's OTLP sink, `zig
-  build otlp-sink`, and OpenTelemetry's Collector v0.165.0 with the same OTLP exports over gRPC,
+- Full stack: `tools/fullstack_check.sh [peak] [production] [production-cleartext] [compression]
+  [compression-cleartext]` loads connect-zig's OTLP sink, `zig build otlp-sink`, and
+  OpenTelemetry's Collector v0.165.0 with the same OTLP exports over gRPC,
   TLS 1.3 and h2, each server on one core (decision 44). `peak` runs h2load as fast as each server
   answers. `production` runs `tools/fullstack/load`, which the check builds with cargo unless
   `FULLSTACK_LOAD` names it, as one gateway core of 33,000 servers takes traffic: 516
   connections that stay open across the climb and a mix of gzip exports, at rates that climb
-  until p99 passes 100 ms. Vector v0.62.0, in Rust, joins both over TLS, and Rotel v0.2.7, in
-  Rust with no receiver TLS, joins a second climb in cleartext. Receivers on connect-go and
+  until p99 passes 100 ms. Each server climbs in three rounds, each on a new process, and the
+  reports give the median and the range. Vector v0.62.0, in Rust, joins both over TLS, and Rotel
+  v0.2.7, in Rust with no receiver TLS, joins the climbs in cleartext of `production-cleartext`,
+  which `tools/ci.sh` runs as the check `fullstack-cleartext`. Receivers on connect-go and
   connect-rust, `tools/fullstack/connect-go` and `tools/fullstack/connect-rust`, join both over
   TLS (decision 46); the check builds them into the cache, unless `CONNECT_GO` and
   `CONNECT_RUST` name built ones. The three Connect receivers also join a second time, checking
@@ -285,7 +287,7 @@ confirm a test fails. Report `CAUGHT` or `NOT CAUGHT` per mutation in the commit
   cleartext h2, with exports in no coding and in gzip, zstd and brotli, which `zig build
   otlp-compress` writes with stdx's encoders; `tools/ci.sh` runs each as a check of its own,
   `fullstack-compression` and `fullstack-compression-cleartext`, and `tools/compression_chart.py`
-  draws their charts. `zig build otlp-validate-cost` times validation in the sink by the size of
+  draws the chart over TLS. `zig build otlp-validate-cost` times validation in the sink by the size of
   its route's storage (decision 37). It fails when a server answered an export wrongly or did not
   take every span, or when a validating one took an export that breaks a rule. It runs on Linux and needs
   h2load, buf, python3, curl, go and cargo.
@@ -295,10 +297,11 @@ confirm a test fails. Report `CAUGHT` or `NOT CAUGHT` per mutation in the commit
 - CI: `tools/ci.sh` runs every check and writes a report; `--only <check>` runs one and `--list`
   names them. `.github/workflows/main.yml` runs each check of `--list` as a job of its own on each
   push and pull request. A new check joins `tools/ci.sh`, never the workflow file. `test`,
-  `bench-compare`, the three `fullstack` checks and `validate-compare` run a second time on an
-  arm64 runner: `test` because an aarch64 Linux link can fail where x86-64's passes, the next four
-  for the arm64 charts, and `validate-compare` for its hardware counters, which GitHub's x86-64
-  runners do not expose. A `fullstack` check has 90 minutes, and every other check 60.
+  `bench-compare`, `fullstack`, `fullstack-compression` and `validate-compare` run a second time
+  on an arm64 runner: `test` because an aarch64 Linux link can fail where x86-64's passes, the
+  next three for the arm64 charts, and `validate-compare` for its hardware counters, which
+  GitHub's x86-64 runners do not expose. A `fullstack` check has 90 minutes, and every other
+  check 60.
   The `fullstack` checks and `bench-compare` draw the charts of `docs/benchmarks.md` and the README into
   `ci-charts/`, which CI keeps with the run as `charts-<check>-<arch>`. To update them, copy a
   chosen run's charts to `docs/images` (decision 44).

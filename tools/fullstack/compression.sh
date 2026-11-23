@@ -10,34 +10,13 @@
 #
 # Each receiver runs both loads with each coding: the peak of tools/fullstack/peak.sh, on the
 # production model's exports of 16 and 512 spans, and the climb of tools/fullstack/production.sh,
-# on its mix. Each round of the peak rotates the order of the codings and of the receivers, and
-# each receiver climbs its codings in an order of its own, so a runner that drifts over the job
-# does not always slow the same coding. Each run checks every span, as theirs do.
+# on its mix, in rounds. Each round of the peak rotates the order of the codings and of the
+# receivers, and each round of the climb gives each receiver its codings in an order of its own,
+# so a runner that drifts over the job does not always slow the same coding. Each run checks
+# every span, as theirs do.
 
 compression_servers="connect-zig connect-go connect-rust"
 compression_codings="identity gzip zstd br"
-
-# The words after the first, rotated left by the first: `rotate 1 a b c` prints `b c a`.
-rotate() {
-    by="$1"
-    shift
-    by=$((by % $#))
-    front="" back=""
-    index=0
-    for word in "$@"; do
-        if [ "${index}" -lt "${by}" ]; then front="${front} ${word}"; else back="${back} ${word}"; fi
-        index=$((index + 1))
-    done
-    echo ${back} ${front}
-}
-
-# The word after the first at the place the first names, from 0: `word_at 1 a b c` prints `b`.
-word_at() {
-    place="$1"
-    shift
-    shift "${place}"
-    echo "$1"
-}
 
 # Writes each class's variants of its export in each coding, and a line of the first variant's
 # octets in each to `compression-octets`: the spans, the coding, the message's octets and the
@@ -82,18 +61,23 @@ compression_peak() {
     peak_export=export peak_tag="" peak_encoding=""
 }
 
-# Each receiver's climb in each coding. At each turn every receiver climbs once, and the n-th
-# receiver climbs its codings rotated by n.
+# Each receiver's climbs in each coding, `production_rounds` rounds of each. At each turn every
+# receiver climbs once, and in round r the n-th receiver climbs its codings rotated by n + r - 1.
+# A receiver's first climb steps up from the lowest rate, and its others search near the rate an
+# earlier one held (tools/fullstack/production.sh, production_search).
 compression_climbs() {
     for coding in ${compression_codings}; do : >"${work}/compression-climb-${coding}"; done
+    rm -f "${work}"/held-*
     count="$(echo ${compression_codings} | wc -w)"
-    for turn in $(seq 0 $((count - 1))); do
-        index=0
-        for server in ${compression_servers}; do
-            coding="$(word_at "${turn}" $(rotate "${index}" ${compression_codings}))"
-            production_tag="-${coding}" production_encoding="$(encoding_of "${coding}")"
-            production_climb "${server}" >>"${work}/compression-climb-${coding}" || status=1
-            index=$((index + 1))
+    for round in $(seq 1 "${production_rounds}"); do
+        for turn in $(seq 0 $((count - 1))); do
+            index=0
+            for server in ${compression_servers}; do
+                coding="$(word_at "${turn}" $(rotate $((index + round - 1)) ${compression_codings}))"
+                production_tag="-${coding}" production_encoding="$(encoding_of "${coding}")"
+                production_climb "${server}" "${round}" >>"${work}/compression-climb-${coding}" || status=1
+                index=$((index + 1))
+            done
         done
     done
     production_tag="" production_encoding=gzip
@@ -112,8 +96,8 @@ compression_part() {
     python3 tools/fullstack/compression_report.py "${work}" "${transport}" "$(getconf CLK_TCK)" \
         "$("${h2load}" --version | head -1)" "${load_text}" \
         "${connect_go_text}" "${connect_rust_text}" "${commit}" "${placement}" "${peak_rounds}" \
-        "${step_seconds}" "${production_variants}" "${p99_limit_ms}" "${tls_suite}" \
-        "${compression_codings}" ${production_classes}
+        "${step_seconds}" "${production_variants}" "${p99_limit_ms}" "${production_rounds}" \
+        "${tls_suite}" "${compression_codings}" ${production_classes}
     echo
     sink="${plain_sink}"
     transport=tls

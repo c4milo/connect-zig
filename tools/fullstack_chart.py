@@ -84,6 +84,10 @@ for line in open(log_path):
         # floor.
         floor = "resolution" in row and not row["resolution"]
         held[cells[0]] = {"spans": number(row["spans/s held"]), "p99": number(row["p99 ms"]), "gap": gap, "floor": floor}
+        # The least and the greatest rate the rounds held. An older report of one climb gives none.
+        if row.get("range"):
+            low, high = row["range"].split("–")
+            held[cells[0]]["low"], held[cells[0]]["high"] = number(low), number(high)
     elif columns and re.fullmatch(r"[0-9.]+", cells[0]):
         row = {"sent": number(cells[1])}
         for name, index in columns.items():
@@ -134,13 +138,19 @@ subtitle = [
     f"Each server holds 516 connections {over}, as one core of a 64-core gateway for 33,000 servers, and",
     f"takes gzip OTLP exports of 16, 128 and 512 spans. The rate climbs until p99 passes {limit_ms} ms or a call is refused.",
 ]
-whiskers = any(item["gap"] is not None for item in held.values())
+ranges = any("low" in item for item in held.values())
+whiskers = ranges or any(item["gap"] is not None for item in held.values())
+# What a whisker spans: the rates the rounds held, or, in a report of one climb, the gap to the
+# step that failed.
+whisker_text = ("Each bar is the median of the rounds, and its whisker spans the rates they held." if ranges else
+                "A whisker reaches the step that failed, so the rate a core holds lies inside it.")
 if validate:
     subtitle.append("Each share is a receiver's spans a second with protovalidate over its own without. A dashed line is a")
-    subtitle.append("receiver that validates." + (" A whisker reaches the step that failed, so the rate a core holds lies inside it."
-                                                   if whiskers else ""))
+    subtitle.append("receiver that validates." + (f" {whisker_text}" if whiskers else ""))
 elif whiskers:
-    subtitle.append("A whisker reaches the step that failed, so the rate a core holds lies inside it.")
+    subtitle.append(whisker_text)
+if ranges:
+    subtitle.append("The right panel gives each server's first round, which climbs from the lowest rate.")
 sub_line_h = 18
 legend_y = 56 + (len(subtitle) + 1) * sub_line_h + 2
 bar_h, bar_gap = 20, 22
@@ -232,7 +242,7 @@ for row, entries in enumerate(legend_rows):
         a(f'<text class="legend" x="{x + 18}" y="{y}">{label}</text>')
 
 a(f'<text class="panel" x="{pad_l}" y="{top - 14}">Spans a second one core holds</text>')
-spans_high = max(item["spans"] for item in held.values())
+spans_high = max(item.get("high", item["spans"]) for item in held.values())
 for index, name in enumerate(servers):
     fill = looks[name][1]
     y = top + 12 + index * (bar_h + bar_gap)
@@ -241,9 +251,16 @@ for index, name in enumerate(servers):
     a(f'<text class="row" x="{bar_left - 10}" y="{y + bar_h / 2 + 4:.1f}" text-anchor="end">{name}</text>')
     a(f'<path d="M{bar_left},{y} h{width - radius:.1f} a{radius},{radius} 0 0 1 {radius},{radius} v{bar_h - 2 * radius} '
       f'a{radius},{radius} 0 0 1 {-radius},{radius} h{-(width - radius):.1f} z" fill="var({fill})"{edge(fill)}/>')
-    if held[name]["gap"]:
+    middle = y + bar_h / 2
+    if "low" in held[name]:
+        # The range of the rounds, with a cap at each end.
+        start = bar_left + held[name]["low"] / spans_high * bar_w
+        end = bar_left + held[name]["high"] / spans_high * bar_w
+        a(f'<line x1="{start:.1f}" y1="{middle}" x2="{end:.1f}" y2="{middle}" stroke="var(--ink)" stroke-width="1.5"/>')
+        for x in (start, end):
+            a(f'<line x1="{x:.1f}" y1="{middle - 4}" x2="{x:.1f}" y2="{middle + 4}" stroke="var(--ink)" stroke-width="1.5"/>')
+    elif held[name]["gap"]:
         end = bar_left + width * (1 + held[name]["gap"])
-        middle = y + bar_h / 2
         a(f'<line x1="{bar_left + width:.1f}" y1="{middle}" x2="{end:.1f}" y2="{middle}" stroke="var(--ink)" stroke-width="1.5"/>')
         a(f'<line x1="{end:.1f}" y1="{middle - 4}" x2="{end:.1f}" y2="{middle + 4}" stroke="var(--ink)" stroke-width="1.5"/>')
     ratio = "" if name == "connect-zig" else f", connect-zig {bound('connect-zig', name)[0]}{held['connect-zig']['spans'] / held[name]['spans']:.1f}×"

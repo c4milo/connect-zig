@@ -4,11 +4,17 @@ A climb's results hold a line for each step of each server: "step", the transpor
 the exports a connection a second, the spans of the calls answered 200, the calls a second and
 spans a second, p50 and p99 in milliseconds, the calls refused, the verdict, the share of the
 load's cores that was busy, -1 with no core pinned, the server's CPU ticks over the step, the
-step's wall time in milliseconds, and the connections the load opened again before the step
-because the server had closed them. A line "memory" gives the transport, the server and its peak
-memory in KiB, and a line "suite" the transport, the server and the TLS 1.3 suite its connections
-ran.
+step's wall time in milliseconds, the connections the load opened again before the step because
+the server had closed them, and the round. A line "memory" gives the transport, the server and
+its peak memory in KiB, and a line "suite" the transport, the server and the TLS 1.3 suite its
+connections ran.
+
+Each server runs in rounds. The first climbs from the lowest rate, and each later one searches
+near the rate an earlier one held, so only the first round's steps fall on the same rates for
+every server.
 """
+import statistics
+
 microseconds = 1_000_000
 milliseconds = 1000
 kib = 1024
@@ -26,15 +32,15 @@ def read(path, transport, ticks, seconds):
         if server not in servers:
             servers.append(server)
         if fields[0] == "memory":
-            memory[server] = int(fields[3]) / kib
+            memory[server] = max(memory.get(server, 0), int(fields[3]) / kib)
             continue
         if fields[0] != "step":
             continue
-        rate, taken, calls, spans, p50, p99, refused, verdict, load, cpu, wall_ms, reopened = fields[3:15]
+        rate, taken, calls, spans, p50, p99, refused, verdict, load, cpu, wall_ms, reopened, round_number = fields[3:16]
         steps.setdefault(server, []).append({
             "rate": float(rate), "taken": int(taken), "calls": float(calls), "spans": float(spans),
             "p50": float(p50), "p99": float(p99), "refused": int(refused), "verdict": verdict,
-            "load": float(load), "reopened": int(reopened),
+            "load": float(load), "reopened": int(reopened), "round": int(round_number),
             # The share of a core over the step's measured wall time, which passes its nominal
             # seconds by the load's start and the calls still in flight at its end.
             "busy": int(cpu) / ticks / max(int(wall_ms) / milliseconds, seconds),
@@ -68,6 +74,50 @@ def held(steps):
     if above["verdict"] == "load":
         return best, None, "load"
     return best, above, above["verdict"]
+
+
+def first_round(steps):
+    """The first round's steps: the climb from the lowest rate, whose rates every server shares."""
+    return [step for step in steps if step["round"] == 1]
+
+
+def rounds(steps):
+    """Each round's result by `held`, by round: the step held, the step above it that failed,
+    and its verdict."""
+    numbers = sorted({step["round"] for step in steps})
+    return {number: held([step for step in steps if step["round"] == number]) for number in numbers}
+
+
+def summary(steps):
+    """The rounds of a server, as the reports give them: the round whose rate held is the median,
+    lower of the two middle ones for an even count, by `held`, with the least and the greatest
+    spans a second a round held, and the spans a second of each round. The interval from the
+    lowest step held to the highest step that failed above one, or no bound when a round failed
+    none, holds the rate the core holds in every round. None, with the first round's verdict,
+    when no round held a step."""
+    by_round = rounds(steps)
+    results = {number: result for number, result in by_round.items() if result[0] is not None}
+    if not results:
+        return None, next(iter(by_round.values()))[2] if by_round else "no step"
+    spans = {number: result[0]["spans"] for number, result in results.items()}
+    middle = statistics.median_low(spans.values())
+    best, above, verdict = next(result for result in results.values() if result[0]["spans"] == middle)
+    tops = [failed["rate"] if failed else float("inf") for _, failed, _ in results.values()]
+    return {"best": best, "above": above, "verdict": verdict, "low": min(spans.values()),
+            "high": max(spans.values()), "spans": spans,
+            "bottom": min(result[0]["rate"] for result in results.values()), "top": max(tops)}, verdict
+
+
+def round_ratios(top, bottom):
+    """The ratio of two servers' spans a second held in each round both held a step. Each round
+    runs every server once, near in time, so a ratio of one round leaves out a drift of the
+    machine between rounds."""
+    return [top["spans"][number] / bottom["spans"][number] for number in top["spans"] if number in bottom["spans"]]
+
+
+def overlap(first, second):
+    """Whether two servers' summaries cannot be told apart: their intervals of rates overlap."""
+    return first["bottom"] < second["top"] and second["bottom"] < first["top"]
 
 
 def bound(top_above, bottom_above):

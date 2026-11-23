@@ -3,7 +3,7 @@
 
     tools/fullstack/compression_report.py <work> <transport> <ticks> <h2load> <load> <connect-go>
                                           <connect-rust> <commit> <placement> <rounds> <seconds>
-                                          <variants> <limit_ms> <suite> <codings>
+                                          <variants> <limit_ms> <rounds> <suite> <codings>
                                           <spans:connections>...
 
 <work> holds, for each coding of <codings>, a space-separated list:
@@ -18,10 +18,11 @@
 compression-octets holds a line for each class's first variant of its export in each coding: the
 spans, the coding, the message's octets, and the octets sent. <ticks> is the ticks of a second of CPU time.
 
-Each receiver's codings compare with the same receiver uncompressed. The climb compares the rate
-each held, with the climb's resolution, and the CPU a span at the highest rate all four held: a
-span costs less CPU as the rate rises. The peak compares the median of the rounds, with their
-spread.
+Each receiver's codings compare with the same receiver uncompressed. The climb runs in rounds, and
+compares the rate each coding held with the rate uncompressed held in the same round: the median
+share of the rounds, with their range. It also compares the CPU a span at the highest rate all
+four first rounds held: a span costs less CPU as the rate rises. The peak compares the median of
+its rounds, with their spread.
 """
 import os
 import statistics
@@ -31,10 +32,10 @@ import climb
 from machine import machine
 
 (work, transport, ticks, h2load, load_text, connect_go, connect_rust, commit, placement, rounds, seconds,
- variants, limit_ms, suite, codings) = sys.argv[1:16]
-ticks, seconds, variants, limit_ms = int(ticks), float(seconds), int(variants), float(limit_ms)
+ variants, limit_ms, climb_rounds, suite, codings) = sys.argv[1:17]
+ticks, seconds, variants, limit_ms, climb_rounds = int(ticks), float(seconds), int(variants), float(limit_ms), int(climb_rounds)
 codings = codings.split()
-classes = [tuple(int(part) for part in item.split(":")) for item in sys.argv[16:]]
+classes = [tuple(int(part) for part in item.split(":")) for item in sys.argv[17:]]
 servers = ["connect-zig", "connect-go", "connect-rust"]
 coding_names = {"identity": "uncompressed", "gzip": "gzip", "zstd": "zstd", "br": "brotli"}
 coded = codings[1:]
@@ -77,20 +78,40 @@ climbs = {coding: climb.read(os.path.join(work, f"compression-climb-{coding}"), 
           for coding in codings}
 
 
+def coding_shares(server, coding, held):
+    """A coding's spans a second as a share of the receiver's uncompressed rate, in each round
+    both held a step: each round climbs every coding once, near in time. The median and the
+    range, or None."""
+    plain = held.get((server, "identity"))
+    if plain is None or (server, coding) not in held:
+        return None
+    ratios = climb.round_ratios(held[(server, coding)], plain)
+    return (statistics.median(ratios), min(ratios), max(ratios)) if ratios else None
+
+
 def write_climb():
-    print("| server | coding | spans/s held | resolution | p99 ms | the next step |")
-    print("|---|---|--:|--:|--:|---|")
+    print("| server | coding | spans/s held | range | share | share range | resolution | p99 ms | the next step |")
+    print("|---|---|--:|--:|--:|--:|--:|--:|---|")
     held = {}
     for server in servers:
         for coding in codings:
-            step, above, verdict = climb.held(climbs[coding].get(server, []))
-            if step is None:
-                print(f"| {server} | {coding_names[coding]} | no step | | | {ended_by.get(verdict, verdict)} |")
+            result, verdict = climb.summary(climbs[coding].get(server, []))
+            if result is not None:
+                held[(server, coding)] = result
+    for server in servers:
+        for coding in codings:
+            if (server, coding) not in held:
+                verdict = climb.summary(climbs[coding].get(server, []))[1]
+                print(f"| {server} | {coding_names[coding]} | no step | | | | | | {ended_by.get(verdict, verdict)} |")
                 continue
-            held[(server, coding)] = (step, above)
-            gap = climb.resolution(step, above)
-            print(f"| {server} | {coding_names[coding]} | {step['spans']:,.0f} | "
-                  f"{'' if gap is None else f'+{gap * percent:.1f}%'} | {step['p99']:.2f} | "
+            result = held[(server, coding)]
+            step, verdict = result["best"], result["verdict"]
+            gap = climb.resolution(step, result["above"])
+            shares = coding_shares(server, coding, held)
+            share = "" if shares is None else f"{shares[0] * percent:.0f}%"
+            share_range = "" if shares is None or coding == "identity" else f"{shares[1] * percent:.0f}–{shares[2] * percent:.0f}%"
+            print(f"| {server} | {coding_names[coding]} | {step['spans']:,.0f} | {result['low']:,.0f}–{result['high']:,.0f} | "
+                  f"{share} | {share_range} | {'' if gap is None else f'+{gap * percent:.1f}%'} | {step['p99']:.2f} | "
                   f"{ended_by.get(verdict, verdict)} |")
     print()
     for server in servers:
@@ -99,28 +120,31 @@ def write_climb():
 
 
 def write_climb_lines(server, held):
-    """Each coding's rate as a share of the receiver's uncompressed rate, or that the climb cannot
-    tell the two apart, then each coding's CPU a span at the highest rate all held."""
+    """Each coding's rate as a share of the receiver's uncompressed rate, or that the rounds cannot
+    tell the two apart, then each coding's CPU a span at the highest rate every first round
+    held."""
     plain = held.get((server, "identity"))
     if plain is None:
         return
     for coding in coded:
-        if (server, coding) not in held:
+        shares = coding_shares(server, coding, held)
+        if shares is None:
             continue
-        step, above = held[(server, coding)]
-        share = step["spans"] / plain[0]["spans"] * percent
-        if climb.apart(step, above, *plain):
-            print(f"- {server} in {coding_names[coding]} holds {climb.bound(above, plain[1])}{share:.0f}% of its uncompressed "
-                  "spans a second.")
+        share, low, high = (value * percent for value in shares)
+        spread = f"{low:.0f}% to {high:.0f}% round by round"
+        if low > percent or high < percent:
+            bound = climb.bound(held[(server, coding)]["above"], plain["above"])
+            print(f"- {server} in {coding_names[coding]} holds {bound}{share:.0f}% of its uncompressed spans a second, {spread}.")
         else:
-            print(f"- {server} in {coding_names[coding]} and uncompressed hold rates the climb cannot tell apart ({share:.0f}%).")
-    rate = climb.common_rate(*(climbs[coding].get(server, []) for coding in codings))
+            print(f"- {server} in {coding_names[coding]} and uncompressed hold rates the rounds cannot tell apart ({share:.0f}%, {spread}).")
+    first = {coding: climb.first_round(climbs[coding].get(server, [])) for coding in codings}
+    rate = climb.common_rate(*first.values())
     if rate is None:
         return
-    cpu = {coding: climb.at(climbs[coding][server], rate)["cpu"] for coding in codings}
+    cpu = {coding: climb.at(first[coding], rate)["cpu"] for coding in codings}
     costs = ", ".join(f"{coding_names[coding]} {cpu[coding]:.2f} ({(cpu[coding] / cpu['identity'] - 1) * percent:+.0f}%)"
                       for coding in coded)
-    print(f"- {server} at {rate * spans_per_rate:,.0f} spans a second, which all four held, spends µs of CPU a span: "
+    print(f"- {server} at {rate * spans_per_rate:,.0f} spans a second, which every coding's first round held, spends µs of CPU a span: "
           f"uncompressed {cpu['identity']:.2f}, {costs}.")
 
 
@@ -186,9 +210,13 @@ print()
 print(f"Each receiver holds {connections} connections, as one core of a 64-core gateway for 33,000 servers, and the rate")
 print(f"climbs until p99 passes {limit_ms:.0f} ms or a call is refused. The load keeps its connections open across the")
 print(f"climb, and each connection sends its class's {variants} variants of the export in turn. Each step lasts {seconds:.0f} s, and every")
-print("call counts. The rate a core holds lies between the step it held and the next step, which failed; the")
-print("resolution gives that gap as a share of the step held. A step that fails while the load's two cores, which the")
-print("server never runs on, were 90% busy or more ends the climb on the load's cores: the rate held is a floor.")
+print(f"call counts. Each receiver runs {climb_rounds} rounds of each coding, each on a new process, and each round gives it its")
+print("codings in an order of its own. Its first climb steps up from the lowest rate, and the others search near the rate")
+print("an earlier one held, from a step at half of it. The table gives the round whose rate held is the median, the")
+print("range of the rounds, and the coding's rate as a share of uncompressed in the same round: the median of the")
+print("rounds, and their range. The rate a core holds lies between the step a round held and the step above it that")
+print("failed; the resolution gives that gap as a share of the step held. A step that fails while the load's two cores,")
+print("which the server never runs on, were 90% busy or more ends the round on the load's cores: its rate held is a floor.")
 print()
 write_climb()
 print(f"### The peak {over}")

@@ -4,7 +4,8 @@ standard output.
 
     tools/fullstack/production_report.py <results> <transport> <ticks> <load> <otelcol> <vector>
                                          <rotel> <connect-go> <connect-rust> <commit> <placement>
-                                         <seconds> <variants> <limit_ms> <spans:connections>...
+                                         <seconds> <variants> <limit_ms> <rounds>
+                                         <spans:connections>...
 
 <results> holds the lines of each server's climb, as tools/fullstack/climb.py reads them. The
 report holds the lines of <transport> alone, `tls` or `cleartext`. <ticks> is the ticks of a
@@ -15,9 +16,9 @@ import sys
 import climb
 from machine import machine
 
-results, transport, ticks, load_text, otelcol, vector, rotel, connect_go, connect_rust, commit, placement, seconds, variants, limit_ms = sys.argv[1:15]
-ticks, seconds, variants, limit_ms = int(ticks), float(seconds), int(variants), float(limit_ms)
-classes = [tuple(int(part) for part in item.split(":")) for item in sys.argv[15:]]
+results, transport, ticks, load_text, otelcol, vector, rotel, connect_go, connect_rust, commit, placement, seconds, variants, limit_ms, round_count = sys.argv[1:16]
+ticks, seconds, variants, limit_ms, round_count = int(ticks), float(seconds), int(variants), float(limit_ms), int(round_count)
+classes = [tuple(int(part) for part in item.split(":")) for item in sys.argv[16:]]
 names = {"connect-zig": "connect-zig", "connect-zig-validate": "connect-zig + protovalidate",
          "collector": "Collector", "vector": "Vector", "rotel": "Rotel", "connect-go": "connect-go",
          "connect-go-validate": "connect-go + protovalidate-go",
@@ -59,43 +60,52 @@ print(f"across the climb, as the agents keep theirs, and each connection sends i
 print(f"turn. The rate climbs until p99 passes {limit_ms:.0f} ms or a call is refused. Each step lasts {seconds:.0f} s, and every")
 print("call and every span counts.")
 print()
-print("The rate a core holds lies between the step it held and the next step, which failed; the resolution gives")
-print("that gap as a share of the step held. The load runs on two cores of its own, which the server never runs on.")
-print("A step that fails while they were 90% busy or more ends the climb on the load's cores, and the rate held is")
-print("then a floor, with no resolution. \"load busy\" is their share at the step held: all their work, the kernel's")
-print("for the traffic the load sends included.")
+print(f"Each server runs {round_count} rounds, each on a new process. The first climbs from the lowest rate, and each")
+print("later round searches near the rate the first held, from a step at half of it. The rate a core holds lies")
+print("between the step a round held and the step above it that failed; the resolution gives that gap as a share")
+print("of the step held. The table gives the round whose rate held is the median, and the range of the rates the")
+print("rounds held. The load runs on two cores of its own, which the server never runs on. A step that fails while")
+print("they were 90% busy or more ends the round on the load's cores, and its rate held is then a floor, with no")
+print("resolution. \"load busy\" is their share at the step held: all their work, the kernel's for the traffic the")
+print("load sends included.")
 print()
-print("| server | spans/s held | resolution | calls/s | p50 ms | p99 ms | core busy | load busy | CPU µs a span | peak MiB | the next step |")
-print("|---|--:|--:|--:|--:|--:|--:|--:|--:|--:|---|")
+print("| server | spans/s held | range | resolution | calls/s | p50 ms | p99 ms | core busy | load busy | CPU µs a span | peak MiB | the next step |")
+print("|---|--:|--:|--:|--:|--:|--:|--:|--:|--:|--:|---|")
 
 
 def validation_line(server, twin):
-    """What validation costs a receiver: the share of its twin's rate it holds, or that the climb
-    cannot tell the two apart, and the CPU a span of each at the highest rate both held."""
+    """What validation costs a receiver: the share of its twin's rate it holds, or that the rounds
+    cannot tell the two apart, and the CPU a span of each at the highest rate both first rounds
+    held."""
     share = best[server]["spans"] / best[twin]["spans"] * percent
-    if climb.apart(best[server], above[server], best[twin], above[twin]):
-        line = f"{names[server]} holds {climb.bound(above[server], above[twin])}{share:.0f}% of {twin}'s spans a second"
+    ratios = climb.round_ratios(held[server], held[twin])
+    spread = f", {min(ratios) * percent:.0f}% to {max(ratios) * percent:.0f}% round by round" if ratios else ""
+    if not climb.overlap(held[server], held[twin]):
+        line = f"{names[server]} holds {climb.bound(above[server], above[twin])}{share:.0f}% of {twin}'s spans a second{spread}"
     else:
-        line = f"{names[server]} and {twin} hold rates the climb cannot tell apart ({share:.0f}%)"
-    rate = climb.common_rate(steps[server], steps[twin])
+        line = f"{names[server]} and {twin} hold rates the rounds cannot tell apart ({share:.0f}%{spread})"
+    mine_steps, theirs_steps = climb.first_round(steps[server]), climb.first_round(steps[twin])
+    rate = climb.common_rate(mine_steps, theirs_steps)
     if rate is None:
         return line + "."
-    mine, theirs = climb.at(steps[server], rate), climb.at(steps[twin], rate)
+    mine, theirs = climb.at(mine_steps, rate), climb.at(theirs_steps, rate)
     return (line + f". At {rate * spans_per_rate:,.0f} spans a second, which both held, it spends {mine['cpu']:.2f} µs "
             f"of CPU a span to its {theirs['cpu']:.2f}, {(mine['cpu'] / theirs['cpu'] - 1) * percent:+.0f}%.")
 
 
-best, above = {}, {}
+held, best, above = {}, {}, {}
 for server in servers:
-    step, failed, verdict = climb.held(steps.get(server, []))
-    if step is None:
-        print(f"| {names[server]} | none | | | | | | | | | {ended_by.get(verdict, verdict)} |")
+    result, verdict = climb.summary(steps.get(server, []))
+    if result is None:
+        print(f"| {names[server]} | none | | | | | | | | | | {ended_by.get(verdict, verdict)} |")
         continue
-    best[server], above[server] = step, failed
-    gap = climb.resolution(step, failed)
+    held[server], best[server], above[server] = result, result["best"], result["above"]
+    step = result["best"]
+    gap = climb.resolution(step, result["above"])
     # A run with no core pinned measures no load's share.
     load = "" if step["load"] < 0 else f"{step['load'] * percent:.0f}%"
-    print(f"| {names[server]} | {step['spans']:,.0f} | {'' if gap is None else f'+{gap * percent:.1f}%'} | "
+    print(f"| {names[server]} | {step['spans']:,.0f} | {result['low']:,.0f}–{result['high']:,.0f} | "
+          f"{'' if gap is None else f'+{gap * percent:.1f}%'} | "
           f"{step['calls']:,.0f} | {step['p50']:.2f} | {step['p99']:.2f} | "
           f"{step['busy'] * percent:.0f}% | {load} | "
           f"{step['cpu']:.2f} | {memory.get(server, 0):.0f} | {ended_by.get(verdict, verdict)} |")
@@ -104,32 +114,36 @@ print()
 closed = [(server, sum(step["reopened"] for step in steps.get(server, []))) for server in servers]
 for server, reopened in closed:
     if reopened:
-        print(f"- {names[server]} closed connections: the load opened {reopened:,} again over its climb.")
+        print(f"- {names[server]} closed connections: the load opened {reopened:,} again over its rounds.")
 if any(reopened for _, reopened in closed) and "connect-zig" not in best:
     print()
 
 if "connect-zig" in best:
-    zig = best["connect-zig"]["spans"]
+    zig = held["connect-zig"]
     for server in servers[1:]:
         if server in best and not server.endswith("-validate"):
-            print(f"- connect-zig holds {climb.bound(above['connect-zig'], above[server])}{zig / best[server]['spans']:.2f} times "
-                  f"{names[server]}'s spans a second on one core.")
+            ratios = climb.round_ratios(zig, held[server])
+            spread = f", {min(ratios):.2f} to {max(ratios):.2f} times round by round" if ratios else ""
+            print(f"- connect-zig holds {climb.bound(above['connect-zig'], above[server])}{zig['best']['spans'] / held[server]['best']['spans']:.2f} times "
+                  f"{names[server]}'s spans a second on one core{spread}.")
     for server, twin in validating:
         if server in best and twin in best:
             print(f"- {validation_line(server, twin)}")
     carried = ", ".join(f"{names[server]} {best[server]['spans'] * gateway_cores / fleet_servers:,.0f}" for server in servers if server in best)
     print(f"- At {gateway_cores} cores, the spans a second each server carries for each of the {fleet_servers:,} servers: {carried}.")
     print()
-print("The climb, one row for each step: p99 in milliseconds and the share of its core each server kept busy.")
+print("The first round's climb, one row for each step: p99 in milliseconds and the share of its core each server kept")
+print("busy.")
 print()
 print("| exports a connection a second | spans/s sent | "
       + " | ".join(f"{names[server]} p99 | {names[server]} core" for server in servers) + " |")
 print("|--:|--:|" + "--:|--:|" * len(servers))
-rates = sorted({step["rate"] for server in steps for step in steps[server]})
+first = {server: climb.first_round(steps.get(server, [])) for server in servers}
+rates = sorted({step["rate"] for server in servers for step in first[server]})
 for rate in rates:
     cells = []
     for server in servers:
-        step = next((step for step in steps.get(server, []) if step["rate"] == rate), None)
+        step = climb.at(first[server], rate)
         if step is None:
             cells += ["", ""]
             continue

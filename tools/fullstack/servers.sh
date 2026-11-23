@@ -271,6 +271,28 @@ check_storage() {
     return 1
 }
 
+# The words after the first, rotated left by the first: `rotate 1 a b c` prints `b c a`.
+rotate() {
+    by="$1"
+    shift
+    by=$((by % $#))
+    front="" back=""
+    index=0
+    for word in "$@"; do
+        if [ "${index}" -lt "${by}" ]; then front="${front} ${word}"; else back="${back} ${word}"; fi
+        index=$((index + 1))
+    done
+    echo ${back} ${front}
+}
+
+# The word after the first at the place the first names, from 0: `word_at 1 a b c` prints `b`.
+word_at() {
+    place="$1"
+    shift
+    shift "${place}"
+    echo "$1"
+}
+
 cpu_ticks() { awk '{ print $14 + $15 }' "/proc/$1/stat"; }
 # The busy and the total ticks of the load's cores, as `<busy>:<total>`, from /proc/stat. The
 # server runs on none of them. Of user, nice, system, idle, iowait, irq, softirq and steal, every

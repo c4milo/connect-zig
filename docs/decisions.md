@@ -1140,6 +1140,19 @@ first. Cite an entry by number in code and commits ("decision 6").
       opens again a connection the server closed, and the report counts them. Beaten: oha, which
       opens its connections again at each step, sends one body, and pins no suite. In a 4-CPU
       container, its two cores were 18% busy where connect-zig held 712,000 spans a second.
+    - Amended a fourth time on 2026-11-23, after the same review: each server climbs in three
+      rounds, each on a new process. One climb's rate moved by up to 38% between CI runs on
+      x86-64, so a single climb could not tell a cost of a few percent from the runner. The first
+      round climbs from the lowest rate. Each later round runs a step at half the rate held
+      before, then brackets it at 0.8 and 1.2 times and halves the gap four times, so it costs
+      about half a climb. Round r runs the servers in their order rotated by r - 1, so a drift of
+      the runner does not always fall on the same server. The reports give the median round, the
+      range, and each ratio of two servers round by round, since one round runs both near in
+      time. Two rates whose intervals over the rounds overlap read as rates the rounds cannot
+      tell apart. The compression part runs three rounds of each coding, and each receiver's first
+      climb alone steps up from the lowest rate. To hold the 90 minutes of a CI job, the climbs in
+      cleartext run in a check of their own, `fullstack-cleartext`, which draws no chart. Beaten:
+      three whole climbs, which do not fit a job, and three runs of the job, whose runners differ.
     - Amended on 2026-11-17: the `fullstack` and `bench-compare` checks draw the README's charts
       from their own output, and CI keeps them with the run for 90 days, as `charts-<check>-<arch>`.
       A person copies a chosen run's charts to `docs/images`, so the README still names one run.

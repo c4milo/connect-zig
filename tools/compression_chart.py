@@ -7,10 +7,11 @@
 <log> holds the job's whole output, or the report of tools/fullstack/compression_report.py.
 <transport> picks the report: `tls` or `cleartext`. Each row is one Connect receiver with exports
 in one coding, as a share of the same receiver uncompressed, so each library's bars read on its
-own scale of 100%. The left panel gives the spans a second its core held in the climb, and a
-whisker to the next step, which failed: the rate the core holds lies between the two. The right
-panel gives the median calls a second at the peak, with exports of 512 spans, and a whisker over
-the range of the rounds. <run> and <commit> name the run in the subtitle, as docs/performance.md
+own scale of 100%. The left panel gives the spans a second its core held in the climb: the median
+of the rounds' shares, each round's coding over uncompressed in the same round, with a whisker
+over their range. A report of one climb gives a whisker to the next step, which failed. The
+right panel gives the median calls a second at the peak, with exports of 512 spans, and a
+whisker over the range of the rounds. <run> and <commit> name the run in the subtitle, as docs/performance.md
 asks of a published number.
 """
 import re
@@ -61,7 +62,18 @@ def read(path):
             # A climb that ended on a refused call ran out of the receiver's slots for calls in
             # flight, not of its core: connect-zig's sink holds 64.
             refused = row.get("the next step") == "a call refused"
-            held[(row["server"], row["coding"])] = {"spans": number(row["spans/s held"]), "gap": gap, "refused": refused}
+            item = {"spans": number(row["spans/s held"]), "gap": gap, "refused": refused}
+            # A report of rounds gives each coding's median share of uncompressed and its range,
+            # and each row's range of spans a second; one of a single climb gives neither.
+            if row.get("share"):
+                item["share"] = number(row["share"])
+                if row.get("share range"):
+                    low, high = row["share range"].split("–")
+                    item["share_low"], item["share_high"] = number(low), number(high)
+            if row.get("range"):
+                low, high = row["range"].split("–")
+                item["low"], item["high"] = number(low), number(high)
+            held[(row["server"], row["coding"])] = item
         elif table == "peak" and row.get("export") == peak_spans and row.get("server") in colors and row["calls/s"] != "absent":
             low, high = row["calls/s range"].split("–")
             peak[(row["server"], row["coding"])] = {"rate": number(row["calls/s"]), "low": number(low), "high": number(high)}
@@ -75,13 +87,20 @@ if ("connect-zig", "uncompressed") not in held:
 
 
 def climb_share(server, coding):
-    """The rate held as a share of uncompressed, and the share of the next step, which failed."""
+    """The rate held as a share of uncompressed, and the whisker's two ends: the range of the
+    rounds' shares, or for uncompressed its rounds' range over its median. A report of one climb
+    gives the share of the next step, which failed, as the whisker's upper end."""
     plain = held.get((server, "uncompressed"))
     if plain is None:
         return None
     item = held[(server, coding)]
+    if "share" in item:
+        if coding == "uncompressed":
+            return (percent, item.get("low", item["spans"]) / item["spans"] * percent,
+                    item.get("high", item["spans"]) / item["spans"] * percent)
+        return item["share"], item.get("share_low", item["share"]), item.get("share_high", item["share"])
     share = item["spans"] / plain["spans"] * percent
-    return share, share * (1 + item["gap"]) if item["gap"] is not None else share
+    return share, share, share * (1 + item["gap"]) if item["gap"] is not None else share
 
 
 def peak_share(server, coding):
@@ -104,11 +123,13 @@ else:
 
 W = 840
 pad_l = 24
+rounds = any("share" in item for item in held.values())
 subtitle = [
     f"Each receiver runs on one core {over}, on its library's own decoders. stdx's encoders wrote each export as a",
     "connect-zig client does: gzip at stdx's default level, zstd and brotli at level 1. Each bar is a share of the",
-    f"same receiver uncompressed, net of {saved} a smaller export saves. A whisker reaches the step that",
-    "failed in the climb, and spans the rounds at peak.",
+    f"same receiver uncompressed, net of {saved} a smaller export saves. "
+    + ("A whisker spans the rounds: in the climb," if rounds else "A whisker reaches the step that"),
+    ("each round's share of uncompressed in the same round." if rounds else "failed in the climb, and spans the rounds at peak."),
 ]
 # Each mark a label can carry, explained on a line of its own only when a label carries it.
 if any(item["gap"] is None for item in held.values()):
@@ -123,7 +144,7 @@ climb_left, climb_w = label_right + 12, 170
 peak_left, peak_w = climb_left + climb_w + 200, 160
 groups = len({server for server, _ in rows})
 H = top + 12 + len(rows) * (row_h + row_gap) + (groups - 1) * group_gap + groups * heading_h + 20
-climb_high = max([110.0] + [climb_share(*row)[1] for row in rows if climb_share(*row)])
+climb_high = max([110.0] + [climb_share(*row)[2] for row in rows if climb_share(*row)])
 peak_high = max([110.0] + [share[2] for share in (peak_share(*row) for row in rows) if share])
 
 parts = []
@@ -177,8 +198,10 @@ def bar(left, width, high, y, fill, share, low, upper, label):
     if upper > low:
         a(f'<line x1="{left + low * scale:.1f}" y1="{middle}" x2="{left + upper * scale:.1f}" y2="{middle}" '
           f'stroke="var(--ink)" stroke-width="1.5"/>')
-        a(f'<line x1="{left + upper * scale:.1f}" y1="{middle - 4}" x2="{left + upper * scale:.1f}" y2="{middle + 4}" '
-          f'stroke="var(--ink)" stroke-width="1.5"/>')
+        # A cap at each end of the whisker that is not the bar's own end.
+        for end in sorted({low, upper} - {share}):
+            a(f'<line x1="{left + end * scale:.1f}" y1="{middle - 4}" x2="{left + end * scale:.1f}" y2="{middle + 4}" '
+              f'stroke="var(--ink)" stroke-width="1.5"/>')
     a(f'<text class="val" x="{left + max(share, upper) * scale + 8:.1f}" y="{middle + 4:.1f}">{label}</text>')
 
 
@@ -204,7 +227,7 @@ for server, coding in rows:
         label = spans if coding == "uncompressed" else f"{share[0]:.0f}% · {spans}"
         if held[(server, coding)]["refused"]:
             label += " · slots full"
-        bar(climb_left, climb_w, climb_high, y, fill, share[0], share[0], share[1], label)
+        bar(climb_left, climb_w, climb_high, y, fill, share[0], share[1], share[2], label)
     rates = peak_share(server, coding)
     if rates:
         calls = f"{peak[(server, coding)]['rate']:,.0f}/s"

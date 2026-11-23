@@ -2,11 +2,11 @@
 # entry 16). `plan` asks tools/ci.sh for its checks, and `check` runs each in a job of its own, so
 # each shows apart in GitHub's checks with its own summary: a new check joins tools/ci.sh alone.
 # Each job's work is `tools/ci.sh --only <check>`, which a person runs by hand for the same
-# answer. Each download is pinned by checksum. `test`, `bench-compare`, the three `fullstack`
-# checks and `validate-compare` run a second time on an arm64 runner: the first because an aarch64
-# Linux link can fail where x86-64's passes, the next four for the arm64 charts, and the last for
-# the hardware counters of `bench-validate --counters`, which GitHub's x86-64 runners do not
-# expose.
+# answer. Each download is pinned by checksum. `test`, `bench-compare`, `fullstack`,
+# `fullstack-compression` and `validate-compare` run a second time on an arm64 runner: the first
+# because an aarch64 Linux link can fail where x86-64's passes, the next three for the arm64
+# charts, and the last for the hardware counters of `bench-validate --counters`, which GitHub's
+# x86-64 runners do not expose.
 name: main
 on:
   push:
@@ -59,10 +59,8 @@ jobs:
           # The full stack on arm64, for the README's arm64 chart (decision 44).
           - check: fullstack
             runner: ubuntu-26.04-arm
-          # The compression charts on arm64 (decision 46 as amended).
+          # The compression chart over TLS on arm64 (decision 46 as amended).
           - check: fullstack-compression
-            runner: ubuntu-26.04-arm
-          - check: fullstack-compression-cleartext
             runner: ubuntu-26.04-arm
           # The validation benchmark on arm64, whose runner gives a process its own hardware
           # counters (docs/performance.md, "The instruments").

@@ -13,7 +13,8 @@
 # GOMAXPROCS=1, Vector with one thread, and connect-rust with one tokio worker. The load runs on
 # two other cores, as colibri's judge places them (colibri decision 33).
 #
-#   tools/fullstack_check.sh [peak] [production] [compression] [compression-cleartext] > report.md
+#   tools/fullstack_check.sh [peak] [production] [production-cleartext] [compression]
+#                            [compression-cleartext] > report.md
 #
 # It runs the parts the command line names, or peak and production when it names none:
 #
@@ -21,10 +22,10 @@
 #   on 16 connections of 4 streams, as fast as each server answers.
 # - production (tools/fullstack/production.sh): the traffic of one gateway core for a fleet of
 #   33,000 servers. tools/fullstack/load sends a mix of gzip exports on 516 connections, which stay
-#   open across the climb, at rates that climb until p99 passes 100 ms or a call is refused: over
-#   TLS to connect-zig, the Collector, Vector,
-#   connect-go and connect-rust, then in cleartext to connect-zig, the Collector and Rotel, whose
-#   receiver has no TLS.
+#   open across the climb, at rates that climb until p99 passes 100 ms or a call is refused, over
+#   TLS to connect-zig, the Collector, Vector, connect-go and connect-rust, in three rounds of each.
+# - production-cleartext: the same climbs in cleartext h2, to connect-zig, the Collector and
+#   Rotel, whose receiver has no TLS.
 # - compression and compression-cleartext (tools/fullstack/compression.sh): the three Connect
 #   receivers under both loads, over TLS 1.3 or in cleartext h2, with exports in no coding and in
 #   gzip, zstd and brotli, which `zig build otlp-compress` writes with stdx's encoders.
@@ -230,7 +231,8 @@ status=0
 for part in ${parts}; do
     case "${part}" in
         peak) peak_part ;;
-        production) production_part ;;
+        production) production_part tls ;;
+        production-cleartext) production_part cleartext ;;
         compression) compression_part tls ;;
         compression-cleartext) compression_part cleartext ;;
         *) echo "fullstack: no part named ${part}" >&2; exit 2 ;;
