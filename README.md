@@ -242,18 +242,18 @@ const Auth = oidc.Interceptor(Values, .{ .exclude = &.{"/grpc.health.v1.Health/"
 An OTLP trace receiver on one core, over TLS and h2, takes the traffic of one gateway core for
 33,000 servers:
 
-![Bars of the spans a second one core holds with p99 under 100 ms over TLS, and lines of p99 as the rate climbs, on arm64: connect-zig holds 765,400 spans a second, 7.9 times connect-go's 96,746, 2.8 times connect-rust's 269,250, 3.6 times the OpenTelemetry Collector's 211,372 and 11.2 times Vector's 68,430](docs/images/fullstack-arm64.svg)
+![Bars of the spans a second one core holds with p99 under 100 ms over TLS, and lines of p99 as the rate climbs, on arm64: connect-zig holds 760,998 spans a second, 8.0 times connect-go's 95,668, 2.8 times connect-rust's 275,894, 3.6 times the OpenTelemetry Collector's 213,600 and 11.4 times Vector's 66,748](docs/images/fullstack-arm64.svg)
 
-On an Arm Neoverse-N2 core, in CI's [run 250](https://github.com/c4milo/connect-zig/actions/runs/45111071415):
+On an Arm Neoverse-N2 core, in CI's [run 256](https://github.com/c4milo/connect-zig/actions/runs/45171587471):
 
-- **A whole server** takes 7.9 times connect-go's spans a second, 2.8 times connect-rust's and
+- **A whole server** takes 8.0 times connect-go's spans a second, 2.8 times connect-rust's and
   3.6 times the OpenTelemetry Collector's.
-- **With protovalidate** checking every span, it keeps 86% of its spans a second: 2.7 times
+- **With protovalidate** checking every span, it keeps 86% of its spans a second: 2.5 times
   connect-rust's with protovalidate-buffa, and 11.2 times connect-go's with protovalidate-go.
-- **gzip and zstd exports** cost it 8% and 10% less CPU a span than uncompressed ones over TLS.
-- **A routed unary call** is 15.3 to 23.4 times as fast as connect-go's, and 3.5 to 6.4 times as
+- **gzip and zstd exports** cost it 7% and 8% less CPU a span than uncompressed ones over TLS.
+- **A routed unary call** is 14.9 to 22.9 times as fast as connect-go's, and 3.4 to 6.5 times as
   fast as connect-rust's.
-- **The codec** encodes and decodes 3.2 to 20.0 times as fast as Go's protobuf runtime.
+- **The codec** encodes and decodes 3.2 to 20.8 times as fast as Go's protobuf runtime.
 
 [docs/benchmarks.md](docs/benchmarks.md) holds every chart, the x86-64 results, and how each
 number is measured.

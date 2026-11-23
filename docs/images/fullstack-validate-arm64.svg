@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 840 494" width="840" height="494" role="img" aria-labelledby="t d">
 <title id="t">The spans a second one core holds over TLS, connect-zig, connect-go and connect-rust, each with and without protovalidate, as one gateway core for 33,000 servers</title>
-<desc id="d">Rate kept with protovalidate: connect-zig 86%, connect-go 61%, connect-rust 90%. connect-zig 765,400 spans a second at p99 96.12 ms, connect-zig + protovalidate 658,600 spans a second at p99 85.99 ms, connect-go 96,746 spans a second at p99 68.1 ms, connect-go + protovalidate-go 58,926 spans a second at p99 55.09 ms, connect-rust 269,250 spans a second at p99 18.37 ms, connect-rust + protovalidate-buffa 242,522 spans a second at p99 36.14 ms. p99 at each step: connect-zig: 9k 0.82 ms, 18k 0.79 ms, 27k 0.79 ms, 36k 0.79 ms, 53k 0.78 ms, 71k 0.78 ms, 107k 0.8 ms, 142k 0.9 ms, 214k 0.92 ms, 285k 1.11 ms, 356k 1.31 ms, 427k 1.43 ms, 570k 1.87 ms, 712k 8.1 ms, 748k 53.55 ms, 765k 96.12 ms, 770k 135.55 ms p99, 774k 159.83 ms p99, 783k 181.95 ms refused, 854k 319.24 ms refused; connect-zig + protovalidate: 9k 0.91 ms, 18k 0.89 ms, 27k 0.88 ms, 36k 0.88 ms, 53k 0.88 ms, 71k 0.87 ms, 107k 0.89 ms, 142k 1.03 ms, 214k 1.12 ms, 285k 1.23 ms, 356k 1.5 ms, 427k 1.72 ms, 570k 2.34 ms, 641k 16.88 ms, 659k 85.99 ms, 663k 102.66 ms p99, 668k 113.58 ms p99, 676k 215.14 ms refused, 712k 263.12 ms refused; connect-go: 9k 3.66 ms, 18k 4.96 ms, 27k 4.07 ms, 36k 6.64 ms, 53k 6.55 ms, 71k 10.29 ms, 89k 15.44 ms, 93k 17.14 ms, 96k 60.93 ms, 97k 68.1 ms, 98k 165.72 ms p99, 107k 456.79 ms p99; connect-go + protovalidate-go: 9k 8.54 ms, 18k 10.95 ms, 27k 11.06 ms, 36k 14.19 ms, 53k 17.81 ms, 58k 21.61 ms, 59k 55.09 ms, 60k 127.2 ms p99, 60k 137.09 ms p99, 62k 262.65 ms p99, 71k 2582.21 ms p99; connect-rust: 9k 1.29 ms, 18k 1.27 ms, 27k 1.31 ms, 36k 1.34 ms, 53k 1.34 ms, 71k 1.49 ms, 107k 1.67 ms, 142k 1.83 ms, 214k 2.27 ms, 249k 2.55 ms, 267k 11.45 ms, 269k 18.37 ms, 271k 114.96 ms p99, 276k 115.02 ms p99, 285k 791.22 ms p99; connect-rust + protovalidate-buffa: 9k 1.41 ms, 18k 1.4 ms, 27k 1.39 ms, 36k 1.41 ms, 53k 1.55 ms, 71k 1.68 ms, 107k 1.92 ms, 142k 2.04 ms, 214k 2.73 ms, 231k 3.16 ms, 240k 13.29 ms, 243k 36.14 ms, 245k 117.88 ms p99, 249k 165.46 ms p99, 285k 2063.7 ms p99.</desc>
+<desc id="d">Rate kept with protovalidate: connect-zig 86%, connect-go 61%, connect-rust 95%. connect-zig 760,998 spans a second at p99 92.9 ms, connect-zig + protovalidate 654,086 spans a second at p99 67.87 ms, connect-go 95,668 spans a second at p99 99.65 ms, connect-go + protovalidate-go 58,386 spans a second at p99 80.09 ms, connect-rust 275,894 spans a second at p99 81.73 ms, connect-rust + protovalidate-buffa 262,530 spans a second at p99 99.87 ms. p99 at each step: connect-zig: 9k 0.81 ms, 18k 0.82 ms, 27k 0.8 ms, 36k 0.8 ms, 53k 0.81 ms, 71k 0.8 ms, 107k 0.8 ms, 142k 0.89 ms, 214k 0.94 ms, 285k 1.12 ms, 356k 1.33 ms, 427k 1.4 ms, 570k 1.76 ms, 712k 9.83 ms, 748k 51.13 ms, 756k 61.38 ms, 761k 92.9 ms, 765k 121.96 ms p99, 783k 212.11 ms refused, 854k 219.06 ms refused; connect-zig + protovalidate: 9k 0.92 ms, 18k 0.9 ms, 27k 0.89 ms, 36k 0.89 ms, 53k 0.89 ms, 71k 0.87 ms, 107k 0.89 ms, 142k 1.02 ms, 214k 1.13 ms, 285k 1.24 ms, 356k 1.52 ms, 427k 1.69 ms, 570k 2.27 ms, 641k 36.64 ms, 650k 81.92 ms, 654k 67.87 ms, 659k 110.99 ms p99, 676k 260.58 ms refused, 712k 253.73 ms refused; connect-go: 9k 4.92 ms, 18k 4.03 ms, 27k 4.39 ms, 36k 6.76 ms, 53k 7.18 ms, 71k 11.84 ms, 89k 16.81 ms, 93k 19.27 ms, 96k 99.65 ms, 97k 154.85 ms p99, 98k 231.65 ms p99, 107k 1023.87 ms p99; connect-go + protovalidate-go: 9k 8.15 ms, 18k 10.8 ms, 27k 12.95 ms, 36k 13.15 ms, 53k 20.03 ms, 58k 23.89 ms, 58k 80.09 ms, 59k 102.48 ms p99, 60k 166.06 ms p99, 62k 238.95 ms p99, 71k 2881.69 ms p99; connect-rust: 9k 1.31 ms, 18k 1.33 ms, 27k 1.29 ms, 36k 1.35 ms, 53k 1.38 ms, 71k 1.52 ms, 107k 1.75 ms, 142k 1.87 ms, 214k 2.22 ms, 249k 2.63 ms, 267k 2.99 ms, 276k 81.73 ms, 278k 272.58 ms p99, 280k 411.18 ms p99, 285k 758 ms p99; connect-rust + protovalidate-buffa: 9k 1.41 ms, 18k 1.4 ms, 27k 1.42 ms, 36k 1.45 ms, 53k 1.55 ms, 71k 1.62 ms, 107k 1.91 ms, 142k 2 ms, 214k 2.51 ms, 249k 2.89 ms, 258k 33.84 ms, 263k 99.87 ms, 265k 485.69 ms p99, 267k 346.26 ms p99, 285k 1185.25 ms p99.</desc>
 <style>
 svg { --surface:#fcfcfb; --ink:#0b0b0b; --ink2:#52514e; --muted:#8a8984; --grid:#e4e3df; --zig:#2a78d6; --zigv:#8db8ea; --otel:#b07d00; --vector:#b8407f; --rotel:#722626; --go:#1a8a82; --gov:#8ccfc9; --rust:#b5562b; --rustv:#dfa283; }
 @media (prefers-color-scheme: dark) {
@@ -16,12 +16,12 @@ text { font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; fil
 .legend { font-size: 12.5px; fill: var(--ink2); }
 </style>
 <rect width="840" height="494" rx="8" fill="var(--surface)"/>
-<text class="title" x="24" y="34">Rate kept with protovalidate: connect-zig 86%, connect-go 61%, connect-rust 90%</text>
+<text class="title" x="24" y="34">Rate kept with protovalidate: connect-zig 86%, connect-go 61%, connect-rust 95%</text>
 <text class="sub" x="24" y="56">Each server holds 516 connections over TLS, as one core of a 64-core gateway for 33,000 servers, and</text>
 <text class="sub" x="24" y="74">takes gzip OTLP exports of 16, 128 and 512 spans. The rate climbs until p99 passes 100 ms or a call is refused.</text>
 <text class="sub" x="24" y="92">Each share is a receiver's spans a second with protovalidate over its own without. A dashed line is a</text>
 <text class="sub" x="24" y="110">receiver that validates. A whisker reaches the step that failed, so the rate a core holds lies inside it.</text>
-<text class="sub" x="24" y="128">One CI job ran all, and checked every span: run 250, commit a5db7e1, Neoverse-N2, 4 cores.</text>
+<text class="sub" x="24" y="128">One CI job ran all, and checked every span: run 256, commit 57ec581, Neoverse-N2, 4 cores.</text>
 <rect x="24" y="138" width="12" height="12" rx="2" fill="var(--zig)"/>
 <text class="legend" x="42" y="148">connect-zig</text>
 <rect x="143" y="138" width="12" height="12" rx="2" fill="var(--zigv)" stroke="var(--zig)" stroke-width="1.5"/>
@@ -39,32 +39,32 @@ text { font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; fil
 <path d="M232,234 h146.0 a4,4 0 0 1 4,4 v12 a4,4 0 0 1 -4,4 h-146.0 z" fill="var(--zig)"/>
 <line x1="382.0" y1="244.0" x2="382.9" y2="244.0" stroke="var(--ink)" stroke-width="1.5"/>
 <line x1="382.9" y1="240.0" x2="382.9" y2="248.0" stroke="var(--ink)" stroke-width="1.5"/>
-<text class="val" x="236.0" y="267">765,400 spans/s, p99 96.12 ms</text>
+<text class="val" x="236.0" y="267">760,998 spans/s, p99 92.9 ms</text>
 <text class="row" x="222" y="290.0" text-anchor="end">connect-zig + protovalidate</text>
-<path d="M232,276 h125.1 a4,4 0 0 1 4,4 v12 a4,4 0 0 1 -4,4 h-125.1 z" fill="var(--zigv)" stroke="var(--zig)" stroke-width="1.5"/>
-<line x1="361.1" y1="286.0" x2="362.0" y2="286.0" stroke="var(--ink)" stroke-width="1.5"/>
-<line x1="362.0" y1="282.0" x2="362.0" y2="290.0" stroke="var(--ink)" stroke-width="1.5"/>
-<text class="val" x="236.0" y="309">658,600 spans/s, p99 85.99 ms, 86%</text>
+<path d="M232,276 h124.9 a4,4 0 0 1 4,4 v12 a4,4 0 0 1 -4,4 h-124.9 z" fill="var(--zigv)" stroke="var(--zig)" stroke-width="1.5"/>
+<line x1="360.9" y1="286.0" x2="361.8" y2="286.0" stroke="var(--ink)" stroke-width="1.5"/>
+<line x1="361.8" y1="282.0" x2="361.8" y2="290.0" stroke="var(--ink)" stroke-width="1.5"/>
+<text class="val" x="236.0" y="309">654,086 spans/s, p99 67.87 ms, 86%</text>
 <text class="row" x="222" y="332.0" text-anchor="end">connect-go</text>
-<path d="M232,318 h15.0 a4,4 0 0 1 4,4 v12 a4,4 0 0 1 -4,4 h-15.0 z" fill="var(--go)"/>
-<line x1="251.0" y1="328.0" x2="251.2" y2="328.0" stroke="var(--ink)" stroke-width="1.5"/>
-<line x1="251.2" y1="324.0" x2="251.2" y2="332.0" stroke="var(--ink)" stroke-width="1.5"/>
-<text class="val" x="236.0" y="351">96,746 spans/s, p99 68.1 ms</text>
+<path d="M232,318 h14.9 a4,4 0 0 1 4,4 v12 a4,4 0 0 1 -4,4 h-14.9 z" fill="var(--go)"/>
+<line x1="250.9" y1="328.0" x2="251.1" y2="328.0" stroke="var(--ink)" stroke-width="1.5"/>
+<line x1="251.1" y1="324.0" x2="251.1" y2="332.0" stroke="var(--ink)" stroke-width="1.5"/>
+<text class="val" x="236.0" y="351">95,668 spans/s, p99 99.65 ms</text>
 <text class="row" x="222" y="374.0" text-anchor="end">connect-go + protovalidate-go</text>
 <path d="M232,360 h7.5 a4,4 0 0 1 4,4 v12 a4,4 0 0 1 -4,4 h-7.5 z" fill="var(--gov)" stroke="var(--go)" stroke-width="1.5"/>
-<line x1="243.5" y1="370.0" x2="243.7" y2="370.0" stroke="var(--ink)" stroke-width="1.5"/>
-<line x1="243.7" y1="366.0" x2="243.7" y2="374.0" stroke="var(--ink)" stroke-width="1.5"/>
-<text class="val" x="236.0" y="393">58,926 spans/s, p99 55.09 ms, 61%</text>
+<line x1="243.5" y1="370.0" x2="243.6" y2="370.0" stroke="var(--ink)" stroke-width="1.5"/>
+<line x1="243.6" y1="366.0" x2="243.6" y2="374.0" stroke="var(--ink)" stroke-width="1.5"/>
+<text class="val" x="236.0" y="393">58,386 spans/s, p99 80.09 ms, 61%</text>
 <text class="row" x="222" y="416.0" text-anchor="end">connect-rust</text>
-<path d="M232,402 h48.8 a4,4 0 0 1 4,4 v12 a4,4 0 0 1 -4,4 h-48.8 z" fill="var(--rust)"/>
-<line x1="284.8" y1="412.0" x2="285.2" y2="412.0" stroke="var(--ink)" stroke-width="1.5"/>
-<line x1="285.2" y1="408.0" x2="285.2" y2="416.0" stroke="var(--ink)" stroke-width="1.5"/>
-<text class="val" x="236.0" y="435">269,250 spans/s, p99 18.37 ms</text>
+<path d="M232,402 h50.4 a4,4 0 0 1 4,4 v12 a4,4 0 0 1 -4,4 h-50.4 z" fill="var(--rust)"/>
+<line x1="286.4" y1="412.0" x2="286.8" y2="412.0" stroke="var(--ink)" stroke-width="1.5"/>
+<line x1="286.8" y1="408.0" x2="286.8" y2="416.0" stroke="var(--ink)" stroke-width="1.5"/>
+<text class="val" x="236.0" y="435">275,894 spans/s, p99 81.73 ms</text>
 <text class="row" x="222" y="458.0" text-anchor="end">connect-rust + protovalidate-buffa</text>
-<path d="M232,444 h43.5 a4,4 0 0 1 4,4 v12 a4,4 0 0 1 -4,4 h-43.5 z" fill="var(--rustv)" stroke="var(--rust)" stroke-width="1.5"/>
-<line x1="279.5" y1="454.0" x2="280.0" y2="454.0" stroke="var(--ink)" stroke-width="1.5"/>
-<line x1="280.0" y1="450.0" x2="280.0" y2="458.0" stroke="var(--ink)" stroke-width="1.5"/>
-<text class="val" x="236.0" y="477">242,522 spans/s, p99 36.14 ms, 90%</text>
+<path d="M232,444 h47.7 a4,4 0 0 1 4,4 v12 a4,4 0 0 1 -4,4 h-47.7 z" fill="var(--rustv)" stroke="var(--rust)" stroke-width="1.5"/>
+<line x1="283.7" y1="454.0" x2="284.2" y2="454.0" stroke="var(--ink)" stroke-width="1.5"/>
+<line x1="284.2" y1="450.0" x2="284.2" y2="458.0" stroke="var(--ink)" stroke-width="1.5"/>
+<text class="val" x="236.0" y="477">262,530 spans/s, p99 99.87 ms, 95%</text>
 <text class="panel" x="480" y="208">p99 as the rate climbs</text>
 <line x1="520" y1="339.3" x2="810" y2="339.3" stroke="var(--grid)" stroke-width="1"/>
 <text class="tick" x="514" y="343.3" text-anchor="end">1 ms</text>
@@ -80,108 +80,108 @@ text { font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; fil
 <text class="tick" x="723.7" y="366" text-anchor="middle">600k</text>
 <text class="tick" x="791.5" y="366" text-anchor="middle">800k</text>
 <text class="tick" x="810" y="382" text-anchor="end">spans a second sent</text>
-<polyline points="523.0,342.4 526.0,342.9 529.1,342.9 532.1,342.9 538.1,343.1 544.2,343.1 556.2,342.7 568.3,340.9 592.5,340.6 616.7,337.7 640.8,335.1 665.0,333.8 713.3,329.6 761.7,307.0 773.8,277.9 779.8,268.8 781.3,263.5 782.8,261.0 785.8,259.0 810.0,250.3" fill="none" stroke="var(--zig)" stroke-width="2"/>
-<circle cx="523.0" cy="342.4" r="4" fill="var(--zig)" stroke="var(--zig)" stroke-width="2"/>
-<circle cx="526.0" cy="342.9" r="4" fill="var(--zig)" stroke="var(--zig)" stroke-width="2"/>
-<circle cx="529.1" cy="342.9" r="4" fill="var(--zig)" stroke="var(--zig)" stroke-width="2"/>
-<circle cx="532.1" cy="342.9" r="4" fill="var(--zig)" stroke="var(--zig)" stroke-width="2"/>
-<circle cx="538.1" cy="343.1" r="4" fill="var(--zig)" stroke="var(--zig)" stroke-width="2"/>
-<circle cx="544.2" cy="343.1" r="4" fill="var(--zig)" stroke="var(--zig)" stroke-width="2"/>
+<polyline points="523.0,342.6 526.0,342.4 529.1,342.7 532.1,342.7 538.1,342.6 544.2,342.7 556.2,342.7 568.3,341.1 592.5,340.3 616.7,337.6 640.8,334.9 665.0,334.1 713.3,330.6 761.7,304.0 773.8,278.6 776.8,275.8 778.3,269.4 779.8,265.2 785.8,256.6 810.0,256.1" fill="none" stroke="var(--zig)" stroke-width="2"/>
+<circle cx="523.0" cy="342.6" r="4" fill="var(--zig)" stroke="var(--zig)" stroke-width="2"/>
+<circle cx="526.0" cy="342.4" r="4" fill="var(--zig)" stroke="var(--zig)" stroke-width="2"/>
+<circle cx="529.1" cy="342.7" r="4" fill="var(--zig)" stroke="var(--zig)" stroke-width="2"/>
+<circle cx="532.1" cy="342.7" r="4" fill="var(--zig)" stroke="var(--zig)" stroke-width="2"/>
+<circle cx="538.1" cy="342.6" r="4" fill="var(--zig)" stroke="var(--zig)" stroke-width="2"/>
+<circle cx="544.2" cy="342.7" r="4" fill="var(--zig)" stroke="var(--zig)" stroke-width="2"/>
 <circle cx="556.2" cy="342.7" r="4" fill="var(--zig)" stroke="var(--zig)" stroke-width="2"/>
-<circle cx="568.3" cy="340.9" r="4" fill="var(--zig)" stroke="var(--zig)" stroke-width="2"/>
-<circle cx="592.5" cy="340.6" r="4" fill="var(--zig)" stroke="var(--zig)" stroke-width="2"/>
-<circle cx="616.7" cy="337.7" r="4" fill="var(--zig)" stroke="var(--zig)" stroke-width="2"/>
-<circle cx="640.8" cy="335.1" r="4" fill="var(--zig)" stroke="var(--zig)" stroke-width="2"/>
-<circle cx="665.0" cy="333.8" r="4" fill="var(--zig)" stroke="var(--zig)" stroke-width="2"/>
-<circle cx="713.3" cy="329.6" r="4" fill="var(--zig)" stroke="var(--zig)" stroke-width="2"/>
-<circle cx="761.7" cy="307.0" r="4" fill="var(--zig)" stroke="var(--zig)" stroke-width="2"/>
-<circle cx="773.8" cy="277.9" r="4" fill="var(--zig)" stroke="var(--zig)" stroke-width="2"/>
-<circle cx="779.8" cy="268.8" r="4" fill="var(--zig)" stroke="var(--zig)" stroke-width="2"/>
-<circle cx="781.3" cy="263.5" r="4" fill="var(--surface)" stroke="var(--zig)" stroke-width="2"/>
-<circle cx="782.8" cy="261.0" r="4" fill="var(--surface)" stroke="var(--zig)" stroke-width="2"/>
-<circle cx="785.8" cy="259.0" r="4" fill="var(--surface)" stroke="var(--zig)" stroke-width="2"/>
-<circle cx="810.0" cy="250.3" r="4" fill="var(--surface)" stroke="var(--zig)" stroke-width="2"/>
-<polyline points="523.0,340.8 526.0,341.1 529.1,341.3 532.1,341.3 538.1,341.3 544.2,341.5 556.2,341.1 568.3,338.8 592.5,337.6 616.7,336.1 640.8,333.0 665.0,330.9 713.3,326.2 737.5,295.7 743.5,270.6 745.1,267.8 746.6,266.3 749.6,256.4 761.7,253.3" fill="none" stroke="var(--zig)" stroke-width="2" stroke-dasharray="5 3"/>
-<circle cx="523.0" cy="340.8" r="4" fill="var(--zigv)" stroke="var(--zig)" stroke-width="2"/>
-<circle cx="526.0" cy="341.1" r="4" fill="var(--zigv)" stroke="var(--zig)" stroke-width="2"/>
-<circle cx="529.1" cy="341.3" r="4" fill="var(--zigv)" stroke="var(--zig)" stroke-width="2"/>
-<circle cx="532.1" cy="341.3" r="4" fill="var(--zigv)" stroke="var(--zig)" stroke-width="2"/>
-<circle cx="538.1" cy="341.3" r="4" fill="var(--zigv)" stroke="var(--zig)" stroke-width="2"/>
+<circle cx="568.3" cy="341.1" r="4" fill="var(--zig)" stroke="var(--zig)" stroke-width="2"/>
+<circle cx="592.5" cy="340.3" r="4" fill="var(--zig)" stroke="var(--zig)" stroke-width="2"/>
+<circle cx="616.7" cy="337.6" r="4" fill="var(--zig)" stroke="var(--zig)" stroke-width="2"/>
+<circle cx="640.8" cy="334.9" r="4" fill="var(--zig)" stroke="var(--zig)" stroke-width="2"/>
+<circle cx="665.0" cy="334.1" r="4" fill="var(--zig)" stroke="var(--zig)" stroke-width="2"/>
+<circle cx="713.3" cy="330.6" r="4" fill="var(--zig)" stroke="var(--zig)" stroke-width="2"/>
+<circle cx="761.7" cy="304.0" r="4" fill="var(--zig)" stroke="var(--zig)" stroke-width="2"/>
+<circle cx="773.8" cy="278.6" r="4" fill="var(--zig)" stroke="var(--zig)" stroke-width="2"/>
+<circle cx="776.8" cy="275.8" r="4" fill="var(--zig)" stroke="var(--zig)" stroke-width="2"/>
+<circle cx="778.3" cy="269.4" r="4" fill="var(--zig)" stroke="var(--zig)" stroke-width="2"/>
+<circle cx="779.8" cy="265.2" r="4" fill="var(--surface)" stroke="var(--zig)" stroke-width="2"/>
+<circle cx="785.8" cy="256.6" r="4" fill="var(--surface)" stroke="var(--zig)" stroke-width="2"/>
+<circle cx="810.0" cy="256.1" r="4" fill="var(--surface)" stroke="var(--zig)" stroke-width="2"/>
+<polyline points="523.0,340.6 526.0,340.9 529.1,341.1 532.1,341.1 538.1,341.1 544.2,341.5 556.2,341.1 568.3,339.0 592.5,337.4 616.7,336.0 640.8,332.8 665.0,331.2 713.3,326.7 737.5,283.7 740.5,271.3 742.0,274.2 743.5,266.6 749.6,253.5 761.7,253.9" fill="none" stroke="var(--zig)" stroke-width="2" stroke-dasharray="5 3"/>
+<circle cx="523.0" cy="340.6" r="4" fill="var(--zigv)" stroke="var(--zig)" stroke-width="2"/>
+<circle cx="526.0" cy="340.9" r="4" fill="var(--zigv)" stroke="var(--zig)" stroke-width="2"/>
+<circle cx="529.1" cy="341.1" r="4" fill="var(--zigv)" stroke="var(--zig)" stroke-width="2"/>
+<circle cx="532.1" cy="341.1" r="4" fill="var(--zigv)" stroke="var(--zig)" stroke-width="2"/>
+<circle cx="538.1" cy="341.1" r="4" fill="var(--zigv)" stroke="var(--zig)" stroke-width="2"/>
 <circle cx="544.2" cy="341.5" r="4" fill="var(--zigv)" stroke="var(--zig)" stroke-width="2"/>
 <circle cx="556.2" cy="341.1" r="4" fill="var(--zigv)" stroke="var(--zig)" stroke-width="2"/>
-<circle cx="568.3" cy="338.8" r="4" fill="var(--zigv)" stroke="var(--zig)" stroke-width="2"/>
-<circle cx="592.5" cy="337.6" r="4" fill="var(--zigv)" stroke="var(--zig)" stroke-width="2"/>
-<circle cx="616.7" cy="336.1" r="4" fill="var(--zigv)" stroke="var(--zig)" stroke-width="2"/>
-<circle cx="640.8" cy="333.0" r="4" fill="var(--zigv)" stroke="var(--zig)" stroke-width="2"/>
-<circle cx="665.0" cy="330.9" r="4" fill="var(--zigv)" stroke="var(--zig)" stroke-width="2"/>
-<circle cx="713.3" cy="326.2" r="4" fill="var(--zigv)" stroke="var(--zig)" stroke-width="2"/>
-<circle cx="737.5" cy="295.7" r="4" fill="var(--zigv)" stroke="var(--zig)" stroke-width="2"/>
-<circle cx="743.5" cy="270.6" r="4" fill="var(--zigv)" stroke="var(--zig)" stroke-width="2"/>
-<circle cx="745.1" cy="267.8" r="4" fill="var(--surface)" stroke="var(--zig)" stroke-width="2"/>
-<circle cx="746.6" cy="266.3" r="4" fill="var(--surface)" stroke="var(--zig)" stroke-width="2"/>
-<circle cx="749.6" cy="256.4" r="4" fill="var(--surface)" stroke="var(--zig)" stroke-width="2"/>
-<circle cx="761.7" cy="253.3" r="4" fill="var(--surface)" stroke="var(--zig)" stroke-width="2"/>
-<polyline points="523.0,319.3 526.0,314.6 529.1,317.6 532.1,310.1 538.1,310.3 544.2,303.3 550.2,297.1 551.7,295.5 552.5,275.9 552.9,274.2 553.2,260.4 556.2,244.8" fill="none" stroke="var(--go)" stroke-width="2"/>
-<circle cx="523.0" cy="319.3" r="4" fill="var(--go)" stroke="var(--go)" stroke-width="2"/>
-<circle cx="526.0" cy="314.6" r="4" fill="var(--go)" stroke="var(--go)" stroke-width="2"/>
-<circle cx="529.1" cy="317.6" r="4" fill="var(--go)" stroke="var(--go)" stroke-width="2"/>
-<circle cx="532.1" cy="310.1" r="4" fill="var(--go)" stroke="var(--go)" stroke-width="2"/>
-<circle cx="538.1" cy="310.3" r="4" fill="var(--go)" stroke="var(--go)" stroke-width="2"/>
-<circle cx="544.2" cy="303.3" r="4" fill="var(--go)" stroke="var(--go)" stroke-width="2"/>
-<circle cx="550.2" cy="297.1" r="4" fill="var(--go)" stroke="var(--go)" stroke-width="2"/>
-<circle cx="551.7" cy="295.5" r="4" fill="var(--go)" stroke="var(--go)" stroke-width="2"/>
-<circle cx="552.5" cy="275.9" r="4" fill="var(--go)" stroke="var(--go)" stroke-width="2"/>
-<circle cx="552.9" cy="274.2" r="4" fill="var(--go)" stroke="var(--go)" stroke-width="2"/>
-<circle cx="553.2" cy="260.4" r="4" fill="var(--surface)" stroke="var(--go)" stroke-width="2"/>
-<circle cx="556.2" cy="244.8" r="4" fill="var(--surface)" stroke="var(--go)" stroke-width="2"/>
-<polyline points="523.0,306.2 526.0,302.4 529.1,302.2 532.1,298.4 538.1,294.9 539.6,291.9 540.0,277.4 540.2,264.5 540.4,263.4 541.1,253.3 544.2,222.0" fill="none" stroke="var(--go)" stroke-width="2" stroke-dasharray="5 3"/>
-<circle cx="523.0" cy="306.2" r="4" fill="var(--gov)" stroke="var(--go)" stroke-width="2"/>
-<circle cx="526.0" cy="302.4" r="4" fill="var(--gov)" stroke="var(--go)" stroke-width="2"/>
-<circle cx="529.1" cy="302.2" r="4" fill="var(--gov)" stroke="var(--go)" stroke-width="2"/>
-<circle cx="532.1" cy="298.4" r="4" fill="var(--gov)" stroke="var(--go)" stroke-width="2"/>
-<circle cx="538.1" cy="294.9" r="4" fill="var(--gov)" stroke="var(--go)" stroke-width="2"/>
-<circle cx="539.6" cy="291.9" r="4" fill="var(--gov)" stroke="var(--go)" stroke-width="2"/>
-<circle cx="540.0" cy="277.4" r="4" fill="var(--gov)" stroke="var(--go)" stroke-width="2"/>
-<circle cx="540.2" cy="264.5" r="4" fill="var(--surface)" stroke="var(--go)" stroke-width="2"/>
-<circle cx="540.4" cy="263.4" r="4" fill="var(--surface)" stroke="var(--go)" stroke-width="2"/>
-<circle cx="541.1" cy="253.3" r="4" fill="var(--surface)" stroke="var(--go)" stroke-width="2"/>
+<circle cx="568.3" cy="339.0" r="4" fill="var(--zigv)" stroke="var(--zig)" stroke-width="2"/>
+<circle cx="592.5" cy="337.4" r="4" fill="var(--zigv)" stroke="var(--zig)" stroke-width="2"/>
+<circle cx="616.7" cy="336.0" r="4" fill="var(--zigv)" stroke="var(--zig)" stroke-width="2"/>
+<circle cx="640.8" cy="332.8" r="4" fill="var(--zigv)" stroke="var(--zig)" stroke-width="2"/>
+<circle cx="665.0" cy="331.2" r="4" fill="var(--zigv)" stroke="var(--zig)" stroke-width="2"/>
+<circle cx="713.3" cy="326.7" r="4" fill="var(--zigv)" stroke="var(--zig)" stroke-width="2"/>
+<circle cx="737.5" cy="283.7" r="4" fill="var(--zigv)" stroke="var(--zig)" stroke-width="2"/>
+<circle cx="740.5" cy="271.3" r="4" fill="var(--zigv)" stroke="var(--zig)" stroke-width="2"/>
+<circle cx="742.0" cy="274.2" r="4" fill="var(--zigv)" stroke="var(--zig)" stroke-width="2"/>
+<circle cx="743.5" cy="266.6" r="4" fill="var(--surface)" stroke="var(--zig)" stroke-width="2"/>
+<circle cx="749.6" cy="253.5" r="4" fill="var(--surface)" stroke="var(--zig)" stroke-width="2"/>
+<circle cx="761.7" cy="253.9" r="4" fill="var(--surface)" stroke="var(--zig)" stroke-width="2"/>
+<polyline points="523.0,314.7 526.0,317.8 529.1,316.5 532.1,309.8 538.1,308.9 544.2,301.2 550.2,295.8 551.7,293.6 552.5,268.3 552.9,261.5 553.2,255.3 556.2,232.3" fill="none" stroke="var(--go)" stroke-width="2"/>
+<circle cx="523.0" cy="314.7" r="4" fill="var(--go)" stroke="var(--go)" stroke-width="2"/>
+<circle cx="526.0" cy="317.8" r="4" fill="var(--go)" stroke="var(--go)" stroke-width="2"/>
+<circle cx="529.1" cy="316.5" r="4" fill="var(--go)" stroke="var(--go)" stroke-width="2"/>
+<circle cx="532.1" cy="309.8" r="4" fill="var(--go)" stroke="var(--go)" stroke-width="2"/>
+<circle cx="538.1" cy="308.9" r="4" fill="var(--go)" stroke="var(--go)" stroke-width="2"/>
+<circle cx="544.2" cy="301.2" r="4" fill="var(--go)" stroke="var(--go)" stroke-width="2"/>
+<circle cx="550.2" cy="295.8" r="4" fill="var(--go)" stroke="var(--go)" stroke-width="2"/>
+<circle cx="551.7" cy="293.6" r="4" fill="var(--go)" stroke="var(--go)" stroke-width="2"/>
+<circle cx="552.5" cy="268.3" r="4" fill="var(--go)" stroke="var(--go)" stroke-width="2"/>
+<circle cx="552.9" cy="261.5" r="4" fill="var(--surface)" stroke="var(--go)" stroke-width="2"/>
+<circle cx="553.2" cy="255.3" r="4" fill="var(--surface)" stroke="var(--go)" stroke-width="2"/>
+<circle cx="556.2" cy="232.3" r="4" fill="var(--surface)" stroke="var(--go)" stroke-width="2"/>
+<polyline points="523.0,306.9 526.0,302.6 529.1,299.8 532.1,299.5 538.1,293.0 539.6,290.3 539.8,271.7 540.0,267.9 540.4,260.4 541.1,254.8 544.2,222.0" fill="none" stroke="var(--go)" stroke-width="2" stroke-dasharray="5 3"/>
+<circle cx="523.0" cy="306.9" r="4" fill="var(--gov)" stroke="var(--go)" stroke-width="2"/>
+<circle cx="526.0" cy="302.6" r="4" fill="var(--gov)" stroke="var(--go)" stroke-width="2"/>
+<circle cx="529.1" cy="299.8" r="4" fill="var(--gov)" stroke="var(--go)" stroke-width="2"/>
+<circle cx="532.1" cy="299.5" r="4" fill="var(--gov)" stroke="var(--go)" stroke-width="2"/>
+<circle cx="538.1" cy="293.0" r="4" fill="var(--gov)" stroke="var(--go)" stroke-width="2"/>
+<circle cx="539.6" cy="290.3" r="4" fill="var(--gov)" stroke="var(--go)" stroke-width="2"/>
+<circle cx="539.8" cy="271.7" r="4" fill="var(--gov)" stroke="var(--go)" stroke-width="2"/>
+<circle cx="540.0" cy="267.9" r="4" fill="var(--surface)" stroke="var(--go)" stroke-width="2"/>
+<circle cx="540.4" cy="260.4" r="4" fill="var(--surface)" stroke="var(--go)" stroke-width="2"/>
+<circle cx="541.1" cy="254.8" r="4" fill="var(--surface)" stroke="var(--go)" stroke-width="2"/>
 <circle cx="544.2" cy="222.0" r="4" fill="var(--surface)" stroke="var(--go)" stroke-width="2"/>
-<polyline points="523.0,335.4 526.0,335.6 529.1,335.1 532.1,334.8 538.1,334.8 544.2,333.1 556.2,331.4 568.3,330.0 592.5,326.7 604.6,324.9 610.6,301.7 611.4,294.4 612.1,266.1 613.6,266.1 616.7,236.3" fill="none" stroke="var(--rust)" stroke-width="2"/>
-<circle cx="523.0" cy="335.4" r="4" fill="var(--rust)" stroke="var(--rust)" stroke-width="2"/>
-<circle cx="526.0" cy="335.6" r="4" fill="var(--rust)" stroke="var(--rust)" stroke-width="2"/>
-<circle cx="529.1" cy="335.1" r="4" fill="var(--rust)" stroke="var(--rust)" stroke-width="2"/>
-<circle cx="532.1" cy="334.8" r="4" fill="var(--rust)" stroke="var(--rust)" stroke-width="2"/>
-<circle cx="538.1" cy="334.8" r="4" fill="var(--rust)" stroke="var(--rust)" stroke-width="2"/>
-<circle cx="544.2" cy="333.1" r="4" fill="var(--rust)" stroke="var(--rust)" stroke-width="2"/>
-<circle cx="556.2" cy="331.4" r="4" fill="var(--rust)" stroke="var(--rust)" stroke-width="2"/>
-<circle cx="568.3" cy="330.0" r="4" fill="var(--rust)" stroke="var(--rust)" stroke-width="2"/>
-<circle cx="592.5" cy="326.7" r="4" fill="var(--rust)" stroke="var(--rust)" stroke-width="2"/>
-<circle cx="604.6" cy="324.9" r="4" fill="var(--rust)" stroke="var(--rust)" stroke-width="2"/>
-<circle cx="610.6" cy="301.7" r="4" fill="var(--rust)" stroke="var(--rust)" stroke-width="2"/>
-<circle cx="611.4" cy="294.4" r="4" fill="var(--rust)" stroke="var(--rust)" stroke-width="2"/>
-<circle cx="612.1" cy="266.1" r="4" fill="var(--surface)" stroke="var(--rust)" stroke-width="2"/>
-<circle cx="613.6" cy="266.1" r="4" fill="var(--surface)" stroke="var(--rust)" stroke-width="2"/>
-<circle cx="616.7" cy="236.3" r="4" fill="var(--surface)" stroke="var(--rust)" stroke-width="2"/>
-<polyline points="523.0,334.0 526.0,334.1 529.1,334.2 532.1,334.0 538.1,332.5 544.2,331.3 556.2,329.2 568.3,328.3 592.5,323.8 598.5,321.5 601.6,299.4 602.3,283.9 603.1,265.7 604.6,260.5 616.7,222.0" fill="none" stroke="var(--rust)" stroke-width="2" stroke-dasharray="5 3"/>
+<polyline points="523.0,335.1 526.0,334.9 529.1,335.4 532.1,334.7 538.1,334.3 544.2,332.8 556.2,330.7 568.3,329.6 592.5,327.0 604.6,324.4 610.6,322.4 613.6,271.3 614.4,252.8 615.2,246.4 616.7,237.0" fill="none" stroke="var(--rust)" stroke-width="2"/>
+<circle cx="523.0" cy="335.1" r="4" fill="var(--rust)" stroke="var(--rust)" stroke-width="2"/>
+<circle cx="526.0" cy="334.9" r="4" fill="var(--rust)" stroke="var(--rust)" stroke-width="2"/>
+<circle cx="529.1" cy="335.4" r="4" fill="var(--rust)" stroke="var(--rust)" stroke-width="2"/>
+<circle cx="532.1" cy="334.7" r="4" fill="var(--rust)" stroke="var(--rust)" stroke-width="2"/>
+<circle cx="538.1" cy="334.3" r="4" fill="var(--rust)" stroke="var(--rust)" stroke-width="2"/>
+<circle cx="544.2" cy="332.8" r="4" fill="var(--rust)" stroke="var(--rust)" stroke-width="2"/>
+<circle cx="556.2" cy="330.7" r="4" fill="var(--rust)" stroke="var(--rust)" stroke-width="2"/>
+<circle cx="568.3" cy="329.6" r="4" fill="var(--rust)" stroke="var(--rust)" stroke-width="2"/>
+<circle cx="592.5" cy="327.0" r="4" fill="var(--rust)" stroke="var(--rust)" stroke-width="2"/>
+<circle cx="604.6" cy="324.4" r="4" fill="var(--rust)" stroke="var(--rust)" stroke-width="2"/>
+<circle cx="610.6" cy="322.4" r="4" fill="var(--rust)" stroke="var(--rust)" stroke-width="2"/>
+<circle cx="613.6" cy="271.3" r="4" fill="var(--rust)" stroke="var(--rust)" stroke-width="2"/>
+<circle cx="614.4" cy="252.8" r="4" fill="var(--surface)" stroke="var(--rust)" stroke-width="2"/>
+<circle cx="615.2" cy="246.4" r="4" fill="var(--surface)" stroke="var(--rust)" stroke-width="2"/>
+<circle cx="616.7" cy="237.0" r="4" fill="var(--surface)" stroke="var(--rust)" stroke-width="2"/>
+<polyline points="523.0,334.0 526.0,334.1 529.1,333.9 532.1,333.6 538.1,332.5 544.2,331.9 556.2,329.3 568.3,328.6 592.5,325.1 604.6,322.9 607.6,285.0 609.1,268.3 609.9,243.8 610.6,249.1 616.7,230.1" fill="none" stroke="var(--rust)" stroke-width="2" stroke-dasharray="5 3"/>
 <circle cx="523.0" cy="334.0" r="4" fill="var(--rustv)" stroke="var(--rust)" stroke-width="2"/>
 <circle cx="526.0" cy="334.1" r="4" fill="var(--rustv)" stroke="var(--rust)" stroke-width="2"/>
-<circle cx="529.1" cy="334.2" r="4" fill="var(--rustv)" stroke="var(--rust)" stroke-width="2"/>
-<circle cx="532.1" cy="334.0" r="4" fill="var(--rustv)" stroke="var(--rust)" stroke-width="2"/>
+<circle cx="529.1" cy="333.9" r="4" fill="var(--rustv)" stroke="var(--rust)" stroke-width="2"/>
+<circle cx="532.1" cy="333.6" r="4" fill="var(--rustv)" stroke="var(--rust)" stroke-width="2"/>
 <circle cx="538.1" cy="332.5" r="4" fill="var(--rustv)" stroke="var(--rust)" stroke-width="2"/>
-<circle cx="544.2" cy="331.3" r="4" fill="var(--rustv)" stroke="var(--rust)" stroke-width="2"/>
-<circle cx="556.2" cy="329.2" r="4" fill="var(--rustv)" stroke="var(--rust)" stroke-width="2"/>
-<circle cx="568.3" cy="328.3" r="4" fill="var(--rustv)" stroke="var(--rust)" stroke-width="2"/>
-<circle cx="592.5" cy="323.8" r="4" fill="var(--rustv)" stroke="var(--rust)" stroke-width="2"/>
-<circle cx="598.5" cy="321.5" r="4" fill="var(--rustv)" stroke="var(--rust)" stroke-width="2"/>
-<circle cx="601.6" cy="299.4" r="4" fill="var(--rustv)" stroke="var(--rust)" stroke-width="2"/>
-<circle cx="602.3" cy="283.9" r="4" fill="var(--rustv)" stroke="var(--rust)" stroke-width="2"/>
-<circle cx="603.1" cy="265.7" r="4" fill="var(--surface)" stroke="var(--rust)" stroke-width="2"/>
-<circle cx="604.6" cy="260.5" r="4" fill="var(--surface)" stroke="var(--rust)" stroke-width="2"/>
-<circle cx="616.7" cy="222.0" r="4" fill="var(--surface)" stroke="var(--rust)" stroke-width="2"/>
-<text class="val" x="552.2" y="230.0">p99 2,582 ms</text>
-<text class="val" x="624.7" y="243.0">p99 2,064 ms</text>
-<text class="val" x="624.7" y="256.0">p99 791 ms</text>
-<text class="val" x="564.2" y="269.0">p99 457 ms</text>
-<text class="val" x="758.6" y="242.3">refused</text>
-<text class="val" x="710.3" y="245.3">refused</text>
+<circle cx="544.2" cy="331.9" r="4" fill="var(--rustv)" stroke="var(--rust)" stroke-width="2"/>
+<circle cx="556.2" cy="329.3" r="4" fill="var(--rustv)" stroke="var(--rust)" stroke-width="2"/>
+<circle cx="568.3" cy="328.6" r="4" fill="var(--rustv)" stroke="var(--rust)" stroke-width="2"/>
+<circle cx="592.5" cy="325.1" r="4" fill="var(--rustv)" stroke="var(--rust)" stroke-width="2"/>
+<circle cx="604.6" cy="322.9" r="4" fill="var(--rustv)" stroke="var(--rust)" stroke-width="2"/>
+<circle cx="607.6" cy="285.0" r="4" fill="var(--rustv)" stroke="var(--rust)" stroke-width="2"/>
+<circle cx="609.1" cy="268.3" r="4" fill="var(--rustv)" stroke="var(--rust)" stroke-width="2"/>
+<circle cx="609.9" cy="243.8" r="4" fill="var(--surface)" stroke="var(--rust)" stroke-width="2"/>
+<circle cx="610.6" cy="249.1" r="4" fill="var(--surface)" stroke="var(--rust)" stroke-width="2"/>
+<circle cx="616.7" cy="230.1" r="4" fill="var(--surface)" stroke="var(--rust)" stroke-width="2"/>
+<text class="val" x="552.2" y="230.0">p99 2,882 ms</text>
+<text class="val" x="624.7" y="243.0">p99 1,185 ms</text>
+<text class="val" x="564.2" y="256.0">p99 1,024 ms</text>
+<text class="val" x="624.7" y="269.0">p99 758 ms</text>
+<text class="val" x="710.3" y="245.9">refused</text>
+<text class="val" x="758.6" y="248.1">refused</text>
 </svg>

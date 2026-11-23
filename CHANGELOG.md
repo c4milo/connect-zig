@@ -31,9 +31,9 @@ It builds on colibri v0.19.2, with Zig 0.16.0.
   2.32 MiB.
 - [docs/benchmarks.md](docs/benchmarks.md) loads OTLP receivers on connect-zig, connect-go and
   connect-rust with protovalidate, and with exports in gzip, zstd and brotli. Over TLS on an
-  arm64 core, connect-zig keeps 86% of its spans a second with validation: 2.7 times
+  arm64 core, connect-zig keeps 86% of its spans a second with validation: 2.5 times
   connect-rust's with protovalidate-buffa, and 11.2 times connect-go's with protovalidate-go.
-  gzip and zstd exports cost connect-zig 8% and 10% less CPU a span than uncompressed ones over
+  gzip and zstd exports cost connect-zig 7% and 8% less CPU a span than uncompressed ones over
   TLS, since they save more TLS and HTTP/2 work than its decoders spend.
 
 ### Changed

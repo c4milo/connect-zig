@@ -1518,6 +1518,16 @@ ran on Linux x86-64 with Zig 0.16.0.
     their own, and each ran again in a form that compiles.
   - pepegrillo moved to `e94a349`. Its commit linter still holds a subject to 72 columns, so
     `b6f90a1` still fails `zig build lint-commits`.
+- **Step 39 and the compression parts' sink in CI** (`57ec581`). CI's
+  [run 256](https://github.com/c4milo/connect-zig/actions/runs/45171587471). Every job passed.
+  - The sink's peak memory was 321 MiB on arm64 and 322 MiB on x86-64, where run 250 gave 352 and
+    354: the route's `reply_bytes` of 4 KiB.
+  - On `otlp-sink-compression`, of 256 calls, each uncompressed climb of connect-zig ended when p99
+    passed 100 ms, with its core busy, where with 64 calls each ended on a refused call. Over TLS
+    on arm64, connect-zig held 115%, 118% and 102% of its uncompressed rate in gzip, zstd and
+    brotli, and spent 7% and 8% less CPU a span in gzip and zstd, and 3% more in brotli.
+  - On x86-64, connect-zig's two main climbs passed every step, up to 1,139,200 spans a second,
+    the top of the climb. Its rates there are floors.
 - **Steps 36 to 38 in CI** (`a5db7e1`, decisions 37 and 46 as amended). CI's
   [run 250](https://github.com/c4milo/connect-zig/actions/runs/45111071415), on colibri v0.19.2.
   Every job passed.
