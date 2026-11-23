@@ -56,7 +56,10 @@ def read(path):
         row = {name: cells[index] for name, index in columns.items() if index < len(cells)}
         if table == "climb" and row.get("server") in colors and row["spans/s held"] != "no step":
             gap = number(row["resolution"]) / percent if row.get("resolution") else None
-            held[(row["server"], row["coding"])] = {"spans": number(row["spans/s held"]), "gap": gap}
+            # A climb that ended on a refused call ran out of the receiver's slots for calls in
+            # flight, not of its core: connect-zig's sink holds 64.
+            refused = row.get("the next step") == "a call refused"
+            held[(row["server"], row["coding"])] = {"spans": number(row["spans/s held"]), "gap": gap, "refused": refused}
         elif table == "peak" and row.get("export") == peak_spans and row.get("server") in colors and row["calls/s"] != "absent":
             low, high = row["calls/s range"].split("–")
             peak[(row["server"], row["coding"])] = {"rate": number(row["calls/s"]), "low": number(low), "high": number(high)}
@@ -103,7 +106,8 @@ subtitle = [
     f"Each receiver runs on one core {over}, on its library's own decoders. stdx's encoders wrote each export as a",
     "connect-zig client does: gzip at stdx's default level, zstd and brotli at level 1. Each bar is a share of the",
     "same receiver uncompressed, net of the TLS and HTTP/2 a smaller export saves. A whisker reaches the step that",
-    "failed in the climb, and spans the rounds at peak; ≥ marks a climb whose every step passed.",
+    "failed in the climb, and spans the rounds at peak; ≥ marks a climb whose every step passed, and \"slots full\"",
+    "one that ended on a call refused because every slot for a call in flight was taken.",
 ]
 line_h = 18
 top = 56 + (len(subtitle) + 1) * line_h + 40
@@ -192,6 +196,8 @@ for server, coding in rows:
         floor = "≥" if held[(server, coding)]["gap"] is None else ""
         spans = f"{floor}{held[(server, coding)]['spans']:,.0f}/s"
         label = spans if coding == "uncompressed" else f"{share[0]:.0f}% · {spans}"
+        if held[(server, coding)]["refused"]:
+            label += " · slots full"
         bar(climb_left, climb_w, climb_high, y, fill, share[0], share[0], share[1], label)
     rates = peak_share(server, coding)
     if rates:
