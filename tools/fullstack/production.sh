@@ -15,8 +15,9 @@
 # oha sends the exports at fixed rates, one process for each size, with its latency correction,
 # so the latency holds the time a call waited in a queue. The rate climbs one step at a time. A
 # step fails when its p99 passes 100 ms, when a call is refused, or when the core takes less than
-# 95% of the step's spans. Then five more steps halve the gap between the last step that passed
-# and the step that failed. Each step opens its connections again, so the measure leaves out its
+# 95% of the step's spans. A step that fails while the load's cores were 90% busy or more ends as
+# "load": the load, not the server, may have set the limit, so the rate held is a floor. Then five
+# more steps halve the gap between the last step that passed and the step that failed. Each step opens its connections again, so the measure leaves out its
 # first 2 seconds, where the TLS handshakes fall, for latency and refusals alike; the report counts
 # the calls refused then (tools/fullstack/production_step.py). The server runs once for the whole
 # climb, and its count of spans must equal what it was sent.
@@ -24,8 +25,8 @@
 # Each class: the spans of its export, and the connections that send it.
 production_classes="16:361 128:129 512:26"
 # The exports each connection sends a second, at each step. At 1, the core takes 35,600 spans a
-# second.
-production_steps="0.25 0.5 0.75 1 1.5 2 3 4 6 8 10 12 16 20 24 32"
+# second. An x86-64 core of connect-zig passed 32 in CI's run 256, so the steps reach 48.
+production_steps="0.25 0.5 0.75 1 1.5 2 3 4 6 8 10 12 16 20 24 32 40 48"
 # Halvings of the gap between the last step that passed and the step that failed. The steps grow
 # by up to half, so five halvings place the rate a core holds within 1/64 of it: a cost of a few
 # percent, such as validation's or a coding's, then shows (decision 44 as amended).
@@ -77,10 +78,13 @@ production_step() {
     step_rate="$2"
     echo "fullstack: production, ${transport}, $1, ${step_rate} a connection a second" >&2
     before="$(cpu_ticks "${server_pid}")"
+    load_before="$(load_ticks)"
     production_load "$1" "${step_rate}"
     after="$(cpu_ticks "${server_pid}")"
+    load_after="$(load_ticks)"
     set -- $(python3 tools/fullstack/production_step.py "${work}" "${warm_seconds}" \
-        "${step_seconds}" "${p99_limit_ms}" "${step_rate}" ${production_classes})
+        "${step_seconds}" "${p99_limit_ms}" "${step_rate}" "${load_before}" "${load_after}" \
+        ${production_classes})
     sent=$((sent + $1))
     echo "step ${transport} ${server} ${step_rate} $* $((after - before))"
     verdict="$7"

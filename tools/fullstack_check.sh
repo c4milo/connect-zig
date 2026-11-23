@@ -92,10 +92,10 @@ counter_metrics_port=18890
 # The server on core 1 and the load on cores 2 and 3, where the machine has 4.
 cores_needed=4
 if [ "$(nproc)" -ge "${cores_needed}" ]; then
-    server_pin="taskset -c 1" load_pin="taskset -c 2,3" load_threads=2
+    server_pin="taskset -c 1" load_pin="taskset -c 2,3" load_cores="2,3" load_threads=2
     placement="each server on core 1, the load on cores 2 and 3"
 else
-    server_pin="" load_pin="" load_threads=1
+    server_pin="" load_pin="" load_cores="" load_threads=1
     placement="no core pinned: the machine has fewer than ${cores_needed}"
 fi
 

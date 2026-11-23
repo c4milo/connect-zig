@@ -48,7 +48,8 @@ spans_per_rate = sum(spans * count for spans, count in classes)
 over = "over TLS" if transport == "tls" else "over cleartext h2"
 # What a step's first seconds hold, which its measure leaves out.
 starting = "each step's TLS handshakes run" if transport == "tls" else "each step opens its connections"
-ended_by = {"refused": "a call refused", "p99": f"p99 past {limit_ms:.0f} ms", "rate": "spans short of the rate"}
+ended_by = {"refused": "a call refused", "p99": f"p99 past {limit_ms:.0f} ms", "rate": "spans short of the rate",
+            "load": "the load's cores full"}
 print(f"## Full stack, production {over}: one gateway core for {fleet_servers:,} servers")
 print()
 print(f"Each server holds {connections} connections {over}, as one core of a {gateway_cores}-core gateway tier does")
@@ -60,10 +61,12 @@ print(f"{starting}. Every span was checked.")
 print()
 print("The rate a core holds lies between the step it held and the next step, which failed; the resolution gives")
 print("that gap as a share of the step held. A server that refuses calls past a fixed count, as connect-zig's sink")
-print("does past 64, refuses some calls in those first seconds: the held step's calls refused then.")
+print("does past 64, refuses some calls in those first seconds: the held step's calls refused then. A step that")
+print("fails while the load's cores were 90% busy or more ends the climb on the load's cores, and the rate held is then")
+print("a floor, with no resolution. The load's cores' share is at the step held.")
 print()
-print("| server | spans/s held | resolution | calls/s | p50 ms | p99 ms | core busy | CPU µs a span | peak MiB | refused at its start | the next step |")
-print("|---|--:|--:|--:|--:|--:|--:|--:|--:|--:|---|")
+print("| server | spans/s held | resolution | calls/s | p50 ms | p99 ms | core busy | load busy | CPU µs a span | peak MiB | refused at its start | the next step |")
+print("|---|--:|--:|--:|--:|--:|--:|--:|--:|--:|--:|---|")
 
 
 def validation_line(server, twin):
@@ -71,7 +74,7 @@ def validation_line(server, twin):
     cannot tell the two apart, and the CPU a span of each at the highest rate both held."""
     share = best[server]["spans"] / best[twin]["spans"] * percent
     if climb.apart(best[server], above[server], best[twin], above[twin]):
-        line = f"{names[server]} holds {share:.0f}% of {twin}'s spans a second"
+        line = f"{names[server]} holds {climb.bound(above[server], above[twin])}{share:.0f}% of {twin}'s spans a second"
     else:
         line = f"{names[server]} and {twin} hold rates the climb cannot tell apart ({share:.0f}%)"
     rate = climb.common_rate(steps[server], steps[twin])
@@ -86,20 +89,24 @@ best, above = {}, {}
 for server in servers:
     step, failed, verdict = climb.held(steps.get(server, []))
     if step is None:
-        print(f"| {names[server]} | none | | | | | | | | | {ended_by.get(verdict, verdict)} |")
+        print(f"| {names[server]} | none | | | | | | | | | | {ended_by.get(verdict, verdict)} |")
         continue
     best[server], above[server] = step, failed
     gap = climb.resolution(step, failed)
+    # A run with no core pinned measures no load's share.
+    load = "" if step["load"] < 0 else f"{step['load'] * percent:.0f}%"
     print(f"| {names[server]} | {step['spans']:,.0f} | {'' if gap is None else f'+{gap * percent:.1f}%'} | "
           f"{step['calls']:,.0f} | {step['p50']:.2f} | {step['p99']:.2f} | "
-          f"{step['busy'] * percent:.0f}% | {step['cpu']:.2f} | {memory.get(server, 0):.0f} | "
+          f"{step['busy'] * percent:.0f}% | {load} | "
+          f"{step['cpu']:.2f} | {memory.get(server, 0):.0f} | "
           f"{step['warm_refused']:,} | {ended_by.get(verdict, verdict)} |")
 print()
 if "connect-zig" in best:
     zig = best["connect-zig"]["spans"]
     for server in servers[1:]:
         if server in best and not server.endswith("-validate"):
-            print(f"- connect-zig holds {zig / best[server]['spans']:.2f} times {names[server]}'s spans a second on one core.")
+            print(f"- connect-zig holds {climb.bound(above['connect-zig'], above[server])}{zig / best[server]['spans']:.2f} times "
+                  f"{names[server]}'s spans a second on one core.")
     for server, twin in validating:
         if server in best and twin in best:
             print(f"- {validation_line(server, twin)}")

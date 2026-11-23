@@ -269,4 +269,12 @@ check_storage() {
 }
 
 cpu_ticks() { awk '{ print $14 + $15 }' "/proc/$1/stat"; }
+# The busy and the total ticks of the load's cores, as `<busy>:<total>`, from /proc/stat: every
+# field but idle and iowait is busy. With no core pinned, it gives `-`, and no step reads it.
+load_ticks() {
+    [ -n "${load_cores:-}" ] || { echo -; return; }
+    awk -v cores="${load_cores}" 'BEGIN { split(cores, list, ","); for (i in list) want["cpu" list[i]] = 1 }
+        $1 in want { for (f = 2; f <= NF; f++) { total += $f; if (f != 5 && f != 6) busy += $f } }
+        END { print busy ":" total }' /proc/stat
+}
 peak_kb() { awk '/^VmHWM:/ { print $2 }' "/proc/$1/status"; }

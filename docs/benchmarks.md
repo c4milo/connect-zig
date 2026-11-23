@@ -126,8 +126,10 @@ to. Each server holds 516 connections. 70%, 25% and 5% of them send gzip exports
 spans. [oha](https://github.com/hatoo/oha) sends at fixed rates, and its latency holds the time a
 call waits in a queue. Each step lasts 10 s, and its measure leaves out the first 2 s, where its TLS
 handshakes run. The rate climbs until p99 passes 100 ms, a call is refused, or the server takes
-less than 95% of the spans sent. Then five more steps halve the gap to the last step that passed,
-so each rate is known within 1/64 of it. CI's two `fullstack` jobs of commit `57ec581` ([run
+less than 95% of the spans sent. A step that fails while oha's two cores were 90% busy or more ends
+the climb on the load, not on the server: oha corrects its latency for each call it sends late, so
+a load that falls behind would show as the server's p99. The rate held is then a floor. Then five
+more steps halve the gap to the last step that passed, so each rate is known within 1/64 of it. CI's two `fullstack` jobs of commit `57ec581` ([run
 256](https://github.com/c4milo/connect-zig/actions/runs/45171587471)) ran it on colibri v0.19.2 and
 Ubuntu 26.04, on an Arm Neoverse-N2 core and on an AMD EPYC 9V45 core. The charts show the climb
 over TLS 1.3: one core of connect-zig held 8.0 times connect-go's spans a second on arm64 and at
@@ -168,8 +170,9 @@ sink grew to 500 MiB in run 248. Over TLS on arm64, connect-rust grew to 52 MiB,
 146 MiB, the Collector to 755 MiB and Vector to 743 MiB; in cleartext, Rotel grew to 324 MiB.
 
 On arm64, connect-zig's climbs ended when p99 passed 100 ms, with its core busy all the time. On
-x86-64 they passed every step, up to 1,139,200 spans a second sent, the top of the climb. There its
-rate is a floor, and each ratio over it is at least its value. Every other server's climb ended
+x86-64 they passed every step, up to 1,139,200 spans a second sent, the top of run 256's climb.
+There its rate is a floor, and each ratio over it is at least its value. The climb now reaches 48
+exports a connection a second, 1,708,800 spans a second. Every other server's climb ended
 when p99 passed 100 ms. A runner's CPU model changes from run to run on x86-64, so its rates move
 between runs; the arm64 runner has been a Neoverse-N2 in each run.
 

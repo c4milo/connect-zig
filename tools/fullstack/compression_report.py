@@ -42,7 +42,8 @@ microseconds = 1_000_000
 over = "over TLS" if transport == "tls" else "over cleartext h2"
 # What a step's first seconds hold, which its measure leaves out.
 starting = "the TLS handshakes run" if transport == "tls" else "the connections open"
-ended_by = {"refused": "a call refused", "p99": f"p99 past {limit_ms:.0f} ms", "rate": "spans short of the rate"}
+ended_by = {"refused": "a call refused", "p99": f"p99 past {limit_ms:.0f} ms", "rate": "spans short of the rate",
+            "load": "the load's cores full"}
 spans_per_rate = sum(spans * count for spans, count in classes)
 
 
@@ -110,7 +111,8 @@ def write_climb_lines(server, held):
         step, above = held[(server, coding)]
         share = step["spans"] / plain[0]["spans"] * percent
         if climb.apart(step, above, *plain):
-            print(f"- {server} in {coding_names[coding]} holds {share:.0f}% of its uncompressed spans a second.")
+            print(f"- {server} in {coding_names[coding]} holds {climb.bound(above, plain[1])}{share:.0f}% of its uncompressed "
+                  "spans a second.")
         else:
             print(f"- {server} in {coding_names[coding]} and uncompressed hold rates the climb cannot tell apart ({share:.0f}%).")
     rate = climb.common_rate(*(climbs[coding].get(server, []) for coding in codings))
@@ -185,7 +187,8 @@ print()
 print(f"Each receiver holds {connections} connections, as one core of a 64-core gateway for 33,000 servers, and the rate")
 print(f"climbs until p99 passes {limit_ms:.0f} ms or a measured call is refused. Each step lasts {seconds:.0f} s, and its measure leaves")
 print(f"out its first seconds, where {starting}. The rate a core holds lies between the step it held and")
-print("the next step, which failed; the resolution gives that gap as a share of the step held.")
+print("the next step, which failed; the resolution gives that gap as a share of the step held. A step that fails")
+print("while the load's cores were 90% busy or more ends the climb on the load's cores: the rate held is a floor.")
 print()
 write_climb()
 print(f"### The peak {over}")

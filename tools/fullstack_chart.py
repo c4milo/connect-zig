@@ -279,7 +279,7 @@ for name in servers:
         a(f'<circle cx="{x:.1f}" cy="{y:.1f}" r="4" fill="{inside}" stroke="var({stroke})" stroke-width="2"/>')
     x, y, (last, failed) = points[-1]
     if failed:
-        text = "refused" if failed == "refused" else ("short of the rate" if failed == "rate" else f"p99 {last:,.0f} ms")
+        text = {"refused": "refused", "rate": "short of the rate", "load": "load full"}.get(failed, f"p99 {last:,.0f} ms")
         labels.append([max(y + 4, top + 8), x, text])
 # Each label of a failed step sits beside its point, to the right, or above it and to the left at
 # the right edge. A label that would cover the one above it moves down a line.
