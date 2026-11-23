@@ -189,57 +189,69 @@ where
     /// Returns a function that runs the operation n times.
     fn runner(&self, operation: &str) -> Run<'_> {
         match operation {
-            "binary encode" => {
-                let mut buffer = Vec::with_capacity(self.binary.len());
-                Box::new(move |n| {
-                    for _ in 0..n {
-                        buffer.clear();
-                        self.input.encode(&mut buffer);
-                        black_box(buffer.len());
-                    }
-                    Ok(())
-                })
-            }
+            "binary encode" => self.binary_encode(),
             "binary decode" | "binary decode+walk" => {
-                let walk = operation == "binary decode+walk";
-                Box::new(move |n| {
-                    for _ in 0..n {
-                        let view = T::decode_view(black_box(&self.binary))
-                            .map_err(|error| error.to_string())?;
-                        if walk {
-                            black_box(view.walk());
-                        }
-                        black_box(&view);
-                    }
-                    Ok(())
-                })
+                self.binary_decode(operation == "binary decode+walk")
             }
-            "JSON encode" => {
-                let mut buffer = Vec::with_capacity(self.json.len());
-                Box::new(move |n| {
-                    for _ in 0..n {
-                        buffer.clear();
-                        serde_json::to_writer(&mut buffer, &self.input)
-                            .map_err(|error| error.to_string())?;
-                        black_box(buffer.len());
-                    }
-                    Ok(())
-                })
-            }
-            _ => {
-                let walk = operation == "JSON decode+walk";
-                Box::new(move |n| {
-                    for _ in 0..n {
-                        let decoded: T = serde_json::from_slice(black_box(&self.json))
-                            .map_err(|error| error.to_string())?;
-                        if walk {
-                            black_box(decoded.walk());
-                        }
-                        black_box(&decoded);
-                    }
-                    Ok(())
-                })
-            }
+            "JSON encode" => self.json_encode(),
+            _ => self.json_decode(operation == "JSON decode+walk"),
         }
+    }
+
+    /// Encodes the input n times into one buffer, which each call clears.
+    fn binary_encode(&self) -> Run<'_> {
+        let mut buffer = Vec::with_capacity(self.binary.len());
+        Box::new(move |n| {
+            for _ in 0..n {
+                buffer.clear();
+                self.input.encode(&mut buffer);
+                black_box(buffer.len());
+            }
+            Ok(())
+        })
+    }
+
+    /// Decodes the binary encoding n times into a view, and walks each view when `walk` is set.
+    fn binary_decode(&self, walk: bool) -> Run<'_> {
+        Box::new(move |n| {
+            for _ in 0..n {
+                let view =
+                    T::decode_view(black_box(&self.binary)).map_err(|error| error.to_string())?;
+                if walk {
+                    black_box(view.walk());
+                }
+                black_box(&view);
+            }
+            Ok(())
+        })
+    }
+
+    /// Writes the input as JSON n times into one buffer, which each call clears.
+    fn json_encode(&self) -> Run<'_> {
+        let mut buffer = Vec::with_capacity(self.json.len());
+        Box::new(move |n| {
+            for _ in 0..n {
+                buffer.clear();
+                serde_json::to_writer(&mut buffer, &self.input)
+                    .map_err(|error| error.to_string())?;
+                black_box(buffer.len());
+            }
+            Ok(())
+        })
+    }
+
+    /// Decodes the JSON encoding n times into a message, and walks each one when `walk` is set.
+    fn json_decode(&self, walk: bool) -> Run<'_> {
+        Box::new(move |n| {
+            for _ in 0..n {
+                let decoded: T = serde_json::from_slice(black_box(&self.json))
+                    .map_err(|error| error.to_string())?;
+                if walk {
+                    black_box(decoded.walk());
+                }
+                black_box(&decoded);
+            }
+            Ok(())
+        })
     }
 }

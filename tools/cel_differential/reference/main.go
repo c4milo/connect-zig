@@ -18,6 +18,7 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protodesc"
 	"google.golang.org/protobuf/reflect/protoreflect"
+	"google.golang.org/protobuf/reflect/protoregistry"
 	"google.golang.org/protobuf/types/descriptorpb"
 	"google.golang.org/protobuf/types/dynamicpb"
 )
@@ -49,30 +50,8 @@ func main() {
 	if len(os.Args) != 3 {
 		fail(errors.New("usage: reference <descriptor set> <messages.txt>"))
 	}
-	encoded, err := os.ReadFile(os.Args[1])
-	if err != nil {
-		fail(err)
-	}
-	set := &descriptorpb.FileDescriptorSet{}
-	if err := proto.Unmarshal(encoded, set); err != nil {
-		fail(err)
-	}
-	files, err := protodesc.NewFiles(set)
-	if err != nil {
-		fail(err)
-	}
-	text, err := os.ReadFile(os.Args[2])
-	if err != nil {
-		fail(err)
-	}
-	var payloads [][]byte
-	for _, line := range strings.Fields(string(text)) {
-		payload, err := hex.DecodeString(line)
-		if err != nil {
-			fail(err)
-		}
-		payloads = append(payloads, payload)
-	}
+	files := readFiles(os.Args[1])
+	payloads := readPayloads(os.Args[2])
 	validator, err := protovalidate.New()
 	if err != nil {
 		fail(err)
@@ -92,4 +71,38 @@ func main() {
 			fmt.Fprintf(out, "%d %d %s\n", index, number, verdict(validator, message))
 		}
 	}
+}
+
+// readFiles reads the descriptor set at path into the registry of its files.
+func readFiles(path string) *protoregistry.Files {
+	encoded, err := os.ReadFile(path)
+	if err != nil {
+		fail(err)
+	}
+	set := &descriptorpb.FileDescriptorSet{}
+	if err := proto.Unmarshal(encoded, set); err != nil {
+		fail(err)
+	}
+	files, err := protodesc.NewFiles(set)
+	if err != nil {
+		fail(err)
+	}
+	return files
+}
+
+// readPayloads reads the messages file at path: one encoded message a line, in hexadecimal.
+func readPayloads(path string) [][]byte {
+	text, err := os.ReadFile(path)
+	if err != nil {
+		fail(err)
+	}
+	var payloads [][]byte
+	for _, line := range strings.Fields(string(text)) {
+		payload, err := hex.DecodeString(line)
+		if err != nil {
+			fail(err)
+		}
+		payloads = append(payloads, payload)
+	}
+	return payloads
 }

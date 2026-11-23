@@ -47,14 +47,7 @@ func main() {
 }
 
 func run(args []string) error {
-	current, directory := full, ""
-	for _, arg := range args {
-		if arg == "--quick" {
-			current = quick
-		} else {
-			directory = arg
-		}
-	}
+	current, directory := parseArgs(args)
 	if directory == "" {
 		return errors.New("usage: validate-go [--quick] <directory>")
 	}
@@ -66,41 +59,71 @@ func run(args []string) error {
 	fmt.Println("| case | verdict | validate ns/op | decode and validate ns/op |")
 	fmt.Println("| --- | --- | ---: | ---: |")
 	for _, c := range cases {
-		bytes, err := os.ReadFile(filepath.Join(directory, c.file))
+		row, err := measureCase(validator, current, directory, c)
 		if err != nil {
 			return err
 		}
-		message := c.empty()
-		if err := proto.Unmarshal(bytes, message); err != nil {
+		fmt.Println(row)
+	}
+	return nil
+}
+
+// parseArgs gives the settings and the directory of the cases: --quick picks the quick settings,
+// and any other argument names the directory.
+func parseArgs(args []string) (settings, string) {
+	current, directory := full, ""
+	for _, arg := range args {
+		if arg == "--quick" {
+			current = quick
+		} else {
+			directory = arg
+		}
+	}
+	return current, directory
+}
+
+// measureCase reads one case's message and gives its row: its verdict, and the median ns of a
+// Validate call and of an Unmarshal and Validate call.
+func measureCase(validator protovalidate.Validator, current settings, directory string, c benchCase) (string, error) {
+	bytes, err := os.ReadFile(filepath.Join(directory, c.file))
+	if err != nil {
+		return "", err
+	}
+	message := c.empty()
+	if err := proto.Unmarshal(bytes, message); err != nil {
+		return "", err
+	}
+	verdict, err := verdictOf(validator, message)
+	if err != nil {
+		return "", err
+	}
+	ns, err := medianNs(current, func(n uint64) error { return validateTimes(validator, message, n) })
+	if err != nil {
+		return "", err
+	}
+	bothNs, err := medianNs(current, func(n uint64) error { return decodeValidateTimes(validator, c, bytes, n) })
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("| %s | %s | %.1f | %.1f |", c.name, verdict, ns, bothNs), nil
+}
+
+// validateTimes validates the message n times.
+func validateTimes(validator protovalidate.Validator, message proto.Message, n uint64) error {
+	for i := uint64(0); i < n; i++ {
+		_ = validator.Validate(message)
+	}
+	return nil
+}
+
+// decodeValidateTimes unmarshals the case's octets into a new message and validates it, n times.
+func decodeValidateTimes(validator protovalidate.Validator, c benchCase, bytes []byte, n uint64) error {
+	for i := uint64(0); i < n; i++ {
+		fresh := c.empty()
+		if err := proto.Unmarshal(bytes, fresh); err != nil {
 			return err
 		}
-		verdict, err := verdictOf(validator, message)
-		if err != nil {
-			return err
-		}
-		ns, err := medianNs(current, func(n uint64) error {
-			for i := uint64(0); i < n; i++ {
-				_ = validator.Validate(message)
-			}
-			return nil
-		})
-		if err != nil {
-			return err
-		}
-		bothNs, err := medianNs(current, func(n uint64) error {
-			for i := uint64(0); i < n; i++ {
-				fresh := c.empty()
-				if err := proto.Unmarshal(bytes, fresh); err != nil {
-					return err
-				}
-				_ = validator.Validate(fresh)
-			}
-			return nil
-		})
-		if err != nil {
-			return err
-		}
-		fmt.Printf("| %s | %s | %.1f | %.1f |\n", c.name, verdict, ns, bothNs)
+		_ = validator.Validate(fresh)
 	}
 	return nil
 }
