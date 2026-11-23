@@ -276,8 +276,9 @@ confirm a test fails. Report `CAUGHT` or `NOT CAUGHT` per mutation in the commit
   connections that stay open across the climb and a mix of gzip exports, at rates that climb
   until p99 passes 100 ms. Each server climbs in three rounds, each on a new process, and the
   reports give the median and the range. Vector v0.62.0, in Rust, joins both over TLS, and Rotel
-  v0.2.7, in Rust with no receiver TLS, joins the climbs in cleartext of `production-cleartext`,
-  which `tools/ci.sh` runs as the check `fullstack-cleartext`. Receivers on connect-go and
+  v0.2.7, in Rust with no receiver TLS, joins the climbs in cleartext of `production-cleartext`.
+  `tools/ci.sh` runs `production` as the check `fullstack`, `peak` as `fullstack-peak`, and
+  `production-cleartext` as `fullstack-cleartext`. Receivers on connect-go and
   connect-rust, `tools/fullstack/connect-go` and `tools/fullstack/connect-rust`, join both over
   TLS (decision 46); the check builds them into the cache, unless `CONNECT_GO` and
   `CONNECT_RUST` name built ones. The three Connect receivers also join a second time, checking

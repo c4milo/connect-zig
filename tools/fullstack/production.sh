@@ -47,8 +47,13 @@ search_low=0.8
 search_high=1.2
 search_moves=4
 search_halvings=4
-rest_seconds=5
+# The wait after a step that failed, while the server's queue empties: the load holds at most
+# `connection_streams` calls in flight on each connection, which a core answers in under a second.
+rest_seconds=3
 step_seconds=10
+# The step at half a rate held before, which warms a new process before a search or the long
+# step. It also gives each coding of a server one rate in common, where their CPU compares.
+warm_seconds=5
 # The long step of each server after its rounds, at the median rate it held: six steps, so a rate
 # a step of 10 s held by chance shows. Each step line's first word: `step` for the rounds, and
 # `confirm` for the long step and the step at half its rate that warms the server before it.
@@ -168,11 +173,12 @@ production_step() {
     verdict="$7"
 }
 
-# One step that moves `passed` or `failed`. A step that failed leaves calls in the server's queue,
-# so the next step waits `rest_seconds` first.
+# One step that moves `passed` or `failed`, for `step_seconds` or the seconds of the second
+# argument. A step that failed leaves calls in the server's queue, so the next step waits
+# `rest_seconds` first.
 production_try() {
     [ "${verdict}" = pass ] || sleep "${rest_seconds}"
-    production_step "${server}" "$1" || return 1
+    production_step "${server}" "$1" "${2:-}" || return 1
     if [ "${verdict}" = pass ]; then passed="$1"; else failed="$1"; fi
 }
 
@@ -219,11 +225,12 @@ production_search() {
     production_halve "${search_halvings}"
 }
 
-# A step at the highest rate of `production_steps` at or below half of the argument, when one is.
+# A step of `warm_seconds` at the highest rate of `production_steps` at or below half of the
+# argument, when one is.
 production_warm() {
     warm="$(echo ${production_steps} | awk -v rate="$1" \
         '{ warm = 0; for (i = 1; i <= NF; i++) if ($i <= rate / 2) warm = $i; print warm }')"
-    [ "${warm}" = 0 ] || production_try "${warm}"
+    [ "${warm}" = 0 ] || production_try "${warm}" "${warm_seconds}"
 }
 
 # The rate a server held in an earlier round, for the transport and the tag: in that coding if

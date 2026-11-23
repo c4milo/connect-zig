@@ -12,7 +12,7 @@
 # `--list` as a job of its own, so each shows apart in GitHub.
 set -eu
 cd "$(dirname "$0")/.."
-checks="format citations commits test release package bench costs bench-compare fullstack fullstack-cleartext fullstack-compression fullstack-compression-cleartext perf generated interop interop-languages interop-servers coverage line-coverage conformance protobuf-conformance protovalidate-conformance cel-differential cel-conformance compile-time validate-compare lean"
+checks="format citations commits test release package bench costs bench-compare fullstack fullstack-peak fullstack-cleartext fullstack-compression fullstack-compression-cleartext perf generated interop interop-languages interop-servers coverage line-coverage conformance protobuf-conformance protovalidate-conformance cel-differential cel-conformance compile-time validate-compare lean"
 only=""
 case "${1:-}" in
     --list)
@@ -108,14 +108,18 @@ check() {
             draw_charts "${compare}" bench-compare
             return "${compare_status}" ;;
         # Whole servers over TLS and h2, connect-zig's OTLP sink beside OpenTelemetry's Collector
-        # (decision 44). The times report and never gate; every span must arrive. The climbs in
-        # cleartext h2 are a job of their own, which the 90 minutes of a job hold, and draw no chart.
-        fullstack) full="$(tools/fullstack_check.sh)" && full_status=0 || full_status=$?
+        # (decision 44). The times report and never gate; every span must arrive. The peak and the
+        # climbs in cleartext h2 are jobs of their own, which the 90 minutes of a job hold, and
+        # draw no chart.
+        fullstack) full="$(tools/fullstack_check.sh production)" && full_status=0 || full_status=$?
             report_only fullstack "${full}"
             draw_charts "${full}" fullstack
             return "${full_status}" ;;
-        fullstack-cleartext) full="$(tools/fullstack_check.sh production-cleartext)" && full_status=0 || full_status=$?
-            report_only fullstack-cleartext "${full}"
+        fullstack-peak | fullstack-cleartext)
+            part=peak
+            [ "$1" = fullstack-peak ] || part=production-cleartext
+            full="$(tools/fullstack_check.sh "${part}")" && full_status=0 || full_status=$?
+            report_only "$1" "${full}"
             return "${full_status}" ;;
         # The Connect receivers with exports in gzip, zstd and brotli, over TLS and in cleartext,
         # each a job of its own, which the 90 minutes of a CI job hold (decision 46 as amended).

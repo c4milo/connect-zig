@@ -1143,15 +1143,16 @@ first. Cite an entry by number in code and commits ("decision 6").
     - Amended a fourth time on 2026-11-23, after the same review: each server climbs in three
       rounds, each on a new process. One climb's rate moved by up to 38% between CI runs on
       x86-64, so a single climb could not tell a cost of a few percent from the runner. The first
-      round climbs from the lowest rate. Each later round runs a step at half the rate held
+      round climbs from the lowest rate. Each later round runs a step of 5 s at half the rate held
       before, then brackets it at 0.8 and 1.2 times and halves the gap four times, so it costs
       about half a climb. Round r runs the servers in their order rotated by r - 1, so a drift of
       the runner does not always fall on the same server. The reports give the median round, the
       range, and each ratio of two servers round by round, since one round runs both near in
       time. Two rates whose intervals over the rounds overlap read as rates the rounds cannot
       tell apart. The compression part runs three rounds of each coding, and each receiver's first
-      climb alone steps up from the lowest rate. To hold the 90 minutes of a CI job, the climbs in
-      cleartext run in a check of their own, `fullstack-cleartext`, which draws no chart. Beaten:
+      climb alone steps up from the lowest rate. To hold the 90 minutes of a CI job, the peak and
+      the climbs in cleartext run in checks of their own, `fullstack-peak` and
+      `fullstack-cleartext`, on x86-64 alone, and draw no chart. Beaten:
       three whole climbs, which do not fit a job, and three runs of the job, whose runners differ.
     - Amended a fifth time on 2026-11-23: after its rounds, each server runs one step of 60 s at
       the median rate it held, on a new process, after a step at half of it, and the report says
