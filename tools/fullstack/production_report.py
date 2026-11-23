@@ -180,7 +180,7 @@ print(f"Machine: {machine()}.")
 print(f"Load: {load_text}, {placement}.")
 chosen = climb.suites(results, transport)
 if chosen:
-    print("TLS 1.3 suites: the load offers TLS_AES_128_GCM_SHA256 alone, and each server's connections ran "
+    print("TLS: the load offers AES-128-GCM alone, in TLS 1.3 and in TLS 1.2, and each server's connections ran "
           + ", ".join(f"{names.get(server, server)} {chosen[server]}" for server in servers if server in chosen) + ".")
 print(f"Servers: connect-zig {commit} in ReleaseSafe, `tools/otlp_sink`; "
       + "; ".join(setups[server] for server in servers if server in setups) + ".")

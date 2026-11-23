@@ -71,8 +71,11 @@ case "$(uname -m)" in
 esac
 h2load="${H2LOAD:-h2load}"
 buf="${BUF:-buf}"
-# TLS 1.3's one suite every implementation must have (RFC 8446 §9.1), so each server runs the same.
+# TLS 1.3's one suite every implementation must have (RFC 8446 §9.1), so each server runs the same,
+# and the same cipher in TLS 1.2 for Vector, whose gRPC listener speaks TLS 1.2 alone. The test
+# identity's key is ECDSA P-256.
 tls_suite=TLS_AES_128_GCM_SHA256
+tls12_cipher=ECDHE-ECDSA-AES128-GCM-SHA256
 ca=examples/harness/tls/ca.pem
 export_path=/opentelemetry.proto.collector.trace.v1.TraceService/Export
 sink_port=14317

@@ -230,7 +230,7 @@ print(f"Load: {h2load} at the peak and {load_text} in the climb, {placement}.")
 if transport == "tls":
     # Both loads offer the one suite: h2load by its option, and the climb's load alone.
     chosen = climb.suites(os.path.join(work, "compression-climb-identity"), transport)
-    print(f"TLS 1.3 suite: both loads offer {suite} alone" + (", and each receiver's connections in the climb ran "
+    print(f"TLS: both loads offer AES-128-GCM alone, {suite} in TLS 1.3" + (", and each receiver's connections in the climb ran "
           + ", ".join(f"{server} {chosen[server]}" for server in servers if server in chosen) if chosen else "") + ".")
 print(f"Servers: connect-zig {commit} in ReleaseSafe, `otlp-sink-compression`, which holds more calls at once than the other parts' sink, "
       f"on stdx's decoders; {connect_go}, GOMAXPROCS=1, "

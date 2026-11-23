@@ -71,8 +71,10 @@ for line in open(log_path):
     if not line.startswith("|") or "---" in line:
         continue
     cells = [cell.strip() for cell in line.strip("|").split("|")]
-    if cells[0] == "server" and "spans/s held" in cells:
-        held_columns = {name: index for index, name in enumerate(cells)}
+    if cells[0] == "server":
+        # The table of the rates held, or another table whose rows also start with a server's
+        # name, such as the long step's, which this reads none of.
+        held_columns = {name: index for index, name in enumerate(cells)} if "spans/s held" in cells else None
     elif cells[0] == "exports a connection a second":
         columns = {cells[index][:-len(" p99")]: index for index in range(2, len(cells), 2)}
     elif cells[0] in looks and held_columns and cells[held_columns["spans/s held"]] != "none":

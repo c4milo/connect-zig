@@ -1133,8 +1133,10 @@ first. Cite an entry by number in code and commits ("decision 6").
       oha. It opens its 516 connections once and keeps them across the climb, as the agents keep
       theirs. So a step holds no TLS handshake, every call counts, and the 2 s that each step
       left out goes, with its column. It sends each class's 32 variants of its export in turn,
-      so a decoder does not read the same octets on every call. It offers TLS_AES_128_GCM_SHA256
-      alone, as h2load does at the peak, and the report names the suite its connections ran. It
+      so a decoder does not read the same octets on every call. It offers AES-128-GCM alone, as
+      h2load does at the peak, and the report names the suite its connections ran. It offers it
+      in TLS 1.3 and in TLS 1.2: Vector's gRPC listener speaks TLS 1.2 alone, and answered run
+      265's offer of TLS 1.3 alone with a protocol_version alert, so Vector ran no climb there. It
       keeps oha's open schedule: each connection sends at ticks of its own, each class spreads
       its ticks over the interval, and a call's latency runs from its tick. Before each step it
       opens again a connection the server closed, and the report counts them. Beaten: oha, which

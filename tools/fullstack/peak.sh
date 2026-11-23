@@ -29,7 +29,8 @@ peak_encoding=""
 peak_load() {
     ${load_pin} "${h2load}" -n "$3" -c "${peak_connections}" -m "${peak_streams}" \
         -t "${load_threads}" \
-        --tls13-ciphers="${tls_suite}" -d "${work}/${peak_export}-$2${peak_tag}.grpc" \
+        --tls13-ciphers="${tls_suite}" --ciphers="${tls12_cipher}" \
+        -d "${work}/${peak_export}-$2${peak_tag}.grpc" \
         -H 'content-type: application/grpc' -H 'te: trailers' \
         ${peak_encoding:+-H "grpc-encoding: ${peak_encoding}"} ${4:+"--log-file=$4"} \
         "$(url_of "$1" "${export_path}")"
@@ -90,6 +91,7 @@ peak_part() {
     loader="$("${h2load}" --version | head -1)"
     python3 tools/fullstack/peak_report.py "${work}" "$(getconf CLK_TCK)" "${loader}" \
         "${collector}" "${vector_text}" "${connect_go_text}" "${connect_rust_text}" "${commit}" \
-        "${placement}" "${peak_rounds}" "${peak_connections}" "${peak_streams}" "${tls_suite}"
+        "${placement}" "${peak_rounds}" "${peak_connections}" "${peak_streams}" \
+        "${tls_suite}, or ${tls12_cipher} in TLS 1.2 for Vector"
     echo
 }

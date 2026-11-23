@@ -4,8 +4,9 @@
 //!     fullstack-load --address <host:port> --path <path> [--ca <ca.pem>] [--encoding <coding>]
 //!                    [--streams <n>] [--threads <n>] --class <spans>:<connections>:<file>,<file>...
 //!
-//! It opens every class's connections once, over TLS 1.3 offering TLS_AES_128_GCM_SHA256 alone
-//! when `--ca` names the test CA, or over cleartext h2. It then prints `ready <connections>
+//! It opens every class's connections once, over TLS offering AES-128-GCM alone when `--ca` names
+//! the test CA, or over cleartext h2. It offers TLS 1.3 and TLS 1.2, since Vector's listener speaks
+//! TLS 1.2 alone. It then prints `ready <connections>
 //! <suite>`, and reads one command a line from standard input:
 //!
 //! - `step <rate> <seconds> <dir>`: each connection sends <rate> exports a second for <seconds>,
@@ -253,8 +254,9 @@ fn read_classes(options: &Options) -> Result<Vec<Class>, String> {
         .collect()
 }
 
-/// TLS 1.3 alone, with TLS_AES_128_GCM_SHA256 alone, so every server runs the same suite; h2 by
-/// ALPN; the test CA as the only root.
+/// AES-128-GCM alone, so every server runs the same cipher: TLS_AES_128_GCM_SHA256 in TLS 1.3, and
+/// for a server of TLS 1.2 alone, as Vector's listener is, the same cipher with ECDHE. h2 by ALPN,
+/// and the test CA as the only root.
 fn connector(ca: &str) -> Result<tokio_rustls::TlsConnector, String> {
     let file = std::fs::File::open(ca).map_err(|error| format!("{ca}: {error}"))?;
     let mut roots = rustls::RootCertStore::empty();
@@ -263,9 +265,13 @@ fn connector(ca: &str) -> Result<tokio_rustls::TlsConnector, String> {
         roots.add(certificate).map_err(|error| format!("{ca}: {error}"))?;
     }
     let mut provider = rustls::crypto::ring::default_provider();
-    provider.cipher_suites = vec![rustls::crypto::ring::cipher_suite::TLS13_AES_128_GCM_SHA256];
+    provider.cipher_suites = vec![
+        rustls::crypto::ring::cipher_suite::TLS13_AES_128_GCM_SHA256,
+        rustls::crypto::ring::cipher_suite::TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
+        rustls::crypto::ring::cipher_suite::TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
+    ];
     let mut config = rustls::ClientConfig::builder_with_provider(Arc::new(provider))
-        .with_protocol_versions(&[&rustls::version::TLS13])
+        .with_protocol_versions(&[&rustls::version::TLS13, &rustls::version::TLS12])
         .map_err(|error| error.to_string())?
         .with_root_certificates(roots)
         .with_no_client_auth();
