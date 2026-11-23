@@ -20,6 +20,8 @@ log_path, run, commit, transport = sys.argv[1:5]
 suffix = "" if transport == "tls" else "-cleartext"
 out = sys.argv[5] if len(sys.argv) > 5 else f"docs/images/fullstack-compression{suffix}.svg"
 over = "over TLS" if transport == "tls" else "over cleartext h2"
+# The work a smaller export saves on the wire.
+saved = "the TLS and HTTP/2" if transport == "tls" else "the HTTP/2"
 # Each receiver's color, as in every chart of the README. A row's label names its coding.
 colors = {"connect-zig": "--zig", "connect-go": "--go", "connect-rust": "--rust"}
 codings = ["uncompressed", "gzip", "zstd", "brotli"]
@@ -105,7 +107,7 @@ pad_l = 24
 subtitle = [
     f"Each receiver runs on one core {over}, on its library's own decoders. stdx's encoders wrote each export as a",
     "connect-zig client does: gzip at stdx's default level, zstd and brotli at level 1. Each bar is a share of the",
-    "same receiver uncompressed, net of the TLS and HTTP/2 a smaller export saves. A whisker reaches the step that",
+    f"same receiver uncompressed, net of {saved} a smaller export saves. A whisker reaches the step that",
     "failed in the climb, and spans the rounds at peak; ≥ marks a climb whose every step passed, and \"slots full\"",
     "one that ended on a call refused because every slot for a call in flight was taken.",
 ]
@@ -113,8 +115,8 @@ line_h = 18
 top = 56 + (len(subtitle) + 1) * line_h + 40
 row_h, row_gap, group_gap, heading_h = 18, 8, 14, 22
 label_right = pad_l + 110
-climb_left, climb_w = label_right + 12, 200
-peak_left, peak_w = climb_left + climb_w + 130, 190
+climb_left, climb_w = label_right + 12, 170
+peak_left, peak_w = climb_left + climb_w + 200, 160
 groups = len({server for server, _ in rows})
 H = top + 12 + len(rows) * (row_h + row_gap) + (groups - 1) * group_gap + groups * heading_h + 20
 climb_high = max([110.0] + [climb_share(*row)[1] for row in rows if climb_share(*row)])

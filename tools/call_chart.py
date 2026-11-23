@@ -96,9 +96,13 @@ pad_t = 134
 panel_w, panel_h = 384, 120
 gap_x = 24
 label_w = 112
-plot_w = panel_w - label_w - 44
+# The room past the longest bar for its label, "23.4×, 0.35 µs".
+value_label_w = 92
+plot_w = panel_w - label_w - value_label_w
 x_max = max(2, math.ceil(max(present(zig_speed) + present(rust_speed))))
-tick_step = 1 if x_max <= 8 else 2
+# The least pixels between two ticks, so that "20×" and "25×" stay apart.
+tick_gap_min = 28
+tick_step = next(step for step in (1, 2, 5, 10, 20, 50) if step * plot_w / x_max >= tick_gap_min)
 bar_h, bar_gap, group_gap = 13, 2, 10
 group_h = 2 * bar_h + bar_gap
 row_h = group_h + group_gap

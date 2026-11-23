@@ -40,6 +40,8 @@ coded = codings[1:]
 percent = 100
 microseconds = 1_000_000
 over = "over TLS" if transport == "tls" else "over cleartext h2"
+# What a step's first seconds hold, which its measure leaves out.
+starting = "the TLS handshakes run" if transport == "tls" else "the connections open"
 ended_by = {"refused": "a call refused", "p99": f"p99 past {limit_ms:.0f} ms", "rate": "spans short of the rate"}
 spans_per_rate = sum(spans * count for spans, count in classes)
 
@@ -174,7 +176,7 @@ print(f"Each Connect receiver takes the production model's OTLP exports {over}, 
       + ", ".join(coding_names[coding] for coding in coded[:-1]) + f" and {coding_names[coded[-1]]}.")
 print("stdx's encoders wrote each export as a connect-zig client places them: gzip at stdx's default level, zstd and")
 print("brotli at level 1. Each receiver decodes with its library's own decoders, at their defaults. A smaller export")
-print("also costs less TLS and HTTP/2, so each share is the coding's cost net of what it saves on the wire. No")
+print(f"also costs less {'TLS and HTTP/2' if transport == 'tls' else 'HTTP/2'}, so each share is the coding's cost net of what it saves on the wire. No")
 print("OpenTelemetry exporter sends brotli. Every span was checked. The octets of each export:")
 print()
 write_octets()
@@ -182,7 +184,7 @@ print(f"### The climb {over}")
 print()
 print(f"Each receiver holds {connections} connections, as one core of a 64-core gateway for 33,000 servers, and the rate")
 print(f"climbs until p99 passes {limit_ms:.0f} ms or a measured call is refused. Each step lasts {seconds:.0f} s, and its measure leaves")
-print("out its first seconds, where the TLS handshakes fall. The rate a core holds lies between the step it held and")
+print(f"out its first seconds, where {starting}. The rate a core holds lies between the step it held and")
 print("the next step, which failed; the resolution gives that gap as a share of the step held.")
 print()
 write_climb()

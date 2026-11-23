@@ -119,7 +119,9 @@ gap_x, gap_y = 24, 24
 label_w = 112        # message names
 plot_w = panel_w - label_w - 44
 x_max = max(2, math.ceil(max(present(zig_speed) + present(buffa_speed))))
-tick_step = 1 if x_max <= 8 else 2
+# The least pixels between two ticks, so that "18×" and "20×" stay apart.
+tick_gap_min = 28
+tick_step = next(step for step in (1, 2, 5, 10, 20, 50) if step * plot_w / x_max >= tick_gap_min)
 bar_h, bar_gap, group_gap = 13, 2, 10
 group_h = 2 * bar_h + bar_gap
 row_h = group_h + group_gap
