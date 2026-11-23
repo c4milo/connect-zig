@@ -32,6 +32,9 @@ pub const Options = struct {
     token_bytes: usize = constants.token_bytes_default,
     /// The storage a binary request's repeated fields are read into, so a handler that reads them
     /// parses them once (decision 37). Null takes `message_bytes`; 0 keeps them in the message.
+    /// A decoded list takes more room than its octets, and a list past the storage's end stays
+    /// in the message, where each reader parses it again. A route whose handler or interceptor
+    /// reads every list, as `protovalidate.Interceptor` does, sizes it for the decoded message.
     storage_bytes: ?usize = null,
     /// The interceptors around the handler, outermost first (`dispatch.zig`).
     interceptors: []const type = &.{},

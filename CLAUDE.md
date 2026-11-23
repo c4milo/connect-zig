@@ -284,8 +284,9 @@ confirm a test fails. Report `CAUGHT` or `NOT CAUGHT` per mutation in the commit
   cleartext h2, with exports in no coding and in gzip, zstd and brotli, which `zig build
   otlp-compress` writes with stdx's encoders; `tools/ci.sh` runs each as a check of its own,
   `fullstack-compression` and `fullstack-compression-cleartext`, and `tools/compression_chart.py`
-  draws their charts. It fails when a server answered an export wrongly or did not take every
-  span, or when a validating one took an export that breaks a rule. It runs on Linux and needs
+  draws their charts. `zig build otlp-validate-cost` times validation in the sink by the size of
+  its route's storage (decision 37). It fails when a server answered an export wrongly or did not
+  take every span, or when a validating one took an export that breaks a rule. It runs on Linux and needs
   h2load, buf, python3, curl, go and cargo.
 - Performance: `tools/perf_check.sh` counts each benchmark operation's instructions under
   callgrind against `bench/instructions.txt` and fails past 2%; `--write` records a new baseline,

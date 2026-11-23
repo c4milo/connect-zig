@@ -89,6 +89,14 @@ program sets once as it starts, and the time from a field `protovalidate_now`. A
 `cpu_features` stops the build.
 [examples/validate](../examples/validate) serves a service behind it.
 
+The interceptor reads every list of a request, so give its route the storage the decoded
+request takes. A route decodes a binary request's lists into `storage_bytes` of
+`connect_colibri.RouteOptions`, which defaults to `message_bytes` (decision 37). A decoded list
+takes more room than its octets. A list that does not fit stays in the message, and the
+interceptor decodes it a second time. An OTLP export of 512 spans, 233 KB, takes about 850 KB
+decoded. In 256 KiB, validation cost the OTLP sink 0.96 µs a span; in 1 MiB, it cost 0.16 µs.
+`zig build otlp-validate-cost` times it by the size of the storage.
+
 ## CEL rules
 
 A schema's own rules are CEL expressions, in `cel` and `cel_expression`:

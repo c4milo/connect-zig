@@ -597,6 +597,12 @@ first. Cite an entry by number in code and commits ("decision 6").
     - connect's codec takes `decode_into` for a binary message when its `Scratch` holds
       storage. Each route holds `message_bytes` of it by default, which the owner chose over
       none (design §8 step 15).
+    - Cost, found on 2026-11-23: a decoded list takes more room than its octets, about 3.6
+      times for an OTLP export. A run that finds no room is decoded by the route's check and
+      thrown away, and decoded again by each reader. In the OTLP sink, a 512-span export past
+      the default 256 KiB cost protovalidate 0.96 µs a span where 1 MiB cost 0.16 µs. The sink
+      sets `storage_bytes` for its decoded exports, and `RouteOptions` and
+      docs/protovalidate.md tell a program to size it so.
     - An iterator gives a message in place (design §8 step 16). `next` returns `?Item`: for a
       message, a pointer that holds until the next call, into `items` or into the iterator's
       own slot for a message of a view; for a number, a string or an enum, the value. The

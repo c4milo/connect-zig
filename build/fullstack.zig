@@ -7,7 +7,8 @@
 //! examples' code, and `count_spans` of the example's receiver. `zig build otlp-sink-validate`
 //! installs `otlp-sink-validate`, the same sink over tools/fullstack/validate/gen, whose spans
 //! carry OTLP's rules, which `protovalidate.Interceptor` checks before each `Export`. `zig build
-//! otlp-compress` installs the program that writes the compression part's exports in each coding.
+//! otlp-compress` installs the program that writes the compression part's exports in each coding,
+//! and `zig build otlp-validate-cost` the program that times validation by the route's storage.
 const std = @import("std");
 
 const Graph = @import("graph.zig").Graph;
@@ -32,6 +33,25 @@ pub fn add(b: *std.Build, graph: Graph) void {
         .imports = &.{.{ .name = "connect", .module = graph.connect }},
     }) });
     b.step("otlp-compress", "Install the program that compresses the full-stack check's exports to zig-out/bin").dependOn(&b.addInstallArtifact(compress, .{}).step);
+    const gen = "tools/fullstack/validate/gen/opentelemetry/proto/";
+    const common = generated(b, graph, gen ++ "common/v1/common.pb.zig", &.{});
+    const resource = generated(b, graph, gen ++ "resource/v1/resource.pb.zig", &.{.{ .name = "opentelemetry_proto_common_v1_common", .module = common }});
+    const trace = generated(b, graph, gen ++ "trace/v1/trace.pb.zig", &.{
+        .{ .name = "opentelemetry_proto_common_v1_common", .module = common },
+        .{ .name = "opentelemetry_proto_resource_v1_resource", .module = resource },
+    });
+    const otlp = generated(b, graph, gen ++ "collector/trace/v1/trace_service.pb.zig", &.{.{ .name = "opentelemetry_proto_trace_v1_trace", .module = trace }});
+    const cost = b.addExecutable(.{ .name = "otlp-validate-cost", .root_module = b.createModule(.{
+        .root_source_file = b.path("tools/otlp_sink/validate_cost.zig"),
+        .target = graph.target,
+        .optimize = graph.optimize,
+        .imports = &.{
+            .{ .name = "protobuf", .module = graph.protobuf },
+            .{ .name = "protovalidate", .module = graph.protovalidate },
+            .{ .name = "otlp", .module = otlp },
+        },
+    }) });
+    b.step("otlp-validate-cost", "Install the profile of validation in the OTLP sink").dependOn(&b.addInstallArtifact(cost, .{}).step);
 }
 
 /// The sink over the generated code of `gen`, which validates each export when `validate` is set.

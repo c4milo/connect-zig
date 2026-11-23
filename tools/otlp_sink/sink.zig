@@ -44,6 +44,7 @@ const Validate = protovalidate.Interceptor(connect, Values, validation);
 
 const route_options: rpc.RouteOptions = .{
     .message_bytes = constants.message_bytes,
+    .storage_bytes = constants.storage_bytes,
     .interceptors = if (sink_options.validate) &.{Validate} else &.{},
 };
 
