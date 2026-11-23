@@ -66,9 +66,29 @@ pub fn decode(comptime T: type, bytes: []const u8) Error!T {
 /// `bytes`, as `decode` leaves it. The message points into both, which must outlive it (decision
 /// 37).
 pub fn decode_into(comptime T: type, bytes: []const u8, storage: []u8) Error!T {
+    // Its own body, not a call of `decode_into_use`: through that call, the compiler laid out the
+    // benchmark's decode and walk of `varints` in 2,225 instructions where this takes 2,022.
     if (bytes.len > constants.limits.message_len_max) return error.LengthTooLarge;
     var store: files.decode.Store = .{ .buffer = storage };
     return files.decode.decode_depth(T, bytes, constants.limits.depth_max, .stored, &store);
+}
+
+/// What a `decode_into_use` took of its storage: the octets it filled from the start, and whether
+/// a repeated field or a `Lazy` field found no room. Such a field points into the input, and each
+/// read of it parses it again, so a program that sees `short` gives the decode more storage
+/// (decision 37).
+pub const StorageUse = struct {
+    octets: usize = 0,
+    short: bool = false,
+};
+
+/// Decodes as `decode_into` does, and writes what the decode took of `storage` to `use`.
+pub fn decode_into_use(comptime T: type, bytes: []const u8, storage: []u8, use: *StorageUse) Error!T {
+    if (bytes.len > constants.limits.message_len_max) return error.LengthTooLarge;
+    var store: files.decode.Store = .{ .buffer = storage };
+    const message = try files.decode.decode_depth(T, bytes, constants.limits.depth_max, .stored, &store);
+    use.* = .{ .octets = store.len, .short = store.short };
+    return message;
 }
 
 /// Merges `bytes` into `message`, as a later occurrence of the same message merges ("Last One
@@ -159,11 +179,11 @@ pub const map_get = files.repeated.map_get;
 
 test "the root exports the names a program calls" {
     try @import("public_names").expect(@This(), &.{
-        "constants",       "Kind",            "Field",       "Descriptor",       "EnumValue",   "EnumDescriptor",
-        "View",            "Unknown",         "Repeated",    "Lazy",             "Error",       "EncodeError",
-        "decode",          "decode_into",     "merge",       "encoded_len",      "encode",      "map_get",
-        "JsonEncodeError", "JsonDecodeError", "encode_json", "encode_json_with", "decode_json", "decode_json_with",
-        "wkt",             "FieldOptions",    "field_of",    "WireType",
+        "constants",   "Kind",             "Field",           "Descriptor",      "EnumValue",   "EnumDescriptor",
+        "View",        "Unknown",          "Repeated",        "Lazy",            "Error",       "EncodeError",
+        "decode",      "decode_into",      "StorageUse",      "decode_into_use", "merge",       "encoded_len",
+        "encode",      "map_get",          "JsonEncodeError", "JsonDecodeError", "encode_json", "encode_json_with",
+        "decode_json", "decode_json_with", "wkt",             "FieldOptions",    "field_of",    "WireType",
     });
 }
 

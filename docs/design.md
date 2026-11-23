@@ -339,6 +339,19 @@ Each step names the check that proves it. A step is done when its check passes i
     their libraries do not hold (decision 46 as amended). New public names: none. Check: the
     counts of step 28 in each coding, which fail when a receiver refuses a coding.
 
+38. **Storage that fits.** A route's storage defaults to `storage_per_message` times
+    `message_bytes`, 4 times, and a program can see when a request's lists did not fit it
+    (decision 37 as amended). `protobuf.decode_into_use` decodes as `decode_into` does and writes
+    a `protobuf.StorageUse`: the octets it filled, and whether a field found no room.
+    `connect.Scratch` gains `storage_short`, a count the decode adds one to for each such
+    message, and a route points it at its context's field `messages_past_storage: u64` when the
+    context has one. New public names: `protobuf.StorageUse` and `protobuf.decode_into_use`;
+    the field `storage_short` of `connect.Scratch`, and the constant `storage_per_message` of
+    `connect_colibri.constants`. Check: `zig build test-protobuf` decodes three messages into
+    storage of every length below and past what each takes, and requires `short` exactly below;
+    `zig build test-connect` counts a message that does not fit and none that fits;
+    `zig build test-connect-colibri` holds the default and the count's path to the context.
+
 ### Step records
 
 Each step records here what was run, on what, and what it printed, once its check passes. Each

@@ -29,6 +29,9 @@ pub const App = struct {
     spans: u64 = 0,
     /// What the validating sink's rules search with, which `main` detects once.
     cpu_features: Features = .none(),
+    /// The exports whose lists did not all fit the route's storage, which connect_colibri counts
+    /// here. Each such list is decoded again by each read of it.
+    messages_past_storage: u64 = 0,
 };
 
 /// The interceptor's sizes: room for about 16 violations of an export.
@@ -61,11 +64,11 @@ const Handlers = struct {
     }
 };
 
-/// Answers `requests <n> spans <n>`, in text.
+/// Answers `requests <n> spans <n> past_storage <n>`, in text.
 const Count = struct {
     pub fn on_request(app: *App, _: *server.RequestContext, _: *void, _: *const server.Request, response: *server.Response) !void {
         try response.header("content-type", "text/plain");
-        try response.body().print("requests {d} spans {d}\n", .{ app.requests, app.spans });
+        try response.body().print("requests {d} spans {d} past_storage {d}\n", .{ app.requests, app.spans, app.messages_past_storage });
         return response.end();
     }
 };

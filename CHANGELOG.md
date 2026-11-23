@@ -19,9 +19,20 @@ It builds on colibri v0.19.1, with Zig 0.16.0.
   your build knows, and `all`, `exists` and `exists_one`. An index your build does not know,
   and `filter` and `map` of such a literal, stop your build, because their result has no one
   type. cel-spec's conformance suite passes 1,174 tests, where it passed 1,142.
+- Your server can see when a request did not fit the storage its route decodes into. Give your
+  context a field `messages_past_storage: u64`, and each route adds one to it for each binary
+  request message whose lists did not all fit. Such a list is parsed again by each read of it,
+  `protovalidate.Interceptor` among them, so raise the route's `storage_bytes` when the count
+  grows. `protobuf.decode_into_use` gives the same answer, and the octets the decode filled, to
+  a program that decodes by itself.
 
 ### Changed
 
+- **Memory.** A route's decode storage defaults to 4 times its `message_bytes`, where it was
+  equal to it: 256 KiB a call at the default 64 KiB messages. A decoded message takes more room
+  than its octets, an OTLP trace export about 3.6 times, and with the old default a validating
+  OTLP server spent 0.96 µs a span decoding lists twice, where with room it spends 0.16 µs. Set
+  `storage_bytes` to keep the old size.
 - `protovalidate`'s `all` and `exists` over a map field search the map for a repeated key only
   when a key's result would end the macro or fail it. The valid `Rules` message of the
   validation benchmark takes 580 instructions, where it took 722.

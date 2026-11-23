@@ -74,6 +74,18 @@ const Bundle = struct {
     } };
 };
 
+/// A run of three 4-octet numbers, then a run of 8-octet ones: the second run starts past 12
+/// octets at the next multiple of 8, so a store of 13 to 15 octets ends before its start.
+const Pair = struct {
+    fixed: Repeated(u32, .fixed32) = .{},
+    numbers: Repeated(i64, .int64) = .{},
+    pub const FieldNumber = enum(u29) { fixed = 1, numbers = 2 };
+    pub const protobuf: proto.Descriptor = .{ .full_name = "test.Pair", .fields = &.{
+        proto.field_of(FieldNumber.fixed, .fixed32, .{}),
+        proto.field_of(FieldNumber.numbers, .int64, .{}),
+    } };
+};
+
 const Crate = struct {
     bundles: Repeated(Bundle, .group) = .{},
     pub const FieldNumber = enum(u29) { bundles = 1 };
@@ -320,6 +332,40 @@ test "with room, each repeated field and each Lazy child is read into the storag
     const lazy = try proto.decode(Node, bytes);
     try testing.expectEqual(@as(usize, 0), lazy.numbers.items.len);
     try testing.expect(lazy.next.value == null);
+}
+
+test "decode_into_use is short exactly when the storage holds less than the message takes" {
+    var buffer: [encoded_len_max]u8 = @splat(0);
+    try expect_short_below_need(Node, try encoded(&full, &buffer));
+    var crate_buffer: [encoded_len_max]u8 = @splat(0);
+    try expect_short_below_need(Crate, try proto.encode(Crate, &.{ .bundles = .of(&bundles) }, &crate_buffer));
+    var pair_buffer: [encoded_len_max]u8 = @splat(0);
+    const three = [_]u32{ fixed_small, fixed_wide, fixed_small };
+    try expect_short_below_need(Pair, try proto.encode(Pair, &.{ .fixed = .of(&three), .numbers = .of(&few_numbers) }, &pair_buffer));
+    // A message with no repeated field and no `Lazy` field takes no storage, so none is short.
+    var leaf_buffer: [encoded_len_max]u8 = @splat(0);
+    var use: proto.StorageUse = .{};
+    _ = try proto.decode_into_use(Leaf, try proto.encode(Leaf, &leaves[0], &leaf_buffer), &.{}, &use);
+    try testing.expectEqual(proto.StorageUse{}, use);
+}
+
+/// Decodes `bytes` into storage of each length from none to past what the message takes. Below
+/// it, a field finds no room at some run, flat or counted, or at a `Lazy` child; from it on, the
+/// decode fills the same octets and none is short.
+fn expect_short_below_need(comptime T: type, bytes: []const u8) !void {
+    var storage: [storage_len_max]u8 align(storage_align) = @splat(0);
+    var roomy: proto.StorageUse = .{};
+    _ = try proto.decode_into_use(T, bytes, &storage, &roomy);
+    try testing.expect(!roomy.short);
+    try testing.expect(roomy.octets > 0 and roomy.octets < storage.len);
+    // One length past what the message takes, and the one after it.
+    const past = 2;
+    for (0..roomy.octets + past) |len| {
+        var use: proto.StorageUse = .{};
+        _ = try proto.decode_into_use(T, bytes, storage[0..len], &use);
+        try testing.expectEqual(len < roomy.octets, use.short);
+        if (!use.short) try testing.expectEqual(roomy.octets, use.octets);
+    }
 }
 
 /// A closed enum: a field of it passes over a number it does not name, so `decode_into` keeps

@@ -91,11 +91,12 @@ program sets once as it starts, and the time from a field `protovalidate_now`. A
 
 The interceptor reads every list of a request, so give its route the storage the decoded
 request takes. A route decodes a binary request's lists into `storage_bytes` of
-`connect_colibri.RouteOptions`, which defaults to `message_bytes` (decision 37). A decoded list
-takes more room than its octets. A list that does not fit stays in the message, and the
-interceptor decodes it a second time. An OTLP export of 512 spans, 233 KB, takes about 850 KB
-decoded. In 256 KiB, validation cost the OTLP sink 0.96 µs a span; in 1 MiB, it cost 0.16 µs.
-`zig build otlp-validate-cost` times it by the size of the storage.
+`connect_colibri.RouteOptions`, which defaults to 4 times `message_bytes` (decision 37). A
+decoded list takes more room than its octets. A list that does not fit stays in the message,
+and the interceptor decodes it a second time. An OTLP export of 512 spans, 233 KB, takes about
+850 KB decoded. In 256 KiB, validation cost the OTLP sink 0.96 µs a span; in 1 MiB, it cost
+0.16 µs. Give your context a field `messages_past_storage: u64` to count the requests that did
+not fit, and `zig build otlp-validate-cost` times validation by the size of the storage.
 
 ## CEL rules
 

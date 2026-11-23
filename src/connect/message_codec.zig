@@ -17,6 +17,10 @@ pub const Scratch = struct {
     /// Where `decode_into` reads a binary message's repeated fields, for a program that reads
     /// every field (decision 37). Empty, `decode` keeps them in the message's octets.
     storage: []u8 = &.{},
+    /// A count the decode adds one to for each binary message whose repeated fields did not all
+    /// fit in `storage`. Each field that did not fit is parsed again by each read of it, so a
+    /// count that grows tells the program to give `storage` more room.
+    storage_short: ?*u64 = null,
 };
 
 pub const EncodeError = proto.EncodeError || proto.JsonEncodeError;
@@ -33,9 +37,20 @@ pub fn encode(comptime T: type, codec: Codec, message: *const T, buffer: []u8) E
 /// `octets`, and its repeated fields into `scratch.storage` while it has room.
 pub fn decode(comptime T: type, codec: Codec, octets: []const u8, scratch: Scratch) DecodeError!T {
     return switch (codec) {
-        .proto => if (scratch.storage.len == 0) proto.decode(T, octets) else proto.decode_into(T, octets, scratch.storage),
+        .proto => if (scratch.storage.len == 0) proto.decode(T, octets) else decode_stored(T, octets, scratch),
         .json => proto.decode_json(T, octets, scratch.work, scratch.tokens),
     };
+}
+
+/// Decodes a binary message into `scratch.storage`, and counts it in `scratch.storage_short` when
+/// a field found no room there.
+fn decode_stored(comptime T: type, octets: []const u8, scratch: Scratch) proto.Error!T {
+    var use: proto.StorageUse = .{};
+    const message = try proto.decode_into_use(T, octets, scratch.storage, &use);
+    if (use.short) {
+        if (scratch.storage_short) |count| count.* += 1;
+    }
+    return message;
 }
 
 /// The octets an envelope's payload holds: as they are, or inflated with `coding`.
@@ -151,4 +166,24 @@ test "a binary message's repeated fields go into the scratch's storage, and stay
     const kept = try decode(Bag, .proto, encoded, none);
     try testing.expectEqual(@as(usize, 0), kept.numbers.items.len);
     try testing.expectEqual(numbers.len, try kept.numbers.count());
+}
+
+test "a binary message whose repeated fields do not fit the storage is counted, and one that fits is not" {
+    const numbers = [_]u32{ 1, 2, 3 };
+    var octets: [compress_len_min]u8 = undefined;
+    const encoded = try proto.encode(Bag, &.{ .numbers = .of(&numbers) }, &octets);
+    var storage: [compress_len_min]u8 align(@alignOf(u64)) = undefined;
+    var short: u64 = 0;
+    var scratch: Scratch = .{ .message = &.{}, .work = &.{}, .tokens = &.{}, .storage = &storage, .storage_short = &short };
+    _ = try decode(Bag, .proto, encoded, scratch);
+    try testing.expectEqual(@as(u64, 0), short);
+    // Room for two of the three numbers.
+    scratch.storage = storage[0 .. 2 * @sizeOf(u32)];
+    const kept = try decode(Bag, .proto, encoded, scratch);
+    try testing.expectEqual(@as(u64, 1), short);
+    try testing.expectEqual(numbers.len, try kept.numbers.count());
+    // A scratch with no storage keeps the fields in the message by choice, so none is counted.
+    scratch.storage = &.{};
+    _ = try decode(Bag, .proto, encoded, scratch);
+    try testing.expectEqual(@as(u64, 1), short);
 }

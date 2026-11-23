@@ -51,6 +51,7 @@ peak_measure() {
     succeeded="$(awk '/^requests:/ { print $8 }' "${work}/load.txt")"
     # The probe's export, the warm ones and the measured ones.
     check_count "${server}" $(((1 + warm + requests) * spans)) || { stop; return 1; }
+    check_storage "${server}" || { stop; return 1; }
     stop
     if [ "${succeeded}" -ne "${requests}" ]; then
         echo "fullstack: ${server}, ${spans} spans: ${succeeded} of ${requests} succeeded" >&2

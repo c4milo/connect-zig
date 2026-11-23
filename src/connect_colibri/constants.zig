@@ -4,6 +4,10 @@ const http = @import("http");
 
 /// The longest message a route reads or writes by default: 64 KiB.
 pub const message_bytes_default = 64 * 1024;
+/// The storage a route decodes a binary request's repeated fields into by default, in multiples
+/// of `message_bytes`: a decoded field takes more room than its octets, an OTLP trace export
+/// about 3.6 times, and a field that does not fit is parsed again by each read (decision 37).
+pub const storage_per_message = 4;
 /// The longest JSON token a route reads by default.
 pub const token_bytes_default = 16 * 1024;
 /// The octets of a route's status trailers: grpc-status, grpc-message and the details, twice

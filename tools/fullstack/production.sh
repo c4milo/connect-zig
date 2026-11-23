@@ -114,6 +114,7 @@ production_climb() {
     fi
     echo "memory ${transport} ${server} $(peak_kb "${server_pid}")"
     check_count "${server}" "${sent}" || { stop; return 1; }
+    check_storage "${server}" || { stop; return 1; }
     stop
 }
 

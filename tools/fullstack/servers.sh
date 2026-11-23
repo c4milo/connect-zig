@@ -255,5 +255,18 @@ check_count() {
     return 1
 }
 
+# connect-zig's sink must decode each export into its route's storage whole: a list that does not
+# fit is decoded again by each read of it, and the benchmark would time that (decision 37).
+check_storage() {
+    case "$1" in
+        connect-zig | connect-zig-validate) ;;
+        *) return 0 ;;
+    esac
+    past="$(curl -sS $(reach) "$(url_of "$1" /sink/count)" | awk '{ print $6 }')"
+    [ "${past}" = 0 ] && return 0
+    echo "fullstack: $1 decoded ${past:-an unknown count of} exports past its route's storage" >&2
+    return 1
+}
+
 cpu_ticks() { awk '{ print $14 + $15 }' "/proc/$1/stat"; }
 peak_kb() { awk '/^VmHWM:/ { print $2 }' "/proc/$1/status"; }

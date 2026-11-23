@@ -21,14 +21,23 @@ const Error = decode.Error;
 pub const Store = struct {
     buffer: []u8,
     len: usize = 0,
+    /// Whether a run or a `Lazy` message found no room, and so stays in the input, where each
+    /// read of it parses it again.
+    short: bool = false,
 
     /// Room for `count` elements of `T` past what the store holds, or null when it has none.
     pub fn reserve(store: *Store, comptime T: type, count: usize) ?[]T {
-        const start = store.aligned(T) orelse return null;
-        if (count > (store.buffer.len - start) / @sizeOf(T)) return null;
+        const start = store.aligned(T) orelse return store.no_room(T);
+        if (count > (store.buffer.len - start) / @sizeOf(T)) return store.no_room(T);
         store.len = start + count * @sizeOf(T);
         const first: [*]T = @ptrCast(@alignCast(store.buffer.ptr + start));
         return first[0..count];
+    }
+
+    /// Notes that the store had no room for a run, and gives no room.
+    fn no_room(store: *Store, comptime T: type) ?[]T {
+        store.short = true;
+        return null;
     }
 
     /// Where the next `T` would start, or null past the buffer's end.
@@ -46,6 +55,8 @@ pub const Store = struct {
 /// alone, as `decode.read_repeated` reads it.
 pub fn read(comptime F: type, slot: *F, field_start: usize, bytes: []const u8, number: u32, tag: wire.Tag, reader: *wire.Reader, depth_left: u32, store: *Store) Error!void {
     comptime assert(!repeated.holds_closed(F));
+    // A store of no octets has room for no run.
+    if (store.buffer.len == 0) store.short = true;
     if (store.buffer.len == 0 or slot.view.bytes.len != 0 or slot.items.len != 0) {
         // A second run of the field's records keeps them all in the view.
         slot.items = &.{};
@@ -81,8 +92,10 @@ fn flat(comptime F: type) bool {
 /// Reads a run of flat elements, each one after the one before, at the store's end.
 fn read_appended(comptime F: type, slot: *F, field_start: usize, bytes: []const u8, number: u32, tag: wire.Tag, reader: *wire.Reader, depth_left: u32, store: *Store) Error!void {
     const T = F.Element;
-    const start = store.aligned(T) orelse
+    const start = store.aligned(T) orelse {
+        store.short = true;
         return decode.read_repeated(F, slot, field_start, bytes, number, tag, reader, depth_left, .checked);
+    };
     const first: [*]T = @ptrCast(@alignCast(store.buffer.ptr + start));
     const room = first[0 .. (store.buffer.len - start) / @sizeOf(T)];
     const before = reader.*;
@@ -90,6 +103,7 @@ fn read_appended(comptime F: type, slot: *F, field_start: usize, bytes: []const 
         error.NoRoom => {
             // The run outgrew the store: the view alone holds the field, as with no storage. The
             // view already starts at the run's first record, so reading the run again widens it.
+            store.short = true;
             reader.* = before;
             return decode.read_repeated(F, slot, field_start, bytes, number, tag, reader, depth_left, .checked);
         },

@@ -603,6 +603,12 @@ first. Cite an entry by number in code and commits ("decision 6").
       the default 256 KiB cost protovalidate 0.96 µs a span where 1 MiB cost 0.16 µs. The sink
       sets `storage_bytes` for its decoded exports, and `RouteOptions` and
       docs/protovalidate.md tell a program to size it so.
+    - Amended on 2026-11-23, ruled by the owner: a route's storage defaults to 4 times
+      `message_bytes`, `connect_colibri.constants.storage_per_message`, and a decode counts each
+      message whose lists did not fit in the context's field `messages_past_storage`, when the
+      context has one (design §8 step 38). Beaten: a fixed 1 MiB, which a route of small messages
+      pays for each call it holds, and which a decoded message can still outgrow; and a silent
+      default, which a program learns of only from a profile.
     - An iterator gives a message in place (design §8 step 16). `next` returns `?Item`: for a
       message, a pointer that holds until the next call, into `items` or into the iterator's
       own slot for a message of a view; for a number, a string or an enum, the value. The
