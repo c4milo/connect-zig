@@ -20,14 +20,19 @@ from machine import machine
 results, transport, ticks, oha, otelcol, vector, rotel, connect_go, connect_rust, commit, placement, seconds, warm, limit_ms, suite = sys.argv[1:16]
 ticks, seconds, warm, limit_ms = int(ticks), float(seconds), float(warm), float(limit_ms)
 classes = [tuple(int(part) for part in item.split(":")) for item in sys.argv[16:]]
-names = {"connect-zig": "connect-zig", "collector": "Collector", "vector": "Vector", "rotel": "Rotel",
-         "connect-go": "connect-go", "connect-rust": "connect-rust"}
+names = {"connect-zig": "connect-zig", "connect-zig-validate": "connect-zig + protovalidate",
+         "collector": "Collector", "vector": "Vector", "rotel": "Rotel", "connect-go": "connect-go",
+         "connect-rust": "connect-rust", "connect-rust-validate": "connect-rust + protovalidate-buffa"}
+# Each receiver that validates, and its twin that does not.
+validating = [("connect-zig-validate", "connect-zig"), ("connect-rust-validate", "connect-rust")]
 setups = {
     "collector": f"{otelcol}, GOMAXPROCS=1, its OTLP receiver into its nop exporter",
     "vector": f"{vector}, one thread, its opentelemetry source into its blackhole sink",
     "rotel": f"{rotel}, its OTLP receiver into its blackhole exporter",
     "connect-go": f"{connect_go}, GOMAXPROCS=1, a receiver that counts spans (`tools/fullstack/connect-go`)",
     "connect-rust": f"{connect_rust}, one tokio worker, a receiver that counts spans (`tools/fullstack/connect-rust`)",
+    "connect-zig-validate": "connect-zig + protovalidate, `otlp-sink-validate`, which checks each export against the rules of `tools/fullstack/validate`",
+    "connect-rust-validate": "connect-rust + protovalidate-buffa, the same receiver with `validate`, which checks each export against the same rules",
 }
 # The fleet the model stands for, and the gateway cores that share its connections.
 fleet_servers = 33_000
@@ -97,8 +102,12 @@ print()
 if "connect-zig" in best:
     zig = best["connect-zig"]["spans"]
     for server in servers[1:]:
-        if server in best:
+        if server in best and not server.endswith("-validate"):
             print(f"- connect-zig holds {zig / best[server]['spans']:.2f} times {names[server]}'s spans a second on one core.")
+    for server, twin in validating:
+        if server in best and twin in best:
+            print(f"- {names[server]} holds {best[server]['spans'] / best[twin]['spans'] * percent:.1f}% of {twin}'s spans "
+                  f"a second, at p99 {best[server]['p99']:.2f} ms to its {best[twin]['p99']:.2f}.")
     carried = ", ".join(f"{names[server]} {best[server]['spans'] * gateway_cores / fleet_servers:,.0f}" for server in servers if server in best)
     print(f"- At {gateway_cores} cores, the spans a second each server carries for each of the {fleet_servers:,} servers: {carried}.")
     print()

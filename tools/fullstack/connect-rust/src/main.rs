@@ -5,7 +5,11 @@
 //! tools/otlp_sink does. Its server has no plain route, so a second port, on cleartext
 //! HTTP/1.0, answers `requests <n> spans <n>`, as the sink's `GET /sink/count` does.
 //!
-//!     fullstack-connect-rust <port> <count port> <chain> <key>
+//!     fullstack-connect-rust <port> <count port> <chain> <key> [validate]
+//!
+//! With `validate`, it first checks each export's view against the rules of
+//! tools/fullstack/validate's schema with protovalidate-buffa, as `otlp-sink-validate` does, and
+//! refuses one that breaks a rule with `invalid_argument`.
 
 use std::io::{Read as _, Write as _};
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -17,6 +21,13 @@ use connectrpc::{RequestContext, Response, Router, Server, ServiceRequest, Servi
 mod proto {
     connectrpc::include_generated!();
 }
+
+#[allow(clippy::all, non_camel_case_types, dead_code, unused_imports)]
+mod validators {
+    include!(concat!(env!("OUT_DIR"), "/validators/mod.rs"));
+}
+
+use protovalidate_buffa::Validate as _;
 
 use proto::opentelemetry::proto::collector::trace::v1::{
     ExportTraceServiceRequest, ExportTraceServiceResponse, TraceService,
@@ -33,7 +44,11 @@ struct Counts {
     spans: AtomicU64,
 }
 
-struct Receiver(Arc<Counts>);
+struct Receiver {
+    counts: Arc<Counts>,
+    /// Whether each export is validated before its spans are counted.
+    validate: bool,
+}
 
 #[allow(refining_impl_trait)]
 impl TraceService for Receiver {
@@ -42,14 +57,19 @@ impl TraceService for Receiver {
         _ctx: RequestContext,
         request: ServiceRequest<'_, ExportTraceServiceRequest>,
     ) -> ServiceResult<ExportTraceServiceResponse> {
+        if self.validate {
+            if let Err(error) = (*request).validate() {
+                return Err(error.into_connect_error());
+            }
+        }
         let mut spans = 0u64;
         for resource in request.resource_spans.iter() {
             for scope in resource.scope_spans.iter() {
                 spans += scope.spans.len() as u64;
             }
         }
-        self.0.requests.fetch_add(1, Ordering::Relaxed);
-        self.0.spans.fetch_add(spans, Ordering::Relaxed);
+        self.counts.requests.fetch_add(1, Ordering::Relaxed);
+        self.counts.spans.fetch_add(spans, Ordering::Relaxed);
         Response::ok(ExportTraceServiceResponse::default())
     }
 }
@@ -99,13 +119,14 @@ fn serve_counts(port: &str, counts: Arc<Counts>) -> std::io::Result<()> {
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<String> = std::env::args().collect();
-    if args.len() != 5 {
-        return Err("usage: fullstack-connect-rust <port> <count port> <chain> <key>".into());
+    let validate = args.len() == 6 && args[5] == "validate";
+    if args.len() != 5 && !validate {
+        return Err("usage: fullstack-connect-rust <port> <count port> <chain> <key> [validate]".into());
     }
     let counts = Arc::new(Counts::default());
     serve_counts(&args[2], counts.clone())?;
     let tls = identity(&args[3], &args[4])?;
-    let router = Router::new().add_service(Arc::new(Receiver(counts)));
+    let router = Router::new().add_service(Arc::new(Receiver { counts, validate }));
     let bound = Server::bind(format!("127.0.0.1:{}", args[1]))
         .await
         .map_err(|error| error.to_string())?

@@ -324,6 +324,12 @@ Each step names the check that proves it. A step is done when its check passes i
 35. **Patterns.** `pattern` rules and CEL's `matches` run on stdx's regular expression module
     (decision 47). New public names: none. Check: the conformance cases of patterns leave the
     known-failing list.
+36. **Validation in the full stack.** The sink with `protovalidate.Interceptor`,
+    `otlp-sink-validate`, and the connect-rust receiver with protovalidate-buffa join the peak
+    part and the climb over TLS. Each checks OpenTelemetry's span rules of
+    `tools/fullstack/validate` (decision 46 as amended). New public names: none. Check: the
+    probes and the counts of step 28, and each refuses an export whose trace ID is 3 octets
+    with `invalid_argument`.
 
 ### Step records
 

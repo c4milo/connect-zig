@@ -1,8 +1,9 @@
 # shellcheck shell=sh
 # The production part of tools/fullstack_check.sh (design §8 steps 29 and 30, decision 44), which
 # sources this file: the traffic of one gateway core for a fleet of 33,000 servers. It climbs
-# over TLS for connect-zig, the Collector and Vector, then in cleartext h2 for connect-zig, the
-# Collector and Rotel, whose receiver has no TLS.
+# over TLS for connect-zig, the Collector, Vector and the receivers on connect-go and connect-rust,
+# with connect-zig and connect-rust also validating each export against tools/fullstack/validate's
+# rules, then in cleartext h2 for connect-zig, the Collector and Rotel, whose receiver has no TLS.
 #
 # Each server of the fleet runs a Collector agent, which exports its spans over OTLP/gRPC with
 # gzip, the default of the Collector's otlp exporter. Each agent holds one TLS connection, through
@@ -84,6 +85,7 @@ production_climb() {
         probe "${server}" "${work}/production-${class%%:*}.grpc.json" || { stop; return 1; }
         sent=$((sent + ${class%%:*}))
     done
+    probe_refused "${server}" || { stop; return 1; }
     passed="" failed=""
     for rate in ${production_steps}; do
         production_step "${server}" "${rate}"
@@ -107,7 +109,7 @@ production_climb() {
 : >"${work}/production-results"
 for transport in tls cleartext; do
     case "${transport}" in
-        tls) servers="connect-zig collector vector connect-go connect-rust" ;;
+        tls) servers="connect-zig connect-zig-validate collector vector connect-go connect-rust connect-rust-validate" ;;
         *) servers="connect-zig collector rotel" ;;
     esac
     for server in ${servers}; do

@@ -1170,3 +1170,11 @@ first. Cite an entry by number in code and commits ("decision 6").
       only the Connect protocol and a large reply. It needed a second check, a second chart, and
       a CPU probe in the interop server, which runs ChaCha20 alone. Beaten too: one cipher suite,
       ChaCha20, for every server, which Go and rustls choose only on a CPU with no AES hardware.
+    - Amended on 2026-11-23, ruled by the owner: two more receivers validate each export against
+      OpenTelemetry's span rules, written as protovalidate rules in `tools/fullstack/validate`
+      (its README lists them). `otlp-sink-validate` is the sink with `protovalidate.Interceptor`
+      (decision 47). connect-rust with `validate` checks each request with protovalidate-buffa
+      0.8.0, on the view it decodes. Both join the peak part and the climb over TLS, and must
+      refuse an export whose trace ID is 3 octets with `invalid_argument`. The chart
+      `fullstack-validate.svg` sets each beside the receiver that does not validate. Beaten:
+      protovalidate in connect-zig alone, which gives its cost and no scale to read it on.

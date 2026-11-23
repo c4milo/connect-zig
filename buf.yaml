@@ -1,11 +1,13 @@
 # The buf workspace of protovalidate's schemas (decision 47): validate.proto with the
-# descriptor.proto it imports, which the `protovalidate` module is generated from, and the three
+# descriptor.proto it imports, which the `protovalidate` module is generated from, and the four
 # schemas of this tree that import validate.proto from it: protovalidate's conformance suite, the
-# wide message of tools/wide, and the schema of the validation benchmark in bench/validate. Every
-# other buf module of this tree stands alone, under the buf.yaml of its own folder.
+# wide message of tools/wide, the schema of the validation benchmark in bench/validate, and the
+# full-stack check's validated OTLP schema in tools/fullstack/validate. Every other buf module of
+# this tree stands alone, under the buf.yaml of its own folder.
 version: v2
 modules:
   - path: src/protovalidate/proto
   - path: conformance/protovalidate/proto
   - path: tools/wide/proto
   - path: bench/validate/proto
+  - path: tools/fullstack/validate/proto

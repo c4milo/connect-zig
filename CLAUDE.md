@@ -140,8 +140,8 @@ confirm a test fails. Report `CAUGHT` or `NOT CAUGHT` per mutation in the commit
   `--write` rewrites it. It needs buf, or `BUF` naming it. It builds the plugin alone, with
   `zig build plugin`, so generated code that no longer compiles does not stop it. The root's
   `buf.yaml` is the buf workspace of the schemas that import validate.proto from this tree:
-  `src/protovalidate/proto`, `conformance/protovalidate/proto` and `tools/wide/proto`. Every
-  other buf module stands alone.
+  `src/protovalidate/proto`, `conformance/protovalidate/proto`, `tools/wide/proto` and
+  `tools/fullstack/validate/proto`. Every other buf module stands alone.
 - Interop: `tools/interop_check.sh` calls the socket server with `buf curl` in Connect, gRPC and
   gRPC-Web, over h2 and h3, with curl over h11 and h2, and with OpenTelemetry's Go SDK, which
   exports spans to the OTLP receiver and reads them back (decision 40), all over TLS with the
@@ -276,8 +276,10 @@ confirm a test fails. Report `CAUGHT` or `NOT CAUGHT` per mutation in the commit
   Rust with no receiver TLS, joins a second climb in cleartext. Receivers on connect-go and
   connect-rust, `tools/fullstack/connect-go` and `tools/fullstack/connect-rust`, join both over
   TLS (decision 46); the check builds them into the cache, unless `CONNECT_GO` and
-  `CONNECT_RUST` name built ones. It fails when a server answered an export wrongly or did not
-  take every span. It runs on Linux and needs h2load, buf, python3, curl, go and cargo.
+  `CONNECT_RUST` name built ones. The sink and the connect-rust receiver also join a second
+  time, checking each export against the span rules of `tools/fullstack/validate`: `zig build
+  otlp-sink-validate`, and protovalidate-buffa. It fails when a server answered an export wrongly
+  or did not take every span, or when a validating one took an export that breaks a rule. It runs on Linux and needs h2load, buf, python3, curl, go and cargo.
 - Performance: `tools/perf_check.sh` counts each benchmark operation's instructions under
   callgrind against `bench/instructions.txt` and fails past 2%; `--write` records a new baseline,
   which the commit that pays for it explains. It needs valgrind.

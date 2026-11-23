@@ -19,8 +19,12 @@ from machine import machine
 
 work, ticks, h2load, otelcol, vector, connect_go, connect_rust, commit, placement, rounds, connections, streams, suite = sys.argv[1:14]
 ticks = int(ticks)
-servers = [("connect-zig", "connect-zig"), ("collector", "Collector"), ("vector", "Vector"),
-           ("connect-go", "connect-go"), ("connect-rust", "connect-rust")]
+servers = [("connect-zig", "connect-zig"), ("connect-zig-validate", "connect-zig + protovalidate"),
+           ("collector", "Collector"), ("vector", "Vector"), ("connect-go", "connect-go"),
+           ("connect-rust", "connect-rust"), ("connect-rust-validate", "connect-rust + protovalidate-buffa")]
+# Each receiver that validates, and its twin that does not.
+validating = [("connect-zig-validate", "connect-zig"), ("connect-rust-validate", "connect-rust")]
+percent = 100
 microseconds = 1_000_000
 kib = 1024
 # The octets of gRPC's prefix before each message (gRPC over HTTP/2, "Requests").
@@ -65,15 +69,25 @@ for spans in spans_list:
     zig_rate, zig_cpu = median(spans, "connect-zig", "rate"), median(spans, "connect-zig", "cpu")
     for server, name in servers[1:]:
         rate, cpu = median(spans, server, "rate"), median(spans, server, "cpu")
-        if None in (zig_rate, zig_cpu, rate, cpu):
+        if server.endswith("-validate") or None in (zig_rate, zig_cpu, rate, cpu):
             continue
         print(f"- {spans} spans: connect-zig answers {zig_rate / rate:.2f} times {name}'s calls a second, and "
               f"spends {zig_cpu / cpu:.2f} times its CPU time a call.")
+    names = dict(servers)
+    for server, twin in validating:
+        rate, cpu = median(spans, server, "rate"), median(spans, server, "cpu")
+        twin_rate, twin_cpu = median(spans, twin, "rate"), median(spans, twin, "cpu")
+        if None in (rate, cpu, twin_rate, twin_cpu):
+            continue
+        print(f"- {spans} spans: {names[server]} answers {rate / twin_rate * percent:.1f}% of {twin}'s calls a "
+              f"second, and spends {cpu - twin_cpu:.1f} µs more CPU time a call.")
 print()
 print(f"Machine: {machine()}.")
 print(f"Load: {h2load}, {connections} connections of {streams} streams each, {suite}; {placement}.")
 print(f"Servers: connect-zig {commit} in ReleaseSafe, `tools/otlp_sink`; {otelcol}, GOMAXPROCS=1, its OTLP")
 print(f"receiver into its nop exporter; {vector}, one thread, its opentelemetry source into its blackhole sink;")
 print(f"{connect_go}, GOMAXPROCS=1, and {connect_rust}, one tokio worker, each a receiver that counts spans")
-print("(`tools/fullstack/connect-go`, `tools/fullstack/connect-rust`).")
+print("(`tools/fullstack/connect-go`, `tools/fullstack/connect-rust`). connect-zig + protovalidate is `otlp-sink-validate`,")
+print("and connect-rust + protovalidate-buffa the same receiver with `validate`: each checks every export against")
+print("the rules of `tools/fullstack/validate` before it counts its spans.")
 print(f"Rounds: {rounds}.")

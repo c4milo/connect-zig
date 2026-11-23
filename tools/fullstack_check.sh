@@ -5,7 +5,10 @@
 # receiver and its nop exporter; two servers in Rust, Vector with its blackhole sink, and Rotel
 # with its blackhole exporter; and receivers on two other Connect libraries, connect-go and
 # connect-rust (tools/fullstack/connect-go and tools/fullstack/connect-rust), which count spans
-# as the sink does. Each server runs alone on one core, the Collector and connect-go with
+# as the sink does. connect-zig and connect-rust also run as receivers that validate each export
+# with protovalidate against the rules of tools/fullstack/validate, `otlp-sink-validate` and
+# connect-rust's receiver with protovalidate-buffa, so the report gives what validation costs
+# each. Each server runs alone on one core, the Collector and connect-go with
 # GOMAXPROCS=1, Vector with one thread, and connect-rust with one tokio worker. The load runs on
 # two other cores, as colibri's judge places them (colibri decision 33).
 #
@@ -22,14 +25,15 @@
 #   receiver has no TLS.
 #
 # Each part checks every answer. One export through buf curl must answer with OTLP's full success,
-# and each server's own count of spans must equal the spans it was sent, with none refused. The
-# times report and never gate.
+# a receiver that validates must refuse one that breaks a rule, and each server's own count of
+# spans must equal the spans it was sent, with none refused. The times report and never gate.
 #
 # It runs on Linux, where /proc gives a process's CPU time and peak memory. It needs h2load
 # (nghttp2-client), buf, python3, curl, go and cargo; H2LOAD and BUF name the first two. It
 # downloads the Collector, Vector, Rotel and oha, each pinned by SHA-256, into a cache, unless
-# OTELCOL, VECTOR, ROTEL and OHA name them. It builds the sink with -Drelease, unless OTLP_SINK
-# names one, and the two receivers, unless CONNECT_GO and CONNECT_RUST name them.
+# OTELCOL, VECTOR, ROTEL and OHA name them. It builds the two sinks with -Drelease, unless
+# OTLP_SINK and OTLP_SINK_VALIDATE name them, and the two receivers, unless CONNECT_GO and
+# CONNECT_RUST name them.
 set -eu
 cd "$(dirname "$0")/.."
 # The reports import tools/fullstack/machine.py, and Python leaves no cache of it in the tree.
@@ -147,7 +151,10 @@ if [ -z "${connect_rust}" ]; then
     target="${cache}/fullstack-connect-rust-target"
     mkdir -p "${target}"
     # The descriptors move only when the schema does, so Cargo builds the crate again only then.
-    "${buf}" build examples/otlp/proto --as-file-descriptor-set -o "${target}/otlp.new.binpb"
+    # tools/fullstack/validate's copy of the schema: the same messages, whose spans carry OTLP's
+    # rules, which the receiver checks with `validate`.
+    "${buf}" build . --path tools/fullstack/validate/proto/opentelemetry --as-file-descriptor-set \
+        -o "${target}/otlp.new.binpb"
     cmp -s "${target}/otlp.new.binpb" "${target}/otlp.binpb" ||
         mv "${target}/otlp.new.binpb" "${target}/otlp.binpb"
     OTLP_DESCRIPTORS="${target}/otlp.binpb" CARGO_TARGET_DIR="${target}" cargo build --quiet \
@@ -155,9 +162,11 @@ if [ -z "${connect_rust}" ]; then
     connect_rust="${target}/release/fullstack-connect-rust"
 fi
 sink="${OTLP_SINK:-}"
-if [ -z "${sink}" ]; then
-    zig build otlp-sink -Drelease >&2
-    sink=zig-out/bin/otlp-sink
+sink_validate="${OTLP_SINK_VALIDATE:-}"
+if [ -z "${sink}" ] || [ -z "${sink_validate}" ]; then
+    zig build otlp-sink otlp-sink-validate -Drelease >&2
+    sink="${sink:-zig-out/bin/otlp-sink}"
+    sink_validate="${sink_validate:-zig-out/bin/otlp-sink-validate}"
 fi
 commit="$(git rev-parse --short HEAD 2>/dev/null || echo unknown)"
 collector="$("${otelcol}" --version)"

@@ -28,6 +28,7 @@ fn on_error(_: *App, _: *server.RequestContext, _: *const server.Request, _: any
 
 const Router = server.Router(App, .{
     .error_handler = on_error,
+    .Values = sink.Values,
     .routes = sink.routes,
 }, .{ .requests = constants.requests, .response_bytes = constants.response_bytes, .body_bytes = constants.body_bytes, .header_bytes = 0 });
 
@@ -50,7 +51,7 @@ pub fn main(init: std.process.Init) !void {
     const command = try command_of(init);
     const state = try init.arena.allocator().create(State);
     state.router = .{};
-    state.app = .{ .codings = .{ .decoders = .{ .gzip = &state.gzip_decoder } } };
+    state.app = .{ .codings = .{ .decoders = .{ .gzip = &state.gzip_decoder } }, .cpu_features = .detect() };
     const cpu = probe();
     // The Unix time when the server starts, which its TLS session tickets carry.
     const unix_seconds: u64 = @intCast(@max(std.Io.Clock.real.now(init.io).toSeconds(), 0));

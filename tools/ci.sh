@@ -64,7 +64,7 @@ draw_charts() {
     case "$2" in
         bench-compare) drawings="speed_chart:speed-vs-go call_chart:call-vs-go routes_chart:call-routes" ;;
         validate-compare) drawings="validate_chart:validate-vs-go" ;;
-        fullstack) drawings="fullstack_chart:fullstack:tls fullstack_chart:fullstack-cleartext:cleartext" ;;
+        fullstack) drawings="fullstack_chart:fullstack:tls fullstack_chart:fullstack-cleartext:cleartext fullstack_chart:fullstack-validate:validate" ;;
     esac
     for drawing in ${drawings}; do
         script="${drawing%%:*}" rest="${drawing#*:}"

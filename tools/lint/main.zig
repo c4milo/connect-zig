@@ -154,14 +154,15 @@ pub const unreleased_acquire = rules.unreleased_acquire.Rule(.{
 /// No unresolved marker ships: open work is a GitHub issue (CLAUDE.md, Conventions).
 pub const denied_words = rules.denied_words.Rule(.{
     // This file names the words to deny them. conformance/proto is connectrpc's copy, kept as
-    // connectrpc wrote it, and examples/otlp/proto/opentelemetry is OpenTelemetry's (decision 40).
+    // connectrpc wrote it, and examples/otlp/proto/opentelemetry is OpenTelemetry's (decision 40),
+    // as is tools/fullstack/validate/proto/opentelemetry, with the rules of its README added.
     // src/protovalidate/proto and conformance/protovalidate/proto are protovalidate's and
     // protobuf's, and conformance/protovalidate/gen is the code of the latter, whose schemas
     // name a field with one of the words (decision 47).
     .scope = .{
         .extensions = &.{ lint.paths.zig_extension, ".md", ".sh", ".yml", ".proto" },
         .exclude_paths = &.{ "tools/lint/main.zig", "docs/specs/cel/langdef.md", "docs/specs/cel/strings.md" },
-        .exclude_directories = &.{ "conformance/proto", "examples/otlp/proto/opentelemetry", "src/protovalidate/proto", "conformance/protovalidate/proto", "conformance/protovalidate/gen" },
+        .exclude_directories = &.{ "conformance/proto", "examples/otlp/proto/opentelemetry", "tools/fullstack/validate/proto/opentelemetry", "src/protovalidate/proto", "conformance/protovalidate/proto", "conformance/protovalidate/gen" },
     },
     .words = &.{ "TODO", "FIXME", "XXX", "HACK" },
     .word_label = "unresolved marker",

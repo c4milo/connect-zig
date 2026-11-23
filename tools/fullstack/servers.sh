@@ -90,13 +90,20 @@ sinks:
     address: 127.0.0.1:${vector_metrics_port}
 YAML
 
+# An export whose first span breaks one of tools/fullstack/validate's rules: its trace_id holds 3
+# octets, where OTLP's holds 16. A validating receiver must refuse it.
+cat >"${work}/broken.json" <<'JSON'
+{"resourceSpans":[{"scopeSpans":[{"spans":[{"traceId":"AAEC","spanId":"AAECAwQFBgc=","name":"GET /","kind":"SPAN_KIND_SERVER","startTimeUnixNano":"100","endTimeUnixNano":"200"}]}]}]}
+JSON
+
+# A receiver that validates each export runs on its twin's port: the servers run one at a time.
 port_of() {
     case "$1" in
-        connect-zig) echo "${sink_port}" ;;
+        connect-zig | connect-zig-validate) echo "${sink_port}" ;;
         collector) echo "${collector_port}" ;;
         vector) echo "${vector_port}" ;;
         connect-go) echo "${connect_go_port}" ;;
-        connect-rust) echo "${connect_rust_port}" ;;
+        connect-rust | connect-rust-validate) echo "${connect_rust_port}" ;;
         rotel) echo "${rotel_port}" ;;
     esac
 }
@@ -116,10 +123,12 @@ reach() {
 # Starts a server on its core, and waits until it answers.
 start() {
     case "$1" in
-        connect-zig)
+        connect-zig | connect-zig-validate)
             mode=""
             [ "${transport}" = tls ] || mode=cleartext
-            ${server_pin} "${sink}" "${sink_port}" ${mode} >"${work}/server.log" 2>&1 & ;;
+            program="${sink}"
+            [ "$1" = connect-zig ] || program="${sink_validate}"
+            ${server_pin} "${program}" "${sink_port}" ${mode} >"${work}/server.log" 2>&1 & ;;
         collector) GOMAXPROCS=1 ${server_pin} "${otelcol}" \
             --config "${work}/otelcol-${transport}.yaml" >"${work}/server.log" 2>&1 & ;;
         vector) ${server_pin} "${vector}" --threads 1 --quiet --config "${work}/vector.yaml" \
@@ -128,9 +137,12 @@ start() {
         connect-go) GOMAXPROCS=1 ${server_pin} "${connect_go}" "${connect_go_port}" \
             "$(pwd)/examples/harness/tls/chain.pem" "$(pwd)/examples/harness/tls/key.pem" \
             >"${work}/server.log" 2>&1 & ;;
-        connect-rust) TOKIO_WORKER_THREADS=1 ${server_pin} "${connect_rust}" "${connect_rust_port}" \
-            "${connect_rust_count_port}" "$(pwd)/examples/harness/tls/chain.pem" \
-            "$(pwd)/examples/harness/tls/key.pem" >"${work}/server.log" 2>&1 & ;;
+        connect-rust | connect-rust-validate)
+            validate=""
+            [ "$1" = connect-rust ] || validate=validate
+            TOKIO_WORKER_THREADS=1 ${server_pin} "${connect_rust}" "${connect_rust_port}" \
+                "${connect_rust_count_port}" "$(pwd)/examples/harness/tls/chain.pem" \
+                "$(pwd)/examples/harness/tls/key.pem" ${validate} >"${work}/server.log" 2>&1 & ;;
         rotel)
             ${load_pin} "${otelcol}" --config "${work}/counter.yaml" >"${work}/counter.log" 2>&1 &
             counter_pid=$!
@@ -177,13 +189,32 @@ probe() {
     return 1
 }
 
+# A receiver that validates must refuse the export of `broken.json` with `invalid_argument`
+# (Connect protocol, "Error Codes"), so a run never times a server that checks no rule. The
+# refused export adds no span to its count.
+probe_refused() {
+    case "$1" in
+        *-validate) ;;
+        *) return 0 ;;
+    esac
+    if "${buf}" curl --schema examples/otlp/proto --protocol grpc $(reach) -d @"${work}/broken.json" \
+        "$(url_of "$1" "${export_path}")" >"${work}/refused.log" 2>&1; then
+        echo "fullstack: $1 took an export that breaks a rule" >&2
+        return 1
+    fi
+    grep -q '"code": "invalid_argument"' "${work}/refused.log" && return 0
+    echo "fullstack: $1 refused an export that breaks a rule, but not with invalid_argument" >&2
+    cat "${work}/refused.log" >&2
+    return 1
+}
+
 # The spans a server says it took and refused. Vector counts one event for each span.
 counted() {
     case "$1" in
-        connect-zig | connect-go) curl -sS $(reach) "$(url_of "$1" /sink/count)" |
+        connect-zig | connect-zig-validate | connect-go) curl -sS $(reach) "$(url_of "$1" /sink/count)" |
             awk '{ print $4, 0 }' ;;
         # connect-rust's server has no plain route, so its counts come from a port of their own.
-        connect-rust) curl -sS "http://127.0.0.1:${connect_rust_count_port}/" | awk '{ print $4, 0 }' ;;
+        connect-rust | connect-rust-validate) curl -sS "http://127.0.0.1:${connect_rust_count_port}/" | awk '{ print $4, 0 }' ;;
         collector) metric_sum "http://127.0.0.1:${metrics_port}/metrics" \
             otelcol_receiver_accepted_spans otelcol_receiver_refused_spans ;;
         vector) metric_sum "http://127.0.0.1:${vector_metrics_port}/metrics" \

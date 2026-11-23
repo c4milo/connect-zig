@@ -5,7 +5,8 @@
 
 <log> holds the job's whole output, or the reports of tools/fullstack/production.sh. <transport>
 picks the table: `tls`, connect-zig against the Collector and Vector, or `cleartext`, against the
-Collector and Rotel. The chart draws the production model: one gateway core for 33,000 servers,
+Collector and Rotel. `validate` draws the TLS table's receivers on connect-zig and connect-rust,
+each beside its twin that validates every export with protovalidate (tools/fullstack/validate). The chart draws the production model: one gateway core for 33,000 servers,
 516 connections and a mix of gzip exports. Its left panel gives the spans a second each server's
 core held with p99 at most 100 ms and no call refused. Its right panel gives each step's p99
 against the spans a second sent, on a log scale, with the 100 ms limit. <run> and <commit> name
@@ -16,10 +17,12 @@ import re
 import sys
 
 log_path, run, commit, transport = sys.argv[1:5]
-out = sys.argv[5] if len(sys.argv) > 5 else f"docs/images/fullstack{'' if transport == 'tls' else '-cleartext'}.svg"
-over = "over TLS" if transport == "tls" else "over cleartext h2"
+suffix = {"tls": "", "cleartext": "-cleartext", "validate": "-validate"}[transport]
+out = sys.argv[5] if len(sys.argv) > 5 else f"docs/images/fullstack{suffix}.svg"
+validate = transport == "validate"
+over = "over cleartext h2" if transport == "cleartext" else "over TLS"
 # Each server's name in the report, its name in the legend, and its color: one color a server, in
-# every chart of the README.
+# every chart of the README. A receiver that validates takes a lighter shade of its library's.
 looks = {
     "connect-zig": ("connect-zig", "--zig"),
     "Collector": ("OpenTelemetry Collector", "--otel"),
@@ -28,6 +31,15 @@ looks = {
     "connect-go": ("connect-go", "--go"),
     "connect-rust": ("connect-rust", "--rust"),
 }
+if validate:
+    looks = {
+        "connect-zig": ("connect-zig", "--zig"),
+        "connect-zig + protovalidate": ("connect-zig + protovalidate", "--zigv"),
+        "connect-rust": ("connect-rust", "--rust"),
+        "connect-rust + protovalidate-buffa": ("connect-rust + protovalidate-buffa", "--rustv"),
+    }
+# Each receiver that validates, and its twin that does not.
+twins = {"connect-zig + protovalidate": "connect-zig", "connect-rust + protovalidate-buffa": "connect-rust"}
 # The Connect libraries, which the title names when the table holds them (decision 46).
 libraries = ("connect-go", "connect-rust")
 limit_ms = 100
@@ -64,6 +76,8 @@ for line in open(log_path):
 servers = [name for name in looks if name in held]
 if "connect-zig" not in held or len(servers) < 2 or not steps:
     sys.exit(f"{log_path}: no production table {over} with connect-zig and another server")
+if validate and "connect-zig + protovalidate" not in held:
+    sys.exit(f"{log_path}: no production table {over} with connect-zig + protovalidate")
 
 others = [name for name in servers if name != "connect-zig"]
 # Four ratios do not fit one title, so a table with the Connect libraries names them alone, and
@@ -77,6 +91,12 @@ title_len_max = 90
 title = f"One core holds {' and '.join(ratios)} spans a second, with p99 under {limit_ms} ms"
 if len(title) > title_len_max:
     title = f"One core holds {' and '.join(ratios)} spans a second"
+if validate:
+    kept = [f"{held[name]['spans'] / held[twin]['spans'] * 100:.0f}%" for name, twin in twins.items()
+            if name in held and twin in held]
+    title = f"With protovalidate, connect-zig keeps {kept[0]} of its spans a second"
+    if len(kept) > 1:
+        title += f", and connect-rust {kept[1]}"
 
 pad_l = 24
 legend_y = 112
@@ -85,8 +105,10 @@ bar_h, bar_gap = 20, 22
 # The chart grows when its bars pass its foot.
 W, H = 840, max(340, top + 12 + len(servers) * (bar_h + bar_gap) + 8)
 plot_h = 128
-bar_left, bar_w = pad_l + 104, 210
-line_left, line_right = 448, 800
+# The receivers that validate take longer names, so their bars start further right, and the panel
+# of the climb starts further right too.
+bar_left, bar_w = (pad_l + 208, 150) if validate else (pad_l + 104, 210)
+line_left, line_right = (520, 810) if validate else (448, 800)
 y_low, y_high = 0.5, 2000
 x_high = max(step["sent"] for step in steps)
 
@@ -107,7 +129,8 @@ def thousands(value):
 parts = []
 a = parts.append
 a(f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} {H}" width="{W}" height="{H}" role="img" aria-labelledby="t d">')
-a(f'<title id="t">The spans a second one core holds {over}, connect-zig against {", ".join(others)}, as one gateway core for 33,000 servers</title>')
+subject = "connect-zig and connect-rust, each with and without protovalidate" if validate else f"connect-zig against {', '.join(others)}"
+a(f'<title id="t">The spans a second one core holds {over}, {subject}, as one gateway core for 33,000 servers</title>')
 climb = "; ".join(
     f"{name}: " + ", ".join(f"{thousands(step['sent'])} {step[name][0]:g} ms" + (f" {step[name][1]}" if step[name][1] else "")
                             for step in steps if name in step)
@@ -115,9 +138,9 @@ climb = "; ".join(
 spans = ", ".join(f"{name} {held[name]['spans']:,.0f} spans a second at p99 {held[name]['p99']:g} ms" for name in servers)
 a(f'<desc id="d">{title}. {spans}. p99 at each step: {climb}.</desc>')
 a('''<style>
-svg { --surface:#fcfcfb; --ink:#0b0b0b; --ink2:#52514e; --muted:#8a8984; --grid:#e4e3df; --zig:#2a78d6; --otel:#b07d00; --vector:#b8407f; --rotel:#722626; --go:#1a8a82; --rust:#b5562b; }
+svg { --surface:#fcfcfb; --ink:#0b0b0b; --ink2:#52514e; --muted:#8a8984; --grid:#e4e3df; --zig:#2a78d6; --zigv:#8db8ea; --otel:#b07d00; --vector:#b8407f; --rotel:#722626; --go:#1a8a82; --rust:#b5562b; --rustv:#dfa283; }
 @media (prefers-color-scheme: dark) {
-  svg { --surface:#1a1a19; --ink:#f0efec; --ink2:#c3c2b7; --muted:#8f8e86; --grid:#33332f; --zig:#3987e5; --otel:#c99512; --vector:#d0599a; --rotel:#b84545; --go:#2fa59c; --rust:#d06d3f; }
+  svg { --surface:#1a1a19; --ink:#f0efec; --ink2:#c3c2b7; --muted:#8f8e86; --grid:#33332f; --zig:#3987e5; --zigv:#1f5596; --otel:#c99512; --vector:#d0599a; --rotel:#b84545; --go:#2fa59c; --rust:#d06d3f; --rustv:#8a4524; }
 }
 text { font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; fill: var(--ink); }
 .title { font-size: 16px; font-weight: 600; }
@@ -152,6 +175,9 @@ for index, name in enumerate(servers):
     a(f'<path d="M{bar_left},{y} h{width - radius:.1f} a{radius},{radius} 0 0 1 {radius},{radius} v{bar_h - 2 * radius} '
       f'a{radius},{radius} 0 0 1 {-radius},{radius} h{-(width - radius):.1f} z" fill="var({fill})"/>')
     ratio = "" if name == "connect-zig" else f", connect-zig {held['connect-zig']['spans'] / held[name]['spans']:.1f}×"
+    if validate:
+        twin = twins.get(name)
+        ratio = f", {held[name]['spans'] / held[twin]['spans'] * 100:.0f}%" if twin in held else ""
     a(f'<text class="val" x="{bar_left + 4:.1f}" y="{y + bar_h + 13}">{held[name]["spans"]:,.0f} spans/s, p99 {held[name]["p99"]:g} ms{ratio}</text>')
 
 a(f'<text class="panel" x="{line_left - 40}" y="{top - 14}">p99 as the rate climbs</text>')
