@@ -15,7 +15,7 @@ trap '[ -n "${server_pid}" ] && kill "${server_pid}" 2>/dev/null; rm -f "${log}"
 server_pid=$!
 # The server's first line names its port. 100 tries of 0.1 s wait 10 s at most.
 port=""
-for try in $(seq 1 100); do
+for _ in $(seq 1 100); do
     port="$(sed -n 's/^listening on port \([0-9][0-9]*\)$/\1/p' "${log}")"
     [ -n "${port}" ] && break
     sleep 0.1

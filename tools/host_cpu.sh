@@ -32,4 +32,5 @@ go_level() {
 }
 
 # The flags that build Rust for this CPU.
+# shellcheck disable=SC2034 # the scripts that source this file read it
 rust_native="-C target-cpu=native"

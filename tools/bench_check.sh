@@ -61,7 +61,7 @@ fi
 # Go builds for the highest level of this CPU that it names, as Zig and Rust build for the CPU.
 . tools/host_cpu.sh
 go_build="$(go_level)"
-(cd bench/go && env ${go_build} "${go}" build -o "${scratch}/bench-go" .)
+(cd bench/go && env ${go_build:+"${go_build}"} "${go}" build -o "${scratch}/bench-go" .)
 baselines="go"
 if command -v "${cargo}" >/dev/null 2>&1; then
     "${buf}" build bench/proto --as-file-descriptor-set -o "${scratch}/bench.binpb"
@@ -84,15 +84,16 @@ fi
 run_bench() {
     write=""
     [ "$2" -eq 1 ] && write="--write ${scratch}/$1"
+    # shellcheck disable=SC2086 # write holds an option and its path, which split into two words
     case "$1" in
-        zig) zig build bench ${cpu_option} -- ${quick} ${write} ;;
+        zig) zig build bench ${cpu_option:+"${cpu_option}"} -- ${quick} ${write} ;;
         go) "${scratch}/bench-go" ${quick} ${write} ;;
         rust) "${bench_rust}" ${quick} ${write} ;;
     esac >"${scratch}/$1-$2.md"
 }
 for round in $(seq 1 "${rounds}"); do
     # The languages rotated left by one more each round: zig go rust, then go rust zig.
-    order="$(echo zig ${baselines} | awk -v by="$((round - 1))" \
+    order="$(echo "zig ${baselines}" | awk -v by="$((round - 1))" \
         '{ for (i = 0; i < NF; i++) printf "%s ", $((i + by) % NF + 1) }')"
     for language in ${order}; do
         echo "bench: round ${round}, ${language}" >&2

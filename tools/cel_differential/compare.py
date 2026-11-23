@@ -10,7 +10,9 @@ expression and, after a tab, its reason. A difference is known when an expressio
 matches this library's reason for it. The script prints each other difference with its rule's
 expression, and exits 1 when there is one.
 """
+
 import collections
+import pathlib
 import re
 import sys
 
@@ -28,18 +30,20 @@ def verdicts(path):
 
 def main():
     schema, zig_path, go_path, refused_path, known_path = sys.argv[1:6]
-    expressions = re.findall(r'expression: "((?:[^"\\]|\\.)*)"', open(schema, encoding="utf-8").read())
+    expressions = re.findall(r'expression: "((?:[^"\\]|\\.)*)"', pathlib.Path(schema).read_text(encoding="utf-8"))
     expressions = [text.replace('\\"', '"').replace("\\\\", "\\") for text in expressions]
     reasons = {}
-    for line in open(refused_path, encoding="utf-8"):
-        found = re.match(r"M(\d+) is refused: (.*)", line.rstrip("\n"))
-        if found:
-            reasons[int(found.group(1))] = found.group(2)
+    with open(refused_path, encoding="utf-8") as lines:
+        for line in lines:
+            found = re.match(r"M(\d+) is refused: (.*)", line.rstrip("\n"))
+            if found:
+                reasons[int(found.group(1))] = found.group(2)
     known = []
-    for line in open(known_path, encoding="utf-8"):
-        if line.strip() and not line.startswith("#"):
-            pattern, reason = line.rstrip("\n").split("\t", 1)
-            known.append((re.compile(pattern), reason))
+    with open(known_path, encoding="utf-8") as lines:
+        for line in lines:
+            if line.strip() and not line.startswith("#"):
+                pattern, reason = line.rstrip("\n").split("\t", 1)
+                known.append((re.compile(pattern), reason))
     zig, go = verdicts(zig_path), verdicts(go_path)
     if zig.keys() != go.keys():
         sys.exit(f"the two sides hold verdicts of different pairs: {len(zig)} and {len(go)}")
@@ -56,13 +60,19 @@ def main():
             excused[excuse] += 1
         else:
             unknown.setdefault(pair[0], []).append((pair[1], zig[pair], go[pair]))
-    print(f"{len(zig)} verdicts of {len(expressions)} rules: " + ", ".join(f"{count} {name}" for name, count in sorted(agreed.items())) + " on both sides")
+    print(
+        f"{len(zig)} verdicts of {len(expressions)} rules: "
+        + ", ".join(f"{count} {name}" for name, count in sorted(agreed.items()))
+        + " on both sides"
+    )
     for excuse, count in sorted(excused.items()):
         print(f"{count} known differences: {excuse}")
     for rule, pairs in sorted(unknown.items()):
         message, ours, theirs = pairs[0]
         print(f"DIFFERENT rule {rule}: `{expressions[rule]}`")
-        print(f"  message {message}: this library says {ours}, protovalidate-go says {theirs} ({len(pairs)} messages differ)")
+        print(
+            f"  message {message}: this library says {ours}, protovalidate-go says {theirs} ({len(pairs)} messages differ)"
+        )
         if rule in reasons:
             print(f"  refused: {reasons[rule]}")
     if unknown:

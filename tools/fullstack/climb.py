@@ -13,6 +13,7 @@ Each server runs in rounds. The first climbs from the lowest rate, and each late
 near the rate an earlier one held, so only the first round's steps fall on the same rates for
 every server.
 """
+
 import statistics
 
 microseconds = 1_000_000
@@ -25,38 +26,52 @@ def read(path, transport, ticks, seconds, kind="step"):
     memory in MiB, for the lines of `transport`. `kind` picks the lines of the steps: "step" for
     the rounds, or "confirm" for the long step at the rate a server held."""
     servers, steps, memory = [], {}, {}
-    for line in open(path):
-        fields = line.split()
-        if len(fields) < 3 or fields[1] != transport:
-            continue
-        server = fields[2]
-        if server not in servers:
-            servers.append(server)
-        if fields[0] == "memory":
-            memory[server] = max(memory.get(server, 0), int(fields[3]) / kib)
-            continue
-        if fields[0] != kind:
-            continue
-        rate, taken, calls, spans, p50, p99, refused, verdict, load, cpu, wall_ms, reopened, round_number = fields[3:16]
-        steps.setdefault(server, []).append({
-            "rate": float(rate), "taken": int(taken), "calls": float(calls), "spans": float(spans),
-            "p50": float(p50), "p99": float(p99), "refused": int(refused), "verdict": verdict,
-            "load": float(load), "reopened": int(reopened), "round": int(round_number),
-            # The share of a core over the step's measured wall time, which passes its nominal
-            # seconds by the load's start and the calls still in flight at its end.
-            "busy": int(cpu) / ticks / max(int(wall_ms) / milliseconds, seconds),
-            "cpu": int(cpu) * microseconds / ticks / max(int(taken), 1),
-        })
+    with open(path) as lines:
+        for line in lines:
+            fields = line.split()
+            if len(fields) < 3 or fields[1] != transport:
+                continue
+            server = fields[2]
+            if server not in servers:
+                servers.append(server)
+            if fields[0] == "memory":
+                memory[server] = max(memory.get(server, 0), int(fields[3]) / kib)
+                continue
+            if fields[0] != kind:
+                continue
+            rate, taken, calls, spans, p50, p99, refused, verdict, load, cpu, wall_ms, reopened, round_number = fields[
+                3:16
+            ]
+            steps.setdefault(server, []).append(
+                {
+                    "rate": float(rate),
+                    "taken": int(taken),
+                    "calls": float(calls),
+                    "spans": float(spans),
+                    "p50": float(p50),
+                    "p99": float(p99),
+                    "refused": int(refused),
+                    "verdict": verdict,
+                    "load": float(load),
+                    "reopened": int(reopened),
+                    "round": int(round_number),
+                    # The share of a core over the step's measured wall time, which passes its nominal
+                    # seconds by the load's start and the calls still in flight at its end.
+                    "busy": int(cpu) / ticks / max(int(wall_ms) / milliseconds, seconds),
+                    "cpu": int(cpu) * microseconds / ticks / max(int(taken), 1),
+                }
+            )
     return servers, steps, memory
 
 
 def suites(path, transport):
     """The TLS 1.3 suite each server's connections ran, by server, from the lines of `transport`."""
     found = {}
-    for line in open(path):
-        fields = line.split()
-        if len(fields) == 4 and fields[0] == "suite" and fields[1] == transport:
-            found[fields[2]] = fields[3]
+    with open(path) as lines:
+        for line in lines:
+            fields = line.split()
+            if len(fields) == 4 and fields[0] == "suite" and fields[1] == transport:
+                found[fields[2]] = fields[3]
     return found
 
 
@@ -104,9 +119,16 @@ def summary(steps):
     middle = statistics.median_low(spans.values())
     best, above, verdict = next(result for result in results.values() if result[0]["spans"] == middle)
     tops = [failed["rate"] if failed else float("inf") for _, failed, _ in results.values()]
-    return {"best": best, "above": above, "verdict": verdict, "low": min(spans.values()),
-            "high": max(spans.values()), "spans": spans,
-            "bottom": min(result[0]["rate"] for result in results.values()), "top": max(tops)}, verdict
+    return {
+        "best": best,
+        "above": above,
+        "verdict": verdict,
+        "low": min(spans.values()),
+        "high": max(spans.values()),
+        "spans": spans,
+        "bottom": min(result[0]["rate"] for result in results.values()),
+        "top": max(tops),
+    }, verdict
 
 
 def round_ratios(top, bottom):
@@ -167,8 +189,10 @@ def at(steps, rate):
 def apart(first, first_above, second, second_above):
     """Whether two climbs held rates the climb tells apart: neither rate lies inside the other's
     interval, from the step held to the step above it that failed."""
+
     def interval(best, above):
         return best["rate"], above["rate"] if above else float("inf")
+
     low_first, high_first = interval(first, first_above)
     low_second, high_second = interval(second, second_above)
     return high_first <= low_second or high_second <= low_first

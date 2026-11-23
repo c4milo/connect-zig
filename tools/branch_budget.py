@@ -11,6 +11,7 @@ test-protovalidate` when none is given, and halves the range until it holds the 
 that builds. It restores the file and prints the range. The commit that pays for a higher cost
 sets the constant to that value and 2% more.
 """
+
 import pathlib
 import re
 import subprocess
@@ -19,7 +20,7 @@ import sys
 
 def main():
     path, name = sys.argv[1], sys.argv[2]
-    command = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else ["zig", "build", "test-protovalidate"]
+    command = sys.argv[sys.argv.index("--") + 1 :] if "--" in sys.argv else ["zig", "build", "test-protovalidate"]
     file = pathlib.Path(path)
     original = file.read_text()
     pattern = re.compile(r"(const " + re.escape(name) + r" = )([0-9_]+);")
@@ -28,7 +29,7 @@ def main():
 
     def builds(value):
         file.write_text(pattern.sub(lambda found: f"{found.group(1)}{value};", original))
-        result = subprocess.run(command, capture_output=True, text=True)
+        result = subprocess.run(command, capture_output=True, text=True, check=False)
         if result.returncode != 0 and "backwards branches" not in result.stderr:
             file.write_text(original)
             sys.exit("the build fails for another reason:\n" + result.stderr[:2000])

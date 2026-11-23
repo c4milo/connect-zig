@@ -111,7 +111,7 @@ def run_chat(stub, interop_pb2, cases):
         answered.put(True)
     expect(not stalled, f"no answer to case {stalled[0] if stalled else 0} before the next send")
     expect(len(responses) == len(cases), f"got {len(responses)} answers, want {len(cases)}")
-    for index, (case, response) in enumerate(zip(cases, responses)):
+    for index, (case, response) in enumerate(zip(cases, responses, strict=True)):
         expect(same(case, response), f"answer {index} differs from its case")
 
 

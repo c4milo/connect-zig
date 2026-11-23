@@ -92,7 +92,7 @@ summarize() {
         annotate "$1" "the client ran no scenario (exit $2)"
         return
     fi
-    for protocol in $(awk '{ print $3 }' "${lines}" | sort -u); do
+    awk '{ print $3 }' "${lines}" | sort -u | while IFS= read -r protocol; do
         passed="$(grep -c "^ok: $1 ${protocol} " "${lines}" || true)"
         failures="$(grep "^FAIL: $1 ${protocol} " "${lines}" | sed "s/^FAIL: $1 ${protocol} //; s/|/\\\\|/g" | tr '\n' ';' || true)"
         echo "| $1 | ${protocol} | ${passed} | ${failures:-none} |" >>"${report}"

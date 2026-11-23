@@ -13,6 +13,7 @@ folder and cache, so nothing is fetched again, and `zig build serve` runs in the
 port 8443 until the session ends. It needs zig, buf, curl and go, and HyperFrames' own needs:
 Node 22 or later, FFmpeg and Chrome. HyperFrames runs with its telemetry off.
 """
+
 import json
 import os
 import pathlib
@@ -47,53 +48,133 @@ EXAMPLES = {
         ("sh", "zig build plugin && buf generate && zig build"),
         ("sh", "zig-out/bin/greet-server 8443 ../harness/tls/chain.pem ../harness/tls/key.pem &"),
         ("sh", "zig-out/bin/greet-client 8443 ../harness/tls/ca.pem"),
-        ("sh", "curl --cacert " + CA + " --json '{\"name\":\"Ada\"}' " + URL + "/greet.v1.GreetService/Greet"),
+        ("sh", "curl --cacert " + CA + ' --json \'{"name":"Ada"}\' ' + URL + "/greet.v1.GreetService/Greet"),
     ],
     "protobuf_messages": [("run", None)],
     "sans_io_call": [("run", None)],
     "eliza": [
         ("run", None),
         ("serve", None),
-        ("sh", "curl --cacert " + CA + " --json '{\"sentence\":\"I feel tired\"}' " + URL + "/connectrpc.eliza.v1.ElizaService/Say"),
-        ("sh", "buf curl --cacert " + CA + " --schema proto --protocol grpc -d '{\"name\":\"Ada\"}' " + URL + "/connectrpc.eliza.v1.ElizaService/Introduce"),
+        (
+            "sh",
+            "curl --cacert "
+            + CA
+            + ' --json \'{"sentence":"I feel tired"}\' '
+            + URL
+            + "/connectrpc.eliza.v1.ElizaService/Say",
+        ),
+        (
+            "sh",
+            "buf curl --cacert "
+            + CA
+            + ' --schema proto --protocol grpc -d \'{"name":"Ada"}\' '
+            + URL
+            + "/connectrpc.eliza.v1.ElizaService/Introduce",
+        ),
     ],
     "streaming": [
         ("run", None),
         ("serve", None),
-        ("sh", "buf curl --schema proto --cacert " + CA + " --data '{\"from\":3}' " + URL + "/streaming.v1.StreamingService/Countdown"),
-        ("sh", "buf curl --schema proto --cacert " + CA + " --data '{\"text\":\"hello\"}{\"text\":\"goodbye\"}' " + URL + "/streaming.v1.StreamingService/Chat"),
+        (
+            "sh",
+            "buf curl --schema proto --cacert "
+            + CA
+            + " --data '{\"from\":3}' "
+            + URL
+            + "/streaming.v1.StreamingService/Countdown",
+        ),
+        (
+            "sh",
+            "buf curl --schema proto --cacert "
+            + CA
+            + ' --data \'{"text":"hello"}{"text":"goodbye"}\' '
+            + URL
+            + "/streaming.v1.StreamingService/Chat",
+        ),
     ],
     "interceptors": [
         ("run", None),
         ("serve", None),
-        ("sh", "curl -i --cacert " + CA + " -H 'authorization: Bearer Ada' --json '{}' " + URL + "/interceptors.v1.WhoamiService/Whoami"),
+        (
+            "sh",
+            "curl -i --cacert "
+            + CA
+            + " -H 'authorization: Bearer Ada' --json '{}' "
+            + URL
+            + "/interceptors.v1.WhoamiService/Whoami",
+        ),
     ],
     "errors": [
         ("run", None),
         ("serve", None),
-        ("sh", "curl --cacert " + CA + " --json '{\"dividend\":7,\"divisor\":0}' " + URL + "/errors.v1.CalculatorService/Divide"),
+        (
+            "sh",
+            "curl --cacert "
+            + CA
+            + ' --json \'{"dividend":7,"divisor":0}\' '
+            + URL
+            + "/errors.v1.CalculatorService/Divide",
+        ),
     ],
     "github": [
         ("run", None),
         ("serve", None),
-        ("sh", "curl --cacert " + CA + " -H 'authorization: Bearer ghp_octocat_example' --json '{\"name\":\"hello-world\",\"topics\":[\"zig\",\"rpc\"]}' " + URL + "/github.v1.RepositoryService/CreateRepository"),
-        ("sh", "curl --cacert " + CA + " --json '{\"owner\":\"octocat\"}' " + URL + "/github.v1.RepositoryService/ListRepositories"),
+        (
+            "sh",
+            "curl --cacert "
+            + CA
+            + ' -H \'authorization: Bearer ghp_octocat_example\' --json \'{"name":"hello-world","topics":["zig","rpc"]}\' '
+            + URL
+            + "/github.v1.RepositoryService/CreateRepository",
+        ),
+        (
+            "sh",
+            "curl --cacert "
+            + CA
+            + ' --json \'{"owner":"octocat"}\' '
+            + URL
+            + "/github.v1.RepositoryService/ListRepositories",
+        ),
     ],
     "oidc": [
         ("run", None),
         ("serve", None),
-        ("sh", "curl --cacert " + CA + " -H \"authorization: Bearer $TOKEN\" --json '{}' " + URL + "/account.v1.AccountService/Whoami"),
+        (
+            "sh",
+            "curl --cacert "
+            + CA
+            + " -H \"authorization: Bearer $TOKEN\" --json '{}' "
+            + URL
+            + "/account.v1.AccountService/Whoami",
+        ),
     ],
     "validate": [
         ("run", None),
         ("serve", None),
-        ("sh", "curl --cacert " + CA + " --json '{\"email\":\"ada@example.com\",\"name\":\"Ada\",\"age\":36}' " + URL + "/signup.v1.SignupService/Register"),
-        ("sh", "curl -i --cacert " + CA + " --json '{\"email\":\"ada\",\"name\":\"Ada\",\"age\":7}' " + URL + "/signup.v1.SignupService/Register"),
+        (
+            "sh",
+            "curl --cacert "
+            + CA
+            + ' --json \'{"email":"ada@example.com","name":"Ada","age":36}\' '
+            + URL
+            + "/signup.v1.SignupService/Register",
+        ),
+        (
+            "sh",
+            "curl -i --cacert "
+            + CA
+            + ' --json \'{"email":"ada","name":"Ada","age":7}\' '
+            + URL
+            + "/signup.v1.SignupService/Register",
+        ),
     ],
     "std_io": [
         ("run", None),
         ("serve", None),
-        ("sh", "curl --json '{\"sentence\":\"I feel tired\"}' http://127.0.0.1:8443/connectrpc.eliza.v1.ElizaService/Say"),
+        (
+            "sh",
+            'curl --json \'{"sentence":"I feel tired"}\' http://127.0.0.1:8443/connectrpc.eliza.v1.ElizaService/Say',
+        ),
     ],
     "otlp": [
         ("run", None),
@@ -102,8 +183,18 @@ EXAMPLES = {
     ],
     "socket_server": [
         ("serve", None),
-        ("sh", "curl --cacert " + CA + " --json '{\"sentence\":\"Hello\"}' " + URL + "/connectrpc.eliza.v1.ElizaService/Say"),
-        ("sh", "curl --cacert " + CA + " --json '{\"dividend\":7,\"divisor\":2}' " + URL + "/errors.v1.CalculatorService/Divide"),
+        (
+            "sh",
+            "curl --cacert " + CA + ' --json \'{"sentence":"Hello"}\' ' + URL + "/connectrpc.eliza.v1.ElizaService/Say",
+        ),
+        (
+            "sh",
+            "curl --cacert "
+            + CA
+            + ' --json \'{"dividend":7,"divisor":2}\' '
+            + URL
+            + "/errors.v1.CalculatorService/Divide",
+        ),
     ],
 }
 
@@ -147,7 +238,15 @@ def record(name):
     try:
         for kind, text in EXAMPLES[name]:
             if kind == "run":
-                done = subprocess.run(zig(cwd, "run", []), cwd=cwd, env=env, capture_output=True, text=True, timeout=COMMAND_WAIT_S)
+                done = subprocess.run(
+                    zig(cwd, "run", []),
+                    cwd=cwd,
+                    env=env,
+                    capture_output=True,
+                    text=True,
+                    timeout=COMMAND_WAIT_S,
+                    check=False,
+                )
                 if done.returncode != 0:
                     raise SystemExit(f"{name}: zig build run failed:\n{done.stderr}")
                 steps.append({"command": "zig build run", "output": shown((done.stdout + done.stderr).splitlines())})
@@ -156,14 +255,22 @@ def record(name):
                 servers.append(server)
                 for line in lines:
                     if line.startswith("token: "):
-                        env["TOKEN"] = line[len("token: "):]
+                        env["TOKEN"] = line[len("token: ") :]
                 steps.append({"command": "zig build serve &", "output": shown(lines)})
             elif text.endswith("&"):
                 lines, server = serve(cwd, env, ["sh", "-c", actual(text[:-1])])
                 servers.append(server)
                 steps.append({"command": text, "output": shown(lines)})
             else:
-                done = subprocess.run(["sh", "-c", actual(text)], cwd=cwd, env=env, capture_output=True, text=True, timeout=COMMAND_WAIT_S)
+                done = subprocess.run(
+                    ["sh", "-c", actual(text)],
+                    cwd=cwd,
+                    env=env,
+                    capture_output=True,
+                    text=True,
+                    timeout=COMMAND_WAIT_S,
+                    check=False,
+                )
                 output = done.stdout + done.stderr
                 # Go's HTTP/2 client logs a frame type it does not know, which a peer must
                 # ignore (RFC 9113 §4.1); the log line is not the call's output.
@@ -179,8 +286,11 @@ def record(name):
 
 def serve(cwd, env, command):
     """Starts a server in the background, and returns its lines up to `listening on port`."""
-    log = tempfile.NamedTemporaryFile("w+", delete=False)
-    server = subprocess.Popen(command, cwd=cwd, env=env, stdout=log, stderr=subprocess.STDOUT, text=True, start_new_session=True)
+    # The server holds its own copy of the file's descriptor, so this one closes once it starts.
+    with tempfile.NamedTemporaryFile("w+", delete=False) as log:
+        server = subprocess.Popen(
+            command, cwd=cwd, env=env, stdout=log, stderr=subprocess.STDOUT, text=True, start_new_session=True
+        )
     deadline = time.monotonic() + SERVE_WAIT_S
     while time.monotonic() < deadline:
         lines = pathlib.Path(log.name).read_text().splitlines()
@@ -210,10 +320,44 @@ def render(name, steps):
     env = dict(os.environ, HYPERFRAMES_NO_TELEMETRY="1", DO_NOT_TRACK="1", HYPERFRAMES_SKIP_SKILLS="1")
     with tempfile.TemporaryDirectory() as scratch:
         project = pathlib.Path(scratch) / "walkthrough"
-        subprocess.run(["npx", "-y", HYPERFRAMES, "init", str(project), "--example", "blank", "--non-interactive", "--skip-skills"], env=env, check=True, capture_output=True)
+        subprocess.run(
+            [
+                "npx",
+                "-y",
+                HYPERFRAMES,
+                "init",
+                str(project),
+                "--example",
+                "blank",
+                "--non-interactive",
+                "--skip-skills",
+            ],
+            env=env,
+            check=True,
+            capture_output=True,
+        )
         (project / "index.html").write_text(page)
         output = ROOT / "examples" / name / "walkthrough.gif"
-        subprocess.run(["npx", "-y", HYPERFRAMES, "render", str(project), "--format", "gif", "--fps", FPS, "--gif-loop", "0", "--quiet", "-o", str(output)], env=env, check=True)
+        subprocess.run(
+            [
+                "npx",
+                "-y",
+                HYPERFRAMES,
+                "render",
+                str(project),
+                "--format",
+                "gif",
+                "--fps",
+                FPS,
+                "--gif-loop",
+                "0",
+                "--quiet",
+                "-o",
+                str(output),
+            ],
+            env=env,
+            check=True,
+        )
     print(f"{name}: {seconds} s, {output.stat().st_size // 1024} KiB")
 
 

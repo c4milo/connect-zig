@@ -1,4 +1,7 @@
 # shellcheck shell=sh
+# tools/fullstack_check.sh, and the files it sources beside this one, set the variables this
+# file reads, which shellcheck cannot see when it reads this file alone.
+# shellcheck disable=SC2154
 # The production part of tools/fullstack_check.sh (design §8 steps 29 and 30, decision 44), which
 # sources this file and runs `production_part`: the traffic of one gateway core for a fleet of
 # 33,000 servers. `production_part tls` climbs over TLS for connect-zig, the Collector, Vector and
@@ -113,13 +116,14 @@ load_start() {
     done
     trust=""
     [ "${transport}" = tls ] && trust="--ca ${ca}"
+    # shellcheck disable=SC2086 # trust and classes hold options, which split into words
     ${load_pin} "${fullstack_load}" --address "127.0.0.1:$(port_of "$1")" --path "${export_path}" \
         ${trust} --encoding "${production_encoding}" --streams "${connection_streams}" \
         --threads "${load_threads}" ${classes} \
         <"${work}/load-in" >"${work}/load-out" 2>"${work}/load.log" &
     load_pid=$!
     exec 7>"${work}/load-in" 8<"${work}/load-out"
-    read -r word connections suite <&8 || word=""
+    read -r word _ suite <&8 || word=""
     if [ "${word}" != ready ]; then
         echo "fullstack: the load did not start on $1: $(cat "${work}/load.log")" >&2
         load_stop
@@ -146,7 +150,7 @@ production_load() {
     kill -0 "${load_pid}" 2>/dev/null || { echo "fullstack: the load ended on $1" >&2; return 1; }
     echo "step $2 ${3:-${step_seconds}} ${work}" >&7
     read -r word _ reopened <&8 || word=""
-    [ "${word}" = done ] && return 0
+    [ "${word}" = "done" ] && return 0
     echo "fullstack: the load ended on $1: $(cat "${work}/load.log")" >&2
     return 1
 }
@@ -164,6 +168,7 @@ production_step() {
     ended_ns="$(date +%s%N)"
     after="$(cpu_ticks "${server_pid}")"
     load_after="$(load_ticks)"
+    # shellcheck disable=SC2046,SC2086 # production_step.py and production_classes give word lists
     set -- $(python3 tools/fullstack/production_step.py "${work}" "${step_length}" \
         "${p99_limit_ms}" "${step_rate}" "${load_before}" "${load_after}" ${production_classes})
     sent=$((sent + $1))
@@ -228,7 +233,7 @@ production_search() {
 # A step of `warm_seconds` at the highest rate of `production_steps` at or below half of the
 # argument, when one is.
 production_warm() {
-    warm="$(echo ${production_steps} | awk -v rate="$1" \
+    warm="$(echo "${production_steps}" | awk -v rate="$1" \
         '{ warm = 0; for (i = 1; i <= NF; i++) if ($i <= rate / 2) warm = $i; print warm }')"
     [ "${warm}" = 0 ] || production_try "${warm}" "${warm_seconds}"
 }
@@ -311,13 +316,16 @@ production_part() {
         *) servers="connect-zig collector rotel" ;;
     esac
     for round in $(seq 1 "${production_rounds}"); do
+        # shellcheck disable=SC2086 # servers is a list of words, one argument each
         for server in $(rotate $((round - 1)) ${servers}); do
             production_climb "${server}" "${round}" >>"${work}/production-results" || status=1
         done
     done
     for server in ${servers}; do
+        # shellcheck disable=SC2034 # tools/fullstack_check.sh exits with status
         production_confirm "${server}" >>"${work}/production-results" || status=1
     done
+    # shellcheck disable=SC2086 # production_classes is a list of words, one argument each
     python3 tools/fullstack/production_report.py "${work}/production-results" "${transport}" \
         "$(getconf CLK_TCK)" "${load_text}" "${collector}" "${vector_text}" \
         "${rotel_text}" "${connect_go_text}" "${connect_rust_text}" "${commit}" "${placement}" \

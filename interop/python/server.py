@@ -77,8 +77,7 @@ def make_servicer(interop_pb2, interop_pb2_grpc, coverage_pb2):
 
         def Chat(self, request_iterator, context):
             # grpcio hands each message over as it arrives, so each answer goes before the next.
-            for request in request_iterator:
-                yield request
+            yield from request_iterator
 
         def Fail(self, request, context):
             if request.code < CODE_MIN or request.code > CODE_MAX:
@@ -91,11 +90,7 @@ def make_servicer(interop_pb2, interop_pb2_grpc, coverage_pb2):
             context.abort(code, request.message)
 
         def Inspect(self, request, context):
-            seen = [
-                (key, value)
-                for key, value in context.invocation_metadata()
-                if key.startswith(INSPECTED_PREFIX)
-            ]
+            seen = [(key, value) for key, value in context.invocation_metadata() if key.startswith(INSPECTED_PREFIX)]
             context.send_initial_metadata(seen)
             context.set_trailing_metadata(seen)
             remaining = context.time_remaining()

@@ -159,7 +159,7 @@ if [ -z "${connect_go}" ]; then
         go build -o "${bin}/protoc-gen-go" google.golang.org/protobuf/cmd/protoc-gen-go
         go build -o "${bin}/protoc-gen-connect-go" connectrpc.com/connect/cmd/protoc-gen-connect-go
         PATH="${bin}:${PATH}" "${buf}" generate
-        env ${go_build} go build -o "${bin}/connect-go" .
+        env ${go_build:+"${go_build}"} go build -o "${bin}/connect-go" .
     ) >&2
     connect_go="${bin}/connect-go"
 fi
@@ -212,7 +212,10 @@ vector_text="$("${vector}" --version | cut -d' ' -f1-2)"
 rotel_text="$("${rotel}" --version)"
 # Each receiver's version, and how it was built for this CPU when this script built it.
 connect_go_text="connect-go $(awk '$1 == "connectrpc.com/connect" { print $2 }' tools/fullstack/connect-go/go.mod)"
-[ -n "${CONNECT_GO:-}" ] || connect_go_text="${connect_go_text} built with ${go_build:-Go's defaults}"
+# The default sits in a variable: bash, run as bash, reads a quote inside "${...:-...}" as the
+# start of a quoted string.
+go_defaults="Go's defaults"
+[ -n "${CONNECT_GO:-}" ] || connect_go_text="${connect_go_text} built with ${go_build:-${go_defaults}}"
 connect_rust_text="connect-rust $(awk '$0 == "name = \"connectrpc\"" { getline; gsub(/"/, "", $3); print "v" $3 }' tools/fullstack/connect-rust/Cargo.lock)"
 [ -n "${CONNECT_RUST:-}" ] || connect_rust_text="${connect_rust_text} built with LTO and target-cpu=native"
 # A crate's version in the load's Cargo.lock.

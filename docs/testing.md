@@ -33,6 +33,11 @@ pull request. `tools/ci.sh` runs them all, as CI does, and writes a report.
   it, and calls it over TLS on h11, h2, and h3.
 - `tools/perf_check.sh` counts each benchmark operation's instructions under callgrind, and
   fails past 2% above `bench/instructions.txt`. Counts do not move with a shared runner's load.
+- `tools/scripts_check.sh` lints each Python and shell script of the tree. It runs ruff's lint and
+  format check under `ruff.toml`, and ShellCheck under `.shellcheckrc`. It skips the code that
+  other projects or a generator wrote. It downloads ruff and ShellCheck, each pinned by version
+  and SHA-256, unless `RUFF` and `SHELLCHECK` name installed ones. `ruff format` rewrites a file
+  that the format check refuses.
 
 Each job writes its results to its summary. The tests and the comparison with Go and Rust run a
 second time on an arm64 runner.
@@ -54,4 +59,5 @@ tools/interop_languages_check.sh  # Go, TypeScript, Python and Rust clients agai
 tools/interop_servers_check.sh    # the client against Go, TypeScript, Python and Rust servers
 tools/perf_check.sh       # instructions of each benchmark operation against the baseline
 tools/bench_check.sh      # the benchmark beside Go's and Rust's
+tools/scripts_check.sh    # ruff and ShellCheck over the Python and shell scripts
 ```

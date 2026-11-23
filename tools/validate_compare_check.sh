@@ -85,7 +85,8 @@ zig build bench-validate -- --counters "${cases}" >"${work}/zig_counters.md"
 # level of the CPU that it names, and Rust with `target-cpu=native`, in a directory named for the
 # CPU (tools/host_cpu.sh).
 . tools/host_cpu.sh
-(cd bench/validate/go && env $(go_level) "${go}" build -o "${work}/validate-go" .)
+go_build="$(go_level)"
+(cd bench/validate/go && env ${go_build:+"${go_build}"} "${go}" build -o "${work}/validate-go" .)
 "${work}/validate-go" ${quick} "${cases}" >"${work}/go.md"
 # npm installs the packages in a copy of the program, so the tree holds no node_modules.
 mkdir -p "${work}/node"

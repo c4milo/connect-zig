@@ -1,4 +1,7 @@
 # shellcheck shell=sh
+# tools/fullstack_check.sh, and the files it sources beside this one, set the variables this
+# file reads, which shellcheck cannot see when it reads this file alone.
+# shellcheck disable=SC2154
 # The compression part of tools/fullstack_check.sh (design §8 step 37, decision 46 as amended),
 # which sources this file and runs `compression_part <transport>`: what each coding of an export
 # costs the three Connect receivers, each on its library's own decoders: connect-zig's sink on
@@ -49,6 +52,7 @@ compression_peak() {
     peak_export=production
     for round in $(seq 1 "${peak_rounds}"); do
         for spans in ${peak_spans}; do
+            # shellcheck disable=SC2086 # compression_codings and compression_servers are lists
             for coding in $(rotate $((round - 1)) ${compression_codings}); do
                 peak_tag="-${coding}" peak_encoding="$(encoding_of "${coding}")"
                 for server in $(rotate $((round - 1)) ${compression_servers}); do
@@ -58,7 +62,8 @@ compression_peak() {
             done
         done
     done
-    peak_export=export peak_tag="" peak_encoding=""
+    # shellcheck disable=SC2034 # peak_measure in tools/fullstack/peak.sh reads these three
+    peak_export="export" peak_tag="" peak_encoding=""
 }
 
 # Each receiver's climbs in each coding, `production_rounds` rounds of each. At each turn every
@@ -68,18 +73,21 @@ compression_peak() {
 compression_climbs() {
     for coding in ${compression_codings}; do : >"${work}/compression-climb-${coding}"; done
     rm -f "${work}"/held-*
-    count="$(echo ${compression_codings} | wc -w)"
+    count="$(echo "${compression_codings}" | wc -w)"
     for round in $(seq 1 "${production_rounds}"); do
         for turn in $(seq 0 $((count - 1))); do
             index=0
             for server in ${compression_servers}; do
+                # shellcheck disable=SC2046,SC2086 # rotate and compression_codings give word lists
                 coding="$(word_at "${turn}" $(rotate $((index + round - 1)) ${compression_codings}))"
                 production_tag="-${coding}" production_encoding="$(encoding_of "${coding}")"
+                # shellcheck disable=SC2034 # tools/fullstack_check.sh exits with status
                 production_climb "${server}" "${round}" >>"${work}/compression-climb-${coding}" || status=1
                 index=$((index + 1))
             done
         done
     done
+    # shellcheck disable=SC2034 # production_climb in tools/fullstack/production.sh reads both
     production_tag="" production_encoding=gzip
 }
 
@@ -93,6 +101,7 @@ compression_part() {
     compression_exports
     compression_peak
     compression_climbs
+    # shellcheck disable=SC2086 # production_classes is a list of words, one argument each
     python3 tools/fullstack/compression_report.py "${work}" "${transport}" "$(getconf CLK_TCK)" \
         "$("${h2load}" --version | head -1)" "${load_text}" \
         "${connect_go_text}" "${connect_rust_text}" "${commit}" "${placement}" "${peak_rounds}" \

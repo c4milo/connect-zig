@@ -4,6 +4,8 @@ zig-pkg/
 spec/lean/.lake/
 .claude/
 ci-charts/
+# ruff's cache, when a person runs ruff by hand: tools/scripts_check.sh keeps none.
+.ruff_cache/
 
 # The packages of the validation benchmark's Node.js program, when a person installs them there:
 # tools/validate_compare_check.sh installs them in a copy.

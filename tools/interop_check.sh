@@ -50,6 +50,7 @@ expect() {
     fi
 }
 call() {
+    # shellcheck disable=SC2086 # schemas holds --schema options, which split into words
     timeout "${call_seconds}" "${buf}" curl --cacert "${ca}" ${schemas} --protocol "$1" -d "$2" "${base}/$3" 2>&1 | unlogged | tr -d ' \n'
 }
 introduced='{"sentence":"HiAda,IamEliza."}{"sentence":"Beforewebegin,Ada,tellmehowyoucamehere."}{"sentence":"Howareyoufeelingtoday,Ada?"}'
@@ -100,6 +101,7 @@ rm -f "${log}.body"
 # h3 on the UDP socket of the same port: buf curl over quic-go.
 h3_base="${base}"
 for protocol in connect grpc grpcweb; do
+    # shellcheck disable=SC2086 # schemas holds --schema options, which split into words
     expect "${protocol} Introduce over h3" "${introduced}" \
         "$(timeout "${call_seconds}" "${buf}" curl --http3 --cacert "${ca}" ${schemas} \
             --protocol "${protocol}" -d '{"name":"Ada"}' "${h3_base}/Introduce" 2>&1 | tr -d ' \n')"
@@ -112,6 +114,7 @@ octocat='authorization: Bearer ghp_octocat_example'
 gh() {
     gh_protocol="$1"
     shift
+    # shellcheck disable=SC2086 # schemas holds --schema options, which split into words
     timeout "${call_seconds}" "${buf}" curl --cacert "${ca}" ${schemas} --protocol "${gh_protocol}" "$@" 2>&1 |
         unlogged | tr -d ' \n'
 }
@@ -155,6 +158,7 @@ calculator_base="https://127.0.0.1:${port}/errors.v1.CalculatorService"
 demo() {
     demo_protocol="$1"
     shift
+    # shellcheck disable=SC2086 # schemas holds --schema options, which split into words
     timeout "${call_seconds}" "${buf}" curl --cacert "${ca}" ${schemas} --protocol "${demo_protocol}" "$@" 2>&1 | unlogged | tr -d ' \n'
 }
 for protocol in connect grpc grpcweb; do
@@ -180,21 +184,24 @@ counted() {
         END { print first + 0, last + 0, count + 0, gaps + 0 }'
 }
 for protocol in connect grpc grpcweb; do
+    # shellcheck disable=SC2086 # schemas holds --schema options, which split into words
     expect "${protocol} Countdown from ${countdown_long}" "${countdown_long} 1 ${countdown_long} 0" \
         "$(timeout "${long_seconds}" "${buf}" curl --cacert "${ca}" ${schemas} --protocol "${protocol}" \
             -d "{\"from\":${countdown_long}}" "${streaming_base}/Countdown" 2>&1 | unlogged | counted)"
 done
 # The same stream over h3, where the response memory frees only as the client acknowledges it
 # (RFC 9000 section 3.1).
+# shellcheck disable=SC2086 # schemas holds --schema options, which split into words
 expect "grpc Countdown from ${countdown_long} over h3" "${countdown_long} 1 ${countdown_long} 0" \
     "$(timeout "${long_seconds}" "${buf}" curl --http3 --cacert "${ca}" ${schemas} --protocol grpc \
         -d "{\"from\":${countdown_long}}" "${streaming_base}/Countdown" 2>&1 | counted)"
 # A gRPC error before any message is Trailers-Only: one header section holds the status and the
 # call's own trailers, here Counting's.
+# shellcheck disable=SC2086 # schemas holds --schema options, which split into words
 expect "grpc Trailers-Only carries trailers" 'call-received: 1|call-sent: 0|' \
     "$(timeout "${call_seconds}" "${buf}" curl --cacert "${ca}" ${schemas} --protocol grpc -v \
         -d '{"dividend":7}' "${calculator_base}/Divide" 2>&1 | sed -n 's/^buf: < (#1) //p' | tr -d '\r' |
-        grep -i -e '^call-received:' -e '^call-sent:' | tr 'A-Z' 'a-z' | tr '\n' '|')"
+        grep -i -e '^call-received:' -e '^call-sent:' | tr '[:upper:]' '[:lower:]' | tr '\n' '|')"
 # Logging's response header, and Whoami's trailer, which a Connect unary reply sends as a header.
 expect "Connect unary headers" 'demo-logged: yes|trailer-whoami-caller: Ada|' \
     "$(curl -sS -m 5 --cacert "${ca}" -H 'authorization: Bearer Ada' --json '{}' -D - -o /dev/null "${whoami_base}/Whoami" |
@@ -213,6 +220,7 @@ expect "oidc: Connect refuses a call with no token" '401|www-authenticate: Beare
 expect "oidc: Connect refuses a token that is no JWT" '401|www-authenticate: Bearer error="invalid_token"|' \
     "$(challenged -H 'authorization: Bearer not-a-token')"
 for protocol in grpc grpcweb; do
+    # shellcheck disable=SC2086 # schemas holds --schema options, which split into words
     expect "oidc: ${protocol} refuses a call with no token" '{"code":"unauthenticated","message":"missingbearertoken"}' \
         "$(timeout "${call_seconds}" "${buf}" curl --cacert "${ca}" ${schemas} --protocol "${protocol}" \
             -d '{}' "${account}/Whoami" 2>&1 | unlogged | tr -d ' \n')"
@@ -221,6 +229,7 @@ done
 # stream open, before it sends the second.
 fifo="${log}.fifo"
 mkfifo "${fifo}"
+# shellcheck disable=SC2086 # schemas holds --schema options, which split into words
 timeout "${call_seconds}" "${buf}" curl --cacert "${ca}" ${schemas} --protocol grpc -d @- "${streaming_base}/Chat" <"${fifo}" >"${log}.chat" 2>&1 &
 chat=$!
 exec 3>"${fifo}"

@@ -16,9 +16,11 @@ encodes it with Go's runtime. <out.grpc> holds the encoding compressed with gzip
 level, 6, in gRPC's Length-Prefixed-Message with its Compressed-Flag set, as the Collector's otlp
 exporter sends it by default.
 """
+
 import base64
 import gzip
 import json
+import pathlib
 import random
 import subprocess
 import sys
@@ -36,15 +38,26 @@ event_share = 0.05
 # 2026-11-16 00:00:00 UTC, in nanoseconds since 1970.
 start_ns = 1_794_787_200_000_000_000
 services = ["channels", "messages", "search", "files", "notifications", "presence", "auth", "billing"]
-routes = ["/api/conversations.history", "/api/chat.postMessage", "/api/users.info", "/api/files.upload",
-          "/api/reactions.add", "/api/search.messages", "/api/conversations.list", "/api/team.info"]
+routes = [
+    "/api/conversations.history",
+    "/api/chat.postMessage",
+    "/api/users.info",
+    "/api/files.upload",
+    "/api/reactions.add",
+    "/api/search.messages",
+    "/api/conversations.list",
+    "/api/team.info",
+]
 tables = ["messages", "channels", "users", "files", "reactions", "teams"]
 topics = ["message-events", "presence-updates", "search-index", "audit-log"]
-agents = ["Slack/4.41.105 (darwin; arm64) Electron/32.2.5",
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0",
-          "com.tinyspeck.chatlyio/24.11.10 (iPhone; iOS 18.1.1; Scale/3.00)"]
-stack = "".join(f"main.(*Handler).serve{n}(0xc000{n:04x}, 0x{n * 4096:x})\n\t/src/app/handler.go:{100 + n}\n"
-                for n in range(12))
+agents = [
+    "Slack/4.41.105 (darwin; arm64) Electron/32.2.5",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0",
+    "com.tinyspeck.chatlyio/24.11.10 (iPhone; iOS 18.1.1; Scale/3.00)",
+]
+stack = "".join(
+    f"main.(*Handler).serve{n}(0xc000{n:04x}, 0x{n * 4096:x})\n\t/src/app/handler.go:{100 + n}\n" for n in range(12)
+)
 
 
 def octets(length):
@@ -63,76 +76,132 @@ def number(key, value):
 def resource(pod):
     service = services[pod % len(services)]
     name = f"{service}-{draw.randrange(16**9):09x}-{draw.randrange(36**5):05x}"
-    return {"attributes": [
-        text("service.name", service), text("service.namespace", "slack"),
-        text("service.version", f"2026.11.{draw.randrange(1, 17)}"), text("service.instance.id", octets(12)),
-        text("deployment.environment.name", "production"), text("k8s.cluster.name", "prod-us-east-1-c7"),
-        text("k8s.namespace.name", service), text("k8s.node.name", "ip-10-24-118-37.ec2.internal"),
-        text("k8s.pod.name", name), text("k8s.pod.uid", octets(16)), text("k8s.deployment.name", service),
-        text("container.name", service), text("container.id", octets(24)),
-        text("host.name", "ip-10-24-118-37.ec2.internal"), text("host.arch", "amd64"), text("os.type", "linux"),
-        text("cloud.provider", "aws"), text("cloud.platform", "aws_eks"), text("cloud.region", "us-east-1"),
-        text("cloud.availability_zone", "us-east-1c"), text("telemetry.sdk.language", "go"),
-        text("telemetry.sdk.name", "opentelemetry"), text("telemetry.sdk.version", "1.38.0"),
-    ]}
+    return {
+        "attributes": [
+            text("service.name", service),
+            text("service.namespace", "slack"),
+            text("service.version", f"2026.11.{draw.randrange(1, 17)}"),
+            text("service.instance.id", octets(12)),
+            text("deployment.environment.name", "production"),
+            text("k8s.cluster.name", "prod-us-east-1-c7"),
+            text("k8s.namespace.name", service),
+            text("k8s.node.name", "ip-10-24-118-37.ec2.internal"),
+            text("k8s.pod.name", name),
+            text("k8s.pod.uid", octets(16)),
+            text("k8s.deployment.name", service),
+            text("container.name", service),
+            text("container.id", octets(24)),
+            text("host.name", "ip-10-24-118-37.ec2.internal"),
+            text("host.arch", "amd64"),
+            text("os.type", "linux"),
+            text("cloud.provider", "aws"),
+            text("cloud.platform", "aws_eks"),
+            text("cloud.region", "us-east-1"),
+            text("cloud.availability_zone", "us-east-1c"),
+            text("telemetry.sdk.language", "go"),
+            text("telemetry.sdk.name", "opentelemetry"),
+            text("telemetry.sdk.version", "1.38.0"),
+        ]
+    }
 
 
 def http_server():
     route = draw.choice(routes)
-    return "SPAN_KIND_SERVER", f"POST {route}", [
-        text("http.request.method", "POST"), text("http.route", route), text("url.path", route),
-        text("url.scheme", "https"), number("http.response.status_code", 200),
-        text("server.address", "slack.com"), number("server.port", 443),
-        text("client.address", f"10.{draw.randrange(256)}.{draw.randrange(256)}.{draw.randrange(256)}"),
-        text("network.protocol.version", "2"), text("user_agent.original", draw.choice(agents)),
-        number("http.request.body.size", draw.randrange(200, 4000)),
-        number("http.response.body.size", draw.randrange(200, 40000)),
-    ]
+    return (
+        "SPAN_KIND_SERVER",
+        f"POST {route}",
+        [
+            text("http.request.method", "POST"),
+            text("http.route", route),
+            text("url.path", route),
+            text("url.scheme", "https"),
+            number("http.response.status_code", 200),
+            text("server.address", "slack.com"),
+            number("server.port", 443),
+            text("client.address", f"10.{draw.randrange(256)}.{draw.randrange(256)}.{draw.randrange(256)}"),
+            text("network.protocol.version", "2"),
+            text("user_agent.original", draw.choice(agents)),
+            number("http.request.body.size", draw.randrange(200, 4000)),
+            number("http.response.body.size", draw.randrange(200, 40000)),
+        ],
+    )
 
 
 def http_client():
     service = draw.choice(services)
-    return "SPAN_KIND_CLIENT", "POST", [
-        text("http.request.method", "POST"), text("url.full", f"http://{service}.{service}.svc:8080/internal/v1/lookup"),
-        text("server.address", f"{service}.{service}.svc"), number("server.port", 8080),
-        number("http.response.status_code", 200), text("network.protocol.version", "1.1"),
-    ]
+    return (
+        "SPAN_KIND_CLIENT",
+        "POST",
+        [
+            text("http.request.method", "POST"),
+            text("url.full", f"http://{service}.{service}.svc:8080/internal/v1/lookup"),
+            text("server.address", f"{service}.{service}.svc"),
+            number("server.port", 8080),
+            number("http.response.status_code", 200),
+            text("network.protocol.version", "1.1"),
+        ],
+    )
 
 
 def grpc_call():
     service = draw.choice(services)
     method = draw.choice(["Get", "List", "BatchGet", "Update"])
-    return draw.choice(["SPAN_KIND_SERVER", "SPAN_KIND_CLIENT"]), f"slack.{service}.v1.{service.title()}Service/{method}", [
-        text("rpc.system", "grpc"), text("rpc.service", f"slack.{service}.v1.{service.title()}Service"),
-        text("rpc.method", method), number("rpc.grpc.status_code", 0),
-        text("server.address", f"{service}.{service}.svc"), number("server.port", 9090),
-    ]
+    return (
+        draw.choice(["SPAN_KIND_SERVER", "SPAN_KIND_CLIENT"]),
+        f"slack.{service}.v1.{service.title()}Service/{method}",
+        [
+            text("rpc.system", "grpc"),
+            text("rpc.service", f"slack.{service}.v1.{service.title()}Service"),
+            text("rpc.method", method),
+            number("rpc.grpc.status_code", 0),
+            text("server.address", f"{service}.{service}.svc"),
+            number("server.port", 9090),
+        ],
+    )
 
 
 def database():
     table = draw.choice(tables)
     system = draw.choice(["mysql", "mysql", "redis"])
-    query = (f"SELECT id, team_id, channel_id, user_id, ts, text, edited_ts FROM {table} "
-             f"WHERE team_id = ? AND channel_id = ? AND ts > ? ORDER BY ts DESC LIMIT ?") if system == "mysql" \
+    query = (
+        (
+            f"SELECT id, team_id, channel_id, user_id, ts, text, edited_ts FROM {table} "
+            f"WHERE team_id = ? AND channel_id = ? AND ts > ? ORDER BY ts DESC LIMIT ?"
+        )
+        if system == "mysql"
         else f"HGETALL {table}:?"
-    return "SPAN_KIND_CLIENT", f"SELECT {table}" if system == "mysql" else "HGETALL", [
-        text("db.system.name", system), text("db.namespace", f"shard_{draw.randrange(1024):04d}"),
-        text("db.operation.name", "SELECT" if system == "mysql" else "HGETALL"),
-        text("db.collection.name", table), text("db.query.text", query),
-        text("server.address", f"{system}-{draw.randrange(64):02d}.db.internal"),
-        number("server.port", 3306 if system == "mysql" else 6379),
-    ]
+    )
+    return (
+        "SPAN_KIND_CLIENT",
+        f"SELECT {table}" if system == "mysql" else "HGETALL",
+        [
+            text("db.system.name", system),
+            text("db.namespace", f"shard_{draw.randrange(1024):04d}"),
+            text("db.operation.name", "SELECT" if system == "mysql" else "HGETALL"),
+            text("db.collection.name", table),
+            text("db.query.text", query),
+            text("server.address", f"{system}-{draw.randrange(64):02d}.db.internal"),
+            number("server.port", 3306 if system == "mysql" else 6379),
+        ],
+    )
 
 
 def kafka():
     topic = draw.choice(topics)
-    return "SPAN_KIND_PRODUCER", f"send {topic}", [
-        text("messaging.system", "kafka"), text("messaging.destination.name", topic),
-        text("messaging.operation.type", "send"), text("messaging.operation.name", "send"),
-        number("messaging.destination.partition.id", draw.randrange(64)),
-        number("messaging.message.body.size", draw.randrange(100, 2000)),
-        text("server.address", "kafka-0.kafka.internal"), number("server.port", 9092),
-    ]
+    return (
+        "SPAN_KIND_PRODUCER",
+        f"send {topic}",
+        [
+            text("messaging.system", "kafka"),
+            text("messaging.destination.name", topic),
+            text("messaging.operation.type", "send"),
+            text("messaging.operation.name", "send"),
+            number("messaging.destination.partition.id", draw.randrange(64)),
+            number("messaging.message.body.size", draw.randrange(100, 2000)),
+            text("server.address", "kafka-0.kafka.internal"),
+            number("server.port", 9092),
+        ],
+    )
 
 
 # The kinds of span, and the share of each: HTTP server 35%, database 25%, gRPC 15%, HTTP client
@@ -143,17 +212,39 @@ kinds = [http_server] * 7 + [database] * 5 + [grpc_call] * 3 + [http_client] * 3
 def span(index, trace, parent, begin):
     kind, name, attributes = (http_server if index % spans_per_trace == 0 else draw.choice(kinds))()
     duration = draw.randrange(200_000, 40_000_000)
-    item = {"traceId": trace, "spanId": octets(8), "parentSpanId": parent, "name": name, "kind": kind,
-            "flags": 1, "startTimeUnixNano": str(begin), "endTimeUnixNano": str(begin + duration),
-            "attributes": attributes, "status": {}}
+    item = {
+        "traceId": trace,
+        "spanId": octets(8),
+        "parentSpanId": parent,
+        "name": name,
+        "kind": kind,
+        "flags": 1,
+        "startTimeUnixNano": str(begin),
+        "endTimeUnixNano": str(begin + duration),
+        "attributes": attributes,
+        "status": {},
+    }
     if draw.random() < error_share:
         item["status"] = {"code": "STATUS_CODE_ERROR", "message": "context deadline exceeded"}
-        item["events"] = [{"timeUnixNano": str(begin + duration), "name": "exception", "attributes": [
-            text("exception.type", "*errors.errorString"), text("exception.message", "context deadline exceeded"),
-            text("exception.stacktrace", stack)]}]
+        item["events"] = [
+            {
+                "timeUnixNano": str(begin + duration),
+                "name": "exception",
+                "attributes": [
+                    text("exception.type", "*errors.errorString"),
+                    text("exception.message", "context deadline exceeded"),
+                    text("exception.stacktrace", stack),
+                ],
+            }
+        ]
     elif draw.random() < event_share:
-        item["events"] = [{"timeUnixNano": str(begin + duration // 2), "name": "cache.miss",
-                           "attributes": [text("cache.key", f"{name}:{draw.randrange(10**9)}")]}]
+        item["events"] = [
+            {
+                "timeUnixNano": str(begin + duration // 2),
+                "name": "cache.miss",
+                "attributes": [text("cache.key", f"{name}:{draw.randrange(10**9)}")],
+            }
+        ]
     return item
 
 
@@ -168,16 +259,38 @@ for pod in range(pods):
         begin = start_ns + draw.randrange(5_000_000_000)
         items.append(span(index, trace, parent, begin))
         parent = items[-1]["spanId"]
-    resource_spans.append({"resource": resource(pod), "scopeSpans": [
-        {"scope": {"name": "go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp", "version": "0.63.0"},
-         "spans": items}]})
+    resource_spans.append(
+        {
+            "resource": resource(pod),
+            "scopeSpans": [
+                {
+                    "scope": {
+                        "name": "go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp",
+                        "version": "0.63.0",
+                    },
+                    "spans": items,
+                }
+            ],
+        }
+    )
 
 with open(out + ".json", "w") as file:
     json.dump({"resourceSpans": resource_spans}, file)
-subprocess.run([buf, "convert", "examples/otlp/proto",
-                "--type", "opentelemetry.proto.collector.trace.v1.ExportTraceServiceRequest",
-                "--from", out + ".json#format=json", "--to", out + ".binpb#format=binpb"], check=True)
-encoded = open(out + ".binpb", "rb").read()
+subprocess.run(
+    [
+        buf,
+        "convert",
+        "examples/otlp/proto",
+        "--type",
+        "opentelemetry.proto.collector.trace.v1.ExportTraceServiceRequest",
+        "--from",
+        out + ".json#format=json",
+        "--to",
+        out + ".binpb#format=binpb",
+    ],
+    check=True,
+)
+encoded = pathlib.Path(out + ".binpb").read_bytes()
 # gzip at Go's default level, with no time in its header, so each run writes the same octets.
 compressed = gzip.compress(encoded, compresslevel=6, mtime=0)
 # gRPC over HTTP/2, "Requests": a Compressed-Flag of 1, the Message-Length in four octets,

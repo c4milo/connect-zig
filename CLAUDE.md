@@ -216,6 +216,13 @@ confirm a test fails. Report `CAUGHT` or `NOT CAUGHT` per mutation in the commit
   of `docs/specs/SHA256SUMS`, and each citation `CEL language definition, "<section>"` in the
   code to name a heading of `docs/specs/cel/langdef.md`. It is the check `citations` of
   `tools/ci.sh`, and needs python3.
+- Scripts: `tools/scripts_check.sh` runs ruff's lint and format check over each tracked Python
+  file, under `ruff.toml`. It runs ShellCheck over each tracked shell script, under
+  `.shellcheckrc`. It skips `docs/specs`, `conformance/`, `zig-pkg/`, and each `gen/`.
+  `ruff format` rewrites a file that the format check refuses. A disabled check states its reason
+  on its line. The script downloads ruff 0.17.6 and ShellCheck 0.11.0 for x86-64 and arm64
+  Linux, each pinned by SHA-256, unless `RUFF` and `SHELLCHECK` name installed ones. It is the
+  check `scripts` of `tools/ci.sh`, and needs curl, tar, xz, and git.
 - CEL differential: `tools/cel_differential_check.sh [seed...]` writes a schema of random CEL
   rules and a file of random messages for each seed, 1 when none is given
   (`tools/cel_differential/generate.py`). It builds `zig build cel-differential-runner

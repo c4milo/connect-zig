@@ -12,7 +12,7 @@
 # `--list` as a job of its own, so each shows apart in GitHub.
 set -eu
 cd "$(dirname "$0")/.."
-checks="format citations commits test release package bench costs bench-compare fullstack fullstack-peak fullstack-cleartext fullstack-compression fullstack-compression-cleartext perf generated interop interop-languages interop-servers coverage line-coverage conformance protobuf-conformance protovalidate-conformance cel-differential cel-conformance compile-time validate-compare lean"
+checks="format citations scripts commits test release package bench costs bench-compare fullstack fullstack-peak fullstack-cleartext fullstack-compression fullstack-compression-cleartext perf generated interop interop-languages interop-servers coverage line-coverage conformance protobuf-conformance protovalidate-conformance cel-differential cel-conformance compile-time validate-compare lean"
 only=""
 case "${1:-}" in
     --list)
@@ -73,7 +73,7 @@ draw_charts() {
         name="${rest%%:*}" transport=""
         [ "${rest}" = "${name}" ] || transport="${rest#*:}"
         out="${charts}/${name}${suffix}.svg"
-        if ! python3 "tools/${script}.py" "${log}" "${run_name}" "${commit}" ${transport} "${out}" >&2; then
+        if ! python3 "tools/${script}.py" "${log}" "${run_name}" "${commit}" ${transport:+"${transport}"} "${out}" >&2; then
             echo "ci: tools/${script}.py drew no ${name}${suffix}.svg" >&2
             [ -z "${GITHUB_ACTIONS:-}" ] || echo "::warning title=$2::tools/${script}.py drew no ${name}${suffix}.svg"
         fi
@@ -87,6 +87,9 @@ check() {
         # The specifications of docs/specs as their publishers wrote them, and each citation of
         # one in the code (docs/specs/README.md).
         citations) tools/citations_check.sh ;;
+        # ruff's lint and format check over the Python scripts, and shellcheck over the shell
+        # scripts, each tool pinned by version and SHA-256 (docs/testing.md).
+        scripts) tools/scripts_check.sh ;;
         # The commit messages of the change: origin/main..HEAD, or COMMIT_RANGE as CI sets it.
         commits) zig build install-commit-lint && zig-out/bin/commit_lint --range "${COMMIT_RANGE:-origin/main..HEAD}" ;;
         # The lint, every module's tests, the examples and the hook check.

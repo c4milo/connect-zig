@@ -24,7 +24,11 @@ cd "${scratch}/project"
 # so the copy drops the entry, and the fetch adds it again with the URL and the hash.
 sed -i.bak '/connect-zig by URL/d; /\.connect_zig = \.{ \.path = "\.\.\/\.\." },/d' build.zig.zon
 rm -f build.zig.zon.bak
-! grep -q '\.path = "\.\./\.\."' build.zig.zon
+# A negated command does not stop the script under `set -e`, so the check exits by itself.
+if grep -q '\.path = "\.\./\.\."' build.zig.zon; then
+    echo "package_check.sh: the copy's build.zig.zon still names connect-zig by path" >&2
+    exit 1
+fi
 zig fetch --save=connect_zig "file://${scratch}/connect-zig.tar.gz"
 grep -q 'connect-zig.tar.gz' build.zig.zon
 zig build plugin

@@ -1,4 +1,7 @@
 # shellcheck shell=sh
+# tools/fullstack_check.sh, and the files it sources beside this one, set the variables this
+# file reads, which shellcheck cannot see when it reads this file alone.
+# shellcheck disable=SC2154
 # The peak part of tools/fullstack_check.sh (design §8 step 28, decision 44), which sources this
 # file and runs `peak_part`: over TLS, h2load sends one export, again and again, on 16 connections
 # of 4 streams, as fast as each server answers: connect-zig, the Collector, Vector, and the
@@ -21,7 +24,7 @@ peak_streams=4
 # What tools/fullstack/compression.sh sets for an export in a coding: the start of its file's
 # name, the end of it, and the coding grpc-encoding names. The peak part sends the exports of
 # tools/fullstack/otlp_request.py, with no coding.
-peak_export=export
+peak_export="export"
 peak_tag=""
 peak_encoding=""
 
@@ -78,12 +81,14 @@ peak_part() {
     for spans in ${peak_spans}; do
         python3 tools/fullstack/otlp_request.py "${buf}" "${spans}" "${work}/export-${spans}.grpc"
     done
+    # shellcheck disable=SC2034 # the calls of tools/fullstack/servers.sh read transport
     transport=tls
     : >"${work}/peak-results"
     for round in $(seq 1 "${peak_rounds}"); do
         for spans in ${peak_spans}; do
             for server in ${peak_servers}; do
                 echo "fullstack: peak, round ${round}, ${server}, ${spans} spans" >&2
+                # shellcheck disable=SC2034 # tools/fullstack_check.sh exits with status
                 peak_measure "${server}" "${spans}" >>"${work}/peak-results" || status=1
             done
         done

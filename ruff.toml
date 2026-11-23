@@ -1,0 +1,15 @@
+# ruff's configuration for the Python scripts of this tree. tools/scripts_check.sh runs its lint
+# and its format check under this file (docs/testing.md).
+line-length = 120
+# The oldest Python the scripts run on: the interop client's wheels are for CPython 3.12 to 3.14
+# (interop/python/requirements.txt), and CI's Ubuntu 26.04 runs 3.14. The pin keeps a new ruff
+# release, whose default may differ, from changing what the lint asks for.
+target-version = "py312"
+# Code that other projects or a generator wrote: the specifications, the conformance suites, the
+# package folder, and each gen/ folder. A path named on the command line is skipped too.
+extend-exclude = ["docs/specs", "conformance", "zig-pkg", "**/gen"]
+force-exclude = true
+
+[lint]
+# ruff's default rules, then bugbear's and the order of imports.
+extend-select = ["B", "I"]

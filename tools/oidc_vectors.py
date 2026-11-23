@@ -4,6 +4,7 @@
 Run: python3 tools/oidc_vectors.py. It needs openssl on the path. Each run makes new keys, and
 keeps no private key, so the tokens and the keys change together.
 """
+
 import base64
 import json
 import pathlib
@@ -59,7 +60,7 @@ def main():
     with tempfile.TemporaryDirectory() as folder:
         for bits in SIZES:
             modulus, token = vector(bits, folder)
-            out += f"\n/// The key's \"kid\" is \"rsa-{bits}\".\n"
+            out += f'\n/// The key\'s "kid" is "rsa-{bits}".\n'
             out += constant(f"rsa_{bits}_modulus", modulus)
             out += constant(f"rsa_{bits}_token", token)
     root = pathlib.Path(__file__).resolve().parent.parent

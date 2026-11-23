@@ -13,6 +13,7 @@ every call in a struct's field types against one quota.
 
 Usage: python3 tools/wide/wide_proto.py, then tools/generate_check.sh --write.
 """
+
 import pathlib
 
 FIELDS = 1200
@@ -47,9 +48,13 @@ for number in range(1, FIELDS + 1):
             rules.append(f'(buf.validate.field).cel_expression = "this < {1000 + number}"')
         lines.append(f"  int32 f{number} = {number} [{', '.join(rules)}];")
     elif kind == 2:
-        lines.append(f'  string f{number} = {number} [(buf.validate.field).string = {{max_len: {number}, not_in: ["x"]}}];')
+        lines.append(
+            f'  string f{number} = {number} [(buf.validate.field).string = {{max_len: {number}, not_in: ["x"]}}];'
+        )
     elif kind == 3:
-        lines.append(f"  repeated int32 f{number} = {number} [(buf.validate.field).repeated = {{max_items: 4, items: {{int32: {{lt: 100}}}}}}];")
+        lines.append(
+            f"  repeated int32 f{number} = {number} [(buf.validate.field).repeated = {{max_items: 4, items: {{int32: {{lt: 100}}}}}}];"
+        )
     else:
         lines.append(f"  Leaf f{number} = {number};")
 lines.append("}")

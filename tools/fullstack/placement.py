@@ -10,6 +10,7 @@ CPUs 2 and 3. Where a core holds two, as on a runner with SMT, the server takes 
 whose core runs the scripts beside it, and the load takes the two threads of another core. With
 fewer than 4 CPUs it prints `- - <threads>`, and nothing is pinned.
 """
+
 import os
 import sys
 

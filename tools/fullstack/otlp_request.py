@@ -10,8 +10,10 @@ request. The script writes it in proto3 JSON, and `buf convert` encodes it with 
 connect-zig encodes none of the octets it reads. <out.grpc> holds the encoding in gRPC's
 Length-Prefixed-Message, as h2load sends it.
 """
+
 import base64
 import json
+import pathlib
 import subprocess
 import sys
 
@@ -68,27 +70,47 @@ def span(index):
 
 
 request = {
-    "resourceSpans": [{
-        "resource": {"attributes": [
-            text("service.name", "checkout"),
-            text("service.version", "1.4.2"),
-            text("host.name", "node-7"),
-            text("telemetry.sdk.language", "go"),
-            text("telemetry.sdk.name", "opentelemetry"),
-            text("telemetry.sdk.version", "1.38.0"),
-        ]},
-        "scopeSpans": [{
-            "scope": {"name": "go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp", "version": "0.63.0"},
-            "spans": [span(index) for index in range(spans)],
-        }],
-    }],
+    "resourceSpans": [
+        {
+            "resource": {
+                "attributes": [
+                    text("service.name", "checkout"),
+                    text("service.version", "1.4.2"),
+                    text("host.name", "node-7"),
+                    text("telemetry.sdk.language", "go"),
+                    text("telemetry.sdk.name", "opentelemetry"),
+                    text("telemetry.sdk.version", "1.38.0"),
+                ]
+            },
+            "scopeSpans": [
+                {
+                    "scope": {
+                        "name": "go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp",
+                        "version": "0.63.0",
+                    },
+                    "spans": [span(index) for index in range(spans)],
+                }
+            ],
+        }
+    ],
 }
 with open(out + ".json", "w") as file:
     json.dump(request, file)
-subprocess.run([buf, "convert", "examples/otlp/proto",
-                "--type", "opentelemetry.proto.collector.trace.v1.ExportTraceServiceRequest",
-                "--from", out + ".json#format=json", "--to", out + ".binpb#format=binpb"], check=True)
-encoded = open(out + ".binpb", "rb").read()
+subprocess.run(
+    [
+        buf,
+        "convert",
+        "examples/otlp/proto",
+        "--type",
+        "opentelemetry.proto.collector.trace.v1.ExportTraceServiceRequest",
+        "--from",
+        out + ".json#format=json",
+        "--to",
+        out + ".binpb#format=binpb",
+    ],
+    check=True,
+)
+encoded = pathlib.Path(out + ".binpb").read_bytes()
 # gRPC over HTTP/2, "Requests": a Length-Prefixed-Message is a Compressed-Flag of 0, then the
 # Message-Length in four octets, big-endian, then the message.
 with open(out, "wb") as file:

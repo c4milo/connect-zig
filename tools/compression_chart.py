@@ -14,6 +14,7 @@ right panel gives the median calls a second at the peak, with exports of 512 spa
 whisker over the range of the rounds. <run> and <commit> name the run in the subtitle, as docs/performance.md
 asks of a published number.
 """
+
 import re
 import sys
 
@@ -40,43 +41,53 @@ def read(path):
     # The time GitHub writes before each line of a job's log, which a log saved from a run holds.
     stamp = re.compile(r"^\d{4}-\d\d-\d\dT[0-9:.]+Z ")
     held, peak, machine, section, columns, table = {}, {}, None, False, {}, None
-    for line in open(path):
-        line = stamp.sub("", line.strip())
-        if line.startswith("## "):
-            section = line.startswith(f"## Full stack, compression {over}")
-            continue
-        if not section:
-            continue
-        if line.startswith("Machine: ") and machine is None:
-            machine = ", ".join(part.strip() for part in line[len("Machine: "):].rstrip(".").split(",")[:2])
-        if not line.startswith("|") or "---" in line:
-            continue
-        cells = [cell.strip() for cell in line.strip("|").split("|")]
-        if "spans/s held" in cells or "calls/s range" in cells:
-            columns = {name: index for index, name in enumerate(cells)}
-            table = "climb" if "spans/s held" in cells else "peak"
-            continue
-        row = {name: cells[index] for name, index in columns.items() if index < len(cells)}
-        if table == "climb" and row.get("server") in colors and row["spans/s held"] != "no step":
-            gap = number(row["resolution"]) / percent if row.get("resolution") else None
-            # A climb that ended on a refused call ran out of the receiver's slots for calls in
-            # flight, not of its core: connect-zig's sink holds 64.
-            refused = row.get("the next step") == "a call refused"
-            item = {"spans": number(row["spans/s held"]), "gap": gap, "refused": refused}
-            # A report of rounds gives each coding's median share of uncompressed and its range,
-            # and each row's range of spans a second; one of a single climb gives neither.
-            if row.get("share"):
-                item["share"] = number(row["share"])
-                if row.get("share range"):
-                    low, high = row["share range"].split("–")
-                    item["share_low"], item["share_high"] = number(low), number(high)
-            if row.get("range"):
-                low, high = row["range"].split("–")
-                item["low"], item["high"] = number(low), number(high)
-            held[(row["server"], row["coding"])] = item
-        elif table == "peak" and row.get("export") == peak_spans and row.get("server") in colors and row["calls/s"] != "absent":
-            low, high = row["calls/s range"].split("–")
-            peak[(row["server"], row["coding"])] = {"rate": number(row["calls/s"]), "low": number(low), "high": number(high)}
+    with open(path) as log:
+        for line in log:
+            line = stamp.sub("", line.strip())
+            if line.startswith("## "):
+                section = line.startswith(f"## Full stack, compression {over}")
+                continue
+            if not section:
+                continue
+            if line.startswith("Machine: ") and machine is None:
+                machine = ", ".join(part.strip() for part in line[len("Machine: ") :].rstrip(".").split(",")[:2])
+            if not line.startswith("|") or "---" in line:
+                continue
+            cells = [cell.strip() for cell in line.strip("|").split("|")]
+            if "spans/s held" in cells or "calls/s range" in cells:
+                columns = {name: index for index, name in enumerate(cells)}
+                table = "climb" if "spans/s held" in cells else "peak"
+                continue
+            row = {name: cells[index] for name, index in columns.items() if index < len(cells)}
+            if table == "climb" and row.get("server") in colors and row["spans/s held"] != "no step":
+                gap = number(row["resolution"]) / percent if row.get("resolution") else None
+                # A climb that ended on a refused call ran out of the receiver's slots for calls in
+                # flight, not of its core: connect-zig's sink holds 64.
+                refused = row.get("the next step") == "a call refused"
+                item = {"spans": number(row["spans/s held"]), "gap": gap, "refused": refused}
+                # A report of rounds gives each coding's median share of uncompressed and its range,
+                # and each row's range of spans a second; one of a single climb gives neither.
+                if row.get("share"):
+                    item["share"] = number(row["share"])
+                    if row.get("share range"):
+                        low, high = row["share range"].split("–")
+                        item["share_low"], item["share_high"] = number(low), number(high)
+                if row.get("range"):
+                    low, high = row["range"].split("–")
+                    item["low"], item["high"] = number(low), number(high)
+                held[(row["server"], row["coding"])] = item
+            elif (
+                table == "peak"
+                and row.get("export") == peak_spans
+                and row.get("server") in colors
+                and row["calls/s"] != "absent"
+            ):
+                low, high = row["calls/s range"].split("–")
+                peak[(row["server"], row["coding"])] = {
+                    "rate": number(row["calls/s"]),
+                    "low": number(low),
+                    "high": number(high),
+                }
     return held, peak, machine
 
 
@@ -96,8 +107,11 @@ def climb_share(server, coding):
     item = held[(server, coding)]
     if "share" in item:
         if coding == "uncompressed":
-            return (percent, item.get("low", item["spans"]) / item["spans"] * percent,
-                    item.get("high", item["spans"]) / item["spans"] * percent)
+            return (
+                percent,
+                item.get("low", item["spans"]) / item["spans"] * percent,
+                item.get("high", item["spans"]) / item["spans"] * percent,
+            )
         return item["share"], item.get("share_low", item["share"]), item.get("share_high", item["share"])
     share = item["spans"] / plain["spans"] * percent
     return share, share, share * (1 + item["gap"]) if item["gap"] is not None else share
@@ -129,13 +143,17 @@ subtitle = [
     "connect-zig client does: gzip at stdx's default level, zstd and brotli at level 1. Each bar is a share of the",
     f"same receiver uncompressed, net of {saved} a smaller export saves. "
     + ("A whisker spans the rounds: in the climb," if rounds else "A whisker reaches the step that"),
-    ("each round's share of uncompressed in the same round." if rounds else "failed in the climb, and spans the rounds at peak."),
+    (
+        "each round's share of uncompressed in the same round."
+        if rounds
+        else "failed in the climb, and spans the rounds at peak."
+    ),
 ]
 # Each mark a label can carry, explained on a line of its own only when a label carries it.
 if any(item["gap"] is None for item in held.values()):
     subtitle.append("≥ marks a climb whose every step passed.")
 if any(item["refused"] for item in held.values()):
-    subtitle.append("\"slots full\" marks a climb that ended on a call refused, every slot for a call in flight taken.")
+    subtitle.append('"slots full" marks a climb that ended on a call refused, every slot for a call in flight taken.')
 line_h = 18
 top = 56 + (len(subtitle) + 1) * line_h + 40
 row_h, row_gap, group_gap, heading_h = 18, 8, 14, 22
@@ -149,16 +167,25 @@ peak_high = max([110.0] + [share[2] for share in (peak_share(*row) for row in ro
 
 parts = []
 a = parts.append
-a(f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} {H}" width="{W}" height="{H}" role="img" aria-labelledby="t d">')
-a(f'<title id="t">What gzip, zstd and brotli leave of each Connect receiver\'s rate {over}, as a share of the same receiver '
-  'uncompressed</title>')
+a(
+    f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} {H}" width="{W}" height="{H}" role="img" aria-labelledby="t d">'
+)
+a(
+    f'<title id="t">What gzip, zstd and brotli leave of each Connect receiver\'s rate {over}, as a share of the same receiver '
+    "uncompressed</title>"
+)
 described = "; ".join(
     f"{server} {coding}: {held[(server, coding)]['spans']:,.0f} spans a second held"
-    + (f", {climb_share(server, coding)[0]:.0f}% of uncompressed" if coding != "uncompressed" and climb_share(server, coding) else "")
+    + (
+        f", {climb_share(server, coding)[0]:.0f}% of uncompressed"
+        if coding != "uncompressed" and climb_share(server, coding)
+        else ""
+    )
     + (f", {peak[(server, coding)]['rate']:,.0f} calls a second at peak" if (server, coding) in peak else "")
-    for server, coding in rows)
+    for server, coding in rows
+)
 a(f'<desc id="d">{title}. {described}.</desc>')
-a('''<style>
+a("""<style>
 svg { --surface:#fcfcfb; --ink:#0b0b0b; --ink2:#52514e; --muted:#8a8984; --grid:#e4e3df; --zig:#2a78d6; --go:#1a8a82; --rust:#b5562b; }
 @media (prefers-color-scheme: dark) {
   svg { --surface:#1a1a19; --ink:#f0efec; --ink2:#c3c2b7; --muted:#8f8e86; --grid:#33332f; --zig:#3987e5; --go:#2fa59c; --rust:#d06d3f; }
@@ -171,14 +198,16 @@ text { font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; fil
 .row { font-size: 12.5px; fill: var(--ink2); }
 .val { font-size: 11px; font-weight: 600; fill: var(--ink2); }
 .tick { font-size: 11px; fill: var(--muted); }
-</style>''')
+</style>""")
 a(f'<rect width="{W}" height="{H}" rx="8" fill="var(--surface)"/>')
 a(f'<text class="title" x="{pad_l}" y="34">{title}</text>')
 for index, text in enumerate(subtitle):
     a(f'<text class="sub" x="{pad_l}" y="{56 + index * line_h}">{text}</text>')
 where = f", {machine}" if machine else ""
-a(f'<text class="sub" x="{pad_l}" y="{56 + len(subtitle) * line_h}">One CI job ran all, and checked every span: '
-  f'run {run}, commit {commit}{where}.</text>')
+a(
+    f'<text class="sub" x="{pad_l}" y="{56 + len(subtitle) * line_h}">One CI job ran all, and checked every span: '
+    f"run {run}, commit {commit}{where}.</text>"
+)
 a(f'<text class="panel" x="{climb_left}" y="{top - 22}">Spans a second held in the climb</text>')
 a(f'<text class="panel" x="{peak_left}" y="{top - 22}">Calls a second at peak, {peak_spans}</text>')
 
@@ -186,7 +215,9 @@ a(f'<text class="panel" x="{peak_left}" y="{top - 22}">Calls a second at peak, {
 def axis(left, width, high, bottom):
     """The panel's line at 100%, the share of each receiver uncompressed."""
     x = left + 100 / high * width
-    a(f'<line x1="{x:.1f}" y1="{top - 6}" x2="{x:.1f}" y2="{bottom}" stroke="var(--muted)" stroke-width="1" stroke-dasharray="4 3"/>')
+    a(
+        f'<line x1="{x:.1f}" y1="{top - 6}" x2="{x:.1f}" y2="{bottom}" stroke="var(--muted)" stroke-width="1" stroke-dasharray="4 3"/>'
+    )
     a(f'<text class="tick" x="{x:.1f}" y="{top - 8}" text-anchor="middle">100%</text>')
 
 
@@ -196,12 +227,16 @@ def bar(left, width, high, y, fill, share, low, upper, label):
     a(f'<rect x="{left}" y="{y}" width="{max(share * scale, 1):.1f}" height="{row_h}" rx="3" fill="var({fill})"/>')
     middle = y + row_h / 2
     if upper > low:
-        a(f'<line x1="{left + low * scale:.1f}" y1="{middle}" x2="{left + upper * scale:.1f}" y2="{middle}" '
-          f'stroke="var(--ink)" stroke-width="1.5"/>')
+        a(
+            f'<line x1="{left + low * scale:.1f}" y1="{middle}" x2="{left + upper * scale:.1f}" y2="{middle}" '
+            f'stroke="var(--ink)" stroke-width="1.5"/>'
+        )
         # A cap at each end of the whisker that is not the bar's own end.
         for end in sorted({low, upper} - {share}):
-            a(f'<line x1="{left + end * scale:.1f}" y1="{middle - 4}" x2="{left + end * scale:.1f}" y2="{middle + 4}" '
-              f'stroke="var(--ink)" stroke-width="1.5"/>')
+            a(
+                f'<line x1="{left + end * scale:.1f}" y1="{middle - 4}" x2="{left + end * scale:.1f}" y2="{middle + 4}" '
+                f'stroke="var(--ink)" stroke-width="1.5"/>'
+            )
     a(f'<text class="val" x="{left + max(share, upper) * scale + 8:.1f}" y="{middle + 4:.1f}">{label}</text>')
 
 
@@ -235,7 +270,7 @@ for server, coding in rows:
         bar(peak_left, peak_w, peak_high, y, fill, rates[0], rates[1], rates[2], label)
     y += row_h + row_gap
     previous = server
-a('</svg>')
+a("</svg>")
 with open(out, "w") as file:
     file.write("\n".join(parts) + "\n")
 print(f"{out}: {len(rows)} rows {over}, run {run}", file=sys.stderr)

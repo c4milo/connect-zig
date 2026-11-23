@@ -9,6 +9,7 @@ message has three CEL rules that read several of its fields, so no two expressio
 text. With `plain` the schema has the same fields and no CEL rule: the build of the two shows
 what the CEL rules cost the compiler.
 """
+
 import sys
 
 
@@ -41,7 +42,9 @@ def field(message, number, total, plain):
         cel = f"this.name.size() != {unique}"
         declared = f"Leaf f{number}"
     if not plain:
-        rules.append(f'(buf.validate.field).cel = {{id: "m{message}.f{number}", message: "wrong", expression: "{cel}"}}')
+        rules.append(
+            f'(buf.validate.field).cel = {{id: "m{message}.f{number}", message: "wrong", expression: "{cel}"}}'
+        )
     return f"  {declared} = {number} [{', '.join(rules)}];"
 
 
@@ -71,7 +74,9 @@ def main():
                 ("order", f"this.f2 <= this.f{last_int} || this.f{last_int} == {message}"),
                 ("either", f"this.f1 != '' ? true : this.f2 > {message}"),
             ]:
-                lines.append(f'  option (buf.validate.message).cel = {{id: "m{message}.{name}", message: "wrong", expression: "{text}"}};')
+                lines.append(
+                    f'  option (buf.validate.message).cel = {{id: "m{message}.{name}", message: "wrong", expression: "{text}"}};'
+                )
         lines += [field(message, number, fields, plain) for number in range(1, fields + 1)]
         lines.append("}")
     lines += ["", "message All {"]

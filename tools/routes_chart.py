@@ -11,38 +11,45 @@ unit, so a flat line means the router's match costs the same at any size. A row 
 "absent" draws no point. <run> and <commit> name the run in the subtitle, as docs/performance.md
 asks of a published number.
 """
+
+import pathlib
 import re
 import sys
 
 table_path, run, commit = sys.argv[1:4]
 out = sys.argv[4] if len(sys.argv) > 4 else "docs/images/call-routes.svg"
 protocols = [("Connect", "Connect unary call"), ("gRPC", "gRPC unary call")]
-time_columns = [("connect-zig", "Zig ns/op", "--zig"), ("connect-rust", "Rust ns/op", "--rust"), ("connect-go", "Go ns/op", "--go")]
+time_columns = [
+    ("connect-zig", "Zig ns/op", "--zig"),
+    ("connect-rust", "Rust ns/op", "--rust"),
+    ("connect-go", "Go ns/op", "--go"),
+]
 
 columns = None
 machine = None
 # For each protocol and route count: each implementation's time a call, in nanoseconds.
 times = {}
-for line in open(table_path):
-    if line.startswith("Machine: "):
-        machine = ", ".join(part.strip() for part in line[len("Machine: "):].split(",")[:2])
-    if not line.startswith("|"):
-        continue
-    cells = [c.strip() for c in line.strip().strip("|").split("|")]
-    if cells[0] == "message":
-        columns = {name: index for index, name in enumerate(cells)}
-        continue
-    if columns is None or cells[0] != "small":
-        continue
-    for _, operation in protocols:
-        match = re.fullmatch(re.escape(operation) + r"(?:, (\d+) routes)?", cells[1])
-        if not match:
+with open(table_path) as table:
+    for line in table:
+        if line.startswith("Machine: "):
+            machine = ", ".join(part.strip() for part in line[len("Machine: ") :].split(",")[:2])
+        if not line.startswith("|"):
             continue
-        routes = int(match.group(1) or 1)
-        times[(operation, routes)] = {
-            name: (None if cells[columns[column]] == "absent" else float(cells[columns[column]]))
-            for name, column, _ in time_columns
-        }
+        cells = [c.strip() for c in line.strip().strip("|").split("|")]
+        if cells[0] == "message":
+            columns = {name: index for index, name in enumerate(cells)}
+            continue
+        if columns is None or cells[0] != "small":
+            continue
+        for _, operation in protocols:
+            match = re.fullmatch(re.escape(operation) + r"(?:, (\d+) routes)?", cells[1])
+            if not match:
+                continue
+            routes = int(match.group(1) or 1)
+            times[(operation, routes)] = {
+                name: (None if cells[columns[column]] == "absent" else float(cells[columns[column]]))
+                for name, column, _ in time_columns
+            }
 counts = sorted({routes for _, routes in times})
 if len(counts) < 2 or 1 not in counts:
     sys.exit(f"{table_path}: the table holds no calls in tables of more than one route")
@@ -96,16 +103,27 @@ def sy(v, top):
 
 parts = []
 a = parts.append
-a(f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} {H}" width="{W}" height="{H}" role="img" aria-labelledby="t d">')
-a('<title id="t">The time of a routed call as its route table grows, for connect-zig, connect-rust and connect-go</title>')
+a(
+    f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} {H}" width="{W}" height="{H}" role="img" aria-labelledby="t d">'
+)
+a(
+    '<title id="t">The time of a routed call as its route table grows, for connect-zig, connect-rust and connect-go</title>'
+)
 description = "; ".join(
-    f"{protocol}, {name}: " + ", ".join(
-        f"{routes} routes {times[(operation, routes)][name]:.1f} ns" if times[(operation, routes)][name] is not None
+    f"{protocol}, {name}: "
+    + ", ".join(
+        f"{routes} routes {times[(operation, routes)][name]:.1f} ns"
+        if times[(operation, routes)][name] is not None
         else f"{routes} routes absent"
-        for routes in counts)
-    for protocol, operation in protocols for name, _, _ in time_columns)
-a(f'<desc id="d">{title}. Each line is one implementation\'s time a call over its time with one route. {description}.</desc>')
-a('''<style>
+        for routes in counts
+    )
+    for protocol, operation in protocols
+    for name, _, _ in time_columns
+)
+a(
+    f'<desc id="d">{title}. Each line is one implementation\'s time a call over its time with one route. {description}.</desc>'
+)
+a("""<style>
 svg { --surface:#fcfcfb; --ink:#0b0b0b; --ink2:#52514e; --muted:#8a8984; --grid:#e4e3df; --zig:#2a78d6; --rust:#eb6834; --go:#6f6e69; }
 @media (prefers-color-scheme: dark) {
   svg { --surface:#1a1a19; --ink:#f0efec; --ink2:#c3c2b7; --muted:#8f8e86; --grid:#33332f; --zig:#3987e5; --rust:#d95926; --go:#a8a79f; }
@@ -117,16 +135,22 @@ text { font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; fil
 .val { font-size: 11px; font-weight: 600; paint-order: stroke; stroke: var(--surface); stroke-width: 3px; stroke-linejoin: round; }
 .tick { font-size: 11px; fill: var(--muted); }
 .legend { font-size: 12.5px; fill: var(--ink2); }
-</style>''')
+</style>""")
 a(f'<rect width="{W}" height="{H}" rx="8" fill="var(--surface)"/>')
 a(f'<text class="title" x="{pad_l}" y="34">{title}</text>')
-a(f'<text class="sub" x="{pad_l}" y="56">The small message\'s routed call in memory, its route among more methods and services. Each line is one</text>')
-a(f'<text class="sub" x="{pad_l}" y="74">implementation\'s time a call over its own time with one route: a flat line costs the same at any size.</text>')
+a(
+    f'<text class="sub" x="{pad_l}" y="56">The small message\'s routed call in memory, its route among more methods and services. Each line is one</text>'
+)
+a(
+    f'<text class="sub" x="{pad_l}" y="74">implementation\'s time a call over its own time with one route: a flat line costs the same at any size.</text>'
+)
 where = f", {machine}" if machine else ""
 a(f'<text class="sub" x="{pad_l}" y="92">One CI job ran all three: run {run}, commit {commit}{where}.</text>')
 legend_x = pad_l
 for name, _, fill in time_columns:
-    a(f'<line x1="{legend_x}" y1="{legend_y - 4}" x2="{legend_x + 16}" y2="{legend_y - 4}" stroke="var({fill})" stroke-width="2.5"/>')
+    a(
+        f'<line x1="{legend_x}" y1="{legend_y - 4}" x2="{legend_x + 16}" y2="{legend_y - 4}" stroke="var({fill})" stroke-width="2.5"/>'
+    )
     a(f'<text class="legend" x="{legend_x + 22}" y="{legend_y}">{name}</text>')
     legend_x += 22 + 7 * len(name) + 24
 for k, (protocol, operation) in enumerate(protocols):
@@ -135,19 +159,23 @@ for k, (protocol, operation) in enumerate(protocols):
     top = pad_t + 28
     left, right = px + plot_l, px + panel_w - plot_r
     xs = {routes: left + i * (right - left) / (len(counts) - 1) for i, routes in enumerate(counts)}
-    for i in range(int(round((y_high - y_low) / step)) + 1):
+    for i in range(round((y_high - y_low) / step) + 1):
         v = y_low + i * step
         y = sy(v, top)
         a(f'<line x1="{left}" y1="{y:.1f}" x2="{right}" y2="{y:.1f}" stroke="var(--grid)" stroke-width="1"/>')
         a(f'<text class="tick" x="{left - 6}" y="{y + 4:.1f}" text-anchor="end">{v:.2f}×</text>')
     for routes, x in xs.items():
-        a(f'<text class="tick" x="{x:.1f}" y="{top + plot_h + 18}" text-anchor="middle">{routes} route{"s" if routes > 1 else ""}</text>')
+        a(
+            f'<text class="tick" x="{x:.1f}" y="{top + plot_h + 18}" text-anchor="middle">{routes} route{"s" if routes > 1 else ""}</text>'
+        )
     labels = []
     for name, _, fill in time_columns:
         points = [(xs[r], sy(ratio(operation, r, name), top)) for r in counts if ratio(operation, r, name) is not None]
         if not points:
             continue
-        a(f'<polyline points="{" ".join(f"{x:.1f},{y:.1f}" for x, y in points)}" fill="none" stroke="var({fill})" stroke-width="2.5"/>')
+        a(
+            f'<polyline points="{" ".join(f"{x:.1f},{y:.1f}" for x, y in points)}" fill="none" stroke="var({fill})" stroke-width="2.5"/>'
+        )
         for x, y in points:
             a(f'<circle cx="{x:.1f}" cy="{y:.1f}" r="4" fill="var({fill})" stroke="var(--surface)" stroke-width="2"/>')
         last = ratio(operation, counts[-1], name)
@@ -160,5 +188,5 @@ for k, (protocol, operation) in enumerate(protocols):
         labels[i][0] = max(labels[i][0], labels[i - 1][0] + label_gap)
     for y, x, text in labels:
         a(f'<text class="val" x="{x:.1f}" y="{y:.1f}">{text}</text>')
-a('</svg>')
-open(out, 'w').write("\n".join(parts) + "\n")
+a("</svg>")
+pathlib.Path(out).write_text("\n".join(parts) + "\n")

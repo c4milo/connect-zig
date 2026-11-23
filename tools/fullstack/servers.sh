@@ -1,4 +1,7 @@
 # shellcheck shell=sh
+# tools/fullstack_check.sh, and the files it sources beside this one, set the variables this
+# file reads, which shellcheck cannot see when it reads this file alone.
+# shellcheck disable=SC2154
 # The servers of tools/fullstack_check.sh (decision 44), which sources this file: how each one
 # starts on its core, answers the probe, and counts the spans it took. It reads what the script
 # sets: work, the programs, buf, ca, export_path, the pins and the ports. `transport` says how
@@ -155,10 +158,13 @@ start() {
         vector) ${server_pin} "${vector}" --threads 1 --quiet --config "${work}/vector.yaml" \
             >"${work}/server.log" 2>&1 & ;;
         # Go's runtime and tokio take as many threads as there are cores, unless told one.
-        connect-go | connect-go-validate | connect-go-memory) GOMAXPROCS=1 $(go_memory "$1") ${server_pin} "${connect_go}" \
-            "${connect_go_port}" "$(pwd)/examples/harness/tls/chain.pem" \
-            "$(pwd)/examples/harness/tls/key.pem" $(words_of "$1") >"${work}/server.log" 2>&1 & ;;
+        connect-go | connect-go-validate | connect-go-memory)
+            # shellcheck disable=SC2046,SC2086 # go_memory, server_pin, and words_of give words
+            GOMAXPROCS=1 $(go_memory "$1") ${server_pin} "${connect_go}" \
+                "${connect_go_port}" "$(pwd)/examples/harness/tls/chain.pem" \
+                "$(pwd)/examples/harness/tls/key.pem" $(words_of "$1") >"${work}/server.log" 2>&1 & ;;
         connect-rust | connect-rust-validate)
+            # shellcheck disable=SC2046 # words_of prints words, one argument each
             TOKIO_WORKER_THREADS=1 ${server_pin} "${connect_rust}" "${connect_rust_port}" \
                 "${connect_rust_count_port}" "$(pwd)/examples/harness/tls/chain.pem" \
                 "$(pwd)/examples/harness/tls/key.pem" $(words_of "$1") >"${work}/server.log" 2>&1 & ;;
@@ -175,6 +181,7 @@ start() {
     esac
     server_pid=$!
     for _ in $(seq 1 100); do
+        # shellcheck disable=SC2046 # reach prints curl's options, one argument each
         curl -s -o /dev/null $(reach) "$(url_of "$1" /)" && return 0
         sleep 0.1
     done
@@ -198,6 +205,7 @@ stop() {
 # states a call's status in its trailers, which the load generators do not read, so this call
 # checks what they cannot.
 probe() {
+    # shellcheck disable=SC2046 # reach prints curl's options, one argument each
     answer="$("${buf}" curl --schema examples/otlp/proto --protocol grpc $(reach) -d @"$2" \
         "$(url_of "$1" "${export_path}")" 2>"${work}/probe.log")" || true
     case "$(printf '%s' "${answer}" | tr -d ' \n')" in
@@ -216,6 +224,7 @@ probe_refused() {
         *-validate) ;;
         *) return 0 ;;
     esac
+    # shellcheck disable=SC2046 # reach prints curl's options, one argument each
     if "${buf}" curl --schema examples/otlp/proto --protocol grpc $(reach) -d @"${work}/broken.json" \
         "$(url_of "$1" "${export_path}")" >"${work}/refused.log" 2>&1; then
         echo "fullstack: $1 took an export that breaks a rule" >&2
@@ -230,8 +239,9 @@ probe_refused() {
 # The spans a server says it took and refused. Vector counts one event for each span.
 counted() {
     case "$1" in
-        connect-zig | connect-zig-validate | connect-zig-generic | connect-go | connect-go-validate | connect-go-memory) curl -sS $(reach) "$(url_of "$1" /sink/count)" |
-            awk '{ print $4, 0 }' ;;
+        connect-zig | connect-zig-validate | connect-zig-generic | connect-go | connect-go-validate | connect-go-memory)
+            # shellcheck disable=SC2046 # reach prints curl's options, one argument each
+            curl -sS $(reach) "$(url_of "$1" /sink/count)" | awk '{ print $4, 0 }' ;;
         # connect-rust's server has no plain route, so its counts come from a port of their own.
         connect-rust | connect-rust-validate) curl -sS "http://127.0.0.1:${connect_rust_count_port}/" | awk '{ print $4, 0 }' ;;
         collector) metric_sum "http://127.0.0.1:${metrics_port}/metrics" \
@@ -257,6 +267,7 @@ metric_sum() {
 # lags reads again each second, `count_tries` times at most.
 check_count() {
     for _ in $(seq 1 "${count_tries}"); do
+        # shellcheck disable=SC2046 # counted prints two numbers, one argument each
         set -- "$1" "$2" $(counted "$1")
         [ "$4" -eq 0 ] || break
         [ "$3" -eq "$2" ] && return 0
@@ -274,6 +285,7 @@ check_storage() {
         connect-zig | connect-zig-validate | connect-zig-generic) ;;
         *) return 0 ;;
     esac
+    # shellcheck disable=SC2046 # reach prints curl's options, one argument each
     past="$(curl -sS $(reach) "$(url_of "$1" /sink/count)" | awk '{ print $6 }')"
     [ "${past}" = 0 ] && return 0
     echo "fullstack: $1 decoded ${past:-an unknown count of} exports past its route's storage" >&2
@@ -291,6 +303,7 @@ rotate() {
         if [ "${index}" -lt "${by}" ]; then front="${front} ${word}"; else back="${back} ${word}"; fi
         index=$((index + 1))
     done
+    # shellcheck disable=SC2086 # the words join with one space between each, and none at the ends
     echo ${back} ${front}
 }
 

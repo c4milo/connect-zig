@@ -25,12 +25,14 @@ Each test ends in one of six groups:
 The script prints a count of each group and each test of the groups refused and wrong, and
 exits 1 when either holds a test, or when a line of known.txt names no test that differs.
 """
+
 import base64
 import json
 import math
+import pathlib
 import re
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 # Every second of the protobuf duration's text is this many nanoseconds.
 NANOS_PER_SECOND = 1_000_000_000
@@ -45,7 +47,7 @@ def timestamp_of(text):
     match = re.fullmatch(r"(.*?)(?:\.(\d{1,9}))?(Z|[+-]\d\d:\d\d)", text)
     whole = datetime.fromisoformat(match.group(1) + ("+00:00" if match.group(3) == "Z" else match.group(3)))
     fraction = (match.group(2) or "").ljust(FRACTION_DIGITS_MAX, "0")
-    seconds = int((whole - datetime(1970, 1, 1, tzinfo=timezone.utc)).total_seconds())
+    seconds = int((whole - datetime(1970, 1, 1, tzinfo=UTC)).total_seconds())
     return [seconds, int(fraction)]
 
 
@@ -115,7 +117,7 @@ def same(expected, actual):
     if isinstance(expected, dict) and isinstance(actual, dict):
         return expected.keys() == actual.keys() and all(same(expected[k], actual[k]) for k in expected)
     if isinstance(expected, (list, tuple)) and isinstance(actual, (list, tuple)):
-        return len(expected) == len(actual) and all(same(e, a) for e, a in zip(expected, actual))
+        return len(expected) == len(actual) and all(same(e, a) for e, a in zip(expected, actual, strict=True))
     return expected == actual
 
 
@@ -153,7 +155,7 @@ def read_known(path):
 
 
 def main():
-    expected = json.load(open(sys.argv[1], encoding="utf-8"))
+    expected = json.loads(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"))
     known = read_known(sys.argv[3])
     results = {}
     with open(sys.argv[2], encoding="utf-8") as lines:
