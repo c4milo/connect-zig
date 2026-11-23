@@ -2,9 +2,9 @@
 """Writes a production report of tools/fullstack/production.sh (design §8 steps 29 and 30) on
 standard output.
 
-    tools/fullstack/production_report.py <results> <transport> <ticks> <oha> <otelcol> <vector>
+    tools/fullstack/production_report.py <results> <transport> <ticks> <load> <otelcol> <vector>
                                          <rotel> <connect-go> <connect-rust> <commit> <placement>
-                                         <seconds> <warm> <limit_ms> <suite> <spans:connections>...
+                                         <seconds> <variants> <limit_ms> <spans:connections>...
 
 <results> holds the lines of each server's climb, as tools/fullstack/climb.py reads them. The
 report holds the lines of <transport> alone, `tls` or `cleartext`. <ticks> is the ticks of a
@@ -15,9 +15,9 @@ import sys
 import climb
 from machine import machine
 
-results, transport, ticks, oha, otelcol, vector, rotel, connect_go, connect_rust, commit, placement, seconds, warm, limit_ms, suite = sys.argv[1:16]
-ticks, seconds, warm, limit_ms = int(ticks), float(seconds), float(warm), float(limit_ms)
-classes = [tuple(int(part) for part in item.split(":")) for item in sys.argv[16:]]
+results, transport, ticks, load_text, otelcol, vector, rotel, connect_go, connect_rust, commit, placement, seconds, variants, limit_ms = sys.argv[1:15]
+ticks, seconds, variants, limit_ms = int(ticks), float(seconds), int(variants), float(limit_ms)
+classes = [tuple(int(part) for part in item.split(":")) for item in sys.argv[15:]]
 names = {"connect-zig": "connect-zig", "connect-zig-validate": "connect-zig + protovalidate",
          "collector": "Collector", "vector": "Vector", "rotel": "Rotel", "connect-go": "connect-go",
          "connect-go-validate": "connect-go + protovalidate-go",
@@ -46,8 +46,6 @@ spans_per_rate = sum(spans * count for spans, count in classes)
 
 
 over = "over TLS" if transport == "tls" else "over cleartext h2"
-# What a step's first seconds hold, which its measure leaves out.
-starting = "each step's TLS handshakes run" if transport == "tls" else "each step opens its connections"
 ended_by = {"refused": "a call refused", "p99": f"p99 past {limit_ms:.0f} ms", "rate": "spans short of the rate",
             "load": "the load's cores full"}
 print(f"## Full stack, production {over}: one gateway core for {fleet_servers:,} servers")
@@ -55,19 +53,20 @@ print()
 print(f"Each server holds {connections} connections {over}, as one core of a {gateway_cores}-core gateway tier does")
 print(f"when {fleet_servers:,} servers each run a Collector agent. "
       + ", ".join(f"{count} connections send gzip exports of {spans} spans" for spans, count in classes) + ".")
-print(f"oha sends at fixed rates with its latency correction, and the rate climbs until p99 passes {limit_ms:.0f} ms or a")
-print(f"measured call is refused. Each step lasts {seconds:.0f} s, and its measure leaves out the first {warm:.0f} s, where")
-print(f"{starting}. Every span was checked.")
+print("The load sends at fixed rates, each connection on a schedule of its own, and counts each call's latency from")
+print("the instant its schedule set, so a call that waits in a queue counts its wait. It keeps its connections open")
+print(f"across the climb, as the agents keep theirs, and each connection sends its class's {variants} variants of the export in")
+print(f"turn. The rate climbs until p99 passes {limit_ms:.0f} ms or a call is refused. Each step lasts {seconds:.0f} s, and every")
+print("call and every span counts.")
 print()
 print("The rate a core holds lies between the step it held and the next step, which failed; the resolution gives")
-print("that gap as a share of the step held. A server that refuses calls past a fixed count, as connect-zig's sink")
-print("does past 64, refuses some calls in those first seconds: the held step's calls refused then. oha runs on two")
-print("cores of its own, which the server never runs on. A step that fails while they were 90% busy or more ends the")
-print("climb on the load's cores, and the rate held is then a floor, with no resolution. \"load busy\" is their share")
-print("at the step held: all their work, the kernel's for the traffic oha sends included.")
+print("that gap as a share of the step held. The load runs on two cores of its own, which the server never runs on.")
+print("A step that fails while they were 90% busy or more ends the climb on the load's cores, and the rate held is")
+print("then a floor, with no resolution. \"load busy\" is their share at the step held: all their work, the kernel's")
+print("for the traffic the load sends included.")
 print()
-print("| server | spans/s held | resolution | calls/s | p50 ms | p99 ms | core busy | load busy | CPU µs a span | peak MiB | refused at its start | the next step |")
-print("|---|--:|--:|--:|--:|--:|--:|--:|--:|--:|--:|---|")
+print("| server | spans/s held | resolution | calls/s | p50 ms | p99 ms | core busy | load busy | CPU µs a span | peak MiB | the next step |")
+print("|---|--:|--:|--:|--:|--:|--:|--:|--:|--:|---|")
 
 
 def validation_line(server, twin):
@@ -90,7 +89,7 @@ best, above = {}, {}
 for server in servers:
     step, failed, verdict = climb.held(steps.get(server, []))
     if step is None:
-        print(f"| {names[server]} | none | | | | | | | | | | {ended_by.get(verdict, verdict)} |")
+        print(f"| {names[server]} | none | | | | | | | | | {ended_by.get(verdict, verdict)} |")
         continue
     best[server], above[server] = step, failed
     gap = climb.resolution(step, failed)
@@ -99,9 +98,16 @@ for server in servers:
     print(f"| {names[server]} | {step['spans']:,.0f} | {'' if gap is None else f'+{gap * percent:.1f}%'} | "
           f"{step['calls']:,.0f} | {step['p50']:.2f} | {step['p99']:.2f} | "
           f"{step['busy'] * percent:.0f}% | {load} | "
-          f"{step['cpu']:.2f} | {memory.get(server, 0):.0f} | "
-          f"{step['warm_refused']:,} | {ended_by.get(verdict, verdict)} |")
+          f"{step['cpu']:.2f} | {memory.get(server, 0):.0f} | {ended_by.get(verdict, verdict)} |")
 print()
+# A server that closed connections under load: the load opened them again before its next step.
+closed = [(server, sum(step["reopened"] for step in steps.get(server, []))) for server in servers]
+for server, reopened in closed:
+    if reopened:
+        print(f"- {names[server]} closed connections: the load opened {reopened:,} again over its climb.")
+if any(reopened for _, reopened in closed) and "connect-zig" not in best:
+    print()
+
 if "connect-zig" in best:
     zig = best["connect-zig"]["spans"]
     for server in servers[1:]:
@@ -132,12 +138,10 @@ for rate in rates:
     print(f"| {rate:g} | {rate * spans_per_rate:,.0f} | " + " | ".join(cells) + " |")
 print()
 print(f"Machine: {machine()}.")
-print(f"Load: {oha}, {placement}.")
-# oha can pin no suite, so each server's suite is the one it chose, which tools/fullstack/servers.sh
-# asks it for before its climb (the argument <suite> is h2load's, at the peak).
+print(f"Load: {load_text}, {placement}.")
 chosen = climb.suites(results, transport)
 if chosen:
-    print("TLS 1.3 suites, as each server chose from an offer in the order of oha's TLS library, rustls 0.23: "
+    print("TLS 1.3 suites: the load offers TLS_AES_128_GCM_SHA256 alone, and each server's connections ran "
           + ", ".join(f"{names.get(server, server)} {chosen[server]}" for server in servers if server in chosen) + ".")
 print(f"Servers: connect-zig {commit} in ReleaseSafe, `tools/otlp_sink`; "
       + "; ".join(setups[server] for server in servers if server in setups) + ".")

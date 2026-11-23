@@ -1128,6 +1128,18 @@ first. Cite an entry by number in code and commits ("decision 6").
       and run 248's climbs ended there: 229,202 spans a second over TLS with uncompressed exports,
       where gzip's held 747,584, and every refusal fell 0.11 to 0.26 s into its step. The report
       gives the held step's refusals in its first seconds in a column of their own.
+    - Amended a third time on 2026-11-23, after a review of the method: the climb's load is
+      `tools/fullstack/load`, a program of this repository on h2, tokio and rustls, in place of
+      oha. It opens its 516 connections once and keeps them across the climb, as the agents keep
+      theirs. So a step holds no TLS handshake, every call counts, and the 2 s that each step
+      left out goes, with its column. It sends each class's 32 variants of its export in turn,
+      so a decoder does not read the same octets on every call. It offers TLS_AES_128_GCM_SHA256
+      alone, as h2load does at the peak, and the report names the suite its connections ran. It
+      keeps oha's open schedule: each connection sends at ticks of its own, each class spreads
+      its ticks over the interval, and a call's latency runs from its tick. Before each step it
+      opens again a connection the server closed, and the report counts them. Beaten: oha, which
+      opens its connections again at each step, sends one body, and pins no suite. In a 4-CPU
+      container, its two cores were 18% busy where connect-zig held 712,000 spans a second.
     - Amended on 2026-11-17: the `fullstack` and `bench-compare` checks draw the README's charts
       from their own output, and CI keeps them with the run for 90 days, as `charts-<check>-<arch>`.
       A person copies a chosen run's charts to `docs/images`, so the README still names one run.
@@ -1142,7 +1154,8 @@ first. Cite an entry by number in code and commits ("decision 6").
     - Slack, whose fleet the model takes its size from, publishes no rate of spans. So the model
       states each core's rate, and the fleet's rate divided by it gives the cores a tier needs.
       The 516 connections, the mix and the 100 ms limit were chosen on 2026-11-17.
-    - oha v1.16.0 is pinned by SHA-256, the digest GitHub states for each release asset.
+    - oha v1.16.0 is pinned by SHA-256, the digest GitHub states for each release asset. Removed
+      on 2026-11-23 with oha, as amended above: Cargo.lock pins the load's crates.
     - CI runs the check on x86-64 and on GitHub's arm64 runner, as it runs `bench-compare`, so the
       README can chart both machines. Each job's numbers belong to its machine alone.
     - Two servers in Rust join, chosen on 2026-11-17. Vector v0.62.0 takes OTLP over TLS with its

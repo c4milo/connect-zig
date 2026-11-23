@@ -20,8 +20,9 @@
 # - peak (tools/fullstack/peak.sh): over TLS 1.3, h2load sends exports of 16 spans, then of 512,
 #   on 16 connections of 4 streams, as fast as each server answers.
 # - production (tools/fullstack/production.sh): the traffic of one gateway core for a fleet of
-#   33,000 servers. oha sends a mix of gzip exports on 516 connections, at rates that climb until
-#   p99 passes 100 ms or a call is refused: over TLS to connect-zig, the Collector, Vector,
+#   33,000 servers. tools/fullstack/load sends a mix of gzip exports on 516 connections, which stay
+#   open across the climb, at rates that climb until p99 passes 100 ms or a call is refused: over
+#   TLS to connect-zig, the Collector, Vector,
 #   connect-go and connect-rust, then in cleartext to connect-zig, the Collector and Rotel, whose
 #   receiver has no TLS.
 # - compression and compression-cleartext (tools/fullstack/compression.sh): the three Connect
@@ -34,10 +35,10 @@
 #
 # It runs on Linux, where /proc gives a process's CPU time and peak memory. It needs h2load
 # (nghttp2-client), buf, python3, curl, go and cargo; H2LOAD and BUF name the first two. It
-# downloads the Collector, Vector, Rotel and oha, each pinned by SHA-256, into a cache, unless
-# OTELCOL, VECTOR, ROTEL and OHA name them. It builds the three sinks with -Drelease, unless
-# OTLP_SINK, OTLP_SINK_VALIDATE and OTLP_SINK_COMPRESSION name them, and the two receivers,
-# unless CONNECT_GO and CONNECT_RUST name them. The compression parts run
+# downloads the Collector, Vector and Rotel, each pinned by SHA-256, into a cache, unless OTELCOL,
+# VECTOR and ROTEL name them. It builds the three sinks with -Drelease, unless OTLP_SINK,
+# OTLP_SINK_VALIDATE and OTLP_SINK_COMPRESSION name them, the two receivers, unless CONNECT_GO and
+# CONNECT_RUST name them, and the climb's load, unless FULLSTACK_LOAD names it. The compression parts run
 # `otlp-sink-compression`, which holds more calls at once (tools/otlp_sink/constants.zig).
 set -eu
 cd "$(dirname "$0")/.."
@@ -45,28 +46,25 @@ cd "$(dirname "$0")/.."
 export PYTHONDONTWRITEBYTECODE=1
 parts="${*:-peak production}"
 collector_version="0.165.0"
-oha_version="v1.16.0"
 vector_version="0.62.0"
 rotel_version="v0.2.7"
 # The SHA-256 of each download: the Collector's core distribution, from its release's .sha256
-# files, and oha's, Vector's and Rotel's builds, as GitHub's digest of each release asset states.
+# files, and Vector's and Rotel's builds, as GitHub's digest of each release asset states.
 case "$(uname -m)" in
     x86_64)
         arch=amd64
         collector_sha256=78570dd4bd6570bc41eb327869ef913bbf91b87dd8170ebebbf43bec71f6370d
-        oha_sha256=620bb9e16fb53eabc9a3fc45f88bdb41fefa3fee5c05e75892011ce320391716
         vector_sha256=e9d9cb3ee12288544c813453d0548524ab2bcc8f7e81b601f5e9d378fa6ac2f6
         rotel_sha256=8f4530006034775e9089a86c1e4aca1c26f7b8416daf394334cff37e84d31eee
         ;;
     aarch64)
         arch=arm64
         collector_sha256=e59c320b90885610e346f3f82d2ceca55c5c30ede1549fd14cce577d175901cd
-        oha_sha256=99a790eb8c3e0feaca974bd6b32f0f8d4426a0c5b289f39e833e5b2c7529cd39
         vector_sha256=99532dce9a1e36a6f604d806c325a52d45f2b738e4c04ccb43bc3db96078c581
         rotel_sha256=9e68282b6a2f667f56f793c055d496d258a25fbed4cb2c013a56dcf4fcd9e74e
         ;;
     *)
-        echo "fullstack: no Collector or oha for $(uname -s) $(uname -m); run it on Linux" >&2
+        echo "fullstack: no Collector for $(uname -s) $(uname -m); run it on Linux" >&2
         exit 2
         ;;
 esac
@@ -130,9 +128,6 @@ releases=https://github.com/open-telemetry/opentelemetry-collector-releases/rele
 otelcol="${OTELCOL:-$(fetch "otelcol-${collector_version}-${arch}" \
     "${releases}/v${collector_version}/otelcol_${collector_version}_linux_${arch}.tar.gz" \
     "${collector_sha256}" otelcol)}"
-oha="${OHA:-$(fetch "oha-${oha_version}-${arch}" \
-    "https://github.com/hatoo/oha/releases/download/${oha_version}/oha-linux-${arch}" \
-    "${oha_sha256}")}"
 # Rust's name of the machine, which Vector's and Rotel's archives carry.
 triple="$(uname -m)-unknown-linux-gnu"
 vector="${VECTOR:-$(fetch "vector-${vector_version}-${arch}" \
@@ -179,6 +174,15 @@ if [ -z "${connect_rust}" ]; then
         cargo build --quiet --locked --release --manifest-path tools/fullstack/connect-rust/Cargo.toml >&2
     connect_rust="${target}/release/fullstack-connect-rust"
 fi
+# The climb's load (tools/fullstack/load), in release with the crates its Cargo.lock pins, built
+# for this machine's CPU as the receivers are.
+fullstack_load="${FULLSTACK_LOAD:-}"
+if [ -z "${fullstack_load}" ]; then
+    target="${cache}/fullstack-load-target-$(host_features)"
+    RUSTFLAGS="${rust_native}" CARGO_TARGET_DIR="${target}" \
+        cargo build --quiet --locked --release --manifest-path tools/fullstack/load/Cargo.toml >&2
+    fullstack_load="${target}/release/fullstack-load"
+fi
 sink="${OTLP_SINK:-}"
 sink_validate="${OTLP_SINK_VALIDATE:-}"
 sink_compression="${OTLP_SINK_COMPRESSION:-}"
@@ -207,11 +211,16 @@ connect_go_text="connect-go $(awk '$1 == "connectrpc.com/connect" { print $2 }' 
 [ -n "${CONNECT_GO:-}" ] || connect_go_text="${connect_go_text} built with ${go_build:-Go's defaults}"
 connect_rust_text="connect-rust $(awk '$0 == "name = \"connectrpc\"" { getline; gsub(/"/, "", $3); print "v" $3 }' tools/fullstack/connect-rust/Cargo.lock)"
 [ -n "${CONNECT_RUST:-}" ] || connect_rust_text="${connect_rust_text} built with LTO and target-cpu=native"
+# A crate's version in the load's Cargo.lock.
+load_crate() { awk -v name="name = \"$1\"" '$0 == name { getline; gsub(/"/, "", $3); print $3 }' tools/fullstack/load/Cargo.lock; }
+load_text="tools/fullstack/load, on h2 $(load_crate h2), tokio $(load_crate tokio) and rustls $(load_crate rustls) with ring"
+[ -n "${FULLSTACK_LOAD:-}" ] || load_text="${load_text}, built with LTO and target-cpu=native"
 
 work="$(mktemp -d)"
 server_pid=""
 counter_pid=""
-trap 'stop; rm -rf "${work}"' EXIT
+load_pid=""
+trap 'stop; [ -z "${load_pid}" ] || kill "${load_pid}" 2>/dev/null; rm -rf "${work}"' EXIT
 . tools/fullstack/servers.sh
 . tools/fullstack/peak.sh
 . tools/fullstack/production.sh

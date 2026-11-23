@@ -39,17 +39,22 @@ word_at() {
     echo "$1"
 }
 
-# Writes each class's export in each coding, and a line of its octets in each to
-# `compression-octets`: the spans, the coding, the message's octets and the octets sent.
+# Writes each class's variants of its export in each coding, and a line of the first variant's
+# octets in each to `compression-octets`: the spans, the coding, the message's octets and the
+# octets sent.
 compression_exports() {
     : >"${work}/compression-octets"
     production_exports
     for class in ${production_classes}; do
         spans="${class%%:*}"
         for coding in ${compression_codings}; do
-            echo "${spans} ${coding} $("${compress}" "${coding}" \
-                "${work}/production-${spans}.grpc.binpb" "${work}/production-${spans}-${coding}.grpc")" \
-                >>"${work}/compression-octets"
+            for variant in $(seq 0 $((production_variants - 1))); do
+                octets="$("${compress}" "${coding}" "$(production_file "${spans}" "${variant}").binpb" \
+                    "$(production_file "${spans}" "${variant}" "-${coding}")")"
+                if [ "${variant}" -eq 0 ]; then
+                    echo "${spans} ${coding} ${octets}" >>"${work}/compression-octets"
+                fi
+            done
         done
     done
 }
@@ -105,9 +110,10 @@ compression_part() {
     compression_peak
     compression_climbs
     python3 tools/fullstack/compression_report.py "${work}" "${transport}" "$(getconf CLK_TCK)" \
-        "$("${h2load}" --version | head -1)" "$("${oha}" --version | head -1)" \
+        "$("${h2load}" --version | head -1)" "${load_text}" \
         "${connect_go_text}" "${connect_rust_text}" "${commit}" "${placement}" "${peak_rounds}" \
-        "${step_seconds}" "${p99_limit_ms}" "${tls_suite}" "${compression_codings}" ${production_classes}
+        "${step_seconds}" "${production_variants}" "${p99_limit_ms}" "${tls_suite}" \
+        "${compression_codings}" ${production_classes}
     echo
     sink="${plain_sink}"
     transport=tls

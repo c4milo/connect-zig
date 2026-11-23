@@ -272,20 +272,11 @@ check_storage() {
 }
 
 cpu_ticks() { awk '{ print $14 + $15 }' "/proc/$1/stat"; }
-# The TLS 1.3 suite a server chooses from an offer in the order of oha's TLS library, rustls 0.23:
-# AES-256-GCM, then AES-128-GCM, then ChaCha20-Poly1305. oha can pin no suite, and Go's server
-# cannot be told one, so each report names the suite each server chose, as `unknown` when openssl
-# is missing.
-rustls_offer="TLS_AES_256_GCM_SHA384:TLS_AES_128_GCM_SHA256:TLS_CHACHA20_POLY1305_SHA256"
-negotiated_suite() {
-    chosen="$(openssl s_client -connect "127.0.0.1:$(port_of "$1")" -tls1_3 -ciphersuites "${rustls_offer}" \
-        -alpn h2 -CAfile "${ca}" </dev/null 2>/dev/null | awk '/Cipher is/ { print $NF; exit }')"
-    echo "${chosen:-unknown}"
-}
 # The busy and the total ticks of the load's cores, as `<busy>:<total>`, from /proc/stat. The
 # server runs on none of them. Of user, nice, system, idle, iowait, irq, softirq and steal, every
 # field but idle and iowait is busy; the guest fields that follow are already in user and nice.
-# The ticks count all the work on those cores: oha's, and the kernel's for the traffic oha sends.
+# The ticks count all the work on those cores: the load's, and the kernel's for the traffic it
+# sends.
 # With no core pinned, it gives `-`, and no step reads it.
 load_ticks() {
     [ -n "${load_cores:-}" ] || { echo -; return; }

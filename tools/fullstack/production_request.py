@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
 """Writes an export of the production model of tools/fullstack/production.sh (decision 44).
 
-    tools/fullstack/production_request.py <buf> <spans> <out.grpc>
+    tools/fullstack/production_request.py <buf> <spans> <out.grpc> [<variant>]
 
 The export is what a node's Collector agent forwards to a gateway: the spans of several pods,
 each pod a resource with the attributes of OpenTelemetry's Kubernetes, cloud and host semantic
 conventions. Its spans are HTTP server and client calls, gRPC calls, database queries and Kafka
 sends, in traces of up to 8 spans. 2% of the spans are errors with an exception event, and 5%
-carry an event of their own. A generator seeded by <spans> chooses every value, so each run writes
-the same octets.
+carry an event of their own. A generator seeded by <spans> and <variant> chooses every value, so
+each run writes the same octets. Variant 0, the default, is seeded by <spans> alone. The load sends
+each class's variants in turn, so a decoder does not read the same octets on every call.
 
 The script writes the export in proto3 JSON to <out.grpc>.json, for `buf curl`, and `buf convert`
 encodes it with Go's runtime. <out.grpc> holds the encoding compressed with gzip at Go's default
@@ -23,7 +24,9 @@ import subprocess
 import sys
 
 buf, spans, out = sys.argv[1], int(sys.argv[2]), sys.argv[3]
-draw = random.Random(spans)
+variant = int(sys.argv[4]) if len(sys.argv) > 4 else 0
+# Python seeds a generator from a string by its SHA-512, the same on every host.
+draw = random.Random(spans if variant == 0 else f"{spans}-{variant}")
 # Pods in one export: one for each 64 spans, from 1 to 8.
 pods_per_spans = 64
 pods_max = 8

@@ -271,8 +271,9 @@ confirm a test fails. Report `CAUGHT` or `NOT CAUGHT` per mutation in the commit
   loads connect-zig's OTLP sink, `zig
   build otlp-sink`, and OpenTelemetry's Collector v0.165.0 with the same OTLP exports over gRPC,
   TLS 1.3 and h2, each server on one core (decision 44). `peak` runs h2load as fast as each server
-  answers. `production` runs oha, pinned by SHA-256 as the Collector is, as one gateway core of
-  33,000 servers takes traffic: 516 connections and a mix of gzip exports, at rates that climb
+  answers. `production` runs `tools/fullstack/load`, which the check builds with cargo unless
+  `FULLSTACK_LOAD` names it, as one gateway core of 33,000 servers takes traffic: 516
+  connections that stay open across the climb and a mix of gzip exports, at rates that climb
   until p99 passes 100 ms. Vector v0.62.0, in Rust, joins both over TLS, and Rotel v0.2.7, in
   Rust with no receiver TLS, joins a second climb in cleartext. Receivers on connect-go and
   connect-rust, `tools/fullstack/connect-go` and `tools/fullstack/connect-rust`, join both over

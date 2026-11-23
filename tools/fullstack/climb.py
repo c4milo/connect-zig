@@ -1,12 +1,13 @@
 """The climbs of tools/fullstack/production.sh, as tools/fullstack's reports read them.
 
 A climb's results hold a line for each step of each server: "step", the transport, the server,
-the exports a connection a second, the spans of the calls answered 200, the measured calls a
-second and spans a second, p50 and p99 in milliseconds, the measured calls refused, the verdict,
-the calls refused in the step's first seconds, which the measure leaves out, the share of the
-load's cores that was busy, -1 with no core pinned, the server's CPU ticks over the step, and the
-step's wall time in milliseconds. A line "memory" gives the transport, the server and its peak
-memory in KiB, and a line "suite" the transport, the server and the TLS 1.3 suite it chose.
+the exports a connection a second, the spans of the calls answered 200, the calls a second and
+spans a second, p50 and p99 in milliseconds, the calls refused, the verdict, the share of the
+load's cores that was busy, -1 with no core pinned, the server's CPU ticks over the step, the
+step's wall time in milliseconds, and the connections the load opened again before the step
+because the server had closed them. A line "memory" gives the transport, the server and its peak
+memory in KiB, and a line "suite" the transport, the server and the TLS 1.3 suite its connections
+ran.
 """
 microseconds = 1_000_000
 milliseconds = 1000
@@ -29,13 +30,13 @@ def read(path, transport, ticks, seconds):
             continue
         if fields[0] != "step":
             continue
-        rate, taken, calls, spans, p50, p99, refused, verdict, warm_refused, load, cpu, wall_ms = fields[3:15]
+        rate, taken, calls, spans, p50, p99, refused, verdict, load, cpu, wall_ms, reopened = fields[3:15]
         steps.setdefault(server, []).append({
             "rate": float(rate), "taken": int(taken), "calls": float(calls), "spans": float(spans),
             "p50": float(p50), "p99": float(p99), "refused": int(refused), "verdict": verdict,
-            "warm_refused": int(warm_refused), "load": float(load),
+            "load": float(load), "reopened": int(reopened),
             # The share of a core over the step's measured wall time, which passes its nominal
-            # seconds by oha's start and end.
+            # seconds by the load's start and the calls still in flight at its end.
             "busy": int(cpu) / ticks / max(int(wall_ms) / milliseconds, seconds),
             "cpu": int(cpu) * microseconds / ticks / max(int(taken), 1),
         })
@@ -43,7 +44,7 @@ def read(path, transport, ticks, seconds):
 
 
 def suites(path, transport):
-    """The TLS 1.3 suite each server chose, by server, from the lines of `transport`."""
+    """The TLS 1.3 suite each server's connections ran, by server, from the lines of `transport`."""
     found = {}
     for line in open(path):
         fields = line.split()

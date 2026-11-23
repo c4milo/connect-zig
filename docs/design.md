@@ -262,7 +262,9 @@ Each step names the check that proves it. A step is done when its check passes i
     core of a fleet of 33,000 servers: 516 TLS connections, gzip exports of 16, 128 and 512
     spans from 70%, 25% and 5% of them, under oha at rates that climb until p99 passes 100 ms
     or a call is refused (decision 44). The sink reads gzip and holds 528 connections. New public
-    names: none. Check: the probes and the counts of step 28, over the whole climb.
+    names: none. Check: the probes and the counts of step 28, over the whole climb. Since
+    2026-11-23 `tools/fullstack/load` sends the climb in oha's place, on connections it keeps
+    across the climb (decision 44 as amended).
 30. **Servers in Rust.** Vector joins the peak part and the climb over TLS. A second climb, in
     cleartext h2, loads connect-zig, the Collector and Rotel, whose receiver has no TLS. The sink
     takes a second argument, `cleartext`, and then serves with no identity (decision 44). New
