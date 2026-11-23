@@ -15,7 +15,7 @@
 # oha sends the exports at fixed rates, one process for each size, with its latency correction,
 # so the latency holds the time a call waited in a queue. The rate climbs one step at a time. A
 # step fails when its p99 passes 100 ms, when a call is refused, or when the core takes less than
-# 95% of the step's spans. Then three more steps halve the gap between the last step that passed
+# 95% of the step's spans. Then five more steps halve the gap between the last step that passed
 # and the step that failed. Each step opens its connections again, so the report leaves out its
 # first 2 seconds, where the TLS handshakes fall. The server runs once for the whole climb, and
 # its count of spans must equal what it was sent.
@@ -26,8 +26,9 @@ production_classes="16:361 128:129 512:26"
 # second.
 production_steps="0.25 0.5 0.75 1 1.5 2 3 4 6 8 10 12 16 20 24 32"
 # Halvings of the gap between the last step that passed and the step that failed. The steps grow
-# by up to half, so three halvings place the rate a core holds within 1/16 of it.
-refine_rounds=3
+# by up to half, so five halvings place the rate a core holds within 1/64 of it: a cost of a few
+# percent, such as validation's or a coding's, then shows (decision 44 as amended).
+refine_rounds=5
 rest_seconds=5
 step_seconds=10
 warm_seconds=2

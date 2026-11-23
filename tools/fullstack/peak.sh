@@ -16,8 +16,10 @@ warm_divisor=10
 # 16 connections of 4 streams each: 64 calls in flight, which the sink's router holds at once.
 peak_connections=16
 peak_streams=4
-# What tools/fullstack/compression.sh sets for an export in a coding: the end of its file's name,
-# and the coding grpc-encoding names. The peak part sends exports with no coding.
+# What tools/fullstack/compression.sh sets for an export in a coding: the start of its file's
+# name, the end of it, and the coding grpc-encoding names. The peak part sends the exports of
+# tools/fullstack/otlp_request.py, with no coding.
+peak_export=export
 peak_tag=""
 peak_encoding=""
 
@@ -25,7 +27,7 @@ peak_encoding=""
 peak_load() {
     ${load_pin} "${h2load}" -n "$3" -c "${peak_connections}" -m "${peak_streams}" \
         -t "${load_threads}" \
-        --tls13-ciphers="${tls_suite}" -d "${work}/export-$2${peak_tag}.grpc" \
+        --tls13-ciphers="${tls_suite}" -d "${work}/${peak_export}-$2${peak_tag}.grpc" \
         -H 'content-type: application/grpc' -H 'te: trailers' \
         ${peak_encoding:+-H "grpc-encoding: ${peak_encoding}"} ${4:+"--log-file=$4"} \
         "$(url_of "$1" "${export_path}")"
@@ -37,7 +39,7 @@ peak_measure() {
     server="$1" spans="$2" requests="$(peak_requests_of "$2")"
     warm=$((requests / warm_divisor))
     start "${server}" || { stop; return 1; }
-    probe "${server}" "${work}/export-${spans}.grpc.json" || { stop; return 1; }
+    probe "${server}" "${work}/${peak_export}-${spans}.grpc.json" || { stop; return 1; }
     probe_refused "${server}" || { stop; return 1; }
     peak_load "${server}" "${spans}" "${warm}" >"${work}/warm.txt"
     # h2load appends to its log, so each round starts with none.

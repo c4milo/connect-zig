@@ -41,6 +41,9 @@ if validate:
         "connect-rust": ("connect-rust", "--rust"),
         "connect-rust + protovalidate-buffa": ("connect-rust + protovalidate-buffa", "--rustv"),
     }
+# A lighter shade is too faint against the surface to show a bar's edge or a line, so a bar of one
+# takes an outline in its library's color, and its line is that color, dashed.
+outlines = {"--zigv": "--zig", "--gov": "--go", "--rustv": "--rust"}
 # Each receiver that validates, and its twin that does not.
 twins = {"connect-zig + protovalidate": "connect-zig", "connect-go + protovalidate-go": "connect-go",
          "connect-rust + protovalidate-buffa": "connect-rust"}
@@ -50,12 +53,14 @@ limit_ms = 100
 
 
 def number(text):
-    return float(text.replace(",", "").rstrip("%"))
+    return float(text.replace(",", "").replace("+", "").rstrip("%"))
 
 
-held, steps, machine, section, columns = {}, [], None, False, None
+# The time GitHub writes before each line of a job's log, which a log saved from a run holds.
+stamp = re.compile(r"^\d{4}-\d\d-\d\dT[0-9:.]+Z ")
+held, steps, machine, section, columns, held_columns = {}, [], None, False, None, None
 for line in open(log_path):
-    line = line.strip()
+    line = stamp.sub("", line.strip())
     if line.startswith("## "):
         section = line.startswith(f"## Full stack, production {over}")
         continue
@@ -66,10 +71,19 @@ for line in open(log_path):
     if not line.startswith("|") or "---" in line:
         continue
     cells = [cell.strip() for cell in line.strip("|").split("|")]
-    if cells[0] == "exports a connection a second":
+    if cells[0] == "server" and "spans/s held" in cells:
+        held_columns = {name: index for index, name in enumerate(cells)}
+    elif cells[0] == "exports a connection a second":
         columns = {cells[index][:-len(" p99")]: index for index in range(2, len(cells), 2)}
-    elif cells[0] in looks and cells[1] != "none":
-        held[cells[0]] = {"spans": number(cells[1]), "p99": number(cells[4])}
+    elif cells[0] in looks and held_columns and cells[held_columns["spans/s held"]] != "none":
+        row = {name: cells[index] for name, index in held_columns.items()}
+        # The resolution: how far above the rate held the rate the core holds may lie. An older
+        # report gives none.
+        gap = number(row["resolution"]) / 100 if row.get("resolution") else None
+        # A report with resolutions gives none for a climb whose every step passed: its rate is a
+        # floor.
+        floor = "resolution" in row and not row["resolution"]
+        held[cells[0]] = {"spans": number(row["spans/s held"]), "p99": number(row["p99 ms"]), "gap": gap, "floor": floor}
     elif columns and re.fullmatch(r"[0-9.]+", cells[0]):
         row = {"sent": number(cells[1])}
         for name, index in columns.items():
@@ -98,10 +112,22 @@ if len(title) > title_len_max:
 if validate:
     kept = [f"{twin} {held[name]['spans'] / held[twin]['spans'] * 100:.0f}%" for name, twin in twins.items()
             if name in held and twin in held]
-    title = f"Spans a second with protovalidate: {', '.join(kept)}"
+    title = f"Rate kept with protovalidate: {', '.join(kept)}"
 
 pad_l = 24
-legend_y = 112
+subtitle = [
+    f"Each server holds 516 connections {over}, as one core of a 64-core gateway for 33,000 servers, and",
+    f"takes gzip OTLP exports of 16, 128 and 512 spans. The rate climbs until p99 passes {limit_ms} ms or a call is refused.",
+]
+whiskers = any(item["gap"] is not None for item in held.values())
+if validate:
+    subtitle.append("Each share is a receiver's spans a second with protovalidate over its own without. A dashed line is a")
+    subtitle.append("receiver that validates." + (" A whisker reaches the step that failed, so the rate a core holds lies inside it."
+                                                   if whiskers else ""))
+elif whiskers:
+    subtitle.append("A whisker reaches the step that failed, so the rate a core holds lies inside it.")
+sub_line_h = 18
+legend_y = 56 + (len(subtitle) + 1) * sub_line_h + 2
 bar_h, bar_gap = 20, 22
 W = 840
 # The legend's entries, a row at a time: an entry that would pass the chart's right edge starts a
@@ -116,7 +142,7 @@ for name in servers:
         legend_x = pad_l
     legend_rows[-1].append((name, legend_x))
     legend_x += width
-top = 168 + (len(legend_rows) - 1) * legend_row_h
+top = legend_y + 56 + (len(legend_rows) - 1) * legend_row_h
 # The chart grows when its bars pass its foot.
 H = max(340, top + 12 + len(servers) * (bar_h + bar_gap) + 8)
 plot_h = 128
@@ -168,15 +194,23 @@ text { font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; fil
 </style>''')
 a(f'<rect width="{W}" height="{H}" rx="8" fill="var(--surface)"/>')
 a(f'<text class="title" x="{pad_l}" y="34">{title}</text>')
-a(f'<text class="sub" x="{pad_l}" y="56">Each server holds 516 connections {over}, as one core of a 64-core gateway for 33,000 servers, and</text>')
-a(f'<text class="sub" x="{pad_l}" y="74">takes gzip OTLP exports of 16, 128 and 512 spans. The rate climbs until p99 passes {limit_ms} ms or a call is refused.</text>')
+for index, text in enumerate(subtitle):
+    a(f'<text class="sub" x="{pad_l}" y="{56 + index * sub_line_h}">{text}</text>')
 where = f", {machine}" if machine else ""
-a(f'<text class="sub" x="{pad_l}" y="92">One CI job ran all, and checked every span: run {run}, commit {commit}{where}.</text>')
+a(f'<text class="sub" x="{pad_l}" y="{56 + len(subtitle) * sub_line_h}">One CI job ran all, and checked every span: '
+  f'run {run}, commit {commit}{where}.</text>')
+
+
+def edge(fill):
+    """The outline a shade too faint for the surface takes, or none."""
+    return f' stroke="var({outlines[fill]})" stroke-width="1.5"' if fill in outlines else ""
+
+
 for row, entries in enumerate(legend_rows):
     y = legend_y + row * legend_row_h
     for name, x in entries:
         label, fill = looks[name]
-        a(f'<rect x="{x}" y="{y - 10}" width="12" height="12" rx="2" fill="var({fill})"/>')
+        a(f'<rect x="{x}" y="{y - 10}" width="12" height="12" rx="2" fill="var({fill})"{edge(fill)}/>')
         a(f'<text class="legend" x="{x + 18}" y="{y}">{label}</text>')
 
 a(f'<text class="panel" x="{pad_l}" y="{top - 14}">Spans a second one core holds</text>')
@@ -188,12 +222,19 @@ for index, name in enumerate(servers):
     radius = min(4, width / 2)
     a(f'<text class="row" x="{bar_left - 10}" y="{y + bar_h / 2 + 4:.1f}" text-anchor="end">{name}</text>')
     a(f'<path d="M{bar_left},{y} h{width - radius:.1f} a{radius},{radius} 0 0 1 {radius},{radius} v{bar_h - 2 * radius} '
-      f'a{radius},{radius} 0 0 1 {-radius},{radius} h{-(width - radius):.1f} z" fill="var({fill})"/>')
+      f'a{radius},{radius} 0 0 1 {-radius},{radius} h{-(width - radius):.1f} z" fill="var({fill})"{edge(fill)}/>')
+    if held[name]["gap"]:
+        end = bar_left + width * (1 + held[name]["gap"])
+        middle = y + bar_h / 2
+        a(f'<line x1="{bar_left + width:.1f}" y1="{middle}" x2="{end:.1f}" y2="{middle}" stroke="var(--ink)" stroke-width="1.5"/>')
+        a(f'<line x1="{end:.1f}" y1="{middle - 4}" x2="{end:.1f}" y2="{middle + 4}" stroke="var(--ink)" stroke-width="1.5"/>')
     ratio = "" if name == "connect-zig" else f", connect-zig {held['connect-zig']['spans'] / held[name]['spans']:.1f}×"
     if validate:
         twin = twins.get(name)
         ratio = f", {held[name]['spans'] / held[twin]['spans'] * 100:.0f}%" if twin in held else ""
-    a(f'<text class="val" x="{bar_left + 4:.1f}" y="{y + bar_h + 13}">{held[name]["spans"]:,.0f} spans/s, p99 {held[name]["p99"]:g} ms{ratio}</text>')
+    floor = "≥" if held[name]["floor"] else ""
+    a(f'<text class="val" x="{bar_left + 4:.1f}" y="{y + bar_h + 13}">{floor}{held[name]["spans"]:,.0f} spans/s, '
+      f'p99 {held[name]["p99"]:g} ms{ratio}</text>')
 
 a(f'<text class="panel" x="{line_left - 40}" y="{top - 14}">p99 as the rate climbs</text>')
 for ms in (1, 10, 100, 1000):
@@ -210,11 +251,14 @@ a(f'<text class="tick" x="{line_right}" y="{top + plot_h + 32}" text-anchor="end
 labels = []
 for name in servers:
     fill = looks[name][1]
+    stroke = outlines.get(fill, fill)
+    dash = ' stroke-dasharray="5 3"' if fill in outlines else ""
     points = [(sx(step["sent"]), sy(step[name][0]), step[name]) for step in steps if name in step]
-    a(f'<polyline points="{" ".join(f"{x:.1f},{y:.1f}" for x, y, _ in points)}" fill="none" stroke="var({fill})" stroke-width="2"/>')
+    a(f'<polyline points="{" ".join(f"{x:.1f},{y:.1f}" for x, y, _ in points)}" fill="none" stroke="var({stroke})" '
+      f'stroke-width="2"{dash}/>')
     for x, y, (_, failed) in points:
         inside = "var(--surface)" if failed else f"var({fill})"
-        a(f'<circle cx="{x:.1f}" cy="{y:.1f}" r="4" fill="{inside}" stroke="var({fill})" stroke-width="2"/>')
+        a(f'<circle cx="{x:.1f}" cy="{y:.1f}" r="4" fill="{inside}" stroke="var({stroke})" stroke-width="2"/>')
     x, y, (last, failed) = points[-1]
     if failed:
         text = "refused" if failed == "refused" else ("short of the rate" if failed == "rate" else f"p99 {last:,.0f} ms")
@@ -223,7 +267,13 @@ for name in servers:
 # the right edge. A label that would cover the one above it moves down a line.
 char_w, line_h = 6.2, 13
 placed = []
+merge_px = 6
+unique = []
 for label in sorted(labels):
+    if any(text == label[2] and abs(x - label[1]) < merge_px and abs(y - label[0]) < merge_px for y, x, text in unique):
+        continue
+    unique.append(label)
+for label in unique:
     y, x, text = label
     width = len(text) * char_w
     at_edge = x + 8 + width > line_right

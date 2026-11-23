@@ -330,10 +330,11 @@ Each step names the check that proves it. A step is done when its check passes i
     OpenTelemetry's span rules of `tools/fullstack/validate` (decision 46 as amended). New public
     names: none. Check: the probes and the counts of step 28, and each refuses an export whose
     trace ID is 3 octets with `invalid_argument`.
-37. **Compression in the full stack.** The three Connect receivers run both loads with exports in
-    no coding and in gzip, zstd and brotli, over TLS and in cleartext h2, in the parts
-    `compression` and `compression-cleartext`. `zig build otlp-compress` writes each export with
-    stdx's encoders, as a connect-zig client places them. The sink holds stdx's zstd and brotli
+37. **Compression in the full stack.** The three Connect receivers run both loads with the
+    production model's exports uncompressed and in gzip, zstd and brotli, over TLS and in
+    cleartext h2, in the parts `compression` and `compression-cleartext`, in an order that each
+    round rotates. `zig build otlp-compress` writes each export with stdx's encoders, as a
+    connect-zig client places them. The sink holds stdx's zstd and brotli
     decoders beside its gzip one, and the receivers on connect-go and connect-rust gain the codings
     their libraries do not hold (decision 46 as amended). New public names: none. Check: the
     counts of step 28 in each coding, which fail when a receiver refuses a coding.

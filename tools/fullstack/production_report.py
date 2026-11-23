@@ -6,15 +6,13 @@ standard output.
                                          <rotel> <connect-go> <connect-rust> <commit> <placement>
                                          <seconds> <warm> <limit_ms> <suite> <spans:connections>...
 
-<results> holds a line for each step of each server's climb: "step", the transport, the server,
-the exports a connection a second, the spans of the calls answered 200, the measured calls a
-second and spans a second, p50 and p99 in milliseconds, the calls refused, the verdict, and the
-server's CPU ticks over the step. A line "memory" gives the transport, the server and its peak
-memory in KiB. The report holds the lines of <transport> alone, `tls` or `cleartext`. <ticks> is
-the ticks of a second of CPU time.
+<results> holds the lines of each server's climb, as tools/fullstack/climb.py reads them. The
+report holds the lines of <transport> alone, `tls` or `cleartext`. <ticks> is the ticks of a
+second of CPU time.
 """
 import sys
 
+import climb
 from machine import machine
 
 results, transport, ticks, oha, otelcol, vector, rotel, connect_go, connect_rust, commit, placement, seconds, warm, limit_ms, suite = sys.argv[1:16]
@@ -40,43 +38,11 @@ setups = {
 # The fleet the model stands for, and the gateway cores that share its connections.
 fleet_servers = 33_000
 gateway_cores = 64
-microseconds = 1_000_000
-kib = 1024
 percent = 100
 
-servers, steps, memory = [], {}, {}
-for line in open(results):
-    fields = line.split()
-    if len(fields) < 3 or fields[1] != transport:
-        continue
-    server = fields[2]
-    if server not in servers:
-        servers.append(server)
-    if fields[0] == "memory":
-        memory[server] = int(fields[3]) / kib
-        continue
-    rate, taken, calls, spans, p50, p99, refused, verdict, cpu = fields[3:12]
-    steps.setdefault(server, []).append({
-        "rate": float(rate), "taken": int(taken), "calls": float(calls), "spans": float(spans),
-        "p50": float(p50), "p99": float(p99), "refused": int(refused), "verdict": verdict,
-        "busy": int(cpu) / ticks / seconds, "cpu": int(cpu) * microseconds / ticks / max(int(taken), 1),
-    })
-
+servers, steps, memory = climb.read(results, transport, ticks, seconds)
 connections = sum(count for _, count in classes)
 spans_per_rate = sum(spans * count for spans, count in classes)
-
-
-def held(server):
-    """The highest step the server passed, and the verdict of the lowest step above it that
-    failed. After its first failure, the climb tries rates between, so its steps are not in
-    order."""
-    passed = [step for step in steps.get(server, []) if step["verdict"] == "pass"]
-    best = max(passed, key=lambda step: step["rate"]) if passed else None
-    floor = best["rate"] if best else 0
-    failed = [step for step in steps.get(server, []) if step["verdict"] != "pass" and step["rate"] > floor]
-    if not failed:
-        return best, "none: the last step passed"
-    return best, min(failed, key=lambda step: step["rate"])["verdict"]
 
 
 over = "over TLS" if transport == "tls" else "over cleartext h2"
@@ -89,16 +55,39 @@ print(f"when {fleet_servers:,} servers each run a Collector agent. "
 print(f"oha sends at fixed rates with its latency correction, and the rate climbs until p99 passes {limit_ms:.0f} ms or a")
 print(f"call is refused. Each step lasts {seconds:.0f} s, and its measure leaves out the first {warm:.0f} s. Every span was checked.")
 print()
-print("| server | spans/s held | calls/s | p50 ms | p99 ms | core busy | CPU µs a span | peak MiB | the next step |")
-print("|---|--:|--:|--:|--:|--:|--:|--:|---|")
-best = {}
+print("The rate a core holds lies between the step it held and the next step, which failed; the resolution gives")
+print("that gap as a share of the step held.")
+print()
+print("| server | spans/s held | resolution | calls/s | p50 ms | p99 ms | core busy | CPU µs a span | peak MiB | the next step |")
+print("|---|--:|--:|--:|--:|--:|--:|--:|--:|---|")
+
+
+def validation_line(server, twin):
+    """What validation costs a receiver: the share of its twin's rate it holds, or that the climb
+    cannot tell the two apart, and the CPU a span of each at the highest rate both held."""
+    share = best[server]["spans"] / best[twin]["spans"] * percent
+    if climb.apart(best[server], above[server], best[twin], above[twin]):
+        line = f"{names[server]} holds {share:.0f}% of {twin}'s spans a second"
+    else:
+        line = f"{names[server]} and {twin} hold rates the climb cannot tell apart ({share:.0f}%)"
+    rate = climb.common_rate(steps[server], steps[twin])
+    if rate is None:
+        return line + "."
+    mine, theirs = climb.at(steps[server], rate), climb.at(steps[twin], rate)
+    return (line + f". At {rate * spans_per_rate:,.0f} spans a second, which both held, it spends {mine['cpu']:.2f} µs "
+            f"of CPU a span to its {theirs['cpu']:.2f}, {(mine['cpu'] / theirs['cpu'] - 1) * percent:+.0f}%.")
+
+
+best, above = {}, {}
 for server in servers:
-    step, verdict = held(server)
+    step, failed, verdict = climb.held(steps.get(server, []))
     if step is None:
-        print(f"| {names[server]} | none | | | | | | | {ended_by.get(verdict, verdict)} |")
+        print(f"| {names[server]} | none | | | | | | | | {ended_by.get(verdict, verdict)} |")
         continue
-    best[server] = step
-    print(f"| {names[server]} | {step['spans']:,.0f} | {step['calls']:,.0f} | {step['p50']:.2f} | {step['p99']:.2f} | "
+    best[server], above[server] = step, failed
+    gap = climb.resolution(step, failed)
+    print(f"| {names[server]} | {step['spans']:,.0f} | {'' if gap is None else f'+{gap * percent:.1f}%'} | "
+          f"{step['calls']:,.0f} | {step['p50']:.2f} | {step['p99']:.2f} | "
           f"{step['busy'] * percent:.0f}% | {step['cpu']:.2f} | {memory.get(server, 0):.0f} | "
           f"{ended_by.get(verdict, verdict)} |")
 print()
@@ -109,8 +98,7 @@ if "connect-zig" in best:
             print(f"- connect-zig holds {zig / best[server]['spans']:.2f} times {names[server]}'s spans a second on one core.")
     for server, twin in validating:
         if server in best and twin in best:
-            print(f"- {names[server]} holds {best[server]['spans'] / best[twin]['spans'] * percent:.1f}% of {twin}'s spans "
-                  f"a second, at p99 {best[server]['p99']:.2f} ms to its {best[twin]['p99']:.2f}.")
+            print(f"- {validation_line(server, twin)}")
     carried = ", ".join(f"{names[server]} {best[server]['spans'] * gateway_cores / fleet_servers:,.0f}" for server in servers if server in best)
     print(f"- At {gateway_cores} cores, the spans a second each server carries for each of the {fleet_servers:,} servers: {carried}.")
     print()

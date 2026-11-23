@@ -1102,6 +1102,13 @@ first. Cite an entry by number in code and commits ("decision 6").
       holds is known within 1/16 of it. Before, a ratio of two servers' rates could be off by
       half: Vector held 71,200 spans a second and failed 106,800. A step after a failure waits
       5 s for the server's queue to empty.
+    - Amended on 2026-11-23, ruled by the owner: five halvings, not three, so a rate is known
+      within 1/64 of it, between 0.6% and 1.6% of the rate held. Three left a gap of 2.5% to
+      6.2%, wider than a cost of a few percent, such as validation's or a coding's. The report
+      gives each server's gap as its resolution, and the chart draws it as a whisker. A cost is
+      compared as CPU a span at the highest rate both servers held: a span costs less CPU as
+      the rate rises, 2.25 µs on connect-zig at 35,600 spans a second and 1.36 µs at 712,000 in
+      run 243.
     - Amended on 2026-11-17: the `fullstack` and `bench-compare` checks draw the README's charts
       from their own output, and CI keeps them with the run for 90 days, as `charts-<check>-<arch>`.
       A person copies a chosen run's charts to `docs/images`, so the README still names one run.
@@ -1187,3 +1194,11 @@ first. Cite an entry by number in code and commits ("decision 6").
       brotli with andybalholm/brotli, and connect-rust brotli with the `brotli` crate, since
       neither library holds those codings. Beaten: the Collector and Vector in the compression
       checks, which would hold each job past 90 minutes.
+    - The compression checks send the production model's exports at peak too: the peak's own
+      export repeats its values, compresses 14.7 times where the production model's compresses
+      7.5, and so gives a decoder less work than real spans do. Each round of the peak rotates the
+      order of the codings and the receivers, and each receiver climbs its codings in an order of
+      its own, so a runner that slows over a job does not always slow the same coding. Each
+      coding is drawn as a share of the same receiver uncompressed, net of the TLS and HTTP/2 a
+      smaller export saves. Beaten: one axis for the three libraries, on which connect-go's
+      costs hid the differences between connect-zig's codings.
