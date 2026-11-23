@@ -68,7 +68,8 @@ confirm a test fails. Report `CAUGHT` or `NOT CAUGHT` per mutation in the commit
   the same limit (decision 49).
 - A file stays at or under 500 lines, its tests included. Generated `.pb.zig` code is one file per
   .proto file, whatever its length, and keeps every other limit, cognitive complexity included
-  (decision 17).
+  (decision 17). The Python, Go, Rust, and JavaScript of `bench/` and `tools/` keep the same 500
+  lines (decision 49).
 - Every number beyond 0 and 1 has a name: a constant in its module's `constants.zig`, a `const`
   of its own, or a member of an enum such as a message's `FieldNumber`.
 - Write prose in active voice with plain words: short sentences, one idea each, no metaphors.
@@ -101,8 +102,9 @@ confirm a test fails. Report `CAUGHT` or `NOT CAUGHT` per mutation in the commit
 - Lint: `zig build lint`: the cognitive-complexity score, then the rules of `tools/lint/main.zig`:
   heap, io, determinism, layering, unbounded-loop, file-length, markdown, relative-import,
   magic-numbers, global-state, static-alignment, defer-order, undefined-fill, unreleased-acquire, and
-  denied-words, all from pepegrillo. The rule state-fill is this tree's own: a program takes its
-  `State` from `rawAlloc` (decision 48). The rules read `conformance/` as they read `examples/`, and
+  denied-words, all from pepegrillo. file-length-scripts is pepegrillo's file-length again, over
+  the Python, Go, Rust, and JavaScript of `bench/` and `tools/` (decision 49). The rule state-fill
+  is this tree's own: a program takes its `State` from `rawAlloc` (decision 48). The rules read `conformance/` as they read `examples/`, and
   each `gen/` as generated code; `conformance/proto` holds connectrpc's copy and
   protobuf's test protos, which denied-words skips, as it skips protovalidate's schemas in
   `src/protovalidate/proto` and `conformance/protovalidate`. `zig build test` also requires `.githooks/pre-push` to equal pepegrillo's

@@ -78,6 +78,19 @@ pub const file_length = rules.file_length.Rule(.{
     .message_suffix = "; split the file",
 });
 
+/// Decision 49: the Python, Go, Rust, and JavaScript of `bench/` and `tools/` keep the same 500
+/// lines. A generator writes each `gen/`, and a build or an install fills `target/`,
+/// `node_modules/`, `__pycache__/`, and a virtual environment, so the rule skips them.
+pub const file_length_scripts = rules.file_length.Rule(.{
+    .name = "file-length-scripts",
+    .scope = .{
+        .extensions = &.{ ".py", ".go", ".rs", ".js", ".mjs" },
+        .include_directories = &.{ "bench", "tools" },
+        .exclude_directories = &.{ "gen", "target", "node_modules", "__pycache__", ".venv" },
+    },
+    .message_suffix = "; split the file",
+});
+
 /// CLAUDE.md, Conventions: a module reaches another by the name the build gives it. Inside `src/`
 /// a file stays in its module's directory; elsewhere no path climbs with `../`.
 pub const relative_import = rules.relative_import.Rule(.{
@@ -180,7 +193,7 @@ pub const state_fill = @import("state_fill.zig").Rule(.{
 const Linter = lint.Linter(.{
     heap,        io,              determinism,             unbounded_loop, file_length,  markdown,
     layering,    relative_import, relative_import_outside, magic_numbers,  global_state, static_alignment,
-    defer_order, undefined_fill,  unreleased_acquire,      denied_words,   state_fill,
+    defer_order, undefined_fill,  unreleased_acquire,      denied_words,   state_fill,   file_length_scripts,
 });
 
 pub fn main(init: std.process.Init) !void {
@@ -192,6 +205,37 @@ const harness = lint.harness;
 
 test {
     _ = @import("state_fill.zig");
+}
+
+/// A source of `count` lines, each `x = 1`, in the arena.
+fn lines_of(arena: std.mem.Allocator, count: usize) ![:0]const u8 {
+    var source: std.ArrayList(u8) = .empty;
+    for (0..count) |_| try source.appendSlice(arena, "x = 1\n");
+    return source.toOwnedSliceSentinel(arena, 0);
+}
+
+test "the file-length rule reads the scripts of bench and tools, at 500 lines" {
+    var arena_state = std.heap.ArenaAllocator.init(testing.allocator);
+    defer arena_state.deinit();
+    const arena = arena_state.allocator();
+    const over = try lines_of(arena, 501);
+    const at = try lines_of(arena, 500);
+    try testing.expectEqual(1, (try harness.run(arena, file_length_scripts, "tools/fullstack/climb.py", over)).len);
+    try testing.expectEqual(1, (try harness.run(arena, file_length_scripts, "bench/go/main.go", over)).len);
+    try testing.expectEqual(1, (try harness.run(arena, file_length_scripts, "tools/fullstack/load/src/main.rs", over)).len);
+    try testing.expectEqual(1, (try harness.run(arena, file_length_scripts, "bench/validate/node/main.js", over)).len);
+    try testing.expectEqual(0, (try harness.run(arena, file_length_scripts, "tools/fullstack/climb.py", at)).len);
+}
+
+test "the file-length rule skips generated code, builds, and the interop clients" {
+    var arena_state = std.heap.ArenaAllocator.init(testing.allocator);
+    defer arena_state.deinit();
+    const arena = arena_state.allocator();
+    const over = try lines_of(arena, 501);
+    try testing.expectEqual(0, (try harness.run(arena, file_length_scripts, "bench/go/gen/bench/v1/bench.pb.go", over)).len);
+    try testing.expectEqual(0, (try harness.run(arena, file_length_scripts, "bench/rust/target/release/build/out.rs", over)).len);
+    try testing.expectEqual(0, (try harness.run(arena, file_length_scripts, "bench/validate/node/node_modules/a.js", over)).len);
+    try testing.expectEqual(0, (try harness.run(arena, file_length_scripts, "interop/connect-rust/src/main.rs", over)).len);
 }
 
 test "the heap rule refuses an allocator in the library and not in the plugin" {

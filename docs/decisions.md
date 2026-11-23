@@ -1293,8 +1293,8 @@ first. Cite an entry by number in code and commits ("decision 6").
       one, and gives each cell the median round. Beaten: one run of each language after the other,
       on which a runner that drifts slows the last.
 
-49. **The Python, Go, Rust, and JavaScript of `bench/` and `tools/` keep cognitive complexity 15.**
-    Asked for by the owner on 2026-11-23.
+49. **The Python, Go, Rust, and JavaScript of `bench/` and `tools/` keep cognitive complexity 15
+    and files of 500 lines.** Asked for by the owner on 2026-11-23.
     - `zig build lint` holds each Zig function to 15, in `bench/` and `tools/` too. The programs
       and scripts that run the benchmarks and the checks are in four more languages, and no check
       read them. Eleven functions were over 15: a chart's reader scored 35, and the Go validation
@@ -1307,6 +1307,10 @@ first. Cite an entry by number in code and commits ("decision 6").
       it. `tools/complexity/top_level.py` refuses control flow there, and each script runs its work
       from `main()`.
     - No tool scores a shell script, so ShellCheck alone reads them (`tools/scripts_check.sh`).
+    - Each file of the four languages keeps 500 lines too. `zig build lint` runs pepegrillo's
+      file-length rule over them a second time, as `file-length-scripts`, beside its first run
+      over the Zig and the shell scripts. It skips each `gen/`, and the `target/`, `node_modules/`,
+      `__pycache__/`, and virtual environment that a build or an install fills.
     - Beaten: clippy's `cognitive_complexity` lint, which scored 7 for a Rust function that the
       other tools score 17 and 18 in their languages, and which needs each crate built with its
       descriptor sets and protoc. Ruff's rule C901, which counts paths and not nesting. The clients
