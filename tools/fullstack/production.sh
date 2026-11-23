@@ -80,14 +80,17 @@ production_step() {
     echo "fullstack: production, ${transport}, $1, ${step_rate} a connection a second" >&2
     before="$(cpu_ticks "${server_pid}")"
     load_before="$(load_ticks)"
+    started_ns="$(date +%s%N)"
     production_load "$1" "${step_rate}"
+    ended_ns="$(date +%s%N)"
     after="$(cpu_ticks "${server_pid}")"
     load_after="$(load_ticks)"
     set -- $(python3 tools/fullstack/production_step.py "${work}" "${warm_seconds}" \
         "${step_seconds}" "${p99_limit_ms}" "${step_rate}" "${load_before}" "${load_after}" \
         ${production_classes})
     sent=$((sent + $1))
-    echo "step ${transport} ${server} ${step_rate} $* $((after - before))"
+    # The step's wall time, in milliseconds, over which the server's CPU ticks count.
+    echo "step ${transport} ${server} ${step_rate} $* $((after - before)) $(((ended_ns - started_ns) / 1000000))"
     verdict="$7"
 }
 
@@ -103,6 +106,7 @@ production_climb() {
         sent=$((sent + ${class%%:*}))
     done
     probe_refused "${server}" || { stop; return 1; }
+    [ "${transport}" = tls ] && echo "suite ${transport} ${server} $(negotiated_suite "${server}")"
     passed="" failed=""
     for rate in ${production_steps}; do
         production_step "${server}" "${rate}"

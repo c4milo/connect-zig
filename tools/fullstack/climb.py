@@ -4,10 +4,12 @@ A climb's results hold a line for each step of each server: "step", the transpor
 the exports a connection a second, the spans of the calls answered 200, the measured calls a
 second and spans a second, p50 and p99 in milliseconds, the measured calls refused, the verdict,
 the calls refused in the step's first seconds, which the measure leaves out, the share of the
-load's cores that was busy, -1 with no core pinned, and the server's CPU ticks over the step. A line "memory" gives the transport, the server and its peak
-memory in KiB.
+load's cores that was busy, -1 with no core pinned, the server's CPU ticks over the step, and the
+step's wall time in milliseconds. A line "memory" gives the transport, the server and its peak
+memory in KiB, and a line "suite" the transport, the server and the TLS 1.3 suite it chose.
 """
 microseconds = 1_000_000
+milliseconds = 1000
 kib = 1024
 
 
@@ -25,14 +27,29 @@ def read(path, transport, ticks, seconds):
         if fields[0] == "memory":
             memory[server] = int(fields[3]) / kib
             continue
-        rate, taken, calls, spans, p50, p99, refused, verdict, warm_refused, load, cpu = fields[3:14]
+        if fields[0] != "step":
+            continue
+        rate, taken, calls, spans, p50, p99, refused, verdict, warm_refused, load, cpu, wall_ms = fields[3:15]
         steps.setdefault(server, []).append({
             "rate": float(rate), "taken": int(taken), "calls": float(calls), "spans": float(spans),
             "p50": float(p50), "p99": float(p99), "refused": int(refused), "verdict": verdict,
             "warm_refused": int(warm_refused), "load": float(load),
-            "busy": int(cpu) / ticks / seconds, "cpu": int(cpu) * microseconds / ticks / max(int(taken), 1),
+            # The share of a core over the step's measured wall time, which passes its nominal
+            # seconds by oha's start and end.
+            "busy": int(cpu) / ticks / max(int(wall_ms) / milliseconds, seconds),
+            "cpu": int(cpu) * microseconds / ticks / max(int(taken), 1),
         })
     return servers, steps, memory
+
+
+def suites(path, transport):
+    """The TLS 1.3 suite each server chose, by server, from the lines of `transport`."""
+    found = {}
+    for line in open(path):
+        fields = line.split()
+        if len(fields) == 4 and fields[0] == "suite" and fields[1] == transport:
+            found[fields[2]] = fields[3]
+    return found
 
 
 def held(steps):

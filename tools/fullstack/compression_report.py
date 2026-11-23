@@ -199,8 +199,13 @@ print(f"answers. Each cell is the median of {rounds} rounds, and each round rota
 print()
 write_peak()
 print(f"Machine: {machine()}.")
-security = f"{suite}; " if transport == "tls" else ""
-print(f"Load: {h2load} and {oha}, {security}{placement}.")
+security = f" with {suite}" if transport == "tls" else ""
+print(f"Load: {h2load}{security} and {oha}, {placement}.")
+# oha can pin no suite: each receiver's is the one it chose before its uncompressed climb.
+chosen = climb.suites(os.path.join(work, "compression-climb-identity"), transport)
+if chosen:
+    print("TLS 1.3 suites of the climb, as each receiver chose from an offer in the order of oha's TLS library, "
+          "rustls 0.23: " + ", ".join(f"{server} {chosen[server]}" for server in servers if server in chosen) + ".")
 print(f"Servers: connect-zig {commit} in ReleaseSafe, `otlp-sink-compression`, which holds more calls at once than the other parts' sink, "
       f"on stdx's decoders; {connect_go}, GOMAXPROCS=1, "
       f"on compress/gzip, klauspost/compress and andybalholm/brotli; {connect_rust}, one tokio worker, on flate2, zstd "

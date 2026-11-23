@@ -134,8 +134,8 @@ call waits in a queue. Each step lasts 10 s, and its measure leaves out the firs
 handshakes run. The rate climbs until p99 passes 100 ms, a call is refused, or the server takes
 less than 95% of the spans sent. Then five more steps halve the gap to the last step that passed.
 A bar's whisker reaches the step that failed: it gives the climb's step, not the spread of the rate
-between runs, which the limits below give. oha runs on two cores of its own, and the server on a
-third that oha never uses. A step that fails while oha's two cores were 90% busy or more ends the
+between runs, which the limits below give. oha runs on two CPUs of its own, and the server on a
+CPU that shares no physical core with them (`tools/fullstack/placement.py`). A step that fails while oha's two cores were 90% busy or more ends the
 climb on the load, not on the server: oha corrects its latency for each call it sends late, so a
 load that falls behind would show as the server's p99. The rate held is then a floor. The share
 counts all the work on oha's cores, the kernel's for the traffic oha sends included. CI's two
@@ -200,7 +200,14 @@ Read these numbers with their limits:
   refused 88 calls in those 2 s, and none after. The 2 s window came after run 248, whose climbs of
   connect-zig ended on such refusals. A load that kept its connections open across steps would need
   no such window.
-- Run 256 ran before the check of oha's cores, so its steps did not measure them.
+- Run 256 ran before the check of oha's cores, so its steps did not measure them. It also pinned
+  the server to CPU 1 and oha to CPUs 2 and 3 without reading which CPUs share a physical core. An
+  x86-64 runner with two threads a core may have run the server and a thread of oha on one core.
+  From the next run the pins follow Linux's CPU topology, and the machine line gives the threads of
+  a core.
+- oha can pin no TLS suite, and Go's server cannot be told one, so each server chose its own from
+  oha's offer. Go's servers likely chose AES-128-GCM, and connect-zig's sink and rustls's
+  AES-256-GCM. From the next run each report names the suite each server chose.
 - In run 256, connect-zig's sink was built for the machine's own CPU, and connect-go,
   connect-rust and the other servers for their architecture's generic CPU. From the next run,
   connect-go and connect-rust are built for the machine's CPU too: Go at the highest level of the

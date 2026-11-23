@@ -132,7 +132,12 @@ for rate in rates:
     print(f"| {rate:g} | {rate * spans_per_rate:,.0f} | " + " | ".join(cells) + " |")
 print()
 print(f"Machine: {machine()}.")
-security = f"{suite}; " if transport == "tls" else ""
-print(f"Load: {oha}, {security}{placement}.")
+print(f"Load: {oha}, {placement}.")
+# oha can pin no suite, so each server's suite is the one it chose, which tools/fullstack/servers.sh
+# asks it for before its climb (the argument <suite> is h2load's, at the peak).
+chosen = climb.suites(results, transport)
+if chosen:
+    print("TLS 1.3 suites, as each server chose from an offer in the order of oha's TLS library, rustls 0.23: "
+          + ", ".join(f"{names.get(server, server)} {chosen[server]}" for server in servers if server in chosen) + ".")
 print(f"Servers: connect-zig {commit} in ReleaseSafe, `tools/otlp_sink`; "
       + "; ".join(setups[server] for server in servers if server in setups) + ".")

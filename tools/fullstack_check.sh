@@ -89,14 +89,22 @@ connect_rust_port=14324
 connect_rust_count_port=18892
 counter_port=14390
 counter_metrics_port=18890
-# The server on core 1 and the load on cores 2 and 3, where the machine has 4.
-cores_needed=4
-if [ "$(nproc)" -ge "${cores_needed}" ]; then
-    server_pin="taskset -c 1" load_pin="taskset -c 2,3" load_cores="2,3" load_threads=2
-    placement="each server on core 1, the load on cores 2 and 3"
+# The server and the load on separate physical cores, where the machine has 4 CPUs, from Linux's
+# CPU topology (tools/fullstack/placement.py).
+cpus_needed=4
+read -r server_cpu load_cpus core_threads <<PLACEMENT
+$(python3 tools/fullstack/placement.py)
+PLACEMENT
+if [ "${server_cpu}" != - ]; then
+    server_pin="taskset -c ${server_cpu}" load_pin="taskset -c ${load_cpus}" load_cores="${load_cpus}" load_threads=2
+    if [ "${core_threads}" -gt 1 ]; then
+        placement="each server on CPU ${server_cpu}, which shares its core with CPU 0, where the scripts run; the load on CPUs ${load_cpus}, the ${core_threads} threads of another core"
+    else
+        placement="each server on core ${server_cpu}, the load on cores ${load_cpus}"
+    fi
 else
     server_pin="" load_pin="" load_cores="" load_threads=1
-    placement="no core pinned: the machine has fewer than ${cores_needed}"
+    placement="no core pinned: the machine has fewer than ${cpus_needed} CPUs"
 fi
 
 # Downloads a release into the cache once, checked by its SHA-256, and prints the program's path.
