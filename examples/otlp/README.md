@@ -24,7 +24,7 @@ back, then compares each span with the one the SDK ended, field by field.
 | [proto/otlpstore/v1/otlpstore.proto](proto/otlpstore/v1/otlpstore.proto) | `SpanStore`, which reads back what the receiver kept |
 | [src/service/service.zig](src/service/service.zig) | `Export` and `Received`, over any program's `App` |
 | [src/app.zig](src/app.zig) | This example's `App` and route table |
-| [src/main.zig](src/main.zig) | The check: a checkout trace of three spans, exported and read back over h2, h11 and h3 |
+| [src/main.zig](src/main.zig) | The check: a checkout trace of three spans, exported and read back over h2, h11, and h3 |
 | [src/serve.zig](src/serve.zig) | The receiver on a socket, for an SDK's exporter |
 
 ## Run it

@@ -7,10 +7,10 @@
 [![Line coverage: 97.7%](https://img.shields.io/badge/line_coverage-97.7%25-brightgreen.svg)](https://github.com/c4milo/connect-zig/actions/runs/44007655863)
 
 **[Connect RPC](https://connectrpc.com/) for Zig.** Write a `.proto` file, run `buf generate`,
-and serve the same handlers to Connect, gRPC and gRPC-Web clients, in binary protobuf or JSON.
+and serve the same handlers to Connect, gRPC, and gRPC-Web clients, in binary protobuf or JSON.
 
 - **Conformant.** It passes [connectrpc's conformance suite](https://github.com/connectrpc/conformance)
-  v1.0.7 in Connect, gRPC and gRPC-Web: all 3,714 server cases and all 10,711 client cases.
+  v1.0.7 in Connect, gRPC, and gRPC-Web: all 3,714 server cases and all 10,711 client cases.
 - **No allocator in the library.** Every buffer is yours, and every size is a constant you can
   read.
 - **Few copies.** Decoded strings and bytes point into the input. A repeated field is read once,
@@ -21,7 +21,7 @@ and serve the same handlers to Connect, gRPC and gRPC-Web clients, in binary pro
   many spans a second as one built on connect-go, and 2.7 times as many as one built on
   connect-rust. See [Performance](#performance).
 - **HTTP from [colibri](https://github.com/c4milo/colibri).** Servers and clients run over
-  HTTP/1.1, HTTP/2 and HTTP/3, which colibri and this README call h11, h2 and h3, in cleartext or
+  HTTP/1.1, HTTP/2, and HTTP/3, which colibri and this README call h11, h2, and h3, in cleartext or
   over TLS.
 
 ## Try it
@@ -49,7 +49,7 @@ curl --cacert examples/harness/tls/ca.pem --json '{"sentence":"I feel tired"}' \
 
 If you have the [Buf CLI](https://buf.build/docs/cli/), call the same server with
 [`buf curl`](https://buf.build/docs/reference/cli/buf/curl) in any protocol. Set `--protocol` to
-`connect`, `grpc` or `grpcweb`, and add `--http3` to call it over h3:
+`connect`, `grpc`, or `grpcweb`, and add `--http3` to call it over h3:
 
 ```sh
 buf curl --cacert examples/harness/tls/ca.pem --protocol grpc --schema examples/eliza/proto \
@@ -63,7 +63,7 @@ connect-zig has six parts:
 | Module | What it does |
 | --- | --- |
 | `protobuf` | The binary encoding and the proto3 JSON mapping, over generated structs. |
-| `connect` | The Connect, gRPC and gRPC-Web rules, as functions over headers and bytes. |
+| `connect` | The Connect, gRPC, and gRPC-Web rules, as functions over headers and bytes. |
 | `connect_colibri` | Routes for colibri's server, and calls for colibri's client. Programs import it as `rpc`. |
 | `protovalidate` | Checks a message against the [protovalidate](https://github.com/bufbuild/protovalidate) rules of its schema. |
 | `oidc` | Checks an OpenID Connect bearer token, with a server interceptor that requires one. |
@@ -76,7 +76,7 @@ Each protocol supports the same features, except Unary GET:
 | Server: unary, all streams | ✅ | ✅ | ✅ |
 | Client: unary, all streams | ✅ | ✅ | ✅ |
 | Proto and JSON codecs | ✅ | ✅ | ✅ |
-| gzip, zstd and brotli both ways | ✅ | ✅ | ✅ |
+| gzip, zstd, and brotli both ways | ✅ | ✅ | ✅ |
 | Unary GET for `NO_SIDE_EFFECTS` | ✅ | n/a[^get] | n/a[^get] |
 | Full-duplex bidirectional streams, server and client, over h2 and h3[^duplex] | ✅ | ✅ | ✅ |
 | Interceptors, server and client | ✅ | ✅ | ✅ |
@@ -87,15 +87,15 @@ Each protocol supports the same features, except Unary GET:
 [^duplex]: Over h11 a stream is half-duplex: the whole request goes before the response is read.
 
 The protobuf runtime covers every scalar type, `optional`, packed and unpacked repeated fields,
-maps, oneofs, enums, recursive messages and every well-known type with its JSON form. It reads
-proto2, proto3 and editions 2023 and 2024. A message keeps the fields its schema does not know,
+maps, oneofs, enums, recursive messages, and every well-known type with its JSON form. It reads
+proto2, proto3, and editions 2023 and 2024. A message keeps the fields its schema does not know,
 and writes them back.
 
 ## Quick start
 
 [examples/quickstart](examples/quickstart) holds these steps as a project you can copy.
 [docs/guide.md](docs/guide.md) explains each step in full: the handler of each stream type,
-interceptors, route options, TLS and the client.
+interceptors, route options, TLS, and the client.
 
 ### 1. Add the package
 
@@ -149,7 +149,7 @@ Run `zig build plugin`, then `buf generate`, then `zig build`. Each `.proto` fil
 
 ### 3. Write a handler
 
-A handler takes the call's context, its request and its response. It fills the response and
+A handler takes the call's context, its request, and its response. It fills the response and
 returns `null`, or returns the error the client reads:
 
 ```zig
@@ -184,7 +184,7 @@ memory the router holds.
 ### 5. Call it
 
 A client call is a `connect_colibri.ClientCall(method, .{})`. Its `.protocol` option picks
-Connect, gRPC or gRPC-Web, and the rest of the call stays the same. In this example, `pool` is
+Connect, gRPC, or gRPC-Web, and the rest of the call stays the same. In this example, `pool` is
 colibri's client connection pool, and `buffers` and `storage` are memory that your program owns.
 [docs/guide.md](docs/guide.md) shows how to set up each one:
 
@@ -197,7 +197,7 @@ const answer = try response.next(eliza.SayResponse);
 ```
 
 [examples/](examples) holds twelve projects to copy, from generated messages to streaming,
-interceptors, error details, bearer tokens and an OpenTelemetry trace receiver.
+interceptors, error details, bearer tokens, and an OpenTelemetry trace receiver.
 
 ## Validate requests
 
@@ -241,7 +241,7 @@ what stops the build, and the limits.
 
 ## Require a bearer token
 
-The `oidc` module checks a JWT that an OpenID Connect provider signed with RS256, ES256 or
+The `oidc` module checks a JWT that an OpenID Connect provider signed with RS256, ES256, or
 EdDSA. It does no I/O and reads no clock: your program fetches the provider's keys and passes
 them, with the time. One interceptor requires a valid token on every method but those you
 exclude:
@@ -261,7 +261,7 @@ generator runs on another core of the same machine, over its loopback device. Ea
 highest rate a server held with its 99th-percentile latency (p99) under 100 ms. The bar is the
 median of three rounds, and its whisker spans the three:
 
-![Bars of the spans a second one core holds with p99 under 100 ms over TLS, the median of three rounds with their range, and lines of p99 as the rate climbs, on arm64: connect-zig holds 711,570 spans a second, 7.0 times connect-go's 101,213, 2.7 times connect-rust's 263,440, 3.3 times the OpenTelemetry Collector's 215,818 and 8.6 times Vector's 82,310](docs/images/fullstack-arm64.svg)
+![Bars of the spans a second one core holds with p99 under 100 ms over TLS, the median of three rounds with their range, and lines of p99 as the rate climbs, on arm64: connect-zig holds 711,570 spans a second, 7.0 times connect-go's 101,213, 2.7 times connect-rust's 263,440, 3.3 times the OpenTelemetry Collector's 215,818, and 8.6 times Vector's 82,310](docs/images/fullstack-arm64.svg)
 
 These results come from an Arm Neoverse-N2 core in CI. The first three come from
 [run 266](https://github.com/c4milo/connect-zig/actions/runs/45246119951), and the last two from
@@ -278,7 +278,7 @@ These results come from an Arm Neoverse-N2 core in CI. The first three come from
 - **Compression.** Over TLS, a gzip or zstd export costs connect-zig 5% less CPU a span than an
   uncompressed one, because the smaller export saves more TLS work than decompression costs. In
   cleartext, with no TLS work to save, it costs 7% to 9% more.
-- **A routed unary call.** A call through connect-zig's router, protocol and codec, in memory, is
+- **A routed unary call.** A call through connect-zig's router, protocol, and codec, in memory, is
   9.6 to 12.4 times as fast as connect-go's and 3.3 to 5.6 times as fast as connect-rust's.
 - **The codec.** connect-zig encodes and decodes protobuf messages 3.2 to 18.9 times as fast as
   Go's protobuf runtime.
@@ -289,13 +289,13 @@ is measured, and the limits of each.
 ## How it is tested
 
 - [connectrpc's conformance suite](https://github.com/connectrpc/conformance): all 3,714 server
-  cases over h11 and h2, and all 10,711 client cases over h11, h2 and h3.
+  cases over h11 and h2, and all 10,711 client cases over h11, h2, and h3.
 - [Google's protobuf conformance suite](https://github.com/protocolbuffers/protobuf/tree/main/conformance):
   5,707 cases pass. A list in the repository names each of the 35 cases that fail, with its
   reason.
 - [protovalidate's conformance suite](https://github.com/bufbuild/protovalidate/blob/main/docs/conformance.md):
   all 2,872 cases.
-- Clients and servers in Go, TypeScript, Python and Rust call connect-zig, and connect-zig calls
+- Clients and servers in Go, TypeScript, Python, and Rust call connect-zig, and connect-zig calls
   them, in every protocol.
 - Mutation tests: each check in the library was broken on purpose, and a test failed each time.
 

@@ -6,7 +6,7 @@ connect-rust with protovalidate-buffa (`tools/fullstack_check.sh`). OpenTelemetr
 schema holds no rules, so this folder holds a copy of the four files of `examples/otlp/proto`,
 from [opentelemetry-proto](https://github.com/open-telemetry/opentelemetry-proto) v1.11.1, under
 the Apache 2.0 license in [LICENSE](proto/opentelemetry/LICENSE). Two of them gain the rules that
-the OTLP specification states for a span. The fields, their numbers and their packages stay as
+the OTLP specification states for a span. The fields, their numbers, and their packages stay as
 OpenTelemetry wrote them, so each export's octets and the path of `Export` are the same.
 
 | Message | Field | Rule |

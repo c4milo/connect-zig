@@ -9,8 +9,8 @@ directories hold servers in those languages, which connect-zig's client calls in
 
 | Directory | Library | Protocols |
 | --- | --- | --- |
-| [go](go) | connect-go and grpc-go | Connect, gRPC and gRPC-Web from connect-go; gRPC from grpc-go |
-| [typescript](typescript) | connect-es on Node | Connect, gRPC and gRPC-Web |
+| [go](go) | connect-go and grpc-go | Connect, gRPC, and gRPC-Web from connect-go; gRPC from grpc-go |
+| [typescript](typescript) | connect-es on Node | Connect, gRPC, and gRPC-Web |
 | [python](python) | grpcio | gRPC |
 | [rust](rust) | tonic | gRPC |
 | [connect-rust](connect-rust) | connect-rust's `connectrpc` on Buffa | Connect in proto and JSON, over h2 and HTTP/1.1, with GET; gRPC and gRPC-Web |
@@ -45,7 +45,7 @@ JSON over grpcio, is not printed.
 
 ## The scenarios
 
-Each client runs every scenario in each protocol, codec and compression its library speaks. Two
+Each client runs every scenario in each protocol, codec, and compression its library speaks. Two
 messages are the same when the client's runtime writes the same octets for both, with its
 deterministic option where it has one; NaN rules out equality checks that compare floats.
 
@@ -63,7 +63,7 @@ deterministic option where it has one; NaN rules out equality checks that compar
 ## What connect-rust leaves out
 
 The connect-rust client runs Connect in proto over h2 (`connect-proto`), in JSON over h2
-(`connect-json`) and in proto over HTTP/1.1 (`connect-h1`), then gRPC and gRPC-Web over h2. It
+(`connect-json`), and in proto over HTTP/1.1 (`connect-h1`), then gRPC and gRPC-Web over h2. It
 leaves out these scenarios, which its library cannot express:
 
 - `chat` over HTTP/1.1. No response arrives until the upload completes, so a bidirectional stream
@@ -125,7 +125,7 @@ connect-zig's own server of `tools/interop_server/interop.zig` does:
 
 ### What the client runs
 
-The client takes the server's name, its origin, the cases, the CA and the runs it speaks:
+The client takes the server's name, its origin, the cases, the CA, and the runs it speaks:
 
 ```sh
 zig-out/bin/interop-client [--leave-out=<protocol>/<scenario>]... <server> <base-url> <cases-dir> <ca> <protocol>...
@@ -167,7 +167,7 @@ interop/otel/run.sh <base-url> <ca>
 The SDK's gRPC exporter sends a small trace, with gzip, over TLS under the test CA. The tracer
 provider also records each span in memory, as the SDK ended it. The program then calls
 `otlpstore.v1.SpanStore/Received`, and compares each span with the receiver's copy: its IDs, its
-parent, its name, its kind, its times, every attribute kind the API has, its events, its links
+parent, its name, its kind, its times, every attribute kind the API has, its events, its links,
 and its status. It prints one line for each check, in the format of the other clients:
 
 ```text

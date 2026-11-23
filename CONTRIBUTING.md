@@ -24,12 +24,12 @@ zig build test
 ```
 
 `zig build hooks` points git at `.githooks`, which checks commit messages. `zig build test` runs
-the lint first, then every module's tests, the examples and the generated code. The first build
+the lint first, then every module's tests, the examples, and the generated code. The first build
 fetches the packages `build.zig.zon` pins: colibri and stdx, which the library links, and
 pepegrillo and Rotor, which the tooling and the examples use.
 
 Some checks need more, and each script in `tools/` names what it needs: buf for the generated
-code and interop, Go for the coverage and benchmark comparisons, node, python3 and cargo for the
+code and interop, Go for the coverage and benchmark comparisons, node, python3, and cargo for the
 clients in `interop/`, and valgrind for the performance gate. `tools/ci.sh` runs every check, as
 CI does, and [docs/testing.md](docs/testing.md) lists each one with its command.
 
@@ -45,7 +45,7 @@ CI does, and [docs/testing.md](docs/testing.md) lists each one with its command.
 - **Every spec rule is cited.** A check that exists because a spec requires it names the spec and
   the section in a comment on its line: the Connect protocol, gRPC's HTTP/2 and gRPC-Web
   documents, the protobuf encoding guide, and the proto3 JSON mapping.
-- **Peer input fails closed.** A malformed octet, a short buffer or a limit reached returns an
+- **Peer input fails closed.** A malformed octet, a short buffer, or a limit reached returns an
   error value. Assertions are for programmer error.
 - **Small pieces.** A function scores at most 15 on cognitive complexity, and a hand-written file
   stays at or under 500 lines, tests included. Split rather than raise a limit.
@@ -63,9 +63,9 @@ body. A `NOT CAUGHT` means a test is missing, so write it.
 Commits are [Conventional Commits](https://www.conventionalcommits.org/):
 `type(scope): description`.
 
-- The type is one of `feat`, `fix`, `docs`, `test`, `refactor`, `perf`, `build`, `ci` or `chore`.
+- The type is one of `feat`, `fix`, `docs`, `test`, `refactor`, `perf`, `build`, `ci`, or `chore`.
 - The scope is one of `protobuf`, `connect`, `connect-colibri`, `oidc`, `protovalidate`,
-  `plugin`, `examples`, `build`, `ci` or `docs`.
+  `plugin`, `examples`, `build`, `ci`, or `docs`.
 - The description is imperative and lowercase, with no period, and the subject line fits in 72
   columns.
 - The body says why, in at most 4 paragraphs and 150 words, with lines of at most 100 columns.

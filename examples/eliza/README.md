@@ -7,7 +7,7 @@ connect-zig over colibri. It has one method of each kind:
 - `Introduce`, a server stream;
 - `Converse`, a bidirectional stream.
 
-![A terminal session: zig build run checks ELIZA over h2, h11 and h3, then zig build serve answers curl and buf curl](walkthrough.gif)
+![A terminal session: zig build run checks ELIZA over h2, h11, and h3, then zig build serve answers curl and buf curl](walkthrough.gif)
 
 ## Files
 
@@ -26,7 +26,7 @@ connect-zig over colibri. It has one method of each kind:
 zig build run
 ```
 
-The check runs three rounds, over h2, h11 and h3, in one process. In each round one client calls
+The check runs three rounds, over h2, h11, and h3, in one process. In each round one client calls
 `Say` over Connect as a POST and as a GET, `Introduce` over gRPC-Web and gRPC, `Converse` over
 Connect with JSON, and `Say` with an empty sentence over gRPC, which fails with
 `invalid_argument`. It exits with an error on a wrong answer, so `zig build test` runs the same.
@@ -37,8 +37,8 @@ Connect with JSON, and `Say` with an empty sentence over gRPC, which fails with
 zig build serve
 ```
 
-The server listens on port 8443 over TLS, h11 and h2 on TCP and h3 on UDP, under the examples'
-test identity. From the root of the repository:
+The server listens on port 8443 over TLS, under the examples' test identity: h11 and h2 on TCP,
+and h3 on UDP. From the root of the repository:
 
 ```sh
 curl --cacert examples/harness/tls/ca.pem --json '{"sentence":"I feel tired"}' \

@@ -1,11 +1,11 @@
 # connect-zig rules
 
-connect-zig is Connect RPC for Zig 0.16: a protobuf runtime, a protocol core for Connect, gRPC
+connect-zig is Connect RPC for Zig 0.16: a protobuf runtime, a protocol core for Connect, gRPC,
 and gRPC-Web, `connect_colibri` over colibri, `oidc` for OpenID Connect bearer tokens,
 `protovalidate` for the rules of a schema, and the protoc plugin `protoc-gen-connect-zig`.
 Home: github.com/c4milo/connect-zig.
 
-It follows the conventions of the libraries it builds on: colibri, stdx and pepegrillo. Read their
+It follows the conventions of the libraries it builds on: colibri, stdx, and pepegrillo. Read their
 `CLAUDE.md` before changing behaviour here.
 
 ## Read before changing behaviour
@@ -13,7 +13,7 @@ It follows the conventions of the libraries it builds on: colibri, stdx and pepe
 - `docs/design.md`: the module graph, the formats, and the numbered build plan (§8). Cite
   sections by number in commits and comments ("§8 step 4").
 - `docs/decisions.md`: numbered decisions, each with what it beat.
-- `docs/performance.md`, before a change to a hot path: the instruments, the admission rule and
+- `docs/performance.md`, before a change to a hot path: the instruments, the admission rule, and
   the pitfalls, beside pepegrillo's method, which `zig build guide` installs to `zig-out/docs`.
 - `docs/specs/`, before a change to the code that cites one of its files: each specification
   as its publisher wrote it, with its checksum. `docs/specs/cel/langdef.md` is the CEL language
@@ -71,6 +71,8 @@ confirm a test fails. Report `CAUGHT` or `NOT CAUGHT` per mutation in the commit
 - Every number beyond 0 and 1 has a name: a constant in its module's `constants.zig`, a `const`
   of its own, or a member of an enum such as a message's `FieldNumber`.
 - Write prose in active voice with plain words: short sentences, one idea each, no metaphors.
+- Use the serial comma, as Google's developer documentation style guide asks: "Connect, gRPC,
+  and gRPC-Web". Where a series holds commas of its own, split the sentence instead.
 - Every Markdown file renders on GitHub as written: real list markers, fenced code blocks with a
   language, pipes in a table cell escaped as `\|`.
 
@@ -84,20 +86,20 @@ confirm a test fails. Report `CAUGHT` or `NOT CAUGHT` per mutation in the commit
   100 columns.
 - Stage by explicit path. Never `git add -A` or `git add .`.
 - A commit message and a pull request description name no AI tool. They carry no `Co-Authored-By`
-  trailer for one, no `Claude-Session` trailer and no "Generated with" line. The repository's
+  trailer for one, no `Claude-Session` trailer, and no "Generated with" line. The repository's
   owner ruled it on 2026-11-21, and the rule overrides a tool or a harness that asks for one.
-- A comment, a review, a reply or an issue that a session posts on GitHub names no AI tool either.
+- A comment, a review, a reply, or an issue that a session posts on GitHub names no AI tool either.
   The one exception is a cloud session whose harness ends each comment with such a line: that
   session posts its comment with the line.
 
 ## Commands
 
 - Build: `zig build`. `-Drelease` builds ReleaseSafe.
-- Test: `zig build test` runs the lint, every module's tests, the examples and the check of the
+- Test: `zig build test` runs the lint, every module's tests, the examples, and the check of the
   generated code. `zig build test-<module>` runs one module's tests alone.
 - Lint: `zig build lint`: the cognitive-complexity score, then the rules of `tools/lint/main.zig`:
   heap, io, determinism, layering, unbounded-loop, file-length, markdown, relative-import,
-  magic-numbers, global-state, static-alignment, defer-order, undefined-fill, unreleased-acquire and
+  magic-numbers, global-state, static-alignment, defer-order, undefined-fill, unreleased-acquire, and
   denied-words, all from pepegrillo. The rules read `conformance/` as they read `examples/`, and
   each `gen/` as generated code; `conformance/proto` holds connectrpc's copy and
   protobuf's test protos, which denied-words skips, as it skips protovalidate's schemas in
@@ -117,7 +119,7 @@ confirm a test fails. Report `CAUGHT` or `NOT CAUGHT` per mutation in the commit
   Schema Registry, at the commit its `proto/buf.lock` pins. In a project's folder, run `zig
   build test --system ../../zig-pkg --cache-dir ../../.zig-cache`, never a plain `zig build`,
   which fetches 500 MB again. `zig build serve -- [port]` serves a project's service over TLS on
-  h11, h2 and h3. `zig build run-eliza-server --
+  h11, h2, and h3. `zig build run-eliza-server --
   [port]` serves every example's service on `colibri.Server` (`examples/socket_server`), and
   `zig build run-std-io-server -- [port]` serves ELIZA with no Rotor, on colibri's engine over
   `std.Io` (`examples/std_io`, decision 32); port 0 lets the kernel choose, and each server prints
@@ -129,10 +131,10 @@ confirm a test fails. Report `CAUGHT` or `NOT CAUGHT` per mutation in the commit
   takes the total from a named CI run.
 - Walkthroughs: `python3 tools/walkthrough/walkthrough.py [example...]` runs each example's README
   commands for real and renders the session with HyperFrames into `examples/<example>/
-  walkthrough.gif`, which the README embeds. It needs Node 22 or later, FFmpeg and Chrome.
+  walkthrough.gif`, which the README embeds. It needs Node 22 or later, FFmpeg, and Chrome.
 - Generated code: `zig build test-generated` compiles the examples' generated code and runs its
   round trips, and those of `tools/wide`: one message of 1,200 fields with rules, more than
-  the compiler's default branch quota, which holds the protobuf module, the plugin's table and
+  the compiler's default branch quota, which holds the protobuf module, the plugin's table, and
   `protovalidate` to a wide message.
   `python3 tools/wide/wide_proto.py` writes its schema.
   `tools/gen` holds the checks' generated code, from `tools/proto` (decision 41).
@@ -140,12 +142,12 @@ confirm a test fails. Report `CAUGHT` or `NOT CAUGHT` per mutation in the commit
   `--write` rewrites it. It needs buf, or `BUF` naming it. It builds the plugin alone, with
   `zig build plugin`, so generated code that no longer compiles does not stop it. The root's
   `buf.yaml` is the buf workspace of the schemas that import validate.proto from this tree:
-  `src/protovalidate/proto`, `conformance/protovalidate/proto`, `tools/wide/proto` and
+  `src/protovalidate/proto`, `conformance/protovalidate/proto`, `tools/wide/proto`, and
   `tools/fullstack/validate/proto`. Every other buf module stands alone.
-- Interop: `tools/interop_check.sh` calls the socket server with `buf curl` in Connect, gRPC and
+- Interop: `tools/interop_check.sh` calls the socket server with `buf curl` in Connect, gRPC, and
   gRPC-Web, over h2 and h3, with curl over h11 and h2, and with OpenTelemetry's Go SDK, which
   exports spans to the OTLP receiver and reads them back (decision 40), all over TLS with the
-  test CA, and checks that Chat answers full-duplex. It needs buf, curl, python3 and go.
+  test CA, and checks that Chat answers full-duplex. It needs buf, curl, python3, and go.
 - Benchmark: `zig build bench` times binary and JSON encode and decode, then, in a program of
   its own (`bench/call_main.zig`), a routed unary call of the small and the medium message in
   Connect and in gRPC, the small one also in tables of 16 and 256 routes, ReleaseFast;
@@ -160,17 +162,17 @@ confirm a test fails. Report `CAUGHT` or `NOT CAUGHT` per mutation in the commit
   and protovalidate-buffa and prost-protovalidate (`bench/validate/rust`) on the schema of
   `bench/validate/proto` and the messages of `bench/validate/cases`. It fails when two give one
   message different verdicts. Last it prints `zig build bench-validate -- --counters <dir>`: each
-  validation's cycles, instructions, branches and branch misses, through Linux's hardware
+  validation's cycles, instructions, branches, and branch misses, through Linux's hardware
   counters (`bench/counters.zig`), where the kernel lets a process count its own events.
   `tools/validate_chart.py` draws the chart of `docs/benchmarks.md` from its
   output, and `tools/ci.sh` runs it as `validate-compare`. `tools/generate_check.sh` holds
   `bench/validate/gen`; `bench/validate/go/buf.gen.yaml` says how the Go code is written. It
-  needs buf, go, node with npm and cargo; prost-protovalidate's build runs protoc, which
+  needs buf, go, node with npm, and cargo; prost-protovalidate's build runs protoc, which
   `PROTOC` names or the script downloads, pinned by SHA-256 (docs/benchmarks.md, "Validation").
 - Coverage: `tools/coverage_check.sh` compares every protobuf type with Go's runtime through
   `buf convert`, over the JSON cases in `tools/testdata/`, and the binary cases with upb's,
   Python's protobuf pinned in `tools/upb_requirements.txt`, for closed enums and unchecked
-  strings. It needs buf, jq and python3 with venv.
+  strings. It needs buf, jq, and python3 with venv.
 - Conformance: `tools/conformance_check.sh` runs connectrpc's conformance runner v1.0.7 against
   `zig build conformance-server`, with the features of `conformance/config.yaml`, then in client
   mode against `zig build conformance-client`, with those of `conformance/client_config.yaml`.
@@ -178,7 +180,7 @@ confirm a test fails. Report `CAUGHT` or `NOT CAUGHT` per mutation in the commit
   fails on purpose goes in `conformance/known_failing.txt` or `client_known_failing.txt`, with
   its reason; one that may fail goes in `client_known_flaky.txt`.
 - Protobuf conformance: `tools/protobuf_conformance_check.sh` runs Google's protobuf conformance
-  runner 37.0.0-rc1 against `zig build protobuf-testee`, in binary and JSON, for proto3, proto2
+  runner 37.0.0-rc1 against `zig build protobuf-testee`, in binary and JSON, for proto3, proto2,
   and edition 2023 (decision 38). It downloads the runner's npm package pinned by SHA-512,
   unless `PROTOBUF_CONFORMANCE` names a runner; the package holds one for x86-64 Linux and for
   macOS. A case that fails on purpose, or that does not pass yet, goes in
@@ -221,7 +223,7 @@ confirm a test fails. Report `CAUGHT` or `NOT CAUGHT` per mutation in the commit
   a message's verdict under a rule differs: valid, invalid with its message, a failure as the
   rule runs, or a rule that does not compile. `tools/cel_differential/known.txt` holds the
   differences that pass, each with its reason. `CEL_DIFFERENTIAL_RULES` and
-  `CEL_DIFFERENTIAL_MESSAGES` set a seed's size. It needs buf, python3 and go.
+  `CEL_DIFFERENTIAL_MESSAGES` set a seed's size. It needs buf, python3, and go.
 - CEL conformance: `tools/cel_conformance_check.sh` runs cel-spec's conformance suite at
   v0.25.3, the commit of `docs/specs/cel`, which it clones into a cache unless `CEL_SPEC` names
   a checkout. `tools/cel_conformance/generate.py` writes a case for each test that declares no
@@ -229,7 +231,7 @@ confirm a test fails. Report `CAUGHT` or `NOT CAUGHT` per mutation in the commit
   -Dcel-conformance=<folder>` compiles each case's expression as a rule's expression compiles,
   over `src/protovalidate/cel_expression.zig`, a module root no package exports.
   `tools/cel_conformance/compare.py` fails on a result that differs from the suite's and that
-  `tools/cel_conformance/known.txt` does not hold with its reason. It needs git, buf and
+  `tools/cel_conformance/known.txt` does not hold with its reason. It needs git, buf, and
   python3.
 - Compile time: `tools/compile_time_check.sh` builds `zig build compile-time-subject
   -Dcompile-time=<folder>` over a schema of 690 CEL rules and over the same schema with none
@@ -249,15 +251,15 @@ confirm a test fails. Report `CAUGHT` or `NOT CAUGHT` per mutation in the commit
   `interop/README.md` holds their contract. It needs buf, go, node with npm, python3 with venv,
   and cargo.
 - Interop servers: `tools/interop_servers_check.sh [server...]` starts the servers of `interop/`
-  (connect-go, grpc-go, connect-node, grpcio and connect-rust) and runs connect-zig's client,
+  (connect-go, grpc-go, connect-node, grpcio, and connect-rust) and runs connect-zig's client,
   `zig build interop-client`, against each in every protocol it speaks; `interop/README.md`,
   "The server side", holds their contract. It needs buf, go, node with npm, python3 with venv,
   and cargo.
 - Package: `tools/package_check.sh` builds a small project against connect-zig as `zig fetch`
   keeps it: the files `.paths` of `build.zig.zon` names, and no other. A new folder that
   `build.zig` imports joins that list. The project generates its code with the plugin, serves a
-  method on colibri's exported modules over TLS, under the test identity, on h11, h2 and h3, and
-  calls it with connect-zig's client and with curl (decision 39). It needs the network, buf and
+  method on colibri's exported modules over TLS, under the test identity, on h11, h2, and h3, and
+  calls it with connect-zig's client and with curl (decision 39). It needs the network, buf, and
   curl.
 - OIDC: `zig build test-oidc` runs the `oidc` module's tests. `build/chapulin.zig` asks for
   chapulin with colibri's own request, so a program links one chapulin object (decision 34); a
@@ -270,7 +272,7 @@ confirm a test fails. Report `CAUGHT` or `NOT CAUGHT` per mutation in the commit
 - Full stack: `tools/fullstack_check.sh [peak] [production] [production-cleartext] [compression]
   [compression-cleartext]` loads connect-zig's OTLP sink, `zig build otlp-sink`, and
   OpenTelemetry's Collector v0.165.0 with the same OTLP exports over gRPC,
-  TLS 1.3 and h2, each server on one core (decision 44). `peak` runs h2load as fast as each server
+  TLS 1.3, and h2, each server on one core (decision 44). `peak` runs h2load as fast as each server
   answers. `production` runs `tools/fullstack/load`, which the check builds with cargo unless
   `FULLSTACK_LOAD` names it, as one gateway core of 33,000 servers takes traffic: 516
   connections that stay open across the climb and a mix of gzip exports, at rates that climb
@@ -283,22 +285,22 @@ confirm a test fails. Report `CAUGHT` or `NOT CAUGHT` per mutation in the commit
   TLS (decision 46); the check builds them into the cache, unless `CONNECT_GO` and
   `CONNECT_RUST` name built ones. The three Connect receivers also join a second time, checking
   each export against the span rules of `tools/fullstack/validate`: `zig build
-  otlp-sink-validate`, protovalidate-go and protovalidate-buffa. `compression` and
+  otlp-sink-validate`, protovalidate-go, and protovalidate-buffa. `compression` and
   `compression-cleartext` run both loads on the three Connect receivers alone, over TLS or in
-  cleartext h2, with exports in no coding and in gzip, zstd and brotli, which `zig build
+  cleartext h2, with exports in no coding and in gzip, zstd, and brotli, which `zig build
   otlp-compress` writes with stdx's encoders; `tools/ci.sh` runs each as a check of its own,
   `fullstack-compression` and `fullstack-compression-cleartext`, and `tools/compression_chart.py`
   draws the chart over TLS. `zig build otlp-validate-cost` times validation in the sink by the size of
   its route's storage (decision 37). It fails when a server answered an export wrongly or did not
   take every span, or when a validating one took an export that breaks a rule. It runs on Linux and needs
-  h2load, buf, python3, curl, go and cargo.
+  h2load, buf, python3, curl, go, and cargo.
 - Performance: `tools/perf_check.sh` counts each benchmark operation's instructions under
   callgrind against `bench/instructions.txt` and fails past 2%; `--write` records a new baseline,
   which the commit that pays for it explains. It needs valgrind.
 - CI: `tools/ci.sh` runs every check and writes a report; `--only <check>` runs one and `--list`
   names them. `.github/workflows/main.yml` runs each check of `--list` as a job of its own on each
   push and pull request. A new check joins `tools/ci.sh`, never the workflow file. `test`,
-  `bench-compare`, `fullstack`, `fullstack-compression` and `validate-compare` run a second time
+  `bench-compare`, `fullstack`, `fullstack-compression`, and `validate-compare` run a second time
   on an arm64 runner: `test` because an aarch64 Linux link can fail where x86-64's passes, the
   next three for the arm64 charts, and `validate-compare` for its hardware counters, which
   GitHub's x86-64 runners do not expose. A `fullstack` check has 90 minutes, and every other

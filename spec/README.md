@@ -4,14 +4,14 @@
 `tla/` is where a TLA+ model goes, one folder for each model, as in the projects connect-zig
 builds on. There is none yet: no part of this tree has steps that interleave.
 
-The one model so far states the CEL syntax that `protovalidate` reads: its lexis, its grammar
+The one model so far states the CEL syntax that `protovalidate` reads: its lexis, its grammar,
 and the text of a tree. The Zig grammar in `src/protovalidate/cel/` is checked against it.
 
 ## What the model is
 
 - `lean/ConnectZig/Cel/Lexis.lean`: the tokens of an expression, from the CEL language
   definition, "Syntax": `IDENT`, `INT_LIT`, `UINT_LIT`, `FLOAT_LIT`, `STRING_LIT`, `BYTES_LIT`,
-  `ESCAPE`, `WHITESPACE` and `COMMENT`.
+  `ESCAPE`, `WHITESPACE`, and `COMMENT`.
 - `lean/ConnectZig/Cel/Grammar.lean`: the grammar, one function for each production, from
   `Expr` down to `Primary`. It also states which doubles and which ints a literal holds.
 - `lean/ConnectZig/Cel/Text.lean`: a tree as an expression with each part in brackets, which
@@ -41,11 +41,11 @@ model has no such limit, and no vector nests that deep.
 `lake exe vectors --write <directory>` writes `cel_vectors.txt`: 6,671 expressions, each with
 the text of its tree or "!" for a text that is no expression. The expressions are:
 
-- every sequence of one, two and three tokens of an alphabet of 16;
+- every sequence of one, two, and three tokens of an alphabet of 16;
 - every pair of those tokens with no space between them;
 - 1,200 sequences of four to nine tokens, and 600 trees, from a fixed generator;
 - 239 expressions chosen for the rules of the lexis: each escape, each prefix of a string, the
-  ends of each number's range, each keyword and each reserved word.
+  ends of each number's range, each keyword, and each reserved word.
 
 The unit test "the grammar reads each expression of the Lean model's vectors as the model does"
 in `cel_tree_test.zig` reads each expression with the Zig grammar, at run time, and requires

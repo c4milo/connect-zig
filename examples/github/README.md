@@ -1,7 +1,7 @@
 # A GitHub-style API
 
 `github.v1.RepositoryService` and `github.v1.IssueService`, used as a real client would use an
-API like GitHub's: bearer tokens, a rate limit, pages, field masks, private resources and
+API like GitHub's: bearer tokens, a rate limit, pages, field masks, private resources, and
 streams. The store is a fixed table in memory, so each run starts the same.
 
 ![A terminal session: zig build run plays a GitHub-style session, then curl creates and lists repositories](walkthrough.gif)
@@ -9,7 +9,7 @@ streams. The store is a fixed table in memory, so each run starts the same.
 - `Auth` reads a bearer token; a change needs one, and a read takes one or none.
 - `RateLimit` counts each caller's calls and sets GitHub's `x-ratelimit-*` headers. Anonymous
   callers have 10 calls in all, and each user has 100.
-- Failures carry `NotFound`, `AlreadyExists`, `BadField` and `RateLimited` details. A private
+- Failures carry `NotFound`, `AlreadyExists`, `BadField`, and `RateLimited` details. A private
   repository reads as not found to anyone but its owner.
 
 ## Files
@@ -17,7 +17,7 @@ streams. The store is a fixed table in memory, so each run starts the same.
 | Path | Holds |
 | --- | --- |
 | [proto/github/v1/github.proto](proto/github/v1/github.proto) | The schema |
-| [src/service/service.zig](src/service/service.zig) | `Auth`, `RateLimit` and the route table |
+| [src/service/service.zig](src/service/service.zig) | `Auth`, `RateLimit`, and the route table |
 | [src/service/repositories.zig](src/service/repositories.zig), [src/service/issues.zig](src/service/issues.zig) | The handlers |
 | [src/service/store.zig](src/service/store.zig), [src/service/room.zig](src/service/room.zig) | The fixed store, and the replies' room |
 | [src/main.zig](src/main.zig) | The check: a whole session, over h2 and h3 |

@@ -20,23 +20,23 @@ the assessment.
 
 ## Scope
 
-In scope: the library modules under `src/` (`protobuf`, `connect` and `connect_colibri`), which
+In scope: the library modules under `src/` (`protobuf`, `connect`, and `connect_colibri`), which
 read a peer's octets, and the code `protoc-gen-connect-zig` writes. A peer's input that makes
 connect-zig crash, trip an assertion, read or write outside a buffer, loop without bound, or
-accept a message the Connect protocol, gRPC's documents or the protobuf encoding guide require it
+accept a message the Connect protocol, gRPC's documents, or the protobuf encoding guide require it
 to refuse is a vulnerability.
 
 Out of scope, so triage stays fast:
 
-- `examples/`, `conformance/`, `interop/`, `bench/` and `tools/`, which are programs and checks
+- `examples/`, `conformance/`, `interop/`, `bench/`, and `tools/`, which are programs and checks
   that ship in no package. The key in `examples/testdata/tls` is public and for tests alone.
 - Attacks that need a malicious caller: a wrong buffer, a wrong instant, or a handler that lies.
   The caller is trusted; the peer and the network are not.
 - Denial of service through the caller's own limits. connect-zig names every limit as a
   constant, and the caller owns its timeouts and its event loop.
-- Weaknesses in colibri, stdx or chapulin. Report those to
+- Weaknesses in colibri, stdx, or chapulin. Report those to
   [colibri](https://github.com/c4milo/colibri/security),
-  [stdx](https://github.com/c4milo/stdx/security) or
+  [stdx](https://github.com/c4milo/stdx/security), or
   [chapulin](https://github.com/c4milo/chapulin/security).
 
 [`docs/decisions.md`](docs/decisions.md) records what connect-zig refuses to build and why.

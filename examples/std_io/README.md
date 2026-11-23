@@ -6,7 +6,7 @@ over `std.Io`. The library takes octets and gives octets back, so any loop can r
 
 ![A terminal session: zig build run calls the std.Io server over TCP, then curl calls ELIZA in cleartext](walkthrough.gif)
 
-The server's task owns the engine. An acceptor task, a reader task for each socket and a ticker
+The server's task owns the engine. An acceptor task, a reader task for each socket, and a ticker
 only wait, and each sends what it got to the owner through one bounded `std.Io.Queue`. The owner
 hands it to the engine and writes what the engine owes. The ticks fire the engine's deadlines, at
 most 50 ms late. It serves h11 and h2 with prior knowledge in cleartext, with no TLS and no h3.
@@ -20,7 +20,7 @@ most 50 ms late. It serves h11 and h2 with prior knowledge in cleartext, with no
 | [src/client/driver.zig](src/client/driver.zig) | The client's loop over a TCP socket |
 
 The project serves the ELIZA service of [eliza](../eliza), which it depends on by path. It
-passes connect-zig, eliza and the harness `.rotor = false`, so its build holds one connect-zig
+passes connect-zig, eliza, and the harness `.rotor = false`, so its build holds one connect-zig
 and no Rotor.
 
 ## Run it

@@ -17,7 +17,7 @@ Every kind of stream, in `streaming.v1.StreamingService`:
 | [proto/streaming/v1/streaming.proto](proto/streaming/v1/streaming.proto) | The schema |
 | [src/service/service.zig](src/service/service.zig) | The three handlers, and the `Counting` interceptor on Chat |
 | [src/app.zig](src/app.zig) | This example's `App` and route table |
-| [src/main.zig](src/main.zig) | The check: each stream, a stream that fails, and a refused one, over h2, h11 and h3 |
+| [src/main.zig](src/main.zig) | The check: each stream, a stream that fails, and a refused one, over h2, h11, and h3 |
 | [src/duplex.zig](src/duplex.zig) | The full-duplex rounds, where the client sends each message with its `Sender` |
 | [src/serve.zig](src/serve.zig) | The same routes on a socket, to play with |
 
@@ -44,7 +44,7 @@ buf curl --schema proto --cacert ../harness/tls/ca.pem --data '{"text":"hello"}{
   https://127.0.0.1:8443/streaming.v1.StreamingService/Chat
 ```
 
-Countdown answers 3, 2 and 1; Sum answers `{"sum":"6","count":"3"}`; Chat answers each line.
+Countdown answers 3, 2, and 1; Sum answers `{"sum":"6","count":"3"}`; Chat answers each line.
 curl sends a stream too, when each message has its Connect envelope:
 
 ```sh

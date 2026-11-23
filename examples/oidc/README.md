@@ -1,7 +1,7 @@
 # OpenID Connect
 
 `account.v1.AccountService` behind `oidc.Interceptor`, which checks OpenID Connect bearer tokens
-with no I/O (decision 34): a JWT signed with RS256, ES256 or EdDSA, then its issuer, its audience
+with no I/O (decision 34): a JWT signed with RS256, ES256, or EdDSA, then its issuer, its audience,
 and its times.
 
 ![A terminal session: zig build run checks the bearer tokens, then zig build serve prints a token and curl calls Whoami with it](walkthrough.gif)
@@ -11,7 +11,7 @@ and its times.
 - A call with no token, an expired one, or one for another audience is refused with
   `unauthenticated` and RFC 6750's `WWW-Authenticate: Bearer` challenge.
 
-A test issuer stands where the OpenID provider would be. It holds two keys, writes their JWK Set
+A test issuer stands where the OpenID provider would be. It holds two keys, writes their JWK Set,
 and signs the tokens. Between the check's two rounds it changes its key: the verifier refuses the
 new key's token, reports its keys stale, takes the new JWK Set, and then takes the same token.
 

@@ -3,7 +3,7 @@
 Every performance change follows pepegrillo's method in `docs/performance/`, starting at
 `performance.md`. `zig build guide` installs it to `zig-out/docs/performance/`, at the commit
 `build.zig.zon` pins. Read it first. This appendix holds what the method leaves to the project:
-connect-zig's instruments, its admission rule, its baselines, its costs and the pitfalls it has
+connect-zig's instruments, its admission rule, its baselines, its costs, and the pitfalls it has
 paid for.
 
 ## The instruments
@@ -24,7 +24,7 @@ paid for.
   connect-zig's OTLP sink, OpenTelemetry's Collector, Vector and Rotel in Rust, and receivers on
   connect-go and connect-rust, each on one core, with the load on two others (decisions 44 and
   46). Its peak part reports calls a second,
-  latency, CPU time a call and peak memory under h2load, over TLS. Its production part gives the
+  latency, CPU time a call, and peak memory under h2load, over TLS. Its production part gives the
   span rate one gateway core holds for 33,000 servers, under `tools/fullstack/load` at climbing rates, with p99 at
   most 100 ms: over TLS beside Vector, and in cleartext beside Rotel. After the first step that
   fails, it halves the gap to the last step that passed five times, so a rate is known within
@@ -38,7 +38,7 @@ paid for.
 - **The smoke run.** `zig build bench -- --quick` runs every operation on every message in a few
   short batches. CI's `bench` job runs it, so a broken operation fails before anyone times it.
 - **Cycles and branch misses are a filter too.** `zig build bench-validate -- --counters <dir>`
-  counts each validation's cycles, instructions, branches and branch misses for one call, through
+  counts each validation's cycles, instructions, branches, and branch misses for one call, through
   Linux's hardware counters (`bench/counters.zig`). `tools/validate_compare_check.sh` prints the
   table last, and CI's `validate-compare` job lets the process count its own events. GitHub's
   x86-64 runners expose no counters: run 240's printed `NOENT` on an Intel Xeon 6973P-C. So the
@@ -53,11 +53,11 @@ paid for.
 ## The units of work
 
 The benchmark has eight messages in `bench/inputs.zig`. Four have the shapes services send:
-Small (40 B), Medium (1 KB), Large (180 KB, with a 6 KB string) and Deep (50 nested levels). Four
+Small (40 B), Medium (1 KB), Large (180 KB, with a 6 KB string), and Deep (50 nested levels). Four
 hold one kind of field each, so their counts give the cost of that kind per field:
 
 - Varints (90 B): each varint kind, at each length from 1 to 10 bytes.
-- Strings (242 B): ASCII strings on each side of 8, 16 and 32 octets, and two short strings
+- Strings (242 B): ASCII strings on each side of 8, 16, and 32 octets, and two short strings
   with Latin and CJK characters.
 - Tree (684 B): 341 nodes that hold only their children, four to a node.
 - Packed (975 B): 64 elements in each of four packed fields.
@@ -74,9 +74,9 @@ medium message, in Connect and in gRPC, through `connect_colibri`'s route on col
 `server.Router`. The route takes the default options, as a program that names none does. The
 program hands the router an engine's events: the request's head, its body with its end, and the
 request's end. A stand-in engine takes each octet at once. So a count holds the router, the
-route, the protocol and the codec, and no framing, TLS or socket. They are a program of their
+route, the protocol, and the codec, and no framing, TLS, or socket. They are a program of their
 own, `bench-call` (`bench/call_main.zig`), which `zig build bench` runs after the codec's and
-`tools/perf_check.sh` counts beside it. The build makes `connect`, `connect_colibri` and colibri's
+`tools/perf_check.sh` counts beside it. The build makes `connect`, `connect_colibri`, and colibri's
 modules in ReleaseFast for it.
 
 A third program, `bench-validate` (`bench/validate_main.zig`), counts `protovalidate` on the
@@ -119,7 +119,7 @@ the three do close to the same work, not the same work.
 ## The costs
 
 The method prices a claim against the costs of a first-level cache hit, a main-memory read, a
-branch mispredict, a copy and a system call, each measured on the judge. `zig build costs` times
+branch mispredict, a copy, and a system call, each measured on the judge. `zig build costs` times
 them with `bench/costs.zig`, in ReleaseFast, and prints each median of five runs with its
 spread. CI's `costs` job runs it through `tools/ci.sh --only costs` and adds the table to the
 job's summary. It reports and never fails CI: a shared runner can time any row badly, and a row
@@ -175,7 +175,7 @@ failed (the owner's ruling of 2026-11-09). A new fast path joins this list the s
 | A string's characters counted only until `min_len` or `max_len` is settled | `rule_string.zig`, `has_characters` | validate small valid +80.17%, medium valid +59.76%, medium invalid +32.72% |
 | An octet found eight at a time in a string shorter than a vector | `octet_search.zig`, `index_of` | validate medium valid +21.40%, medium invalid +13.46%, small invalid +6.84% |
 | Hexadecimal digits and a hostname label's octets looked up in a table | `format_name.zig`, `all_hexadecimal` and `is_label` | validate small valid +20.11%, medium valid +7.80%, medium invalid +2.82% |
-| A stored list's and map's elements walked in their slice, and a stored map's key looked up from its last entry back | `cel_list.zig`, `Iterator`, `KeyIterator` and `stored_value_at` | validate rules valid +12.41%, rules invalid +6.11%, decode and validate rules valid +5.91% |
+| A stored list's and map's elements walked in their slice, and a stored map's key looked up from its last entry back | `cel_list.zig`, `Iterator`, `KeyIterator`, and `stored_value_at` | validate rules valid +12.41%, rules invalid +6.11%, decode and validate rules valid +5.91% |
 | A pattern's searcher kept on its thread, made ready once | `pattern.zig`, `Searcher` | decode and validate medium valid +93.07%, medium invalid +55.62% |
 | A map's entry value bound beside its key in a macro whose expression reads the map at the key | `cel_entry.zig`, `bound_name` and `place_of` | validate rules valid +15.23%, rules invalid +10.64%, decode and validate rules valid +6.18% |
 | A short ASCII string's size read from its length | `cel_function.zig`, `size` | validate rules valid +5.65%, decode and validate rules valid +2.29%, validate rules invalid +2.06% |

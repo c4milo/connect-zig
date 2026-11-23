@@ -18,13 +18,13 @@ Start at the top: each project adds one layer to the one before it.
 
 | Project | What it shows |
 | --- | --- |
-| [quickstart](quickstart) | The README's "Use it in your project": a server and a client over TLS on h11, h2 and h3 |
+| [quickstart](quickstart) | The README's "Use it in your project": a server and a client over TLS on h11, h2, and h3 |
 | [protobuf_messages](protobuf_messages) | Generated messages in binary and JSON, with no RPC |
 | [sans_io_call](sans_io_call) | A whole call through `connect` alone: no socket, no HTTP library |
-| [eliza](eliza) | The ELIZA service, a client and a server over colibri's h11, h2 and h3 |
-| [streaming](streaming) | Bidirectional, client and server streams, a stream that fails, and full-duplex over h2 and h3 |
+| [eliza](eliza) | The ELIZA service, with a client and a server over colibri's h11, h2, and h3 |
+| [streaming](streaming) | Bidirectional, client, and server streams, a stream that fails, and full-duplex over h2 and h3 |
 | [interceptors](interceptors) | Server interceptors that log and authenticate, and a client interceptor |
-| [errors](errors) | Errors with typed details in Connect, gRPC and gRPC-Web |
+| [errors](errors) | Errors with typed details in Connect, gRPC, and gRPC-Web |
 | [oidc](oidc) | A service behind OpenID Connect bearer tokens, with an issuer that changes its key |
 | [github](github) | A GitHub-style API: tokens, rate limits, pages, field masks, private resources, streams |
 | [std_io](std_io) | ELIZA on colibri's engine over `std.Io`, with no Rotor, and a client over TCP |
@@ -47,7 +47,7 @@ From the root of the repository, `zig build examples` runs `zig build test` in e
 `zig build example-<name>` runs one project's check. These builds share the root's packages and
 cache, so each package is fetched once.
 
-The checks of `eliza`, `streaming`, `interceptors`, `errors`, `oidc` and `github` run a client and
+The checks of `eliza`, `streaming`, `interceptors`, `errors`, `oidc`, and `github` run a client and
 a server in one process, over the in-memory links of the [harness](harness). The rounds over h2
 and h11 run in cleartext, with prior knowledge for h2. The round over h3 runs QUIC under the
 test-only identity of [harness/tls](harness/tls) (decision 25).
@@ -75,10 +75,10 @@ all of them on one port, and `tools/interop_check.sh` calls it with curl and buf
 ## The harness
 
 [harness](harness) is a package, not an example. It stands where a program's sockets,
-certificate and clock would be:
+certificate, and clock would be:
 
 - colibri's in-memory links, copied unchanged, and a client and a server that run a round of
-  calls over them in h11, h2 and h3;
+  calls over them in h11, h2, and h3;
 - `Served`, which runs an example's route table on a real socket for `zig build serve`;
 - the test-only TLS identity, whose key anyone can read, so no program outside the examples and
   the checks presents it;
@@ -90,4 +90,4 @@ A project that depends on another, as `socket_server` and `std_io` do, passes co
 options as the project it depends on. Zig builds one package for each set of options, so other
 options give a second `connect` module, and the compile fails with "file exists in modules".
 The projects on Rotor pass `.rotor = true`. `std_io` runs with no Rotor (decision 32), so it
-passes `.rotor = false` to connect-zig, to `eliza` and to the harness.
+passes `.rotor = false` to connect-zig, to `eliza`, and to the harness.

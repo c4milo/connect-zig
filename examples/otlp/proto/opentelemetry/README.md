@@ -7,7 +7,7 @@ OpenTelemetry wrote them, under the Apache 2.0 license in [LICENSE](LICENSE) (de
 | File | Holds |
 | --- | --- |
 | `proto/collector/trace/v1/trace_service.proto` | `TraceService`, with its one method `Export` |
-| `proto/trace/v1/trace.proto` | Spans, their events, links and status |
+| `proto/trace/v1/trace.proto` | Spans, their events, links, and status |
 | `proto/resource/v1/resource.proto` | The resource that produced the spans |
 | `proto/common/v1/common.proto` | Attribute values, and the scope of the instrumentation |
 

@@ -20,7 +20,7 @@ Whoami has no side effects, so a Connect client may also send it as a GET.
 | Path | Holds |
 | --- | --- |
 | [proto/interceptors/v1/interceptors.proto](proto/interceptors/v1/interceptors.proto) | The schema |
-| [src/service/service.zig](src/service/service.zig) | Whoami, `Logging` and `Auth` |
+| [src/service/service.zig](src/service/service.zig) | Whoami, `Logging`, and `Auth` |
 | [src/app.zig](src/app.zig) | This example's `App` and route table |
 | [src/main.zig](src/main.zig) | The check, over h2 and h3 |
 | [src/serve.zig](src/serve.zig) | The same routes on a socket, to play with |

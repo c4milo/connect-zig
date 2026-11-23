@@ -18,7 +18,7 @@ that builds on v0.3.0: each adds a name, or a field with a default.
 
 - `protovalidate` reads a CEL list or map literal of two element types, such as `[1, 'a']` and
   `{'k': 1, 2: 'v'}`, as cel-go does: its size, `in`, `==`, `type`, `%s` of `format`, an index
-  your build knows, and `all`, `exists` and `exists_one`. An index your build does not know,
+  your build knows, and `all`, `exists`, and `exists_one`. An index your build does not know,
   and `filter` and `map` of such a literal, stop your build, because their result has no one
   type. cel-spec's conformance suite passes 1,174 tests, where it passed 1,142.
 - Your server can see when a request did not fit the storage its route decodes into. Give your
@@ -31,8 +31,8 @@ that builds on v0.3.0: each adds a name, or a field with a default.
   for its reply, which took `message_bytes` each and take `reply_bytes` when it is set. The
   OTLP sink of the benchmarks sets it to 4 KiB, and each of its calls holds 1.83 MiB in place of
   2.32 MiB.
-- [docs/benchmarks.md](docs/benchmarks.md) loads OTLP receivers on connect-zig, connect-go and
-  connect-rust with protovalidate, and with exports in gzip, zstd and brotli. Over TLS on an
+- [docs/benchmarks.md](docs/benchmarks.md) loads OTLP receivers on connect-zig, connect-go, and
+  connect-rust with protovalidate, and with exports in gzip, zstd, and brotli. Over TLS on an
   arm64 core, connect-zig keeps 86% of its spans a second with validation: 2.5 times
   connect-rust's with protovalidate-buffa, and 11.2 times connect-go's with protovalidate-go.
   gzip and zstd exports cost connect-zig 7% and 8% less CPU a span than uncompressed ones over
@@ -74,12 +74,12 @@ Four changes to the API are marked below.
 - `protovalidate`, a module that checks a message against the
   [protovalidate](https://github.com/bufbuild/protovalidate) v1.2.2 rules of its schema
   (decision 47). The plugin writes each message's `(buf.validate.message)`,
-  `(buf.validate.oneof)` and `(buf.validate.field)` options as a table, `pub const
+  `(buf.validate.oneof)`, and `(buf.validate.field)` options as a table, `pub const
   protovalidate`, beside its descriptor. `protovalidate.validate` reads the table at compile
   time, so no rule is parsed at run time, and writes each violation into a `Report` over storage
-  the program passes. It checks `required`, `ignore`, oneofs and every standard rule: numbers,
+  the program passes. It checks `required`, `ignore`, oneofs, and every standard rule: numbers,
   bool, enum, string with each well-known form, bytes, repeated fields, maps, Any, Duration,
-  Timestamp and FieldMask.
+  Timestamp, and FieldMask.
 - The package exports `protovalidate`, and the generated code of validate.proto and of
   descriptor.proto as `buf_validate_validate` and `google_protobuf_descriptor`.
 - A message with no rule, in itself or in a message it holds, keeps the code it had.
@@ -97,41 +97,41 @@ Four changes to the API are marked below.
 - `protovalidate` compiles a schema's CEL rules, `cel` and `cel_expression`, at comptime, from
   the text the table holds (decision 47 as amended). An expression unfolds into plain code: no
   interpreter runs, and the plugin writes no function. It reads CEL's operators, conditionals,
-  field selection, `has`, `dyn`, lists and maps with `in`, `size`, an index and the macros
-  `all`, `exists` and `exists_one`, the conversions, the string functions and protovalidate's
-  own functions. A problem of an expression stops the build.
+  field selection, `has`, and `dyn`. It reads lists and maps, with `in`, `size`, an index, and
+  the macros `all`, `exists`, and `exists_one`. It also reads the conversions, the string
+  functions, and protovalidate's own functions. A problem of an expression stops the build.
 - `protovalidate.Error` gains `Unevaluable`, for an expression that fails as it runs, such as
   by a division by zero.
 - The plugin reads the predefined rules of an extension from its request: an extension of a
   rule message whose declaration states CEL rules in `(buf.validate.predefined)`. It writes
   each one's value and rules into the table of the message that sets it, and `protovalidate`
-  compiles them as it compiles a schema's own. A value is a scalar, a wrapper or a list of
+  compiles them as it compiles a schema's own. A value is a scalar, a wrapper, or a list of
   them.
 - A CEL string of three quotes, `'''...'''`, which holds line ends, and a comma after the last
   element of a list literal, as the CEL language definition states them.
 - A Lean model of the CEL syntax in `spec/lean/`, and `zig build lean`, which requires the
   vectors a unit test replays to be what the model gives. `tools/lean_check.sh` runs it, and
   is the check `lean` of `tools/ci.sh`.
-- CEL's `type(x)`, compared with a type's name such as `int`, `list`, `null_type` or a
+- CEL's `type(x)`, compared with a type's name such as `int`, `list`, `null_type`, or a
   message's full name.
 - CEL's timestamps and durations: `timestamp(string)` and `duration(string)` of any text,
   arithmetic between them, the `get` functions such as `getFullYear` and `getHours('+05:30')`,
   and `string` of each. A zone is `UTC` or a fixed offset; a zone's name stops the build.
-- CEL's `+` of two strings, two bytes values or two lists, and `string` of an int, a uint, a
-  double or a bool, so a rule's message may be `'too long: ' + string(size(this))`. A string is
+- CEL's `+` of two strings, two bytes values, or two lists, and `string` of an int, a uint, a
+  double, or a bool, so a rule's message may be `'too long: ' + string(size(this))`. A string is
   written into the report's storage, as `format` writes, and a list is joined as it is read.
 - CEL reads a map's string key as a field: `this.labels.env` is `this.labels['env']`, and
   `has(this.labels.env)` tells whether the map holds the key.
-- CEL's `filter(x, p)`, `map(x, t)` and `map(x, p, t)` on any list or map, such as
+- CEL's `filter(x, p)`, `map(x, t)`, and `map(x, p, t)` on any list or map, such as
   `this.items.filter(i, i.price > 0).size() > 0`. The list they give is computed as it is read,
   so it needs no memory. Before, only `map` of a list literal compiled.
 - CEL's `==` and `!=` of two lists: equal when they have one length and the elements at each
   place are equal, such as `this.tags == ['a', 'b']`. `in` finds a list in a list of lists.
 - CEL's empty list literal, `[]`, which is a list of any element type: `this.tags != []`,
-  `[] + this.tags` and `[].all(x, x > 0)` compile.
-- CEL's map literals, `{'a': 1, 'b': 2}`, whose keys are ints, uints, bools or strings of one
+  `[] + this.tags`, and `[].all(x, x > 0)` compile.
+- CEL's map literals, `{'a': 1, 'b': 2}`, whose keys are ints, uints, bools, or strings of one
   type, and whose values are of one type; `{}` is a map of any. An index, `in`, `size`, `has`,
-  a key read as a field and each macro read one. Two equal keys fail the run. `==` and `!=`
+  a key read as a field, and each macro read one. Two equal keys fail the run. `==` and `!=`
   compare two maps, a map field's included: `this.labels == {'env': 'prod'}`.
 - The plugin raises the compiler's branch quota in the table of a message with more than 500
   list and message rules, so a message of a thousand fields with rules compiles.
@@ -139,7 +139,7 @@ Four changes to the API are marked below.
   v0.25.3, with its checksum. `tools/citations_check.sh`, the check `citations`, requires each
   citation of it in the code to name one of its sections.
 - `tools/validate_compare_check.sh`, the check `validate-compare`: connect-zig's
-  `protovalidate`, protovalidate-go, protovalidate-es on Node.js, protovalidate-buffa and
+  `protovalidate`, protovalidate-go, protovalidate-es on Node.js, protovalidate-buffa, and
   prost-protovalidate on one schema, each message's verdict required to match.
   `tools/validate_chart.py` draws `docs/images/validate-vs-go.svg` from its output.
 - `tools/lean_check.sh [seed...]` also compares the Lean model with the Zig grammar on
@@ -162,7 +162,7 @@ Four changes to the API are marked below.
   and takes that module alone from it (decision 47).
 - CEL's `format`, `'text %s'.format([values])`, from the CEL strings extension, which
   `docs/specs/cel/strings.md` holds. The text and the list are literals, and the conversions
-  `%s`, `%d`, `%x` and `%X` are read; `%f`, `%e`, `%o`, `%b` and a precision stop the build. A
+  `%s`, `%d`, `%x`, and `%X` are read; `%f`, `%e`, `%o`, `%b`, and a precision stop the build. A
   rule's formatted message is written into the report's storage. protovalidate's conformance
   suite passes all of its 2872 cases.
 - A formatted message with no room in the report ends `validate` as a full report does:
@@ -199,7 +199,7 @@ Four changes to the API are marked below.
   keeps one tree and one typing for each expression, and finds a function and a field by its
   name in one step (docs/performance.md, "The compiler's time").
 - A CEL expression has the verdict protovalidate-go gives it. **Changes what compiles.** `==`,
-  `!=` and `in` take two values of one type, so `1 == 1u` stops the build, and behind `dyn`
+  `!=`, and `in` take two values of one type, so `1 == 1u` stops the build, and behind `dyn`
   two values of unlike types are not equal. A conversion of a literal that fails, such as
   `int('x')`, stops the build. One `-` before a number is the number's sign, so
   `-2.5.isInf()` asks -2.5, and `--9223372036854775808` is refused. `uint` takes no double
@@ -213,7 +213,7 @@ Four changes to the API are marked below.
   part of its literal.
 - A table with two entries for one field stops the build.
 - CEL's `size` of a repeated field that `decode_into` stored reads no element, and an index of
-  one reads only the element at its place. A string form check, such as `email`, `uri` or
+  one reads only the element at its place. A string form check, such as `email`, `uri`, or
   `hostname`, looks each octet up in a table, and finds a separator eight octets at a time.
   `min_len` and `max_len` count a string's characters only until the count settles the rule.
   docs/performance.md lists what each costs when it is switched off.
@@ -224,7 +224,7 @@ Four changes to the API are marked below.
   searches no entry. Such a macro reads each key once, at its last entry. CEL's `size` of a
   short ASCII string counts its octets. The benchmark's valid `Rules` takes 18% fewer
   instructions.
-- CEL reads a stored list's element, size and index inline, and compares two ints or two uints
+- CEL reads a stored list's element, size, and index inline, and compares two ints or two uints
   directly. The benchmark's valid `Rules` takes 38% fewer instructions again, 722.
 - `tools/perf_check.sh` also counts `protovalidate` on the six messages of the validation
   benchmark, `bench-validate --instructions`, against `bench/instructions.txt`.
@@ -240,7 +240,7 @@ Four changes to the API are marked below.
   RE2 reads it, from Unicode 17.0.0. Before, stdx refused each and the build stopped. The
   `stdx_regex` pin moved to 44615ef, whose CI passed.
 - A message of about 500 fields or more encodes and decodes. Before, the compiler stopped at
-  its default branch quota in `encode`, in `decode` and in the JSON writer.
+  its default branch quota in `encode`, in `decode`, and in the JSON writer.
 - A message with more than about 1,000 repeated and map fields compiles. A generated file now
   declares each repeated type once, at the top, as `const RepeatedSpan = proto.Repeated(Span,
   .message);`, and each field uses that name. The field types are the same as before. Before,
@@ -260,7 +260,7 @@ Four changes to the API are marked below.
   absorbs the failure: `dyn(1) && false` is false. Before, the whole expression failed.
 - In CEL, a list takes a uint and a double with no fraction as its index behind `dyn`, as in
   cel-go: `[7, 8][dyn(1u)]` is 8. Before, the expression failed.
-- In CEL's `format`, `%s` writes a timestamp, a duration and a type, as the strings extension
+- In CEL's `format`, `%s` writes a timestamp, a duration, and a type, as the strings extension
   says, and `%%` writes one `%`. Before, each stopped the build.
 - In CEL, a function that no library declares stops the build behind `dyn` too, as cel-go
   refuses it. Before, `dyn(x).nothing()` compiled and failed each time it ran.
@@ -323,7 +323,7 @@ marked below.
 - Over HTTP/1.1, a stream that answers before its request ends keeps its connection, and a
   response that ends its connection says `Connection: close`, so a client never sends its next
   request into a closed connection (colibri v0.17.3).
-- A request to a path with no route gets its 404, 405, 501 or 503 when the connection is busy,
+- A request to a path with no route gets its 404, 405, 501, or 503 when the connection is busy,
   where over HTTP/2 it could read a reset with CANCEL (colibri v0.17.3).
 - A Connect GET writes its query in the protocol's order: `connect`, `base64`, `compression`,
   `encoding`, then `message`. connectrpc's conformance suite v1.0.7 checks it.
@@ -332,7 +332,7 @@ marked below.
 
 - The routed call runs in tables of 16 and 256 routes, and the performance gate counts its
   instructions there too.
-- A full-stack check loads connect-zig's OTLP sink beside OpenTelemetry's Collector, Vector and
+- A full-stack check loads connect-zig's OTLP sink beside OpenTelemetry's Collector, Vector, and
   Rotel, each on one core. In CI's run 172, connect-zig held 4.0 times the Collector's spans a
   second on x86-64 and 5.0 times on arm64, with p99 under 100 ms. It held 12.0 and 13.3 times
   Vector's over TLS, and 3.0 and 3.3 times Rotel's in cleartext.
@@ -344,7 +344,7 @@ The first release. It builds on colibri v0.17.0, and on the stdx (`22f5139`) and
 
 ### Protocols
 
-- Connect, gRPC and gRPC-Web, on the server and the client, over h11, h2 and h3, in cleartext
+- Connect, gRPC, and gRPC-Web, on the server and the client, over h11, h2, and h3, in cleartext
   and over TLS.
 - Unary calls and every stream type. Bidirectional streams are full-duplex over h2 and h3, on the
   server through type handlers and on the client through `rpc.ClientCall`'s `Sender`. Over h11
@@ -353,10 +353,10 @@ The first release. It builds on colibri v0.17.0, and on the stdx (`22f5139`) and
   asks it for one message at a time while the response memory has room (decision 33).
 - Connect's unary GET for methods marked `NO_SIDE_EFFECTS`.
 - gzip and zstd both ways. brotli is read, not written, until stdx has an encoder.
-- Interceptors on the server and the client, typed error details, timeouts, headers and trailers.
+- Interceptors on the server and the client, typed error details, timeouts, headers, and trailers.
   A client interceptor's hooks get the context the call's `init` takes, such as a pointer to the
   program's state (decision 44).
-- A handler takes the call's context, its request and its response, as connect-go splits them:
+- A handler takes the call's context, its request, and its response, as connect-go splits them:
   `rpc.Context`, `rpc.Request(T)` or `RequestStream(T)`, and `rpc.Response(T)` or
   `ResponseStream(T)`. An interceptor takes `rpc.AnyRequest` and `rpc.AnyResponse`, with no
   message (decision 36).
@@ -372,41 +372,41 @@ The first release. It builds on colibri v0.17.0, and on the stdx (`22f5139`) and
 ### OpenID Connect
 
 - `oidc`, a module that checks an OpenID Connect bearer token with no I/O: a JWT signed with
-  RS256, ES256 or EdDSA, then its issuer, its audience and its times (decision 34). The program
+  RS256, ES256, or EdDSA, then its issuer, its audience, and its times (decision 34). The program
   passes the issuer's JWK Set and the time.
 - `oidc` checks signatures with chapulin, the TLS library colibri links, through one object:
   connect-zig's build asks for chapulin with colibri's own request.
 - `oidc.Interceptor`, a server interceptor that refuses a call with no valid token, and lets
   the paths a program excludes through. It writes the claims into the call's values.
-  `Claims.string`, `integer` and `holds` read a program's own claims, such as `email` or
+  `Claims.string`, `integer`, and `holds` read a program's own claims, such as `email` or
   `roles`.
 
 ### Protobuf
 
-- A runtime with no allocator: decoding leaves strings, bytes and repeated fields pointing into
+- A runtime with no allocator: decoding leaves strings, bytes, and repeated fields pointing into
   the input, and a message is encoded straight into the body it goes out in.
 - `decode_into` reads each repeated field's elements, and each recursive field's message, into
   storage the caller owns, once. A program that reads every field takes it, and parses nothing
   twice. `decode` stores nothing (decision 37).
 - JSON decode checks the binary it transcodes once, as it writes it, and decodes it one level:
-  tree's JSON decode takes 23% fewer instructions, deep 17% and large 14%. An array of a packed
+  tree's JSON decode takes 23% fewer instructions, deep 17%, and large 14%. An array of a packed
   field transcodes to one packed record, as the encoder writes it: packed JSON decode takes 18%
   fewer instructions.
 - JSON encode opens a nested message's object with its member's name in one stdx call: deep's
   JSON encode takes 9% fewer instructions.
 - A repeated field's iterator gives a message in place: for a field of messages, `next`
   returns a pointer, and copies no message that `decode_into` stored or that a program set.
-  The pointer holds until the next call. A number, a string or an enum still comes back by
+  The pointer holds until the next call. A number, a string, or an enum still comes back by
   value.
 - A server reads each binary request's repeated fields into storage once, so a handler that
   reads them parses them once: each route holds `storage_bytes`, `message_bytes` by default, and
   0 keeps `decode`. A client passes storage in its `connect.Scratch`.
 - Every scalar type, `optional`, packed and unpacked repeated fields, maps with every key type,
   oneofs, enums, recursive messages, and unknown fields kept and written back.
-- proto2, proto3, and editions 2023 and 2024, with groups, closed enums and `utf8_validation`.
+- proto2, proto3, and editions 2023 and 2024, with groups, closed enums, and `utf8_validation`.
 - The proto3 JSON mapping, with every well-known type: Timestamp, Duration, FieldMask, the
-  wrappers, Empty, Struct, Value, ListValue and Any.
-- base64 from stdx for bytes in JSON, error details, "-bin" values and unary GET messages. A
+  wrappers, Empty, Struct, Value, ListValue, and Any.
+- base64 from stdx for bytes in JSON, error details, "-bin" values, and unary GET messages. A
   value whose pad characters do not complete a quantum of four is refused (RFC 4648 §4).
 - `protoc-gen-connect-zig`, a protoc and buf plugin that writes one `.pb.zig` file for each
   `.proto` file. A field or an enum value named `protobuf` gains an underscore, since each
@@ -414,16 +414,16 @@ The first release. It builds on colibri v0.17.0, and on the stdx (`22f5139`) and
 
 ### Runs on any event loop
 
-- The library does no I/O, holds no allocator and reads no clock. It builds on colibri's protocol
+- The library does no I/O, holds no allocator, and reads no clock. It builds on colibri's protocol
   modules alone and never names Rotor (decision 32).
 - The examples run on `colibri.Server` and colibri's in-memory links, and one serves ELIZA on
   colibri's engine over Zig's `std.Io`, with no Rotor at all.
-- The package exports colibri's `server`, `client`, `http`, `tls` and `colibri` modules, so a
+- The package exports colibri's `server`, `client`, `http`, `tls`, and `colibri` modules, so a
   program builds on the colibri that `connect_colibri` uses. `.rotor = true` builds
   `colibri.Server` and `colibri.Client` on Rotor (decision 39).
-- Each example is a Zig project of its own, which you can copy: its own manifest, schema and
+- Each example is a Zig project of its own, which you can copy: its own manifest, schema, and
   generated code. `zig build test` runs its check, and `zig build serve` serves its service over
-  TLS on h11, h2 and h3, for curl and buf curl. `examples/quickstart` holds the README's steps
+  TLS on h11, h2, and h3, for curl and buf curl. `examples/quickstart` holds the README's steps
   (decision 41).
 
 ### Checked
@@ -437,7 +437,7 @@ The first release. It builds on colibri v0.17.0, and on the stdx (`22f5139`) and
   field mask written that JSON could not carry back, URL-safe JSON bytes with pad bits refused,
   and a oneof's repeated `Lazy` member that silently replaced the first.
 - Clients in other languages call connect-zig's server: connect-go, grpc-go, connect-es on Node,
-  grpcio, tonic and connect-rust, across every protobuf type. connect-zig's client calls their
+  grpcio, tonic, and connect-rust, across every protobuf type. connect-zig's client calls their
   servers too.
 - Every protobuf type is compared with Go's runtime, and closed enums and unchecked strings with
   upb's.
@@ -449,10 +449,10 @@ The first release. It builds on colibri v0.17.0, and on the stdx (`22f5139`) and
   connect-go and connect-rust, which CI publishes.
 - CI runs the tests on x86-64 Linux and on arm64 Linux.
 - A project that fetches connect-zig as a package follows the README: it generates its code
-  with the plugin, and serves a method over TLS on h11, h2 and h3. It calls the method with
+  with the plugin, and serves a method over TLS on h11, h2, and h3. It calls the method with
   connect-zig's client over h2 and h3, and with curl over h11. `tools/package_check.sh` runs it
   as a CI job of its own.
-- `oidc` verifies the RFCs' known answers for RS256, ES256 and EdDSA, and RS256 tokens that
+- `oidc` verifies the RFCs' known answers for RS256, ES256, and EdDSA, and RS256 tokens that
   OpenSSL signs, and each of its checks was broken on purpose to prove a test catches it.
 
 ### Known limits

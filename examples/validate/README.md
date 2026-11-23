@@ -23,9 +23,9 @@ options:
 | --- | --- |
 | [proto/signup/v1/signup.proto](proto/signup/v1/signup.proto) | The schema and its rules |
 | [proto/buf.yaml](proto/buf.yaml) | The buf module, which takes validate.proto from the Buf Schema Registry |
-| [src/service/service.zig](src/service/service.zig) | The handlers, the interceptor and the values of a call |
+| [src/service/service.zig](src/service/service.zig) | The handlers, the interceptor, and the values of a call |
 | [src/app.zig](src/app.zig) | This example's `App` and route table |
-| [src/main.zig](src/main.zig) | The check, over h2, h11 and h3 |
+| [src/main.zig](src/main.zig) | The check, over h2, h11, and h3 |
 | [src/serve.zig](src/serve.zig) | The same routes on a socket, to play with |
 
 ## Run it

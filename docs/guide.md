@@ -78,7 +78,7 @@ module.addImport("eliza", eliza);
 
 ## 3. Write a handler
 
-A handler takes the call's context, its request and its response, as connect-go splits them. It
+A handler takes the call's context, its request, and its response, as connect-go splits them. It
 fills its response and returns `null`, or returns the error the client reads:
 
 ```zig
@@ -96,7 +96,7 @@ pub fn say(app: *App, ctx: *rpc.Context, request: *const rpc.Request(eliza.SayRe
 
 - `ctx` is the call: `path()`, `protocol()`, `codec()`, `timeout_ns()`, the counts `received()`
   and `sent()`, and `values(T)`, your own values for this call.
-- `request` holds the message, and `header(name)`, `headers()` and `query()`.
+- `request` holds the message, and `header(name)`, `headers()`, and `query()`.
 - `response` holds the message to fill, and `add_header` and `add_trailer`.
 
 Each stream type takes the request and the response that fit it:
@@ -114,7 +114,7 @@ handler as a type with `on_message` and `on_end`: over h2 the stream is then ful
 An interceptor is a type that a route lists in its options. Its `on_call(app, ctx, request,
 response)` runs before the handler and may refuse the call, and `on_finish(app, ctx, response,
 failure)` sees the outcome. Its request and response, `rpc.AnyRequest` and `rpc.AnyResponse`,
-hold the headers, the query and the trailers, with no message.
+hold the headers, the query, and the trailers, with no message.
 
 ## 4. Route it
 
@@ -200,7 +200,7 @@ const answer = try response.next(eliza.SayResponse);
 if (response.failure) |failure| std.debug.print("{s}\n", .{failure.message});
 ```
 
-`.protocol` picks Connect, the default, gRPC or gRPC-Web, and the rest of the call stays the same.
+`.protocol` picks Connect (the default), gRPC, or gRPC-Web, and the rest of the call stays the same.
 On Rotor, `colibri.Client(.{}, .private)` holds the pool. Over TLS, the pool's configuration
 names what it trusts:
 
@@ -221,7 +221,7 @@ lets an interceptor count what it sees. A call with no context passes `{}`.
 
 ## 6. Require a bearer token
 
-The `oidc` module checks a JWT that an OpenID Connect provider signed with RS256, ES256 or
+The `oidc` module checks a JWT that an OpenID Connect provider signed with RS256, ES256, or
 EdDSA. It does no I/O and reads no clock: your program fetches the provider's JWK Set and passes
 its text and the time. Import it as the others, as `connect_zig.module("oidc")`:
 
@@ -254,7 +254,7 @@ if (ctx.values(Values).oidc) |*claims| {
 ```
 
 The verifier checks the signature with the key the token names, then the issuer, the audience,
-`exp` and `nbf` ([decision 34](decisions.md)). A call with no valid token gets `unauthenticated` and a
+`exp`, and `nbf` ([decision 34](decisions.md)). A call with no valid token gets `unauthenticated` and a
 `WWW-Authenticate: Bearer` header. On an excluded path, `oidc` stays null. `oidc` checks
 signatures with chapulin, which colibri already links, so it adds no second crypto library.
 
@@ -278,14 +278,14 @@ The `protovalidate` module checks a message against the rules its schema states.
 
 Editions 2023 and 2024 follow [protobuf.dev's editions
 overview](https://protobuf.dev/editions/overview/): field presence, packed and expanded repeated
-fields, delimited messages, closed enums and `utf8_validation`. The library does not report a
+fields, delimited messages, closed enums, and `utf8_validation`. The library does not report a
 missing required field ([decision 23](decisions.md)).
 
 ## More examples
 
 [examples/](../examples) holds twelve projects, each a Zig project you can copy ([decision 41](decisions.md)). They
 range from generated messages to streaming, interceptors, error details, bearer tokens, a
-GitHub-style API, an OpenTelemetry trace receiver and a socket server. Each checks itself
+GitHub-style API, an OpenTelemetry trace receiver, and a socket server. Each checks itself
 with `zig build test`, and serves its service with `zig build serve` for curl and `buf curl`.
 [examples/std_io](../examples/std_io) runs with no Rotor: it drives colibri's engine over Zig's
 `std.Io`. [examples/README.md](../examples/README.md) says where to start.

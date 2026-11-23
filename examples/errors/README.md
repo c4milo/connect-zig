@@ -2,7 +2,7 @@
 
 `errors.v1.CalculatorService/Divide`, which fails with a typed detail when the divisor is 0:
 `invalid_argument`, with an `errors.v1.DivisionByZero` that holds the dividend. The check reads
-the error and its detail in Connect, gRPC and gRPC-Web, and calls a method the service does not
+the error and its detail in Connect, gRPC, and gRPC-Web, and calls a method the service does not
 have, which answers `unimplemented`.
 
 ![A terminal session: zig build run checks the typed errors, then curl divides by zero and reads the DivisionByZero detail](walkthrough.gif)

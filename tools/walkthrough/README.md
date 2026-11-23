@@ -20,6 +20,6 @@ each command's output. It writes the session to [sessions/](sessions), then rend
 - `session.html` draws the terminal from the time alone, so HyperFrames may render any frame in
   any order.
 
-It needs zig, buf, curl and go, and what HyperFrames needs: Node 22 or later, FFmpeg and Chrome.
+It needs zig, buf, curl, and go, and what HyperFrames needs: Node 22 or later, FFmpeg, and Chrome.
 HyperFrames runs with its telemetry off (`HYPERFRAMES_NO_TELEMETRY` and `DO_NOT_TRACK`), and
 installs no skill (`--skip-skills`). Run it again when an example's commands or output change.

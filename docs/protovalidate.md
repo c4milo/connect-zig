@@ -48,8 +48,8 @@ protovalidate.validate(User, &user, .{ .cpu_features = cpu_features }, &report) 
 
 Import it as `connect_zig.module("protovalidate")`, and give a generated file that holds rules
 the same module: its header names it. A message with no rule keeps the code it had. `validate`
-checks `required`, `ignore`, a oneof's `required`, a message's `oneof` rules and each type's
-standard rules, and walks nested messages, repeated fields and maps. A rule that reads the time,
+checks `required`, `ignore`, a oneof's `required`, a message's `oneof` rules, and each type's
+standard rules, and walks nested messages, repeated fields, and maps. A rule that reads the time,
 such as `timestamp.lt_now`, takes it from `.{ .now = ... }`. A rule's regular expression
 searches with the CPU features in `.cpu_features`, stdx's `codec.Features`. The module probes no
 CPU, so your program calls `codec.Features.detect()` once as it starts. `codec` is stdx's: name
@@ -118,9 +118,10 @@ message Booking {
 The module compiles each expression when your program compiles, from the text the table holds
 ([decision 47](decisions.md)). It reads the expression, gives each part a type from the message's fields, and
 unfolds it into plain code, so no interpreter and no expression's tree exist at run time. It
-reads CEL's operators, conditionals, field selection, `has`, `dyn`, lists and maps with `in`,
-`size`, an index and the macros `all`, `exists` and `exists_one`, the conversions, the string
-functions, and protovalidate's own functions, such as `isEmail` and `isIpPrefix`.
+reads CEL's operators, conditionals, field selection, `has`, and `dyn`. It reads lists and maps,
+with `in`, `size`, an index, and the macros `all`, `exists`, and `exists_one`. It also reads the
+conversions, the string functions, and protovalidate's own functions, such as `isEmail` and
+`isIpPrefix`.
 
 - An expression that does not parse, names a field its message lacks, or calls a function with
   the wrong types stops your build, with a message that names the expression.
@@ -150,7 +151,7 @@ message Order {
 
 The plugin reads each extension from its request and writes its value and its rules into the
 table of the message that sets it. An expression reads the field as `this`, the extension's
-value as `rule` and the rule message as `rules`. A value is a scalar, a wrapper such as
+value as `rule`, and the rule message as `rules`. A value is a scalar, a wrapper such as
 `google.protobuf.Int64Value`, or a list of them.
 
 ## Patterns
@@ -164,7 +165,7 @@ build.
 ## Messages from `format`
 
 A rule's message may come from CEL's `format`, as in `'not a valid path: %s'.format([this])`.
-The text and the list are literals, and the conversions `%s`, `%d`, `%x` and `%X` are read.
+The text and the list are literals, and the conversions `%s`, `%d`, `%x`, and `%X` are read.
 The text is written into the report's storage, so a report needs room for it.
 
 ## What stops the build
@@ -183,7 +184,7 @@ given back as it runs.
 so it takes no memory, and reading it twice computes it twice.
 
 A list literal, `[1, 2]`, and a map literal, `{'a': 1, 'b': 2}`, may hold elements of two
-types, such as `[1, 'a']`, and a map's keys are ints, uints, bools or strings. `[]` and `{}`
+types, such as `[1, 'a']`, and a map's keys are ints, uints, bools, or strings. `[]` and `{}`
 are a list and a map of any type. `==` compares two lists element by element, and two maps key
 by key, so `this.labels == {'env': 'prod'}` reads. An index into a list of two element types
 takes a place your build knows, such as `[1, 'a'][0]`, and `filter` and `map` take no such
@@ -214,13 +215,13 @@ map fields: `tools/wide` has one with 1,100.
 ## Speed
 
 One decode of a request message and one validation of it against the rules of
-its schema, beside protovalidate-go, protovalidate-es on Node.js, protovalidate-buffa and
+its schema, beside protovalidate-go, protovalidate-es on Node.js, protovalidate-buffa, and
 prost-protovalidate. From CI's [run 265](https://github.com/c4milo/connect-zig/actions/runs/45231244610), on a Neoverse-N2 core, arm64: connect-zig is 15 to
 65 times as fast as protovalidate-go, and the fastest of the five in all six cases. On an AMD EPYC
 9V74 core it is 13 to 57 times as fast, and the fastest in all six too.
 [benchmarks.md](benchmarks.md), "Validation", holds the tables and says how it is measured.
 
-![Bars of the speed of a decode with a validation through connect-zig, protovalidate-buffa, prost-protovalidate and protovalidate-es, in multiples of protovalidate-go's, on arm64: connect-zig is 15 to 65 times as fast as protovalidate-go and the fastest in 6 of 6 cases](images/validate-vs-go-arm64.svg)
+![Bars of the speed of a decode with a validation through connect-zig, protovalidate-buffa, prost-protovalidate, and protovalidate-es, in multiples of protovalidate-go's, on arm64: connect-zig is 15 to 65 times as fast as protovalidate-go and the fastest in 6 of 6 cases](images/validate-vs-go-arm64.svg)
 
 ## How it is checked
 

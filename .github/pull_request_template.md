@@ -9,5 +9,5 @@
       commit body.
 - [ ] Each check that a spec requires cites the spec and the section on its line.
 - [ ] Each commit is a Conventional Commit, and `zig build lint-commits` passes.
-- [ ] I changed no named limit, no dependency and no edge of the module graph, or an issue
+- [ ] I changed no named limit, no dependency, and no edge of the module graph, or an issue
       approved the change first.

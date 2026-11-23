@@ -45,14 +45,14 @@ JSON decode by 1.09 times.
 ## The routed call
 
 From CI's [run 265](https://github.com/c4milo/connect-zig/actions/runs/45231244610), on an Arm Neoverse-N2 core. One unary call in memory through each library's
-router, protocol and codec. connect-zig is 9.6 to 12.4 times as fast as connect-go, and 3.3 to 5.6
+router, protocol, and codec. connect-zig is 9.6 to 12.4 times as fast as connect-go, and 3.3 to 5.6
 times as fast as connect-rust.
 
 ![Bars of the speed of a routed unary call through connect-zig and connect-rust, in multiples of connect-go's, on arm64: connect-zig is 9.6 to 12.4 times as fast as connect-go, and 3.3 to 5.6 times as fast as connect-rust](images/call-vs-go-arm64.svg)
 
 The routed calls (`bench/call.zig`) run the same unary call in memory through connect-zig,
-connect-go and connect-rust: the router, the route, the protocol and the codec, with no socket, no
-TLS and no HTTP/2 framing. connect-go's router is an `http.ServeMux`, as a server's is. Each program
+connect-go, and connect-rust: the router, the route, the protocol, and the codec, with no socket, no
+TLS, and no HTTP/2 framing. connect-go's router is an `http.ServeMux`, as a server's is. Each program
 builds its request once and times the calls alone. connect-zig replays a request head that colibri
 has already parsed. connect-go copies a request that `httptest` built once, and writes into one
 response writer that each call clears. connect-rust clones a head that `http::Request::builder`
@@ -88,12 +88,12 @@ From CI's [run 266](https://github.com/c4milo/connect-zig/actions/runs/452461199
 core for 33,000 servers. connect-zig holds 7.0 times connect-go's spans a second and 2.7 times
 connect-rust's, in 321 MiB that it takes at start.
 
-![Bars of the spans a second one core holds with p99 under 100 ms over TLS, the median of three rounds with their range, and lines of p99 as the rate climbs, on arm64: connect-zig holds 711,570 spans a second, 7.0 times connect-go's 101,213, 2.7 times connect-rust's 263,440, 3.3 times the OpenTelemetry Collector's 215,818 and 8.6 times Vector's 82,310](images/fullstack-arm64.svg)
+![Bars of the spans a second one core holds with p99 under 100 ms over TLS, the median of three rounds with their range, and lines of p99 as the rate climbs, on arm64: connect-zig holds 711,570 spans a second, 7.0 times connect-go's 101,213, 2.7 times connect-rust's 263,440, 3.3 times the OpenTelemetry Collector's 215,818, and 8.6 times Vector's 82,310](images/fullstack-arm64.svg)
 
 <details>
-<summary>On x86-64, connect-zig holds 6.2 times connect-go's spans a second, 2.1 times connect-rust's, 3.0 times the Collector's and 7.5 times Vector's.</summary>
+<summary>On x86-64, connect-zig holds 6.2 times connect-go's spans a second, 2.1 times connect-rust's, 3.0 times the Collector's, and 7.5 times Vector's.</summary>
 
-![Bars of the spans a second one core holds with p99 under 100 ms over TLS, the median of three rounds with their range, and lines of p99 as the rate climbs, on x86-64: connect-zig holds 990,541 spans a second, 6.2 times connect-go's 160,510, 2.1 times connect-rust's 476,179, 3.0 times the OpenTelemetry Collector's 327,675 and 7.5 times Vector's 132,786](images/fullstack.svg)
+![Bars of the spans a second one core holds with p99 under 100 ms over TLS, the median of three rounds with their range, and lines of p99 as the rate climbs, on x86-64: connect-zig holds 990,541 spans a second, 6.2 times connect-go's 160,510, 2.1 times connect-rust's 476,179, 3.0 times the OpenTelemetry Collector's 327,675, and 7.5 times Vector's 132,786](images/fullstack.svg)
 
 </details>
 
@@ -116,14 +116,14 @@ OTLP exports. The servers:
   (`tools/fullstack/connect-go` and `tools/fullstack/connect-rust`). Each counts the spans of
   each export and drops it, as connect-zig's receiver does.
 
-Each server decodes and checks every span, counts it and drops it. Each runs on one core, the
+Each server decodes and checks every span, counts it, and drops it. Each runs on one core, the
 Collector and connect-go with `GOMAXPROCS=1`, Vector with one thread, and connect-rust with one
 tokio worker. connect-zig's sink is built for the machine's CPU, connect-go at the highest level
-of the CPU that Go names, and connect-rust with LTO and `target-cpu=native`. The Collector, Vector
+of the CPU that Go names, and connect-rust with LTO and `target-cpu=native`. The Collector, Vector,
 and Rotel run their projects' release builds. Each run checks every span.
 
 The production model stands for one core of a 64-core gateway that 33,000 servers send their traces
-to. Each server holds 516 connections. 70%, 25% and 5% of them send gzip exports of 16, 128 and 512
+to. Each server holds 516 connections. 70%, 25%, and 5% of them send gzip exports of 16, 128, and 512
 spans. The load, `tools/fullstack/load`, opens the 516 connections once and keeps them across the
 climb, as the agents keep theirs. Each connection sends 32 versions of its class's export in turn,
 so a decoder does not read the same octets on every call. It sends at fixed rates, each
@@ -194,7 +194,7 @@ connect-rust holds a sixth of it. Vector held twice the memory it held in run 25
 sent one export again and again; no check here measures why.
 
 Rotel has no TLS on its receiver, so a check of its own, `fullstack-cleartext`, climbs in
-cleartext h2 for connect-zig, the Collector and Rotel, on x86-64 alone. There connect-zig held
+cleartext h2 for connect-zig, the Collector, and Rotel, on x86-64 alone. There connect-zig held
 820,142 spans a second, 4.14 times the Collector's 198,018 and 3.41 times Rotel's 240,307, and 3.77
 to 4.36 and 3.41 to 3.59 times round by round. All three held their rate for 60 s. Rotel grew to
 327 MiB, and the Collector to 186 MiB.
@@ -204,7 +204,7 @@ Read these numbers with their limits:
 - Every server and the load run on one machine, and talk over its loopback device: no network
   card, no second machine, no lost packet.
 - Three rounds narrow the spread of one job, not of the runner: an x86-64 runner's CPU model
-  changes from job to job, and this run's x86-64 jobs ran on AMD EPYC 9V45, AMD EPYC 7763 and
+  changes from job to job, and this run's x86-64 jobs ran on AMD EPYC 9V45, AMD EPYC 7763, and
   Intel Xeon 6973P-C and 6975P-C cores. Compare a number only with the numbers of its own table.
   The arm64 runner has been a Neoverse-N2 in each run.
 - On x86-64 the server's CPU shares its physical core with the CPU where the scripts run, which
@@ -245,7 +245,7 @@ CPU.
 
 From the same run, on an Arm Neoverse-N2 core over TLS. Each Connect receiver runs a second time,
 and checks every span of each export against OTLP's span rules before it counts it. With
-validation, one core of connect-zig keeps 87% of its spans a second, connect-rust 94% and
+validation, one core of connect-zig keeps 87% of its spans a second, connect-rust 94%, and
 connect-go 62%. So connect-zig with protovalidate holds 2.5 times connect-rust's spans a second
 with protovalidate-buffa, and 9.8 times connect-go's with protovalidate-go.
 
@@ -278,8 +278,8 @@ what validation costs it in CPU a span:
 
 The CPU a span compares each receiver with its twin at the highest rate both first rounds held,
 since a span costs less CPU as the rate rises. On arm64 that rate was 569,600 spans a second for
-connect-zig, 213,600 for connect-rust and 53,400 for connect-go, and on x86-64 it was 854,400,
-356,000 and 71,200. On x86-64, connect-zig's two rates overlap over the rounds, so the rounds
+connect-zig, 213,600 for connect-rust, and 53,400 for connect-go, and on x86-64 it was 854,400,
+356,000, and 71,200. On x86-64, connect-zig's two rates overlap over the rounds, so the rounds
 cannot tell its rate with validation from its rate without.
 
 At the peak on x86-64, with one export sent again and again, validation costs connect-zig 1.8 µs a
@@ -295,20 +295,20 @@ did not fit. The check fails when the sink counts one.
 
 ### With compression
 
-From the same run, on an Arm Neoverse-N2 core over TLS. connect-zig, connect-go and connect-rust
-each take the production model's exports uncompressed and in gzip, zstd and brotli. Over TLS, one
-core of connect-zig holds 7% more spans a second in gzip than uncompressed, 10% more in zstd and 8%
+From the same run, on an Arm Neoverse-N2 core over TLS. connect-zig, connect-go, and connect-rust
+each take the production model's exports uncompressed and in gzip, zstd, and brotli. Over TLS, one
+core of connect-zig holds 7% more spans a second in gzip than uncompressed, 10% more in zstd, and 8%
 fewer in brotli. connect-go holds 18% to 24% fewer, and connect-rust 9% to 21% fewer.
 
-![Bars of the spans a second each Connect receiver holds over TLS with exports in gzip, zstd and brotli, as a share of the same receiver with uncompressed exports in the same round, and of its calls a second at peak, on arm64: connect-zig holds 107%, 110% and 92%, connect-go 76%, 82% and 78%, and connect-rust 86%, 91% and 79%](images/fullstack-compression-arm64.svg)
+![Bars of the spans a second each Connect receiver holds over TLS with exports in gzip, zstd, and brotli, as a share of the same receiver with uncompressed exports in the same round, and of its calls a second at peak, on arm64: connect-zig holds 107%, 110%, and 92%, connect-go 76%, 82%, and 78%, and connect-rust 86%, 91%, and 79%](images/fullstack-compression-arm64.svg)
 
 `tools/fullstack/compression.sh` runs the climb and the peak of the production model on the three
 Connect receivers, in three rounds of each coding. Each round gives each receiver its codings in
 an order of its own, and a coding's share compares it with the receiver uncompressed in the same
 round. stdx's encoders write each export as a connect-zig client does: gzip at stdx's default
 level, and zstd and brotli at level 1. Each receiver decodes with its library's own decoders, at
-their defaults: connect-zig with stdx's, connect-go with compress/gzip, klauspost/compress and
-andybalholm/brotli, and connect-rust with flate2, zstd and brotli. Every span is checked. The
+their defaults: connect-zig with stdx's, connect-go with compress/gzip, klauspost/compress, and
+andybalholm/brotli, and connect-rust with flate2, zstd, and brotli. Every span is checked. The
 octets of each class's first export:
 
 | Export | Uncompressed | gzip | zstd | brotli |
@@ -378,12 +378,12 @@ gzip and 120% in zstd on arm64. The run's summary holds every table.
 ## Validation
 
 One decode of a request message and one validation of it against the rules of
-its schema, beside protovalidate-go, protovalidate-es on Node.js, protovalidate-buffa and
+its schema, beside protovalidate-go, protovalidate-es on Node.js, protovalidate-buffa, and
 prost-protovalidate. From CI's [run 265](https://github.com/c4milo/connect-zig/actions/runs/45231244610), on an Arm Neoverse-N2 core: connect-zig is 15 to 65
 times as fast as protovalidate-go, and the fastest of the five in all six cases. On an AMD EPYC
 9V74 core it is 13 to 57 times as fast, and the fastest in all six too.
 
-![Bars of the speed of a decode with a validation through connect-zig, protovalidate-buffa, prost-protovalidate and protovalidate-es, in multiples of protovalidate-go's, on arm64: connect-zig is 15 to 65 times as fast as protovalidate-go and the fastest in 6 of 6 cases](images/validate-vs-go-arm64.svg)
+![Bars of the speed of a decode with a validation through connect-zig, protovalidate-buffa, prost-protovalidate, and protovalidate-es, in multiples of protovalidate-go's, on arm64: connect-zig is 15 to 65 times as fast as protovalidate-go and the fastest in 6 of 6 cases](images/validate-vs-go-arm64.svg)
 
 `tools/validate_compare_check.sh` times five implementations of protovalidate on one schema,
 `bench/validate/proto`, and requires each to give each message the same verdict:
@@ -401,9 +401,9 @@ crates most downloaded in November 2026, about 535,000 and 314,000 times; Buf pu
 library yet.
 
 The schema holds three messages. `Small` has three fields of one standard rule each. `Medium` is a
-typical request of an API: a standard rule of each kind, among them `uuid`, `email`, `uri`,
-`hostname`, `ip`, a repeated field with `unique`, a map, a required message, bytes and a
-duration, and two CEL rules of the message. `Rules` holds CEL rules alone, over lists, a map
+typical request of an API: two CEL rules of the message, and a standard rule of each kind. Its
+standard rules cover `uuid`, `email`, `uri`, `hostname`, `ip`, a repeated field with `unique`, a
+map, a required message, bytes, and a duration. `Rules` holds CEL rules alone, over lists, a map,
 and two fields. `bench/validate/cases` holds a valid and an invalid message of each as JSON, and
 `buf convert` encodes them. Since step 35, `Medium`'s name takes a `pattern`, which its invalid
 message breaks.

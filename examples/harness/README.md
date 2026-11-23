@@ -1,13 +1,13 @@
 # The harness
 
-A package, not an example (decision 41). It stands where a program's sockets, certificate and
+A package, not an example (decision 41). It stands where a program's sockets, certificate, and
 clock would be, so each example can check itself in one process. The examples depend on it by
 path: `.harness = .{ .path = "../harness" }`.
 
 | Module or file | Holds |
 | --- | --- |
 | `harness`, [src/harness.zig](src/harness.zig) | The module's root |
-| [src/rounds.zig](src/rounds.zig) | `Rounds(App, Router)`: a client and a server that run a round of calls in memory, over h11, h2 or h3 |
+| [src/rounds.zig](src/rounds.zig) | `Rounds(App, Router)`: a client and a server that run a round of calls in memory, over h11, h2, or h3 |
 | [src/call.zig](src/call.zig) | `Call(method, options)`: a client call with the buffers it writes and reads in |
 | [src/serve.zig](src/serve.zig) | `Served(App, Router)`: an example's routes on a real socket, for `zig build serve` |
 | [src/link.zig](src/link.zig), [src/link_datagram.zig](src/link_datagram.zig) | colibri's in-memory links for octet streams and for datagrams, copied unchanged |
