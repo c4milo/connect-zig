@@ -12,9 +12,9 @@ pub const tcp_connections = 528;
 /// QUIC connections at once. The benchmark sends none, but the server binds UDP too.
 pub const quic_connections = 1;
 /// Calls the router answers at once: as many as the benchmark has in flight, at most. Each call
-/// holds about 3.75 MiB, most of it four buffers of `message_bytes` that `connect_colibri` keeps
-/// for its request and its reply, and `storage_bytes`, so these calls take most of the sink's
-/// memory.
+/// holds about 1.8 MiB: `storage_bytes`, two buffers of `message_bytes` for its request, and
+/// `body_bytes`. So these calls take the largest part of the sink's memory. A call past them is
+/// answered 503 at once, which gRPC reads as UNAVAILABLE and an OpenTelemetry exporter retries.
 pub const requests = 64;
 /// The longest export a call reads: the benchmark's largest request holds 512 spans in about
 /// 192 KB, and an OpenTelemetry SDK sends at most 512 spans in one export by default.
@@ -30,5 +30,9 @@ pub const storage_bytes = 1_048_576;
 pub const body_bytes = message_bytes + 1024;
 /// Room for one reply with its headers and trailers: an empty message, or the count's line.
 pub const response_bytes = 4 * 1024;
+/// The longest reply message the export route writes: OTLP's reply to an export is empty, and it
+/// goes out within `response_bytes` with its headers. The route's two reply buffers take this
+/// and not `message_bytes`, which saves about 0.5 MiB a call.
+pub const reply_bytes = response_bytes;
 /// The path that answers with the count of what the sink took.
 pub const count_path = "/sink/count";

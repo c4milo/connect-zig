@@ -145,6 +145,8 @@ Set the first two above the routes' `message_bytes`. Each call also holds storag
 A decoded message takes more room than its octets. A request whose lists do not fit is still
 answered, but each read of such a list parses it again: give your context a field
 `messages_past_storage: u64` to count them, and raise the route's `storage_bytes` when it grows.
+Each call also holds two buffers of `message_bytes` for its reply. A method whose replies are
+short sets `reply_bytes` to the longest it writes, and each call then holds that instead.
 `rpc.Refusals` answers 405 with an Allow header to a method Connect does not serve, such as
 DELETE, as connect-go does. To give methods options of their own, list each route by hand with
 `rpc.post(App, Service.say, say, options)` and `rpc.get`.

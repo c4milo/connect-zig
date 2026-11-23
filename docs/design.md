@@ -352,6 +352,15 @@ Each step names the check that proves it. A step is done when its check passes i
     `zig build test-connect` counts a message that does not fit and none that fits;
     `zig build test-connect-colibri` holds the default and the count's path to the context.
 
+39. **A reply of its own size.** `RouteOptions` gains `reply_bytes`, the longest reply message a
+    route writes, which takes `message_bytes` when it is null. Each call holds two buffers of it,
+    the reply's message and its compressed form, where both took `message_bytes`. The OTLP sink
+    sets it to its 4 KiB `response_bytes`, since OTLP's reply to an export is empty: a call holds
+    1.83 MiB in place of 2.32 MiB, and the sink 316 MiB in place of 347.5 MiB at 64 calls. New
+    public names: the field `reply_bytes` of `connect_colibri.RouteOptions`. Check: `zig build
+    test-connect-colibri` holds a reply's scratch to `reply_bytes`, and to `message_bytes` when it
+    is not set.
+
 ### Step records
 
 Each step records here what was run, on what, and what it printed, once its check passes. Each

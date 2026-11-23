@@ -25,6 +25,10 @@ It builds on colibri v0.19.2, with Zig 0.16.0.
   `protovalidate.Interceptor` among them, so raise the route's `storage_bytes` when the count
   grows. `protobuf.decode_into_use` gives the same answer, and the octets the decode filled, to
   a program that decodes by itself.
+- A route's `reply_bytes` sets the longest reply message it writes. Each call holds two buffers
+  for its reply, which took `message_bytes` each and take `reply_bytes` when it is set. The
+  OTLP sink of the benchmarks sets it to 4 KiB, and each of its calls holds 1.83 MiB in place of
+  2.32 MiB.
 - [docs/benchmarks.md](docs/benchmarks.md) loads OTLP receivers on connect-zig, connect-go and
   connect-rust with protovalidate, and with exports in gzip, zstd and brotli. Over TLS on an
   arm64 core, connect-zig keeps 86% of its spans a second with validation: 2.7 times

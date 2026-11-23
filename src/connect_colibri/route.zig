@@ -37,6 +37,11 @@ pub const Options = struct {
     /// it again. A context field `messages_past_storage: u64` counts the messages that did not
     /// fit (`short_count_of`).
     storage_bytes: ?usize = null,
+    /// The longest reply message the route writes, encoded or compressed. Null takes
+    /// `message_bytes`. Each call holds two buffers of it, so a route whose replies are short,
+    /// such as OTLP's export with its empty reply, saves memory with it. A reply past it fails
+    /// the call through the router's error handler, as one past `message_bytes` does.
+    reply_bytes: ?usize = null,
     /// The interceptors around the handler, outermost first (`dispatch.zig`).
     interceptors: []const type = &.{},
 };
@@ -60,10 +65,10 @@ pub fn CallState(comptime spec: RouteSpec, comptime handler: anytype) type {
         request_work: [options.message_bytes]u8 = undefined,
         tokens: [options.token_bytes]u8 = undefined,
         storage: [options.storage_bytes orelse options.message_bytes * constants.storage_per_message]u8 align(@alignOf(u64)) = undefined,
-        /// A reply message of `message_bytes`, after the octets of its envelope's prefix
+        /// A reply message of `reply_bytes`, after the octets of its envelope's prefix
         /// (`connect.server.Reply.prepare`).
-        reply_message: [reply_bytes]u8 = undefined,
-        reply_work: [reply_bytes]u8 = undefined,
+        reply_message: [reply_room_bytes]u8 = undefined,
+        reply_work: [reply_room_bytes]u8 = undefined,
         // colibri resets the state one top-level field at a time at each request, and a field
         // whose default is `undefined` costs no store (colibri decision 163). A default of `.{}`
         // writes each buffer the struct holds, so these default to `undefined`: `begin` writes
@@ -75,7 +80,7 @@ pub fn CallState(comptime spec: RouteSpec, comptime handler: anytype) type {
         /// How far a route with `next` wrote its response.
         outgoing: if (pulls) pull.Outgoing else struct {} = .{},
 
-        const reply_bytes = options.message_bytes + connect.constants.protocol.envelope_prefix_len;
+        const reply_room_bytes = (options.reply_bytes orelse options.message_bytes) + connect.constants.protocol.envelope_prefix_len;
         /// Whether the route asks the handler for each message of the response.
         pub const pulls = dispatch.pulls(handler);
     };
@@ -426,6 +431,30 @@ test "a request's scratch holds storage_per_message times message_bytes, or stor
     const none: RouteSpec = .{ .method = say, .options = .{ .message_bytes = message_bytes, .token_bytes = token_bytes, .storage_bytes = 0 } };
     var none_state: CallState(none, handler) = .{};
     try testing.expectEqual(@as(usize, 0), scratch_of(none, handler, &app, &none_state, .request).storage.len);
+}
+
+test "a reply's scratch holds reply_bytes, or message_bytes when it is not set" {
+    const handler = struct {
+        fn on_say(_: *struct {}, _: *context_file.Context, _: *const context_file.Request(Empty), _: *context_file.Response(Empty)) ?connect.RpcError {
+            return null;
+        }
+    }.on_say;
+    const say: connect.Method = .{ .service = "test.Notes", .name = "Say", .Request = Empty, .Response = Empty, .stream_type = .unary };
+    const prefix_len = connect.constants.protocol.envelope_prefix_len;
+    // Each size differs from the others, so no size stands in for another.
+    const message_bytes = 64;
+    const reply_bytes = 24;
+    var app: struct {} = .{};
+    const sized: RouteSpec = .{ .method = say, .options = .{ .message_bytes = message_bytes, .token_bytes = 16, .reply_bytes = reply_bytes } };
+    var state: CallState(sized, handler) = .{};
+    const reply = scratch_of(sized, handler, &app, &state, .reply);
+    try testing.expectEqual(@as(usize, reply_bytes + prefix_len), reply.message.len);
+    try testing.expectEqual(@as(usize, reply_bytes + prefix_len), reply.work.len);
+    // The request side keeps `message_bytes`.
+    try testing.expectEqual(@as(usize, message_bytes), scratch_of(sized, handler, &app, &state, .request).message.len);
+    const unset: RouteSpec = .{ .method = say, .options = .{ .message_bytes = message_bytes, .token_bytes = 16 } };
+    var unset_state: CallState(unset, handler) = .{};
+    try testing.expectEqual(@as(usize, message_bytes + prefix_len), scratch_of(unset, handler, &app, &unset_state, .reply).message.len);
 }
 
 /// A message with no field, for the tests of a route's scratch.
