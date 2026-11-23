@@ -35,9 +35,10 @@
 # It runs on Linux, where /proc gives a process's CPU time and peak memory. It needs h2load
 # (nghttp2-client), buf, python3, curl, go and cargo; H2LOAD and BUF name the first two. It
 # downloads the Collector, Vector, Rotel and oha, each pinned by SHA-256, into a cache, unless
-# OTELCOL, VECTOR, ROTEL and OHA name them. It builds the two sinks with -Drelease, unless
-# OTLP_SINK and OTLP_SINK_VALIDATE name them, and the two receivers, unless CONNECT_GO and
-# CONNECT_RUST name them.
+# OTELCOL, VECTOR, ROTEL and OHA name them. It builds the three sinks with -Drelease, unless
+# OTLP_SINK, OTLP_SINK_VALIDATE and OTLP_SINK_COMPRESSION name them, and the two receivers,
+# unless CONNECT_GO and CONNECT_RUST name them. The compression parts run
+# `otlp-sink-compression`, which holds more calls at once (tools/otlp_sink/constants.zig).
 set -eu
 cd "$(dirname "$0")/.."
 # The reports import tools/fullstack/machine.py, and Python leaves no cache of it in the tree.
@@ -167,11 +168,13 @@ if [ -z "${connect_rust}" ]; then
 fi
 sink="${OTLP_SINK:-}"
 sink_validate="${OTLP_SINK_VALIDATE:-}"
+sink_compression="${OTLP_SINK_COMPRESSION:-}"
 compress="${OTLP_COMPRESS:-}"
-if [ -z "${sink}" ] || [ -z "${sink_validate}" ] || [ -z "${compress}" ]; then
-    zig build otlp-sink otlp-sink-validate otlp-compress -Drelease >&2
+if [ -z "${sink}" ] || [ -z "${sink_validate}" ] || [ -z "${sink_compression}" ] || [ -z "${compress}" ]; then
+    zig build otlp-sink otlp-sink-validate otlp-sink-compression otlp-compress -Drelease >&2
     sink="${sink:-zig-out/bin/otlp-sink}"
     sink_validate="${sink_validate:-zig-out/bin/otlp-sink-validate}"
+    sink_compression="${sink_compression:-zig-out/bin/otlp-sink-compression}"
     compress="${compress:-zig-out/bin/otlp-compress}"
 fi
 commit="$(git rev-parse --short HEAD 2>/dev/null || echo unknown)"

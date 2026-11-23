@@ -7,7 +7,8 @@
 //! examples' code, and `count_spans` of the example's receiver. `zig build otlp-sink-validate`
 //! installs `otlp-sink-validate`, the same sink over tools/fullstack/validate/gen, whose spans
 //! carry OTLP's rules, which `protovalidate.Interceptor` checks before each `Export`. `zig build
-//! otlp-compress` installs the program that writes the compression part's exports in each coding,
+//! otlp-sink-compression` installs the sink of the compression part, which holds more calls at
+//! once (tools/otlp_sink/constants.zig, `requests_compression`). `zig build otlp-compress` installs the program that writes the compression part's exports in each coding,
 //! and `zig build otlp-validate-cost` the program that times validation by the route's storage.
 const std = @import("std");
 
@@ -17,15 +18,18 @@ pub fn add(b: *std.Build, graph: Graph) void {
     // The sink runs colibri's TLS, which a program defines chapulin's hook for, on Rotor: a host
     // target alone builds it, as the interop server.
     if (graph.oidc == null) return;
-    const plain = sink(b, graph, "otlp-sink", "examples/otlp/gen/opentelemetry/proto/", false);
+    const plain = sink(b, graph, "otlp-sink", "examples/otlp/gen/opentelemetry/proto/", .plain);
     b.step("otlp-sink", "Install the full-stack benchmark's OTLP server to zig-out/bin").dependOn(&b.addInstallArtifact(plain, .{}).step);
     const run = b.addRunArtifact(plain);
     if (b.args) |args| run.addArgs(args);
     b.step("run-otlp-sink", "Serve the OTLP sink on a TCP socket: zig build run-otlp-sink -- [port]").dependOn(&run.step);
     // The same sink over tools/fullstack/validate's schema, whose spans carry OTLP's rules, with
     // `protovalidate.Interceptor` around `Export`.
-    const validating = sink(b, graph, "otlp-sink-validate", "tools/fullstack/validate/gen/opentelemetry/proto/", true);
+    const validating = sink(b, graph, "otlp-sink-validate", "tools/fullstack/validate/gen/opentelemetry/proto/", .validate);
     b.step("otlp-sink-validate", "Install the OTLP sink that validates each export to zig-out/bin").dependOn(&b.addInstallArtifact(validating, .{}).step);
+    // The same sink with room for more calls at once, for the compression part.
+    const for_compression = sink(b, graph, "otlp-sink-compression", "examples/otlp/gen/opentelemetry/proto/", .compression);
+    b.step("otlp-sink-compression", "Install the OTLP sink of the compression part, with room for more calls at once, to zig-out/bin").dependOn(&b.addInstallArtifact(for_compression, .{}).step);
     const compress = b.addExecutable(.{ .name = "otlp-compress", .root_module = b.createModule(.{
         .root_source_file = b.path("tools/otlp_compress/main.zig"),
         .target = graph.target,
@@ -54,8 +58,12 @@ pub fn add(b: *std.Build, graph: Graph) void {
     b.step("otlp-validate-cost", "Install the profile of validation in the OTLP sink").dependOn(&b.addInstallArtifact(cost, .{}).step);
 }
 
-/// The sink over the generated code of `gen`, which validates each export when `validate` is set.
-fn sink(b: *std.Build, graph: Graph, name: []const u8, comptime gen: []const u8, validate: bool) *std.Build.Step.Compile {
+/// Each sink the build installs: the plain one, the one that validates each export, and the one
+/// of the compression part, which holds more calls at once (tools/otlp_sink/constants.zig).
+const Kind = enum { plain, validate, compression };
+
+/// The sink of `kind` over the generated code of `gen`.
+fn sink(b: *std.Build, graph: Graph, name: []const u8, comptime gen: []const u8, kind: Kind) *std.Build.Step.Compile {
     const common = generated(b, graph, gen ++ "common/v1/common.pb.zig", &.{});
     const resource = generated(b, graph, gen ++ "resource/v1/resource.pb.zig", &.{.{ .name = "opentelemetry_proto_common_v1_common", .module = common }});
     const trace = generated(b, graph, gen ++ "trace/v1/trace.pb.zig", &.{
@@ -77,7 +85,8 @@ fn sink(b: *std.Build, graph: Graph, name: []const u8, comptime gen: []const u8,
         },
     });
     const options = b.addOptions();
-    options.addOption(bool, "validate", validate);
+    options.addOption(bool, "validate", kind == .validate);
+    options.addOption(bool, "compression", kind == .compression);
     return b.addExecutable(.{ .name = name, .root_module = b.createModule(.{
         .root_source_file = b.path("tools/otlp_sink/main.zig"),
         .target = graph.target,

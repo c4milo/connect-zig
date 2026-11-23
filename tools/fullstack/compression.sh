@@ -96,6 +96,11 @@ compression_climbs() {
 
 compression_part() {
     transport="$1"
+    # connect-zig's sink with room for more calls at once: an uncompressed export holds its call
+    # longer while its octets arrive, and its climb would end on the calls and not on the core
+    # (tools/otlp_sink/constants.zig, `requests_compression`).
+    plain_sink="${sink}"
+    sink="${sink_compression}"
     compression_exports
     compression_peak
     compression_climbs
@@ -104,5 +109,6 @@ compression_part() {
         "${connect_go_text}" "${connect_rust_text}" "${commit}" "${placement}" "${peak_rounds}" \
         "${step_seconds}" "${p99_limit_ms}" "${tls_suite}" "${compression_codings}" ${production_classes}
     echo
+    sink="${plain_sink}"
     transport=tls
 }

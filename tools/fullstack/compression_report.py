@@ -197,6 +197,7 @@ write_peak()
 print(f"Machine: {machine()}.")
 security = f"{suite}; " if transport == "tls" else ""
 print(f"Load: {h2load} and {oha}, {security}{placement}.")
-print(f"Servers: connect-zig {commit} in ReleaseSafe, `tools/otlp_sink`, on stdx's decoders; {connect_go}, GOMAXPROCS=1, "
+print(f"Servers: connect-zig {commit} in ReleaseSafe, `otlp-sink-compression`, which holds more calls at once than the other parts' sink, "
+      f"on stdx's decoders; {connect_go}, GOMAXPROCS=1, "
       f"on compress/gzip, klauspost/compress and andybalholm/brotli; {connect_rust}, one tokio worker, on flate2, zstd "
       "and brotli (`tools/fullstack/connect-go`, `tools/fullstack/connect-rust`).")

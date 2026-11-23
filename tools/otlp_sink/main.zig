@@ -4,7 +4,8 @@
 //! loads it beside OpenTelemetry's Collector. Run it with `zig build run-otlp-sink -- [port]
 //! [cleartext]`. Port 0 lets the kernel choose. With `cleartext` it serves h11 and h2 with no TLS,
 //! and no h3, for the benchmark's cleartext climb. It prints `listening on port <port>`, and
-//! serves until it is killed.
+//! serves until it is killed. `otlp-sink-compression` is the same program with room for more
+//! calls at once, for the compression part (`constants.requests_compression`).
 const std = @import("std");
 const builtin = @import("builtin");
 const connect = @import("connect");
@@ -13,6 +14,7 @@ const colibri = @import("colibri");
 const tls = @import("tls");
 const platform = @import("platform");
 const identity = @import("test_identity");
+const sink_options = @import("sink_options");
 const constants = @import("constants.zig");
 const sink = @import("sink.zig");
 const App = sink.App;
@@ -30,7 +32,7 @@ const Router = server.Router(App, .{
     .error_handler = on_error,
     .Values = sink.Values,
     .routes = sink.routes,
-}, .{ .requests = constants.requests, .response_bytes = constants.response_bytes, .body_bytes = constants.body_bytes, .header_bytes = 0 });
+}, .{ .requests = if (sink_options.compression) constants.requests_compression else constants.requests, .response_bytes = constants.response_bytes, .body_bytes = constants.body_bytes, .header_bytes = 0 });
 
 const Server = colibri.Server(.{ .tcp_connections = constants.tcp_connections, .quic_connections = constants.quic_connections }, .private);
 

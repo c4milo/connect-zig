@@ -16,6 +16,11 @@ pub const quic_connections = 1;
 /// `body_bytes`. So these calls take the largest part of the sink's memory. A call past them is
 /// answered 503 at once, which gRPC reads as UNAVAILABLE and an OpenTelemetry exporter retries.
 pub const requests = 64;
+/// Calls the compression part's sink answers at once (`zig build otlp-sink-compression`). An
+/// uncompressed export holds its call longer while its octets arrive, so 64 calls fill before the
+/// core does, and that climb would measure the calls and not the coding. With room for the bursts,
+/// each climb ends on the core, as the other receivers' climbs do.
+pub const requests_compression = 256;
 /// The longest export a call reads: the benchmark's largest request holds 512 spans in about
 /// 192 KB, and an OpenTelemetry SDK sends at most 512 spans in one export by default.
 pub const message_bytes = 256 * 1024;

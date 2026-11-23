@@ -336,8 +336,11 @@ Each step names the check that proves it. A step is done when its check passes i
     round rotates. `zig build otlp-compress` writes each export with stdx's encoders, as a
     connect-zig client places them. The sink holds stdx's zstd and brotli
     decoders beside its gzip one, and the receivers on connect-go and connect-rust gain the codings
-    their libraries do not hold (decision 46 as amended). New public names: none. Check: the
-    counts of step 28 in each coding, which fail when a receiver refuses a coding.
+    their libraries do not hold (decision 46 as amended). The parts run `otlp-sink-compression`,
+    the sink with room for 256 calls at once: an uncompressed export holds its call longer while
+    its octets arrive, and with 64 calls the climb ended on the calls before the core. New public
+    names: none. Check: the counts of step 28 in each coding, which fail when a receiver refuses a
+    coding.
 
 38. **Storage that fits.** A route's storage defaults to `storage_per_message` times
     `message_bytes`, 4 times, and a program can see when a request's lists did not fit it
