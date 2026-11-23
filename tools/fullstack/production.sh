@@ -1,9 +1,10 @@
 # shellcheck shell=sh
 # The production part of tools/fullstack_check.sh (design §8 steps 29 and 30, decision 44), which
-# sources this file: the traffic of one gateway core for a fleet of 33,000 servers. It climbs
-# over TLS for connect-zig, the Collector, Vector and the receivers on connect-go and connect-rust,
-# with connect-zig and connect-rust also validating each export against tools/fullstack/validate's
-# rules, then in cleartext h2 for connect-zig, the Collector and Rotel, whose receiver has no TLS.
+# sources this file and runs `production_part`: the traffic of one gateway core for a fleet of
+# 33,000 servers. It climbs over TLS for connect-zig, the Collector, Vector and the receivers on
+# connect-go and connect-rust, each Connect receiver also validating each export against
+# tools/fullstack/validate's rules, then in cleartext h2 for connect-zig, the Collector and Rotel,
+# whose receiver has no TLS. tools/fullstack/compression.sh runs `production_climb` too.
 #
 # Each server of the fleet runs a Collector agent, which exports its spans over OTLP/gRPC with
 # gzip, the default of the Collector's otlp exporter. Each agent holds one TLS connection, through
@@ -33,12 +34,20 @@ warm_seconds=2
 # Calls in flight on one connection at most, as the otlp exporter's queue sends them.
 connection_streams=4
 p99_limit_ms=100
+# What tools/fullstack/compression.sh sets for exports in a coding: the end of their files' names,
+# and the coding grpc-encoding names, none for exports with no coding. The production part sends
+# the gzip exports of tools/fullstack/production_request.py.
+production_tag=""
+production_encoding=gzip
 
-for class in ${production_classes}; do
-    spans="${class%%:*}"
-    python3 tools/fullstack/production_request.py "${buf}" "${spans}" \
-        "${work}/production-${spans}.grpc" >&2
-done
+# Writes each class's export: its proto3 JSON, its encoding, and its encoding in gzip.
+production_exports() {
+    for class in ${production_classes}; do
+        spans="${class%%:*}"
+        python3 tools/fullstack/production_request.py "${buf}" "${spans}" \
+            "${work}/production-${spans}.grpc" >&2
+    done
+}
 
 # One step: oha sends each class at the step's rate, into a CSV file for each class.
 production_load() {
@@ -50,8 +59,9 @@ production_load() {
         [ "${transport}" = tls ] && trust="--cacert ${ca}"
         ${load_pin} "${oha}" --no-tui --http2 -c "${connections}" -p "${connection_streams}" \
             -q "${calls}" -z "${step_seconds}s" -w --latency-correction ${trust} -m POST \
-            -D "${work}/production-${spans}.grpc" -H 'content-type: application/grpc' \
-            -H 'te: trailers' -H 'grpc-encoding: gzip' --output-format csv \
+            -D "${work}/production-${spans}${production_tag}.grpc" \
+            -H 'content-type: application/grpc' -H 'te: trailers' \
+            ${production_encoding:+-H "grpc-encoding: ${production_encoding}"} --output-format csv \
             "$(url_of "$1" "${export_path}")" \
             >"${work}/step-${spans}.csv" 2>"${work}/step-${spans}.log" &
         loads="${loads} $!"
@@ -106,20 +116,23 @@ production_climb() {
     stop
 }
 
-: >"${work}/production-results"
-for transport in tls cleartext; do
-    case "${transport}" in
-        tls) servers="connect-zig connect-zig-validate collector vector connect-go connect-rust connect-rust-validate" ;;
-        *) servers="connect-zig collector rotel" ;;
-    esac
-    for server in ${servers}; do
-        production_climb "${server}" >>"${work}/production-results" || status=1
+production_part() {
+    production_exports
+    : >"${work}/production-results"
+    for transport in tls cleartext; do
+        case "${transport}" in
+            tls) servers="connect-zig connect-zig-validate collector vector connect-go connect-go-validate connect-rust connect-rust-validate" ;;
+            *) servers="connect-zig collector rotel" ;;
+        esac
+        for server in ${servers}; do
+            production_climb "${server}" >>"${work}/production-results" || status=1
+        done
+        python3 tools/fullstack/production_report.py "${work}/production-results" "${transport}" \
+            "$(getconf CLK_TCK)" "$("${oha}" --version | head -1)" "${collector}" "${vector_text}" \
+            "${rotel_text}" "${connect_go_text}" "${connect_rust_text}" "${commit}" "${placement}" \
+            "${step_seconds}" "${warm_seconds}" \
+            "${p99_limit_ms}" "${tls_suite}" ${production_classes}
+        echo
     done
-    python3 tools/fullstack/production_report.py "${work}/production-results" "${transport}" \
-        "$(getconf CLK_TCK)" "$("${oha}" --version | head -1)" "${collector}" "${vector_text}" \
-        "${rotel_text}" "${connect_go_text}" "${connect_rust_text}" "${commit}" "${placement}" \
-        "${step_seconds}" "${warm_seconds}" \
-        "${p99_limit_ms}" "${tls_suite}" ${production_classes}
-    echo
-done
-transport=tls
+    transport=tls
+}

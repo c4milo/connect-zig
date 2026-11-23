@@ -102,7 +102,7 @@ port_of() {
         connect-zig | connect-zig-validate) echo "${sink_port}" ;;
         collector) echo "${collector_port}" ;;
         vector) echo "${vector_port}" ;;
-        connect-go) echo "${connect_go_port}" ;;
+        connect-go | connect-go-validate) echo "${connect_go_port}" ;;
         connect-rust | connect-rust-validate) echo "${connect_rust_port}" ;;
         rotel) echo "${rotel_port}" ;;
     esac
@@ -120,6 +120,15 @@ reach() {
     if [ "${transport}" = tls ]; then echo "--cacert ${ca}"; else echo "--http2-prior-knowledge"; fi
 }
 
+# The words after a Connect receiver's key: `validate` for a name that ends in -validate, and
+# `cleartext` for the transport.
+words_of() {
+    case "$1" in
+        *-validate) printf 'validate ' ;;
+    esac
+    [ "${transport}" = tls ] || printf 'cleartext'
+}
+
 # Starts a server on its core, and waits until it answers.
 start() {
     case "$1" in
@@ -134,15 +143,13 @@ start() {
         vector) ${server_pin} "${vector}" --threads 1 --quiet --config "${work}/vector.yaml" \
             >"${work}/server.log" 2>&1 & ;;
         # Go's runtime and tokio take as many threads as there are cores, unless told one.
-        connect-go) GOMAXPROCS=1 ${server_pin} "${connect_go}" "${connect_go_port}" \
-            "$(pwd)/examples/harness/tls/chain.pem" "$(pwd)/examples/harness/tls/key.pem" \
-            >"${work}/server.log" 2>&1 & ;;
+        connect-go | connect-go-validate) GOMAXPROCS=1 ${server_pin} "${connect_go}" \
+            "${connect_go_port}" "$(pwd)/examples/harness/tls/chain.pem" \
+            "$(pwd)/examples/harness/tls/key.pem" $(words_of "$1") >"${work}/server.log" 2>&1 & ;;
         connect-rust | connect-rust-validate)
-            validate=""
-            [ "$1" = connect-rust ] || validate=validate
             TOKIO_WORKER_THREADS=1 ${server_pin} "${connect_rust}" "${connect_rust_port}" \
                 "${connect_rust_count_port}" "$(pwd)/examples/harness/tls/chain.pem" \
-                "$(pwd)/examples/harness/tls/key.pem" ${validate} >"${work}/server.log" 2>&1 & ;;
+                "$(pwd)/examples/harness/tls/key.pem" $(words_of "$1") >"${work}/server.log" 2>&1 & ;;
         rotel)
             ${load_pin} "${otelcol}" --config "${work}/counter.yaml" >"${work}/counter.log" 2>&1 &
             counter_pid=$!
@@ -211,7 +218,7 @@ probe_refused() {
 # The spans a server says it took and refused. Vector counts one event for each span.
 counted() {
     case "$1" in
-        connect-zig | connect-zig-validate | connect-go) curl -sS $(reach) "$(url_of "$1" /sink/count)" |
+        connect-zig | connect-zig-validate | connect-go | connect-go-validate) curl -sS $(reach) "$(url_of "$1" /sink/count)" |
             awk '{ print $4, 0 }' ;;
         # connect-rust's server has no plain route, so its counts come from a port of their own.
         connect-rust | connect-rust-validate) curl -sS "http://127.0.0.1:${connect_rust_count_port}/" | awk '{ print $4, 0 }' ;;

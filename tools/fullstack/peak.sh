@@ -1,14 +1,14 @@
 # shellcheck shell=sh
 # The peak part of tools/fullstack_check.sh (design §8 step 28, decision 44), which sources this
-# file: over TLS, h2load sends one export, again and again, on 16 connections of 4 streams, as
-# fast as each server answers: connect-zig, the Collector, Vector, and the receivers on connect-go
-# and connect-rust, with connect-zig and connect-rust also validating each export against
-# tools/fullstack/validate's rules. The exports hold 16 spans
-# and 512, from tools/fullstack/otlp_request.py. Each round starts each server again, in turns,
-# and the report gives the median of the rounds.
+# file and runs `peak_part`: over TLS, h2load sends one export, again and again, on 16 connections
+# of 4 streams, as fast as each server answers: connect-zig, the Collector, Vector, and the
+# receivers on connect-go and connect-rust, each Connect receiver also validating each export
+# against tools/fullstack/validate's rules. The exports hold 16 spans and 512, from
+# tools/fullstack/otlp_request.py. Each round starts each server again, in turns, and the report
+# gives the median of the rounds. tools/fullstack/compression.sh runs `peak_measure` too.
 
 peak_spans="16 512"
-peak_servers="connect-zig connect-zig-validate collector vector connect-go connect-rust connect-rust-validate"
+peak_servers="connect-zig connect-zig-validate collector vector connect-go connect-go-validate connect-rust connect-rust-validate"
 peak_rounds=3
 # The requests of each round for each export, after warm requests that are never counted.
 peak_requests_of() { case "$1" in 16) echo 40000 ;; *) echo 4000 ;; esac; }
@@ -16,17 +16,18 @@ warm_divisor=10
 # 16 connections of 4 streams each: 64 calls in flight, which the sink's router holds at once.
 peak_connections=16
 peak_streams=4
-
-for spans in ${peak_spans}; do
-    python3 tools/fullstack/otlp_request.py "${buf}" "${spans}" "${work}/export-${spans}.grpc"
-done
+# What tools/fullstack/compression.sh sets for an export in a coding: the end of its file's name,
+# and the coding grpc-encoding names. The peak part sends exports with no coding.
+peak_tag=""
+peak_encoding=""
 
 # h2load's calls of one export, with its report on standard output.
 peak_load() {
     ${load_pin} "${h2load}" -n "$3" -c "${peak_connections}" -m "${peak_streams}" \
         -t "${load_threads}" \
-        --tls13-ciphers="${tls_suite}" -d "${work}/export-$2.grpc" \
-        -H 'content-type: application/grpc' -H 'te: trailers' ${4:+"--log-file=$4"} \
+        --tls13-ciphers="${tls_suite}" -d "${work}/export-$2${peak_tag}.grpc" \
+        -H 'content-type: application/grpc' -H 'te: trailers' \
+        ${peak_encoding:+-H "grpc-encoding: ${peak_encoding}"} ${4:+"--log-file=$4"} \
         "$(url_of "$1" "${export_path}")"
 }
 
@@ -67,18 +68,23 @@ peak_measure() {
     echo "${spans} ${server} ${rate} ${latency} $((after - before)) ${requests} ${peak}"
 }
 
-transport=tls
-: >"${work}/peak-results"
-for round in $(seq 1 "${peak_rounds}"); do
+peak_part() {
     for spans in ${peak_spans}; do
-        for server in ${peak_servers}; do
-            echo "fullstack: peak, round ${round}, ${server}, ${spans} spans" >&2
-            peak_measure "${server}" "${spans}" >>"${work}/peak-results" || status=1
+        python3 tools/fullstack/otlp_request.py "${buf}" "${spans}" "${work}/export-${spans}.grpc"
+    done
+    transport=tls
+    : >"${work}/peak-results"
+    for round in $(seq 1 "${peak_rounds}"); do
+        for spans in ${peak_spans}; do
+            for server in ${peak_servers}; do
+                echo "fullstack: peak, round ${round}, ${server}, ${spans} spans" >&2
+                peak_measure "${server}" "${spans}" >>"${work}/peak-results" || status=1
+            done
         done
     done
-done
-loader="$("${h2load}" --version | head -1)"
-python3 tools/fullstack/peak_report.py "${work}" "$(getconf CLK_TCK)" "${loader}" \
-    "${collector}" "${vector_text}" "${connect_go_text}" "${connect_rust_text}" "${commit}" \
-    "${placement}" "${peak_rounds}" "${peak_connections}" "${peak_streams}" "${tls_suite}"
-echo
+    loader="$("${h2load}" --version | head -1)"
+    python3 tools/fullstack/peak_report.py "${work}" "$(getconf CLK_TCK)" "${loader}" \
+        "${collector}" "${vector_text}" "${connect_go_text}" "${connect_rust_text}" "${commit}" \
+        "${placement}" "${peak_rounds}" "${peak_connections}" "${peak_streams}" "${tls_suite}"
+    echo
+}

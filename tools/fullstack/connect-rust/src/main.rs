@@ -5,17 +5,23 @@
 //! tools/otlp_sink does. Its server has no plain route, so a second port, on cleartext
 //! HTTP/1.0, answers `requests <n> spans <n>`, as the sink's `GET /sink/count` does.
 //!
-//!     fullstack-connect-rust <port> <count port> <chain> <key> [validate]
+//!     fullstack-connect-rust <port> <count port> <chain> <key> [validate] [cleartext]
 //!
 //! With `validate`, it first checks each export's view against the rules of
 //! tools/fullstack/validate's schema with protovalidate-buffa, as `otlp-sink-validate` does, and
-//! refuses one that breaks a rule with `invalid_argument`.
+//! refuses one that breaks a rule with `invalid_argument`. With `cleartext`, it serves h2 with
+//! prior knowledge and HTTP/1.1, with no TLS, for the cleartext climb. It reads exports in gzip
+//! and zstd, which connect-rust holds, and in brotli, through `BrotliProvider`.
 
 use std::io::{Read as _, Write as _};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
-use connectrpc::{RequestContext, Response, Router, Server, ServiceRequest, ServiceResult};
+use connectrpc::compression::{CompressionProvider, CompressionRegistry};
+use connectrpc::{
+    ConnectError, ConnectRpcService, RequestContext, Response, Router, Server, ServiceRequest,
+    ServiceResult,
+};
 
 #[allow(dead_code, clippy::all)]
 mod proto {
@@ -36,6 +42,46 @@ use proto::opentelemetry::proto::collector::trace::v1::{
 /// The octets of a count request the receiver reads before it answers: its request line and
 /// headers, which it does not parse.
 const COUNT_REQUEST_LEN: usize = 1024;
+
+/// The octets of the brotli crate's buffer between its coder and the stream, its examples' size.
+const BROTLI_BUFFER_LEN: usize = 4096;
+/// The quality and the window, as base-2 logarithms of octets (RFC 7932 §9.1), of an answer in
+/// brotli, which no client of the check asks for: an export's answer is empty.
+const BROTLI_QUALITY: u32 = 5;
+const BROTLI_WINDOW_BITS: u32 = 22;
+
+/// Brotli, which connect-rust holds no provider of, on the `brotli` crate, as its documentation
+/// of `CompressionProvider` shows.
+struct BrotliProvider;
+
+impl CompressionProvider for BrotliProvider {
+    fn name(&self) -> &'static str {
+        "br"
+    }
+
+    fn compress(&self, data: &[u8]) -> Result<bytes::Bytes, ConnectError> {
+        let mut compressed = Vec::new();
+        {
+            let mut writer = brotli::CompressorWriter::new(
+                &mut compressed,
+                BROTLI_BUFFER_LEN,
+                BROTLI_QUALITY,
+                BROTLI_WINDOW_BITS,
+            );
+            writer
+                .write_all(data)
+                .map_err(|error| ConnectError::internal(error.to_string()))?;
+        }
+        Ok(bytes::Bytes::from(compressed))
+    }
+
+    fn decompressor<'a>(
+        &self,
+        data: &'a [u8],
+    ) -> Result<Box<dyn std::io::Read + 'a>, ConnectError> {
+        Ok(Box::new(brotli::Decompressor::new(data, BROTLI_BUFFER_LEN)))
+    }
+}
 
 /// The exports and the spans the receiver took.
 #[derive(Default)]
@@ -119,21 +165,30 @@ fn serve_counts(port: &str, counts: Arc<Counts>) -> std::io::Result<()> {
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<String> = std::env::args().collect();
-    let validate = args.len() == 6 && args[5] == "validate";
-    if args.len() != 5 && !validate {
-        return Err("usage: fullstack-connect-rust <port> <count port> <chain> <key> [validate]".into());
+    let words = &args[args.len().min(5)..];
+    if args.len() < 5
+        || words
+            .iter()
+            .any(|word| word != "validate" && word != "cleartext")
+    {
+        return Err("usage: fullstack-connect-rust <port> <count port> <chain> <key> [validate] [cleartext]".into());
     }
+    let validate = words.iter().any(|word| word == "validate");
+    let cleartext = words.iter().any(|word| word == "cleartext");
     let counts = Arc::new(Counts::default());
     serve_counts(&args[2], counts.clone())?;
-    let tls = identity(&args[3], &args[4])?;
     let router = Router::new().add_service(Arc::new(Receiver { counts, validate }));
-    let bound = Server::bind(format!("127.0.0.1:{}", args[1]))
+    let service = ConnectRpcService::new(router)
+        .with_compression(CompressionRegistry::default().register(BrotliProvider));
+    let mut bound = Server::bind(format!("127.0.0.1:{}", args[1]))
         .await
-        .map_err(|error| error.to_string())?
-        .with_tls(tls);
+        .map_err(|error| error.to_string())?;
+    if !cleartext {
+        bound = bound.with_tls(identity(&args[3], &args[4])?);
+    }
     println!("listening on port {}", bound.local_addr()?.port());
     bound
-        .serve(router)
+        .serve_with_service(service)
         .await
         .map_err(|error| error.to_string())?;
     Ok(())

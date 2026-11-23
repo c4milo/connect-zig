@@ -22,9 +22,11 @@ ticks, seconds, warm, limit_ms = int(ticks), float(seconds), float(warm), float(
 classes = [tuple(int(part) for part in item.split(":")) for item in sys.argv[16:]]
 names = {"connect-zig": "connect-zig", "connect-zig-validate": "connect-zig + protovalidate",
          "collector": "Collector", "vector": "Vector", "rotel": "Rotel", "connect-go": "connect-go",
+         "connect-go-validate": "connect-go + protovalidate-go",
          "connect-rust": "connect-rust", "connect-rust-validate": "connect-rust + protovalidate-buffa"}
 # Each receiver that validates, and its twin that does not.
-validating = [("connect-zig-validate", "connect-zig"), ("connect-rust-validate", "connect-rust")]
+validating = [("connect-zig-validate", "connect-zig"), ("connect-go-validate", "connect-go"),
+              ("connect-rust-validate", "connect-rust")]
 setups = {
     "collector": f"{otelcol}, GOMAXPROCS=1, its OTLP receiver into its nop exporter",
     "vector": f"{vector}, one thread, its opentelemetry source into its blackhole sink",
@@ -32,6 +34,7 @@ setups = {
     "connect-go": f"{connect_go}, GOMAXPROCS=1, a receiver that counts spans (`tools/fullstack/connect-go`)",
     "connect-rust": f"{connect_rust}, one tokio worker, a receiver that counts spans (`tools/fullstack/connect-rust`)",
     "connect-zig-validate": "connect-zig + protovalidate, `otlp-sink-validate`, which checks each export against the rules of `tools/fullstack/validate`",
+    "connect-go-validate": "connect-go + protovalidate-go, the same receiver with `validate`, which checks each export against the same rules",
     "connect-rust-validate": "connect-rust + protovalidate-buffa, the same receiver with `validate`, which checks each export against the same rules",
 }
 # The fleet the model stands for, and the gateway cores that share its connections.

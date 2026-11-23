@@ -6,7 +6,8 @@
 //! It reads the generated code of examples/otlp/gen, as `zig build test-generated` reads the
 //! examples' code, and `count_spans` of the example's receiver. `zig build otlp-sink-validate`
 //! installs `otlp-sink-validate`, the same sink over tools/fullstack/validate/gen, whose spans
-//! carry OTLP's rules, which `protovalidate.Interceptor` checks before each `Export`.
+//! carry OTLP's rules, which `protovalidate.Interceptor` checks before each `Export`. `zig build
+//! otlp-compress` installs the program that writes the compression part's exports in each coding.
 const std = @import("std");
 
 const Graph = @import("graph.zig").Graph;
@@ -24,6 +25,13 @@ pub fn add(b: *std.Build, graph: Graph) void {
     // `protovalidate.Interceptor` around `Export`.
     const validating = sink(b, graph, "otlp-sink-validate", "tools/fullstack/validate/gen/opentelemetry/proto/", true);
     b.step("otlp-sink-validate", "Install the OTLP sink that validates each export to zig-out/bin").dependOn(&b.addInstallArtifact(validating, .{}).step);
+    const compress = b.addExecutable(.{ .name = "otlp-compress", .root_module = b.createModule(.{
+        .root_source_file = b.path("tools/otlp_compress/main.zig"),
+        .target = graph.target,
+        .optimize = graph.optimize,
+        .imports = &.{.{ .name = "connect", .module = graph.connect }},
+    }) });
+    b.step("otlp-compress", "Install the program that compresses the full-stack check's exports to zig-out/bin").dependOn(&b.addInstallArtifact(compress, .{}).step);
 }
 
 /// The sink over the generated code of `gen`, which validates each export when `validate` is set.

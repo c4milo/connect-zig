@@ -36,12 +36,14 @@ const Server = colibri.Server(.{ .tcp_connections = constants.tcp_connections, .
 
 /// All the program holds, which `main` allocates once before the first call (decision 42). The
 /// production model sends gzip, as the Collector's otlp exporter does by default, so the sink
-/// reads it.
+/// reads it. The compression part sends zstd and brotli too, through stdx's decoders.
 const State = struct {
     http_server: Server,
     router: Router,
     app: App,
     gzip_decoder: connect.GzipDecoder,
+    zstd_decoder: connect.ZstdDecoder,
+    brotli_decoder: connect.BrotliDecoder,
     /// The TLS session of each connection over TLS (colibri decision 167). A sink in cleartext
     /// passes none, so this room stays untouched.
     tls_buffer: [server.Config.tls_buffer_len(constants.tcp_connections)]u8,
@@ -51,7 +53,11 @@ pub fn main(init: std.process.Init) !void {
     const command = try command_of(init);
     const state = try init.arena.allocator().create(State);
     state.router = .{};
-    state.app = .{ .codings = .{ .decoders = .{ .gzip = &state.gzip_decoder } }, .cpu_features = .detect() };
+    state.app = .{ .codings = .{ .decoders = .{
+        .gzip = &state.gzip_decoder,
+        .zstd = &state.zstd_decoder,
+        .brotli = &state.brotli_decoder,
+    } }, .cpu_features = .detect() };
     const cpu = probe();
     // The Unix time when the server starts, which its TLS session tickets carry.
     const unix_seconds: u64 = @intCast(@max(std.Io.Clock.real.now(init.io).toSeconds(), 0));

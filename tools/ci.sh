@@ -12,7 +12,7 @@
 # `--list` as a job of its own, so each shows apart in GitHub.
 set -eu
 cd "$(dirname "$0")/.."
-checks="format citations commits test release package bench costs bench-compare fullstack perf generated interop interop-languages interop-servers coverage line-coverage conformance protobuf-conformance protovalidate-conformance cel-differential cel-conformance compile-time validate-compare lean"
+checks="format citations commits test release package bench costs bench-compare fullstack fullstack-compression fullstack-compression-cleartext perf generated interop interop-languages interop-servers coverage line-coverage conformance protobuf-conformance protovalidate-conformance cel-differential cel-conformance compile-time validate-compare lean"
 only=""
 case "${1:-}" in
     --list)
@@ -65,6 +65,8 @@ draw_charts() {
         bench-compare) drawings="speed_chart:speed-vs-go call_chart:call-vs-go routes_chart:call-routes" ;;
         validate-compare) drawings="validate_chart:validate-vs-go" ;;
         fullstack) drawings="fullstack_chart:fullstack:tls fullstack_chart:fullstack-cleartext:cleartext fullstack_chart:fullstack-validate:validate" ;;
+        fullstack-compression) drawings="compression_chart:fullstack-compression:tls" ;;
+        fullstack-compression-cleartext) drawings="compression_chart:fullstack-compression-cleartext:cleartext" ;;
     esac
     for drawing in ${drawings}; do
         script="${drawing%%:*}" rest="${drawing#*:}"
@@ -110,6 +112,14 @@ check() {
         fullstack) full="$(tools/fullstack_check.sh)" && full_status=0 || full_status=$?
             report_only fullstack "${full}"
             draw_charts "${full}" fullstack
+            return "${full_status}" ;;
+        # The Connect receivers with exports in gzip, zstd and brotli, over TLS and in cleartext,
+        # each a job of its own, which the 60 minutes of a CI job hold (decision 46 as amended).
+        fullstack-compression | fullstack-compression-cleartext)
+            part="compression${1#fullstack-compression}"
+            full="$(tools/fullstack_check.sh "${part}")" && full_status=0 || full_status=$?
+            report_only "$1" "${full}"
+            draw_charts "${full}" "$1"
             return "${full_status}" ;;
         perf) tools/perf_check.sh ;;
         generated) tools/generate_check.sh ;;

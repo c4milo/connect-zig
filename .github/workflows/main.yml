@@ -2,10 +2,11 @@
 # entry 16). `plan` asks tools/ci.sh for its checks, and `check` runs each in a job of its own, so
 # each shows apart in GitHub's checks with its own summary: a new check joins tools/ci.sh alone.
 # Each job's work is `tools/ci.sh --only <check>`, which a person runs by hand for the same
-# answer. Each download is pinned by checksum. `test`, `bench-compare`, `fullstack` and
-# `validate-compare` run a second time on an arm64 runner: the first because an aarch64 Linux link
-# can fail where x86-64's passes, the next two for the arm64 charts, and the last for the hardware
-# counters of `bench-validate --counters`, which GitHub's x86-64 runners do not expose.
+# answer. Each download is pinned by checksum. `test`, `bench-compare`, the three `fullstack`
+# checks and `validate-compare` run a second time on an arm64 runner: the first because an aarch64
+# Linux link can fail where x86-64's passes, the next four for the arm64 charts, and the last for
+# the hardware counters of `bench-validate --counters`, which GitHub's x86-64 runners do not
+# expose.
 name: main
 on:
   push:
@@ -38,7 +39,9 @@ jobs:
     needs: plan
     name: ${{ matrix.check }}${{ matrix.runner == 'ubuntu-26.04-arm' && ' (arm64)' || '' }}
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 60
+    # A full-stack check climbs one server after another: the compression checks run 12 climbs,
+    # about 45 minutes, and the margin keeps a slow runner from ending one.
+    timeout-minutes: ${{ startsWith(matrix.check, 'fullstack') && 90 || 60 }}
     strategy:
       fail-fast: false
       matrix:
@@ -55,6 +58,11 @@ jobs:
             runner: ubuntu-26.04-arm
           # The full stack on arm64, for the README's arm64 chart (decision 44).
           - check: fullstack
+            runner: ubuntu-26.04-arm
+          # The compression charts on arm64 (decision 46 as amended).
+          - check: fullstack-compression
+            runner: ubuntu-26.04-arm
+          - check: fullstack-compression-cleartext
             runner: ubuntu-26.04-arm
           # The validation benchmark on arm64, whose runner gives a process its own hardware
           # counters (docs/performance.md, "The instruments").
@@ -105,7 +113,7 @@ jobs:
         run: sudo sysctl -w kernel.perf_event_paranoid=1
       # The full-stack check's load generator, as colibri's judge installs it (decision 44).
       - name: Install h2load
-        if: matrix.check == 'fullstack'
+        if: startsWith(matrix.check, 'fullstack')
         run: sudo apt-get update -q && sudo apt-get install -y -q nghttp2-client
       - name: Put the tools on the path
         run: |

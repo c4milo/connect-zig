@@ -21,9 +21,11 @@ work, ticks, h2load, otelcol, vector, connect_go, connect_rust, commit, placemen
 ticks = int(ticks)
 servers = [("connect-zig", "connect-zig"), ("connect-zig-validate", "connect-zig + protovalidate"),
            ("collector", "Collector"), ("vector", "Vector"), ("connect-go", "connect-go"),
+           ("connect-go-validate", "connect-go + protovalidate-go"),
            ("connect-rust", "connect-rust"), ("connect-rust-validate", "connect-rust + protovalidate-buffa")]
 # Each receiver that validates, and its twin that does not.
-validating = [("connect-zig-validate", "connect-zig"), ("connect-rust-validate", "connect-rust")]
+validating = [("connect-zig-validate", "connect-zig"), ("connect-go-validate", "connect-go"),
+              ("connect-rust-validate", "connect-rust")]
 percent = 100
 microseconds = 1_000_000
 kib = 1024
@@ -88,6 +90,6 @@ print(f"Servers: connect-zig {commit} in ReleaseSafe, `tools/otlp_sink`; {otelco
 print(f"receiver into its nop exporter; {vector}, one thread, its opentelemetry source into its blackhole sink;")
 print(f"{connect_go}, GOMAXPROCS=1, and {connect_rust}, one tokio worker, each a receiver that counts spans")
 print("(`tools/fullstack/connect-go`, `tools/fullstack/connect-rust`). connect-zig + protovalidate is `otlp-sink-validate`,")
-print("and connect-rust + protovalidate-buffa the same receiver with `validate`: each checks every export against")
-print("the rules of `tools/fullstack/validate` before it counts its spans.")
+print("and connect-go + protovalidate-go and connect-rust + protovalidate-buffa the same receivers with `validate`: each")
+print("checks every export against the rules of `tools/fullstack/validate` before it counts its spans.")
 print(f"Rounds: {rounds}.")

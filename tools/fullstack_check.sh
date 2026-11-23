@@ -5,16 +5,17 @@
 # receiver and its nop exporter; two servers in Rust, Vector with its blackhole sink, and Rotel
 # with its blackhole exporter; and receivers on two other Connect libraries, connect-go and
 # connect-rust (tools/fullstack/connect-go and tools/fullstack/connect-rust), which count spans
-# as the sink does. connect-zig and connect-rust also run as receivers that validate each export
-# with protovalidate against the rules of tools/fullstack/validate, `otlp-sink-validate` and
-# connect-rust's receiver with protovalidate-buffa, so the report gives what validation costs
-# each. Each server runs alone on one core, the Collector and connect-go with
+# as the sink does. The three Connect receivers also run as receivers that validate each export
+# with protovalidate against the rules of tools/fullstack/validate: `otlp-sink-validate`, and the
+# receivers on connect-go and connect-rust with protovalidate-go and protovalidate-buffa, so the
+# report gives what validation costs each. Each server runs alone on one core, the Collector and
+# connect-go with
 # GOMAXPROCS=1, Vector with one thread, and connect-rust with one tokio worker. The load runs on
 # two other cores, as colibri's judge places them (colibri decision 33).
 #
-#   tools/fullstack_check.sh [peak] [production] > report.md
+#   tools/fullstack_check.sh [peak] [production] [compression] [compression-cleartext] > report.md
 #
-# It runs two parts, both unless the command line names one:
+# It runs the parts the command line names, or peak and production when it names none:
 #
 # - peak (tools/fullstack/peak.sh): over TLS 1.3, h2load sends exports of 16 spans, then of 512,
 #   on 16 connections of 4 streams, as fast as each server answers.
@@ -23,6 +24,9 @@
 #   p99 passes 100 ms or a call is refused: over TLS to connect-zig, the Collector, Vector,
 #   connect-go and connect-rust, then in cleartext to connect-zig, the Collector and Rotel, whose
 #   receiver has no TLS.
+# - compression and compression-cleartext (tools/fullstack/compression.sh): the three Connect
+#   receivers under both loads, over TLS 1.3 or in cleartext h2, with exports in no coding and in
+#   gzip, zstd and brotli, which `zig build otlp-compress` writes with stdx's encoders.
 #
 # Each part checks every answer. One export through buf curl must answer with OTLP's full success,
 # a receiver that validates must refuse one that breaks a rule, and each server's own count of
@@ -163,10 +167,12 @@ if [ -z "${connect_rust}" ]; then
 fi
 sink="${OTLP_SINK:-}"
 sink_validate="${OTLP_SINK_VALIDATE:-}"
-if [ -z "${sink}" ] || [ -z "${sink_validate}" ]; then
-    zig build otlp-sink otlp-sink-validate -Drelease >&2
+compress="${OTLP_COMPRESS:-}"
+if [ -z "${sink}" ] || [ -z "${sink_validate}" ] || [ -z "${compress}" ]; then
+    zig build otlp-sink otlp-sink-validate otlp-compress -Drelease >&2
     sink="${sink:-zig-out/bin/otlp-sink}"
     sink_validate="${sink_validate:-zig-out/bin/otlp-sink-validate}"
+    compress="${compress:-zig-out/bin/otlp-compress}"
 fi
 commit="$(git rev-parse --short HEAD 2>/dev/null || echo unknown)"
 collector="$("${otelcol}" --version)"
@@ -180,12 +186,17 @@ server_pid=""
 counter_pid=""
 trap 'stop; rm -rf "${work}"' EXIT
 . tools/fullstack/servers.sh
+. tools/fullstack/peak.sh
+. tools/fullstack/production.sh
+. tools/fullstack/compression.sh
 
 status=0
 for part in ${parts}; do
     case "${part}" in
-        peak) . tools/fullstack/peak.sh ;;
-        production) . tools/fullstack/production.sh ;;
+        peak) peak_part ;;
+        production) production_part ;;
+        compression) compression_part tls ;;
+        compression-cleartext) compression_part cleartext ;;
         *) echo "fullstack: no part named ${part}" >&2; exit 2 ;;
     esac
 done

@@ -1,15 +1,21 @@
 # The Go code of OpenTelemetry's trace export, which tools/fullstack_check.sh generates into gen/
-# before it builds the receiver, with the plugins it builds at the versions go.mod pins.
+# before it builds the receiver, with the plugins it builds at the versions go.mod pins. It reads
+# tools/fullstack/validate's copy of the schema, whose spans carry OTLP's rules, from the
+# repository's buf workspace, which holds the validate.proto it imports. validate.proto keeps its
+# own go_package, which names the code protovalidate-go registers it with.
 version: v2
 managed:
   enabled: true
+  disable:
+    - file_option: go_package
+      path: buf/validate
   override:
     - file_option: go_package_prefix
       value: github.com/c4milo/connect-zig/tools/fullstack/connect-go/gen
 inputs:
-  - directory: ../../../examples/otlp/proto
+  - directory: ../../..
     paths:
-      - ../../../examples/otlp/proto/opentelemetry
+      - ../../../tools/fullstack/validate/proto/opentelemetry
 plugins:
   - local: protoc-gen-go
     out: gen

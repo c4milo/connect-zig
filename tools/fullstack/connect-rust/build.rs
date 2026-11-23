@@ -30,14 +30,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         ..Default::default()
     };
     let validators = scan::gather(&request).map_err(|e| e.to_string())?;
-    let options = emit::Options { proto_module: "crate::proto".into(), ..Default::default() };
+    let options = emit::Options {
+        proto_module: "crate::proto".into(),
+        ..Default::default()
+    };
     let out = std::path::PathBuf::from(std::env::var("OUT_DIR")?).join("validators");
     std::fs::create_dir_all(&out)?;
     for file in emit::render_with_options(&validators, &options).map_err(|e| e.to_string())? {
         let name = file.name.unwrap_or_default();
         let target = out.join(&name);
         std::fs::create_dir_all(target.parent().unwrap())?;
-        std::fs::write(&target, without_inner_attributes(&file.content.unwrap_or_default()))?;
+        std::fs::write(
+            &target,
+            without_inner_attributes(&file.content.unwrap_or_default()),
+        )?;
     }
     Ok(())
 }
@@ -46,7 +52,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// file that `include!` reads into a module, so src/main.rs states the same allowances on the
 /// module.
 fn without_inner_attributes(text: &str) -> String {
-    let Some(start) = text.find("#![allow(") else { return text.to_string() };
+    let Some(start) = text.find("#![allow(") else {
+        return text.to_string();
+    };
     let end = text[start..].find(")]").map_or(start, |at| start + at + 2);
     format!("{}{}", &text[..start], &text[end..])
 }

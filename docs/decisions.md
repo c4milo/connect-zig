@@ -1178,3 +1178,12 @@ first. Cite an entry by number in code and commits ("decision 6").
       refuse an export whose trace ID is 3 octets with `invalid_argument`. The chart
       `fullstack-validate.svg` sets each beside the receiver that does not validate. Beaten:
       protovalidate in connect-zig alone, which gives its cost and no scale to read it on.
+    - Amended again on 2026-11-23, ruled by the owner: connect-go joins with protovalidate-go
+      v1.4.1, the third pair of the chart. The three Connect receivers also run both loads with
+      exports in no coding and in gzip, zstd and brotli, over TLS and in cleartext h2, in two
+      checks of their own, `fullstack-compression` and `fullstack-compression-cleartext`: the two
+      transports in one job pass the 60 minutes a CI job had. stdx's encoders write every export,
+      as a connect-zig client places them. connect-go reads zstd with klauspost/compress and
+      brotli with andybalholm/brotli, and connect-rust brotli with the `brotli` crate, since
+      neither library holds those codings. Beaten: the Collector and Vector in the compression
+      checks, which would hold each job past 90 minutes.

@@ -267,7 +267,8 @@ confirm a test fails. Report `CAUGHT` or `NOT CAUGHT` per mutation in the commit
   openssl.
 - Guide: `zig build guide` installs pepegrillo's performance method and API guide to
   `zig-out/docs`, at the commit `build.zig.zon` pins.
-- Full stack: `tools/fullstack_check.sh [peak] [production]` loads connect-zig's OTLP sink, `zig
+- Full stack: `tools/fullstack_check.sh [peak] [production] [compression] [compression-cleartext]`
+  loads connect-zig's OTLP sink, `zig
   build otlp-sink`, and OpenTelemetry's Collector v0.165.0 with the same OTLP exports over gRPC,
   TLS 1.3 and h2, each server on one core (decision 44). `peak` runs h2load as fast as each server
   answers. `production` runs oha, pinned by SHA-256 as the Collector is, as one gateway core of
@@ -276,20 +277,26 @@ confirm a test fails. Report `CAUGHT` or `NOT CAUGHT` per mutation in the commit
   Rust with no receiver TLS, joins a second climb in cleartext. Receivers on connect-go and
   connect-rust, `tools/fullstack/connect-go` and `tools/fullstack/connect-rust`, join both over
   TLS (decision 46); the check builds them into the cache, unless `CONNECT_GO` and
-  `CONNECT_RUST` name built ones. The sink and the connect-rust receiver also join a second
-  time, checking each export against the span rules of `tools/fullstack/validate`: `zig build
-  otlp-sink-validate`, and protovalidate-buffa. It fails when a server answered an export wrongly
-  or did not take every span, or when a validating one took an export that breaks a rule. It runs on Linux and needs h2load, buf, python3, curl, go and cargo.
+  `CONNECT_RUST` name built ones. The three Connect receivers also join a second time, checking
+  each export against the span rules of `tools/fullstack/validate`: `zig build
+  otlp-sink-validate`, protovalidate-go and protovalidate-buffa. `compression` and
+  `compression-cleartext` run both loads on the three Connect receivers alone, over TLS or in
+  cleartext h2, with exports in no coding and in gzip, zstd and brotli, which `zig build
+  otlp-compress` writes with stdx's encoders; `tools/ci.sh` runs each as a check of its own,
+  `fullstack-compression` and `fullstack-compression-cleartext`, and `tools/compression_chart.py`
+  draws their charts. It fails when a server answered an export wrongly or did not take every
+  span, or when a validating one took an export that breaks a rule. It runs on Linux and needs
+  h2load, buf, python3, curl, go and cargo.
 - Performance: `tools/perf_check.sh` counts each benchmark operation's instructions under
   callgrind against `bench/instructions.txt` and fails past 2%; `--write` records a new baseline,
   which the commit that pays for it explains. It needs valgrind.
 - CI: `tools/ci.sh` runs every check and writes a report; `--only <check>` runs one and `--list`
   names them. `.github/workflows/main.yml` runs each check of `--list` as a job of its own on each
   push and pull request. A new check joins `tools/ci.sh`, never the workflow file. `test`,
-  `bench-compare`, `fullstack` and `validate-compare` run a second time on an arm64 runner:
-  `test` because an aarch64 Linux link can fail where x86-64's passes, the next two for the arm64
-  charts, and `validate-compare` for its hardware counters, which GitHub's x86-64 runners do not
-  expose.
-  `fullstack` and `bench-compare` draw the charts of `docs/benchmarks.md` and the README into
+  `bench-compare`, the three `fullstack` checks and `validate-compare` run a second time on an
+  arm64 runner: `test` because an aarch64 Linux link can fail where x86-64's passes, the next four
+  for the arm64 charts, and `validate-compare` for its hardware counters, which GitHub's x86-64
+  runners do not expose. A `fullstack` check has 90 minutes, and every other check 60.
+  The `fullstack` checks and `bench-compare` draw the charts of `docs/benchmarks.md` and the README into
   `ci-charts/`, which CI keeps with the run as `charts-<check>-<arch>`. To update them, copy a
   chosen run's charts to `docs/images` (decision 44).
