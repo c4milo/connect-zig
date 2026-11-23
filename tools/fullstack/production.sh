@@ -15,8 +15,9 @@
 # oha sends the exports at fixed rates, one process for each size, with its latency correction,
 # so the latency holds the time a call waited in a queue. The rate climbs one step at a time. A
 # step fails when its p99 passes 100 ms, when a call is refused, or when the core takes less than
-# 95% of the step's spans. A step that fails while the load's cores were 90% busy or more ends as
-# "load": the load, not the server, may have set the limit, so the rate held is a floor. Then five
+# 95% of the step's spans. oha runs on two cores of its own, and the server on a third. A step that
+# fails while oha's cores were 90% busy or more ends as "load": the load, not the server, may have
+# set the limit, so the rate held is a floor. Then five
 # more steps halve the gap between the last step that passed and the step that failed. Each step opens its connections again, so the measure leaves out its
 # first 2 seconds, where the TLS handshakes fall, for latency and refusals alike; the report counts
 # the calls refused then (tools/fullstack/production_step.py). The server runs once for the whole

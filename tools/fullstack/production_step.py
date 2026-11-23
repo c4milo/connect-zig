@@ -12,7 +12,8 @@ server's count must hold; the measured calls a second and spans a second; p50 an
 milliseconds over every class; the measured calls answered with another status; the verdict;
 the calls answered with another status in the first <warm> seconds; and the share of the load's
 cores that was busy, from <load_before> and <load_after>, each `<busy>:<total>` ticks of
-/proc/stat, or `-` when no core is pinned. The verdict is "pass", or names what failed: "refused",
+/proc/stat, or `-` when no core is pinned. oha runs on those cores alone, and the server on
+another; the share counts all their work, the kernel's for the traffic oha sends included. The verdict is "pass", or names what failed: "refused",
 "p99" past <limit_ms>, or "rate" when the measured spans fall short of 95% of the step's. A step
 that fails while its load's cores were 90% busy or more is "load" instead: oha corrects its
 latency for each call it sends late, so a load that falls behind shows as the server's p99.

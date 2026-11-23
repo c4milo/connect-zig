@@ -126,9 +126,11 @@ to. Each server holds 516 connections. 70%, 25% and 5% of them send gzip exports
 spans. [oha](https://github.com/hatoo/oha) sends at fixed rates, and its latency holds the time a
 call waits in a queue. Each step lasts 10 s, and its measure leaves out the first 2 s, where its TLS
 handshakes run. The rate climbs until p99 passes 100 ms, a call is refused, or the server takes
-less than 95% of the spans sent. A step that fails while oha's two cores were 90% busy or more ends
-the climb on the load, not on the server: oha corrects its latency for each call it sends late, so
-a load that falls behind would show as the server's p99. The rate held is then a floor. Then five
+less than 95% of the spans sent. oha runs on two cores of its own, and the server on a third that
+oha never uses. A step that fails while oha's two cores were 90% busy or more ends the climb on the
+load, not on the server: oha corrects its latency for each call it sends late, so a load that falls
+behind would show as the server's p99. The rate held is then a floor. The share counts all the work
+on oha's cores, the kernel's for the traffic oha sends included. Then five
 more steps halve the gap to the last step that passed, so each rate is known within 1/64 of it. CI's two `fullstack` jobs of commit `57ec581` ([run
 256](https://github.com/c4milo/connect-zig/actions/runs/45171587471)) ran it on colibri v0.19.2 and
 Ubuntu 26.04, on an Arm Neoverse-N2 core and on an AMD EPYC 9V45 core. The charts show the climb
