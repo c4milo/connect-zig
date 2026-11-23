@@ -99,7 +99,7 @@ JSON
 # A receiver that validates each export runs on its twin's port: the servers run one at a time.
 port_of() {
     case "$1" in
-        connect-zig | connect-zig-validate) echo "${sink_port}" ;;
+        connect-zig | connect-zig-validate | connect-zig-generic) echo "${sink_port}" ;;
         collector) echo "${collector_port}" ;;
         vector) echo "${vector_port}" ;;
         connect-go | connect-go-validate) echo "${connect_go_port}" ;;
@@ -132,11 +132,14 @@ words_of() {
 # Starts a server on its core, and waits until it answers.
 start() {
     case "$1" in
-        connect-zig | connect-zig-validate)
+        connect-zig | connect-zig-validate | connect-zig-generic)
             mode=""
             [ "${transport}" = tls ] || mode=cleartext
-            program="${sink}"
-            [ "$1" = connect-zig ] || program="${sink_validate}"
+            case "$1" in
+                connect-zig) program="${sink}" ;;
+                connect-zig-validate) program="${sink_validate}" ;;
+                *) program="${sink_generic}" ;;
+            esac
             ${server_pin} "${program}" "${sink_port}" ${mode} >"${work}/server.log" 2>&1 & ;;
         collector) GOMAXPROCS=1 ${server_pin} "${otelcol}" \
             --config "${work}/otelcol-${transport}.yaml" >"${work}/server.log" 2>&1 & ;;
@@ -218,7 +221,7 @@ probe_refused() {
 # The spans a server says it took and refused. Vector counts one event for each span.
 counted() {
     case "$1" in
-        connect-zig | connect-zig-validate | connect-go | connect-go-validate) curl -sS $(reach) "$(url_of "$1" /sink/count)" |
+        connect-zig | connect-zig-validate | connect-zig-generic | connect-go | connect-go-validate) curl -sS $(reach) "$(url_of "$1" /sink/count)" |
             awk '{ print $4, 0 }' ;;
         # connect-rust's server has no plain route, so its counts come from a port of their own.
         connect-rust | connect-rust-validate) curl -sS "http://127.0.0.1:${connect_rust_count_port}/" | awk '{ print $4, 0 }' ;;
@@ -259,7 +262,7 @@ check_count() {
 # fit is decoded again by each read of it, and the benchmark would time that (decision 37).
 check_storage() {
     case "$1" in
-        connect-zig | connect-zig-validate) ;;
+        connect-zig | connect-zig-validate | connect-zig-generic) ;;
         *) return 0 ;;
     esac
     past="$(curl -sS $(reach) "$(url_of "$1" /sink/count)" | awk '{ print $6 }')"

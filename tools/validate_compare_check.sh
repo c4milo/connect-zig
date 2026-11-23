@@ -81,17 +81,22 @@ done
 
 zig build bench-validate -- ${quick} "${cases}" >"${work}/zig.md"
 zig build bench-validate -- --counters "${cases}" >"${work}/zig_counters.md"
-(cd bench/validate/go && "${go}" build -o "${work}/validate-go" .)
+# Each program is built for this machine's CPU, as `zig build` builds for it: Go at the highest
+# level of the CPU that it names, and Rust with `target-cpu=native`, in a directory named for the
+# CPU (tools/host_cpu.sh).
+. tools/host_cpu.sh
+(cd bench/validate/go && env $(go_level) "${go}" build -o "${work}/validate-go" .)
 "${work}/validate-go" ${quick} "${cases}" >"${work}/go.md"
 # npm installs the packages in a copy of the program, so the tree holds no node_modules.
 mkdir -p "${work}/node"
 cp bench/validate/node/package.json bench/validate/node/package-lock.json bench/validate/node/main.js "${work}/node/"
 (cd "${work}/node" && "${npm}" ci --no-audit --no-fund --silent)
 node "${work}/node/main.js" ${quick} "${cases}" >"${work}/node.md"
-(cd bench/validate/rust && PROTOC="${protoc}" VALIDATE_DESCRIPTORS="${cases}/set.binpb" \
-    "${cargo}" build --quiet --release --target-dir "${root}/.zig-cache/validate-rust")
-"${root}/.zig-cache/validate-rust/release/validate-rust" ${quick} "${cases}" >"${work}/buffa.md"
-"${root}/.zig-cache/validate-rust/release/validate-rust" --prost ${quick} "${cases}" >"${work}/prost.md"
+rust_target="${root}/.zig-cache/validate-rust-$(host_features)"
+(cd bench/validate/rust && RUSTFLAGS="${rust_native}" PROTOC="${protoc}" VALIDATE_DESCRIPTORS="${cases}/set.binpb" \
+    "${cargo}" build --quiet --release --target-dir "${rust_target}")
+"${rust_target}/release/validate-rust" ${quick} "${cases}" >"${work}/buffa.md"
+"${rust_target}/release/validate-rust" --prost ${quick} "${cases}" >"${work}/prost.md"
 
 machine="$(lscpu 2>/dev/null | sed -n 's/^Model name:[[:space:]]*//p' | head -n 1)"
 [ -n "${machine}" ] || machine="$(sysctl -n machdep.cpu.brand_string 2>/dev/null || echo unknown)"

@@ -135,11 +135,16 @@ rotel="${ROTEL:-$(fetch "rotel-${rotel_version}-${arch}" \
     "${rotel_sha256}" rotel)}"
 # The receivers on Connect libraries (decision 46): connect-go, built with the plugins and the
 # modules its go.sum pins, and connect-rust, in release, with the crates its Cargo.lock pins. Each
-# build lives in the cache, outside the repository, unless CONNECT_GO and CONNECT_RUST name one.
+# is built for this machine's CPU, as connect-zig's sink is: Go at the highest level of the CPU
+# that Go names, and Rust with LTO and `target-cpu=native` (tools/host_cpu.sh). Each build lives in
+# the cache, outside the repository and named for the CPU, unless CONNECT_GO and CONNECT_RUST name
+# one.
+. tools/host_cpu.sh
 cache="${XDG_CACHE_HOME:-${HOME}/.cache}/connect-zig"
+go_build="$(go_level)"
 connect_go="${CONNECT_GO:-}"
 if [ -z "${connect_go}" ]; then
-    bin="${cache}/fullstack-connect-go-$(sha256sum tools/fullstack/connect-go/go.sum | cut -c1-12)"
+    bin="${cache}/fullstack-connect-go-$(sha256sum tools/fullstack/connect-go/go.sum | cut -c1-12)-$(host_features)"
     mkdir -p "${bin}"
     (
         cd tools/fullstack/connect-go
@@ -147,13 +152,13 @@ if [ -z "${connect_go}" ]; then
         go build -o "${bin}/protoc-gen-go" google.golang.org/protobuf/cmd/protoc-gen-go
         go build -o "${bin}/protoc-gen-connect-go" connectrpc.com/connect/cmd/protoc-gen-connect-go
         PATH="${bin}:${PATH}" "${buf}" generate
-        go build -o "${bin}/connect-go" .
+        env ${go_build} go build -o "${bin}/connect-go" .
     ) >&2
     connect_go="${bin}/connect-go"
 fi
 connect_rust="${CONNECT_RUST:-}"
 if [ -z "${connect_rust}" ]; then
-    target="${cache}/fullstack-connect-rust-target"
+    target="${cache}/fullstack-connect-rust-target-$(host_features)"
     mkdir -p "${target}"
     # The descriptors move only when the schema does, so Cargo builds the crate again only then.
     # tools/fullstack/validate's copy of the schema: the same messages, whose spans carry OTLP's
@@ -162,8 +167,8 @@ if [ -z "${connect_rust}" ]; then
         -o "${target}/otlp.new.binpb"
     cmp -s "${target}/otlp.new.binpb" "${target}/otlp.binpb" ||
         mv "${target}/otlp.new.binpb" "${target}/otlp.binpb"
-    OTLP_DESCRIPTORS="${target}/otlp.binpb" CARGO_TARGET_DIR="${target}" cargo build --quiet \
-        --locked --release --manifest-path tools/fullstack/connect-rust/Cargo.toml >&2
+    RUSTFLAGS="${rust_native}" OTLP_DESCRIPTORS="${target}/otlp.binpb" CARGO_TARGET_DIR="${target}" \
+        cargo build --quiet --locked --release --manifest-path tools/fullstack/connect-rust/Cargo.toml >&2
     connect_rust="${target}/release/fullstack-connect-rust"
 fi
 sink="${OTLP_SINK:-}"
@@ -177,12 +182,23 @@ if [ -z "${sink}" ] || [ -z "${sink_validate}" ] || [ -z "${sink_compression}" ]
     sink_compression="${sink_compression:-zig-out/bin/otlp-sink-compression}"
     compress="${compress:-zig-out/bin/otlp-compress}"
 fi
+# The sink built for the architecture's baseline CPU, which the peak part runs beside the sink
+# built for this machine's: what the build for the host's CPU gives connect-zig. The servers it is
+# compared with ship builds for the baseline CPU.
+sink_generic="${OTLP_SINK_GENERIC:-}"
+if [ -z "${sink_generic}" ]; then
+    zig build otlp-sink -Drelease -Dcpu=baseline --prefix zig-out/generic >&2
+    sink_generic=zig-out/generic/bin/otlp-sink
+fi
 commit="$(git rev-parse --short HEAD 2>/dev/null || echo unknown)"
 collector="$("${otelcol}" --version)"
 vector_text="$("${vector}" --version | cut -d' ' -f1-2)"
 rotel_text="$("${rotel}" --version)"
+# Each receiver's version, and how it was built for this CPU when this script built it.
 connect_go_text="connect-go $(awk '$1 == "connectrpc.com/connect" { print $2 }' tools/fullstack/connect-go/go.mod)"
+[ -n "${CONNECT_GO:-}" ] || connect_go_text="${connect_go_text} built with ${go_build:-Go's defaults}"
 connect_rust_text="connect-rust $(awk '$0 == "name = \"connectrpc\"" { getline; gsub(/"/, "", $3); print "v" $3 }' tools/fullstack/connect-rust/Cargo.lock)"
+[ -n "${CONNECT_RUST:-}" ] || connect_rust_text="${connect_rust_text} built with LTO and target-cpu=native"
 
 work="$(mktemp -d)"
 server_pid=""

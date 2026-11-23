@@ -19,7 +19,8 @@ from machine import machine
 
 work, ticks, h2load, otelcol, vector, connect_go, connect_rust, commit, placement, rounds, connections, streams, suite = sys.argv[1:14]
 ticks = int(ticks)
-servers = [("connect-zig", "connect-zig"), ("connect-zig-validate", "connect-zig + protovalidate"),
+servers = [("connect-zig", "connect-zig"), ("connect-zig-generic", "connect-zig, generic CPU"),
+           ("connect-zig-validate", "connect-zig + protovalidate"),
            ("collector", "Collector"), ("vector", "Vector"), ("connect-go", "connect-go"),
            ("connect-go-validate", "connect-go + protovalidate-go"),
            ("connect-rust", "connect-rust"), ("connect-rust-validate", "connect-rust + protovalidate-buffa")]
@@ -71,11 +72,15 @@ for spans in spans_list:
     zig_rate, zig_cpu = median(spans, "connect-zig", "rate"), median(spans, "connect-zig", "cpu")
     for server, name in servers[1:]:
         rate, cpu = median(spans, server, "rate"), median(spans, server, "cpu")
-        if server.endswith("-validate") or None in (zig_rate, zig_cpu, rate, cpu):
+        if server.endswith(("-validate", "-generic")) or None in (zig_rate, zig_cpu, rate, cpu):
             continue
         print(f"- {spans} spans: connect-zig answers {zig_rate / rate:.2f} times {name}'s calls a second, and "
               f"spends {zig_cpu / cpu:.2f} times its CPU time a call.")
     names = dict(servers)
+    rate, cpu = median(spans, "connect-zig-generic", "rate"), median(spans, "connect-zig-generic", "cpu")
+    if None not in (rate, cpu, zig_rate, zig_cpu):
+        print(f"- {spans} spans: connect-zig built for the generic CPU answers {rate / zig_rate * percent:.1f}% of the "
+              f"calls a second of its build for this CPU, and spends {(cpu / zig_cpu - 1) * percent:+.0f}% CPU time a call.")
     for server, twin in validating:
         rate, cpu = median(spans, server, "rate"), median(spans, server, "cpu")
         twin_rate, twin_cpu = median(spans, twin, "rate"), median(spans, twin, "cpu")
@@ -86,7 +91,8 @@ for spans in spans_list:
 print()
 print(f"Machine: {machine()}.")
 print(f"Load: {h2load}, {connections} connections of {streams} streams each, {suite}; {placement}.")
-print(f"Servers: connect-zig {commit} in ReleaseSafe, `tools/otlp_sink`; {otelcol}, GOMAXPROCS=1, its OTLP")
+print(f"Servers: connect-zig {commit} in ReleaseSafe for this CPU, `tools/otlp_sink`, and the same for the generic CPU; "
+      f"{otelcol}, GOMAXPROCS=1, its OTLP")
 print(f"receiver into its nop exporter; {vector}, one thread, its opentelemetry source into its blackhole sink;")
 print(f"{connect_go}, GOMAXPROCS=1, and {connect_rust}, one tokio worker, each a receiver that counts spans")
 print("(`tools/fullstack/connect-go`, `tools/fullstack/connect-rust`). connect-zig + protovalidate is `otlp-sink-validate`,")

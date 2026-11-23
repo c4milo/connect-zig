@@ -8,7 +8,7 @@
 # gives the median of the rounds. tools/fullstack/compression.sh runs `peak_measure` too.
 
 peak_spans="16 512"
-peak_servers="connect-zig connect-zig-validate collector vector connect-go connect-go-validate connect-rust connect-rust-validate"
+peak_servers="connect-zig connect-zig-generic connect-zig-validate collector vector connect-go connect-go-validate connect-rust connect-rust-validate"
 peak_rounds=3
 # The requests of each round for each export, after warm requests that are never counted.
 peak_requests_of() { case "$1" in 16) echo 40000 ;; *) echo 4000 ;; esac; }

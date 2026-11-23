@@ -201,8 +201,12 @@ Read these numbers with their limits:
   connect-zig ended on such refusals. A load that kept its connections open across steps would need
   no such window.
 - Run 256 ran before the check of oha's cores, so its steps did not measure them.
-- connect-zig's sink is built for the machine's own CPU. connect-go, connect-rust and the other
-  servers are built for their architecture's generic CPU.
+- In run 256, connect-zig's sink was built for the machine's own CPU, and connect-go,
+  connect-rust and the other servers for their architecture's generic CPU. From the next run,
+  connect-go and connect-rust are built for the machine's CPU too: Go at the highest level of the
+  CPU that it names, and Rust with LTO and `target-cpu=native` (`tools/host_cpu.sh`). The
+  Collector, Vector and Rotel stay their projects' release builds. The peak part also runs
+  connect-zig built for the generic CPU, which shows what the build for the host's CPU gives it.
 - The sink's limits fit this load: 528 connections for its 516, and 64 calls at once, which h2load's
   16 connections of 4 streams fill at the peak. A core with more connections, or with exports over
   256 KiB, needs larger limits and more memory.

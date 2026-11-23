@@ -28,3 +28,6 @@ protoc-gen-protovalidate-buffa = "0.11.0"
 
 [profile.release]
 codegen-units = 1
+# As the validate benchmark's crate builds, and with the host's CPU from RUSTFLAGS
+# (tools/fullstack_check.sh), as connect-zig's sink is built for it.
+lto = "fat"

@@ -53,7 +53,10 @@ if [ "$(uname -s)-$(uname -m)" = "Linux-aarch64" ]; then
     echo "Zig builds for: ${zig_cpu%%+*}, the model's features"
 fi
 zig build bench ${cpu_option} -- ${quick} --write "${scratch}/zig" >"${scratch}/zig.md"
-(cd bench/go && "${go}" run . ${quick} --write "${scratch}/go") >"${scratch}/go.md"
+# Go builds for the highest level of this CPU that it names, as Zig and Rust build for the CPU.
+. tools/host_cpu.sh
+go_build="$(go_level)"
+(cd bench/go && env ${go_build} "${go}" run . ${quick} --write "${scratch}/go") >"${scratch}/go.md"
 baselines="go"
 if command -v "${cargo}" >/dev/null 2>&1; then
     "${buf}" build bench/proto --as-file-descriptor-set -o "${scratch}/bench.binpb"
@@ -123,6 +126,7 @@ if [ -n "${missing}" ]; then
 fi
 echo
 echo "Machine: $(uname -m), $(cpu_model), $(getconf _NPROCESSORS_ONLN 2>/dev/null || echo "?") CPUs, features ${cpu_features}"
+echo "Builds: Zig and Rust for this CPU, Go with ${go_build:-its defaults}."
 echo
 
 # Each table row is "| message | operation | bytes | ns/op | MB/s |". The Zig row and the Go and
