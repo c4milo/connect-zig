@@ -1,7 +1,8 @@
 # The validated OTLP schema
 
-The full-stack check loads two receivers that validate each export with protovalidate:
-connect-zig's sink and the receiver on connect-rust (`tools/fullstack_check.sh`). OpenTelemetry's
+The full-stack check loads three receivers that validate each export with protovalidate:
+connect-zig's sink, the receiver on connect-go with protovalidate-go, and the receiver on
+connect-rust with protovalidate-buffa (`tools/fullstack_check.sh`). OpenTelemetry's
 schema holds no rules, so this folder holds a copy of the four files of `examples/otlp/proto`,
 from [opentelemetry-proto](https://github.com/open-telemetry/opentelemetry-proto) v1.11.1, under
 the Apache 2.0 license in [LICENSE](proto/opentelemetry/LICENSE). Two of them gain the rules that

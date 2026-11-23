@@ -25,6 +25,12 @@ It builds on colibri v0.19.2, with Zig 0.16.0.
   `protovalidate.Interceptor` among them, so raise the route's `storage_bytes` when the count
   grows. `protobuf.decode_into_use` gives the same answer, and the octets the decode filled, to
   a program that decodes by itself.
+- [docs/benchmarks.md](docs/benchmarks.md) loads OTLP receivers on connect-zig, connect-go and
+  connect-rust with protovalidate, and with exports in gzip, zstd and brotli. Over TLS on an
+  arm64 core, connect-zig keeps 86% of its spans a second with validation: 2.7 times
+  connect-rust's with protovalidate-buffa, and 11.2 times connect-go's with protovalidate-go.
+  gzip and zstd exports cost connect-zig 8% and 10% less CPU a span than uncompressed ones over
+  TLS, since they save more TLS and HTTP/2 work than its decoders spend.
 
 ### Changed
 
@@ -33,6 +39,9 @@ It builds on colibri v0.19.2, with Zig 0.16.0.
   than its octets, an OTLP trace export about 3.6 times, and with the old default a validating
   OTLP server spent 0.96 µs a span decoding lists twice, where with room it spends 0.16 µs. Set
   `storage_bytes` to keep the old size.
+- **Memory.** The guide and every example start a router with colibri v0.19.2's `Router.init`.
+  A router set to `.{}` copies its whole default value, which the program's image then holds:
+  155 MB in the OTLP sink of the benchmarks. Start yours with `init` too.
 - `protovalidate`'s `all` and `exists` over a map field search the map for a repeated key only
   when a key's result would end the macro or fail it. The valid `Rules` message of the
   validation benchmark takes 580 instructions, where it took 722.

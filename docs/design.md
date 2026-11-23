@@ -1506,6 +1506,20 @@ ran on Linux x86-64 with Zig 0.16.0.
     their own, and each ran again in a form that compiles.
   - pepegrillo moved to `e94a349`. Its commit linter still holds a subject to 72 columns, so
     `b6f90a1` still fails `zig build lint-commits`.
+- **Steps 36 to 38 in CI** (`a5db7e1`, decisions 37 and 46 as amended). CI's
+  [run 250](https://github.com/c4milo/connect-zig/actions/runs/45111071415), on colibri v0.19.2.
+  Every job passed.
+  - Step 36: each validating receiver refused the export whose trace ID is 3 octets, and took
+    every span of the load. Over TLS on arm64, connect-zig with protovalidate held 658,600 spans
+    a second, 86% of its 765,400. connect-rust with protovalidate-buffa held 242,522, 90%, and
+    connect-go with protovalidate-go 58,926, 61%. At the highest rate each pair held, validation
+    cost 11%, 10% and 50% more CPU a span.
+  - Step 37: each receiver took every span in every coding, over TLS and in cleartext. Over TLS
+    on arm64, connect-zig held 136%, 137% and 117% of its uncompressed rate in gzip, zstd and
+    brotli, and spent 8% and 10% less CPU a span in gzip and zstd, and 3% more in brotli. Each
+    uncompressed climb of connect-zig ended on its 64 call slots.
+  - Step 38: the sink counted no request past its storage in any part. Its peak memory was 352
+    MiB on arm64 and 354 MiB on x86-64.
 - **Ubuntu 26.04** (`fa83b86`, decision 44 as amended on 2026-11-20). CI's
   [run 191](https://github.com/c4milo/connect-zig/actions/runs/44673102412), the first on
   `ubuntu-26.04` and `ubuntu-26.04-arm`. Every job passed. Over TLS on arm64, connect-zig held
