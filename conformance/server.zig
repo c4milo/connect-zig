@@ -63,7 +63,7 @@ pub fn main(init: std.process.Init) !void {
     // rather than serving cleartext to a client that expects TLS.
     if (request.use_tls or request.client_tls_cert.len != 0) return error.TlsUnsupported;
     if (request.message_receive_limit > constants.message_bytes) return error.ReceiveLimitTooLarge;
-    state.router = .{};
+    state.router.init();
     state.app = .{
         .message_receive_limit = request.message_receive_limit,
         .io = init.io,

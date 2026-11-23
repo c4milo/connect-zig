@@ -122,7 +122,7 @@ pub fn Calls(comptime Message: type, comptime name: []const u8, comptime routes:
         /// Encodes `message`, writes each protocol's head and body, and checks one call of each.
         pub fn prepare(self: *Self, message: *const Message) !void {
             self.app = .{};
-            self.router = .{};
+            self.router.init();
             // The reply's buffer holds the encoding until `prepare` copies it into each body.
             const reply = &self.exchange.reply;
             const octets = try proto.encode(Message, message, reply[0 .. reply.len - prefix_len]);

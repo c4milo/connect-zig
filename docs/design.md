@@ -1513,6 +1513,15 @@ ran on Linux x86-64 with Zig 0.16.0.
   first attempt of `bench-compare` on arm64 timed some of connect-zig's cells at twice the lab's
   time, with the same CPU and code; a second attempt matched the lab, and the README takes it.
   valgrind 3.26 counted the routed call's instructions as 3.22 did: 4,177 and 4,430.
+- **colibri v0.19.2** (colibri `377ad658`). It is v0.19.1 with colibri's pull request
+  [149](https://github.com/c4milo/colibri/pull/149), for colibri issue
+  [148](https://github.com/c4milo/colibri/issues/148): `Router.init` starts a router in place.
+  - `router = .{}` copied the router's whole default value from the program's image, and the
+    image held it. In the OTLP sink, with 64 calls of 1 MiB of decode storage each, that was 155
+    MB of `.data.rel.ro`, and the sink's peak memory was 500 MiB in CI's run 248.
+  - Every program here that starts a router now calls `init`: the OTLP sink, the interop and
+    conformance servers, the benchmark's routed call, the quickstart, `std_io` and the
+    examples' harness.
 - **colibri v0.19.1** (colibri `b785d8eb`). It is v0.19.0 with one fix, colibri's pull request
   [145](https://github.com/c4milo/colibri/pull/145): a socket closes only once its staged
   close's shutdown has completed.

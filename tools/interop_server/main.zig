@@ -61,7 +61,7 @@ const State = struct {
 pub fn main(init: std.process.Init) !void {
     const port = try port_of(init);
     const state = try init.arena.allocator().create(State);
-    state.router = .{};
+    state.router.init();
     state.app = .{ .codings = .{
         .decoders = .{ .gzip = &state.gzip_decoder, .zstd = &state.zstd_decoder },
         .encoders = .{ .gzip = &state.gzip_encoder, .zstd = &state.zstd_encoder },

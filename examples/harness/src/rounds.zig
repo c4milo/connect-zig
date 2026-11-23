@@ -35,7 +35,7 @@ pub fn Rounds(comptime App: type, comptime Router: type) type {
             try self.link.init();
             // The datagram link runs on the stream link's loops, so each side reads one clock.
             self.datagram_link.init(&self.link.loops);
-            self.router = .{};
+            self.router.init();
             try self.server.init(&self.link, &self.datagram_link, .of(&self.router, app));
             try self.client.init(&self.server, &self.link, &self.datagram_link);
         }

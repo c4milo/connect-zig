@@ -130,7 +130,7 @@ const State = struct {
     /// Starts the engine, with no socket yet.
     fn init(state: *State, io: Io) !void {
         state.config = .{ .timeouts = .{ .first_request_ns = constants.first_request_timeout_ns } };
-        state.router = .{};
+        state.router.init();
         state.app = .{};
         state.entries = @splat(.{});
         state.random_source = .{ .io = io };

@@ -10,7 +10,7 @@ change the public API, and the entry marks each change that does.
 
 ## Unreleased
 
-It builds on colibri v0.19.1, with Zig 0.16.0.
+It builds on colibri v0.19.2, with Zig 0.16.0.
 
 ### Added
 

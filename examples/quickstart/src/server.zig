@@ -80,7 +80,7 @@ pub fn main(init: std.process.Init) !void {
     const chain_path = args.next() orelse return error.ArgumentMissing;
     const key_path = args.next() orelse return error.ArgumentMissing;
     const state = try init.arena.allocator().create(State);
-    state.router = .{};
+    state.router.init();
     state.app = .{};
     const cwd = std.Io.Dir.cwd();
     const chain = try cwd.readFile(init.io, chain_path, &state.chain_pem);

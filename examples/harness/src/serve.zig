@@ -27,7 +27,7 @@ pub fn Served(comptime App: type, comptime Router: type) type {
 
         /// Serves `app` on the port the command line names, until the program is killed.
         pub fn run(self: *Self, init: std.process.Init, app: *App) !void {
-            self.router = .{};
+            self.router.init();
             try serve(&self.http_server, &self.router, app, &self.tls_buffer, init);
         }
     };
