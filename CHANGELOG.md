@@ -22,6 +22,18 @@ pins. `protovalidate` takes `regex` from the same stdx: the second pin, `stdx_re
 
 ### Changed
 
+- **Breaking.** A program imports one module, `connect_zig`, which names the library's
+  modules, colibri's, and stdx's `platform` as its fields: `@import("connect_zig").connect`
+  ([decision 52](docs/decisions.md)). The package exports no other module. Replace each
+  `module.addImport(name, connect_zig.module(name))` with one
+  `module.addImport("connect_zig", connect_zig.module("connect_zig"))`, give each generated file
+  the same import, and remove stdx from your `build.zig.zon`. Run `buf generate` again: the
+  generated code imports `connect_zig`.
+
+- A program that codes messages, or runs the protocol on an HTTP library of its own, passes
+  `.colibri = false` and links no chapulin. `examples/std_http` serves ELIZA so on
+  `std.http.Server`, over Connect and gRPC-Web.
+
 - **Breaking.** stdx moved its type of CPU features from `codec.Features` to
   `platform.CpuFeatures`. `protovalidate.Options.cpu_features` and an `App`'s `cpu_features` take
   the new type. Import stdx's `platform` in place of `codec`, and pin stdx at the commit

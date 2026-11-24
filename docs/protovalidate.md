@@ -28,8 +28,8 @@ program compiles ([decision 47](decisions.md)). No rule is read or parsed at run
 nothing: your program passes the report's storage.
 
 ```zig
-const protovalidate = @import("protovalidate");
-const platform = @import("platform");
+const protovalidate = @import("connect_zig").protovalidate;
+const platform = @import("connect_zig").platform;
 
 // Once, as the program starts: the CPU features a rule's regular expression may use.
 const cpu_features: platform.CpuFeatures = .detect();
@@ -46,15 +46,15 @@ protovalidate.validate(User, &user, .{ .cpu_features = cpu_features }, &report) 
 };
 ```
 
-Import it as `connect_zig.module("protovalidate")`, and give a generated file that holds rules
-the same module: its header names it. A message with no rule keeps the code it had. `validate`
+It is a field of the module `connect_zig` ([decision 52](decisions.md)), which a generated file
+that holds rules imports too. A program that validates and serves no RPC takes the module with
+`.colibri = false`, and links no chapulin. A message with no rule keeps the code it had. `validate`
 checks `required`, `ignore`, a oneof's `required`, a message's `oneof` rules, and each type's
 standard rules, and walks nested messages, repeated fields, and maps. A rule that reads the time,
 such as `timestamp.lt_now`, takes it from `.{ .now = ... }`. A rule's regular expression
 searches with the CPU features in `.cpu_features`, stdx's `platform.CpuFeatures`. The module
 probes no CPU, so your program calls `platform.CpuFeatures.detect()` once as it starts.
-`platform` is stdx's: name stdx in your `build.zig.zon` at the commit connect-zig pins, and pass
-it connect-zig's options, so its `platform` is the module protovalidate imports.
+`platform` is stdx's, and `connect_zig` names the copy connect-zig builds on.
 `platform.CpuFeatures.target()` names what the build target guarantees, and
 `platform.CpuFeatures.none()` keeps each search on its plain path.
 `report.encode` writes the violations as a `buf.validate.Violations`, which an error carries as

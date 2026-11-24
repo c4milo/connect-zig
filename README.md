@@ -89,31 +89,17 @@ and its JSON form. A message keeps the fields its schema does not know.
 zig fetch --save git+https://github.com/c4milo/connect-zig#v0.4.0
 ```
 
-Then import the modules in `build.zig`. Take colibri's modules from connect-zig: a second copy of
-colibri fails the build.
+Then add its one module to your program in `build.zig`. It names the library, colibri's
+modules, and stdx's `platform`, each the copy connect-zig builds on:
 
 ```zig
 const connect_zig = b.dependency("connect_zig", .{ .target = target, .rotor = true });
-module.addImport("protobuf", connect_zig.module("protobuf"));
-module.addImport("connect", connect_zig.module("connect"));
-module.addImport("connect_colibri", connect_zig.module("connect_colibri"));
-module.addImport("server", connect_zig.module("server"));
-module.addImport("client", connect_zig.module("client"));
-module.addImport("tls", connect_zig.module("tls"));
-module.addImport("colibri", connect_zig.module("colibri"));
+module.addImport("connect_zig", connect_zig.module("connect_zig"));
 ```
 
-Your program detects its CPU's features once, with [stdx](https://github.com/c4milo/stdx)'s type.
-Name stdx at the commit connect-zig pins, with the `.release` you pass connect-zig:
-
-```sh
-zig fetch --save=stdx git+https://github.com/c4milo/stdx#1df5f9f2fd51e8ebc1707e2e77c02afc6041f49f
-```
-
-```zig
-const stdx = b.dependency("stdx", .{ .target = target, .release = false });
-module.addImport("platform", stdx.module("platform"));
-```
+A program that codes messages, or runs the protocol on an HTTP library of its own, passes
+`.colibri = false`: the same module, without colibri, links no TLS library.
+[examples/std_http](examples/std_http) serves ELIZA that way on `std.http.Server`.
 
 > [!IMPORTANT]
 > A program that imports `connect_colibri` or `oidc` links
@@ -142,15 +128,22 @@ plugins:
     out: gen
 ```
 
-Run `zig build plugin`, then `buf generate`. Each `.proto` file gives one `<file>.pb.zig` module.
+Run `zig build plugin`, then `buf generate`. Each `.proto` file gives one `<file>.pb.zig` module,
+which imports `connect_zig` too:
+
+```zig
+const greet = b.createModule(.{ .root_source_file = b.path("gen/greet/v1/greet.pb.zig"), .target = target, .optimize = optimize });
+greet.addImport("connect_zig", connect_zig.module("connect_zig"));
+```
 
 ### 3. Write a handler
 
 A handler fills the response and returns `null`, or returns the error the client reads:
 
 ```zig
-const connect = @import("connect");
-const rpc = @import("connect_colibri");
+const connect_zig = @import("connect_zig");
+const connect = connect_zig.connect;
+const rpc = connect_zig.connect_colibri;
 
 pub fn say(app: *App, ctx: *rpc.Context, request: *const rpc.Request(eliza.SayRequest), response: *rpc.Response(eliza.SayResponse)) ?connect.RpcError {
     if (request.message.sentence.len == 0) return .{ .code = .invalid_argument, .message = "say something" };
@@ -167,7 +160,7 @@ The routes share one context, your `App`, which holds the CPU features. Set them
 with `.cpu_features = .detect()`:
 
 ```zig
-const platform = @import("platform");
+const platform = @import("connect_zig").platform;
 
 /// What every route reads: your program's state, and the CPU features it detected as it started.
 const App = struct {

@@ -370,6 +370,19 @@ Each step names the check that proves it. A step is done when its check passes i
     test-connect-colibri` holds a reply's scratch to `reply_bytes`, and to `message_bytes` when it
     is not set.
 
+40. **One module.** The package exports `connect_zig` alone (decision 52). It names the library's
+    modules, stdx's `platform`, and the library's generated code, and colibri's modules unless a
+    program passes `.colibri = false`. Generated code imports it. New public names: the module
+    `connect_zig`, with the fields `protobuf`, `connect`, `protovalidate`, `platform`,
+    `buf_validate_validate`, `google_protobuf_descriptor`, `connect_colibri`, `oidc`, `server`,
+    `client`, `http`, `tls`, and `colibri`, and the build option `colibri`. The exports
+    `protobuf`, `connect`, `connect_colibri`, `protovalidate`, `oidc`, `server`, `client`,
+    `http`, `tls`, `colibri`, `buf_validate_validate`, and `google_protobuf_descriptor` leave.
+    Every program needs the module; a program of messages, or one on another HTTP library,
+    needs the option. Check: `zig build test-connect-zig` holds the list and each colibri name,
+    `zig build test-plugin` each file's imports, and `zig build examples` a program with colibri,
+    and `protobuf_messages`, `sans_io_call`, and `std_http` without it.
+
 ### Step records
 
 Each step records here what was run, on what, and what it printed, once its check passes. Each
@@ -2239,6 +2252,27 @@ ran on Linux x86-64 with Zig 0.16.0.
     and the GET that names no coding. Both lines are older than this step. Two tests of
     `client_call.zig` now hold them: the gzip encoder's CRC-32 path names the features each
     kind of request took, and each kind of request names the client's codings.
+
+- **One module** (decision 52). Public names: see step 40. Each example adds `connect_zig`
+  alone and names no stdx. `protobuf_messages`, `sans_io_call`, and the new `std_http` pass
+  `.colibri = false`. `kitchen.proto` and `large.proto` lose their services, which no program
+  called, so the example of messages declares no RPC. `tools/generate_check.sh` matched every
+  `gen/` folder, with buf 1.74.0.
+  - On x86-64 Linux, `protobuf_messages`, `sans_io_call`, and `std_http` build static programs
+    with no `ch_` symbol, where `eliza` links libc. `std_http` answered curl over Connect, with
+    a 400 and `invalid_argument` for an empty sentence, and buf curl over gRPC-Web.
+  - Mutations, 8, each `CAUGHT`. Against `zig build example-std_http`: the module without
+    colibri that still names it. Against `zig build example-eliza`: the option false by
+    default. Against `zig build example-oidc`: `oidc` never named. Against `zig build
+    test-connect-zig`: `server`, and `tls`, named by the refusal with colibri. Against `zig
+    build test-plugin`: the library's own files importing `connect_zig`, a library module
+    imported by its own name, and every file importing `protobuf`.
+  - `server` named by the refusal first passed `zig build test-connect-zig`, which checked
+    the list with `@hasDecl` alone. A test now reads one declaration of each colibri name.
+  - The `layering` rule leaves out `src/connect_zig`, which names colibri's modules for a
+    program, as `build.zig` exported them before, and calls none of them. No library module
+    imports it, so the rest of `src/` still runs on any event loop (decision 32).
+  - `zig build test` passed on x86-64 Linux, with Zig 0.16.0.
 
 ### Work not done yet
 

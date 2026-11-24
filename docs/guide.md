@@ -10,41 +10,42 @@ fetched copy of connect-zig on each push.
 zig fetch --save git+https://github.com/c4milo/connect-zig#v0.4.0
 ```
 
-Then import the modules in `build.zig`:
+Then add its one module, `connect_zig`, to your program in `build.zig` ([decision 52](decisions.md)):
 
 ```zig
 const connect_zig = b.dependency("connect_zig", .{ .target = target, .rotor = true });
-module.addImport("protobuf", connect_zig.module("protobuf"));
-module.addImport("connect", connect_zig.module("connect"));
-module.addImport("connect_colibri", connect_zig.module("connect_colibri"));
-// colibri's modules, which connect_colibri is built on.
-module.addImport("server", connect_zig.module("server"));
-module.addImport("client", connect_zig.module("client"));
-module.addImport("tls", connect_zig.module("tls"));
-module.addImport("colibri", connect_zig.module("colibri"));
+module.addImport("connect_zig", connect_zig.module("connect_zig"));
 ```
 
-Take colibri's modules from connect-zig, and do not add colibri to your own `build.zig.zon`: a
-second colibri fails the build ([decision 39](decisions.md)). `.rotor = true` builds `colibri.Server` and
-`colibri.Client` on [Rotor](https://github.com/c4milo/rotor), colibri's event loop. Without it,
-your program drives colibri's engine and pool on its own loop ([decision 32](decisions.md)).
+The module names each part of the library, colibri's modules, and stdx's `platform`, each the copy
+connect-zig builds on. Your program reaches them as fields: `@import("connect_zig").connect`.
 
-connect-zig probes no CPU. Your program detects its CPU's features once, as it starts, and
-states them in a field of its routes' context, in the type of [stdx](https://github.com/c4milo/stdx)'s
-`platform` module. So name stdx too, at the commit connect-zig pins:
+| Name | What it is |
+| --- | --- |
+| `protobuf` | The binary encoding and the proto3 JSON mapping, over generated structs |
+| `connect` | The Connect, gRPC, and gRPC-Web rules, as functions over headers and bytes |
+| `protovalidate` | The check of a message against the rules of its schema |
+| `platform` | stdx's `platform`: the type of the CPU features your program detects and states |
+| `connect_colibri` | Routes for colibri's server, and calls for colibri's client |
+| `oidc` | The check of an OpenID Connect bearer token, on a host target |
+| `server`, `client`, `http`, `tls`, `colibri` | colibri's modules, which `connect_colibri` is built on |
+| `buf_validate_validate`, `google_protobuf_descriptor` | The generated code of validate.proto and descriptor.proto |
 
-```sh
-zig fetch --save=stdx git+https://github.com/c4milo/stdx#1df5f9f2fd51e8ebc1707e2e77c02afc6041f49f
-```
+Do not add colibri or stdx to your own `build.zig.zon`: a second copy of either fails the build
+with a file in two modules ([decision 39](decisions.md)). `.rotor = true` builds `colibri.Server`
+and `colibri.Client` on [Rotor](https://github.com/c4milo/rotor), colibri's event loop. Without
+it, your program drives colibri's engine and pool on its own loop ([decision 32](decisions.md)).
 
-```zig
-// `.release` as you pass it to connect-zig, and false when you pass none: this `platform` is then
-// the module connect-zig imports. Another value fails the build with a file in two modules.
-const stdx = b.dependency("stdx", .{ .target = target, .release = false });
-module.addImport("platform", stdx.module("platform"));
-```
+connect-zig probes no CPU. Your program detects its CPU's features once, as it starts, with
+`platform.CpuFeatures.detect()`, and states them in a field of its routes' context.
 
-A program that imports `connect_colibri` or `oidc` links
+A program that codes messages, checks them, or runs the protocol on an HTTP library of its own
+passes `.colibri = false`. Its module then holds no `connect_colibri`, `oidc` or colibri module,
+and the program links no chapulin. [examples/std_http](../examples/std_http) serves ELIZA so on
+`std.http.Server`, and [examples/protobuf_messages](../examples/protobuf_messages) codes messages
+with no RPC.
+
+A program that takes `connect_zig` with colibri links
 [chapulin](https://github.com/c4milo/chapulin), the TLS library under colibri. chapulin reports
 a failed assertion through one hook, which your program defines once:
 
@@ -78,12 +79,12 @@ plugins:
 Run `zig build plugin`, then `buf generate`, then `zig build`. Each `.proto` file gives one
 `<file>.pb.zig`. A message becomes a struct with a `FieldNumber` enum, an enum a non-exhaustive
 `enum(i32)`, and each RPC a `connect.Method`. Give your program each
-generated file as a module, with the modules its header names:
+generated file as a module, with the modules its header names: `connect_zig`, and the modules of
+the files it imports.
 
 ```zig
 const eliza = b.createModule(.{ .root_source_file = b.path("gen/connectrpc/eliza/v1/eliza.pb.zig") });
-eliza.addImport("protobuf", connect_zig.module("protobuf"));
-eliza.addImport("connect", connect_zig.module("connect"));
+eliza.addImport("connect_zig", connect_zig.module("connect_zig"));
 module.addImport("eliza", eliza);
 ```
 
@@ -97,8 +98,9 @@ A handler takes the call's context, its request, and its response, as connect-go
 fills its response and returns `null`, or returns the error the client reads:
 
 ```zig
-const connect = @import("connect");
-const rpc = @import("connect_colibri");
+const connect_zig = @import("connect_zig");
+const connect = connect_zig.connect;
+const rpc = connect_zig.connect_colibri;
 
 pub fn say(app: *App, ctx: *rpc.Context, request: *const rpc.Request(eliza.SayRequest), response: *rpc.Response(eliza.SayResponse)) ?connect.RpcError {
     if (request.message.sentence.len == 0) return .{ .code = .invalid_argument, .message = "say something" };
@@ -138,7 +140,7 @@ your program detected: each route reads and writes its messages with them. An `A
 field `cpu_features` stops the build.
 
 ```zig
-const platform = @import("platform");
+const platform = @import("connect_zig").platform;
 
 /// What every route reads: your program's state, and the CPU features it detected as it started.
 const App = struct {
@@ -270,10 +272,10 @@ lets an interceptor count what it sees. A call with no context passes `{}`.
 
 The `oidc` module checks a JWT that an OpenID Connect provider signed with RS256, ES256, or
 EdDSA. It does no I/O and reads no clock: your program fetches the provider's JWK Set and passes
-its text and the time. Import it as the others, as `connect_zig.module("oidc")`:
+its text and the time. It is a field of the module, as the others are:
 
 ```zig
-const oidc = @import("oidc");
+const oidc = @import("connect_zig").oidc;
 
 // The context of your routes holds the verifier, as `app.oidc`. Its JSON readers take the CPU
 // features your program detected once, the context's own.

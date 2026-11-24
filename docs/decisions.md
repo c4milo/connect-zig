@@ -28,7 +28,7 @@ first. Cite an entry by number in code and commits ("decision 6").
    on decode, which colibri and stdx both refuse (colibri non-negotiable 4, stdx non-negotiable 2).
 
 39. **The package exports the colibri modules a program builds on.** Ruled by the owner on
-    2026-11-14.
+    2026-11-14. Amended by decision 52: the modules are fields of `connect_zig`.
     - `build.zig` exports colibri's `server`, `client`, `http`, `tls`, and `colibri` modules under
       colibri's own names. A program takes them as it takes `connect_colibri`:
       `dependency.module("server")`.
@@ -47,6 +47,45 @@ first. Cite an entry by number in code and commits ("decision 6").
       it passed connect-zig's three arguments exactly. It could not build on Rotor at all.
     - Beaten: the README states the three arguments that colibri takes, and a `rotor` option. A
       program then repeats connect-zig's request, and a change of that request breaks it.
+
+52. **A program imports one module, `connect_zig`, and a build option leaves colibri out of
+    it.** Ruled by the owner on 2026-11-24.
+    - The package exports one module, `connect_zig`. Its fields name `protobuf`, `connect`,
+      `protovalidate`, stdx's `platform`, the generated code of validate.proto and
+      descriptor.proto, and, with colibri, `connect_colibri`, `oidc`, and colibri's `server`,
+      `client`, `http`, `tls`, and `colibri`. Each is the module the library builds on, so a
+      program and its generated code hold one copy of each, and a program names no stdx.
+    - The build option `colibri`, true by default, chooses whether the module names colibri. A
+      program that codes or checks messages, or runs the protocol on an HTTP library of its
+      own, passes `.colibri = false`. Its module then reaches no colibri module, and the
+      program links no chapulin and no libc. A colibri name it uses stops the build with a
+      message that names the option.
+    - Generated code imports `connect_zig`, and reads `protobuf`, `connect`, `protovalidate`,
+      and the library's generated code from it. The two files of the library's own generated
+      code import `protobuf` and each other by module, since the library builds them below
+      `connect_zig`.
+    - The build's own checks and benchmarks give generated code the module without colibri,
+      so a check that serves no RPC links no chapulin.
+    - This amends decision 39: colibri's modules are fields of `connect_zig`, and no longer
+      exports of their own.
+    - `examples/std_http` serves ELIZA on `std.http.Server` and calls it with
+      `std.http.Client`, with `.colibri = false`. It is the first program that runs the
+      protocol over a socket on an HTTP library other than colibri. `std.http` speaks HTTP/1.1
+      and sends no trailers, so it speaks Connect and gRPC-Web, and not gRPC.
+
+    Beaten:
+    - One module that always names colibri. A program that imports it links chapulin and libc
+      and defines `ch_assert_fail`, even one that only codes messages, because Zig links the
+      objects of every module a compilation reaches.
+    - `connect_zig` beside an exported `protobuf`, with generated code that imports one or the
+      other. A file with rules then had to import `connect_zig` for `protovalidate`, so a
+      program that validates and serves nothing linked chapulin, and a program of messages
+      whose schema declares a service did too.
+    - `connect_zig` beside a second module with no colibri. A program then maps the name of
+      generated code to one of two modules. A build option is what a Cargo feature is to
+      tonic, whose transport is a default feature, and connect-zig already takes `rotor` so.
+    - What it costs: two projects in one build must pass connect-zig the same `colibri` and
+      `rotor`, or Zig builds two packages and the compile fails with a file in two modules.
 
 41. **Each example is a Zig project of its own.** Ruled by the owner on 2026-11-14.
     - `examples/<name>/` holds `build.zig`, `build.zig.zon`, `buf.gen.yaml`, `proto/`, `gen/`, and

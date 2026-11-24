@@ -35,7 +35,16 @@ test "the root exports the names a program calls" {
     });
 }
 
-test {
-    // `connect_colibri` defines chapulin's hook in a test binary, which links chapulin through it.
-    if (options.colibri) _ = connect_colibri;
+test "with colibri, each name of colibri is the module, not the refusal" {
+    // Each name is evaluated here, so one that `without_colibri` gives stops the build. The
+    // `connect_colibri` file also defines chapulin's hook in a test binary.
+    if (!options.colibri) return;
+    const std = @import("std");
+    try std.testing.expect(@hasDecl(connect_colibri, "Route"));
+    try std.testing.expect(@hasDecl(server, "Router"));
+    try std.testing.expect(@hasDecl(client, "ConnectionPool"));
+    try std.testing.expect(@hasDecl(http, "Field"));
+    try std.testing.expect(@hasDecl(tls, "Cpu"));
+    try std.testing.expect(@hasDecl(colibri, "Server"));
+    // `oidc` defines the hook too, so this test leaves it to the oidc example.
 }

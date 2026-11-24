@@ -44,7 +44,13 @@ pub const io = rules.forbidden_references.Rule(.{
 /// `colibri` module, whose `Server` and `Client` own a Rotor loop.
 pub const layering = rules.forbidden_references.Rule(.{
     .name = "layering",
-    .scope = library_tree,
+    // `src/connect_zig` names colibri's modules for a program, as `build.zig` exported them
+    // before decision 52, and its own code calls none of them. No library module imports it.
+    .scope = .{
+        .extensions = &.{lint.paths.zig_extension},
+        .include_directories = &.{"src"},
+        .exclude_directories = &.{ "examples", "src/connect_zig" },
+    },
     .prefixes = &.{ "rotor", "colibri" },
     .resolve_file_aliases = true,
     .reason = "the library runs on any event loop (docs/decisions.md entry 32)",

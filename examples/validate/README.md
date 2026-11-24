@@ -61,12 +61,11 @@ It fails with 400 and `invalid_argument`. The message is "email: must be a valid
 
 - Name protovalidate in your `buf.yaml`, as [proto/buf.yaml](proto/buf.yaml) does, and run
   `buf dep update`.
-- Give a generated file that holds rules the module `protovalidate`: its header names it.
+- Give each generated file the module `connect_zig`: its header names it.
 - Declare the interceptor's room in your route table's `.Values`, and list the interceptor in
   the route options, as [src/service/service.zig](src/service/service.zig) does.
-- Name stdx in your `build.zig.zon` at the commit connect-zig pins, as
-  [build.zig.zon](build.zig.zon) does, and pass it connect-zig's options.
-- Give your `App` a field `cpu_features: platform.CpuFeatures`, stdx's type, and set it once as
+- Give your `App` a field `cpu_features: platform.CpuFeatures`, stdx's type, which
+  `connect_zig` names as `platform`, and set it once as
   your program starts, from `platform.CpuFeatures.detect()`, as [src/main.zig](src/main.zig) does. A rule's
   regular expression searches with those CPU features.
 - A rule that reads the time, such as `timestamp.lt_now`, takes it from a field
