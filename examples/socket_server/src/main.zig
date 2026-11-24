@@ -50,7 +50,7 @@ pub fn main(init: std.process.Init) !void {
     // starts. A server that runs for long calls `set_time` again as its clock moves, and
     // `set_keys` when `keys_stale` asks for it.
     const started_seconds: i64 = @max(std.Io.Clock.real.now(init.io).toSeconds(), 0);
-    try account_service.start(&state.app.oidc, issuer.jwks(&state.jwks_text, &.{issuer.first_key()}), started_seconds);
+    try account_service.start(&state.app.oidc, issuer.jwks(&state.jwks_text, &.{issuer.first_key()}), started_seconds, .detect());
     defer state.app.oidc.deinit();
     try state.served.run(init, &state.app);
 }

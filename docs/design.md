@@ -2155,11 +2155,38 @@ ran on Linux x86-64 with Zig 0.16.0.
     `tools/compile_time_check.sh` printed a ratio of 4.41, +6.9% over its baseline of 4.12.
   - No behaviour changed, so no mutation applies.
 
+- **The program's CPU features in `connect` and `oidc`** (decisions 10 and 34, amended
+  2026-11-24; https://github.com/c4milo/connect-zig/issues/14). No public name changes. Five
+  calls of `connect` take `cpu_features` as their last argument: `error_json.encode`,
+  `end_stream.encode`, `trailers.write`, `get.write_query` and `get.message_octets`. Three
+  `Storage` types and `oidc.VerifierOptions` take a field `cpu_features`, with no default. The
+  server and the client pass the features of their `Encoders` and `Decoders`. The oidc, quickstart
+  and socket server examples detect the features and pass them, and the oidc example names stdx.
+  - `zig build test` passed, with the examples. `zig build test-connect` printed 76 of 76 tests
+    passed, and `zig build test-oidc` 57 of 57.
+  - Mutations, 16. Against `zig build test-oidc`: `Verifier.init` that keeps the target's
+    features in place of the options', and `verify` that writes no features into the `Claims`.
+    Each was `CAUGHT`. A JSON reader or a base64 coder on the target's features writes the same
+    octets, so no test sees it. 11 such mutants each passed every test, and the lint's new rule
+    `target-features` refused each one: oidc's header, claims and JWK Set readers, its string
+    lookup and its `Reader` through `@import("platform")`, and connect's `Tokens`, the base64 that
+    `Tokens` keeps, the error body, the end-stream message with `.target()`, a GET's query
+    through an alias, and a "-bin" trailer. Three mutants of the rule, which reads comments,
+    refuses the ruled default, or reads every directory, were each `CAUGHT`.
+
 ### Work not done yet
 
 - A stream that waits for an event of the program once its request ended (colibri issue 130).
   colibri v0.16.0 left it out, as ruled on 2026-11-10. No release up to v0.17.0 holds it, and
   the issue is still open.
+- For `protobuf`, the program's CPU features in `decode`, `decode_into`, `encode_json` and
+  `decode_json`: the UTF-8 check of a string, and the JSON and base64 of stdx. It changes the
+  decode API, so the owner rules its form first (https://github.com/c4milo/connect-zig/issues/14).
+  `tools/perf_check.sh`'s count, built with `-Dcpu=baseline`, gave the gain on 2026-11-24. The
+  build target's features were measured against x86-64-v3's, a literal in a patch that was not
+  kept. Large JSON decode fell 15.5%, from 5,838,289 instructions to 4,936,210, large JSON encode
+  14.4%, and large binary decode 3.6%. Small, medium, deep, packed, tree and varints moved 0.3% or
+  less. Strings JSON encode rose 12.1%, from 3,084 to 3,458: its strings are short.
 - For `oidc`, a measurement before any change: a client sends one token with each call, and
   the verifier checks its signature each time. If that cost shows in a server's profile, a
   verifier may keep the last tokens it took.

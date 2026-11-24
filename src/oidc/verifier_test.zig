@@ -1,6 +1,7 @@
 //! The verifier's tests: tokens of each algorithm, the RFCs' known answers, and each refusal.
 const std = @import("std");
 const testing = std.testing;
+const platform = @import("platform");
 const constants = @import("constants.zig");
 const verifier_file = @import("verifier.zig");
 const Verifier = verifier_file.Verifier;
@@ -43,7 +44,7 @@ test "a token the issuer signed verifies in ES256 and EdDSA, and gives its claim
 }
 
 fn rsa_verifier(verifier: *Verifier, modulus: []const u8, id: []const u8) !void {
-    try verifier.init(&.{ .issuer = rsa.issuer, .audience = rsa.audience });
+    try verifier.init(&.{ .issuer = rsa.issuer, .audience = rsa.audience, .cpu_features = support.cpu_features });
     var buffer: [support.text_bytes]u8 = undefined;
     const jwks = try std.fmt.bufPrint(&buffer, "{{\"keys\":[{{\"kty\":\"RSA\",\"alg\":\"RS256\",\"use\":\"sig\",\"kid\":\"{s}\",\"n\":\"{s}\",\"e\":\"{s}\"}}]}}", .{ id, modulus, rsa.exponent });
     try verifier.set_keys(jwks);
@@ -83,7 +84,7 @@ test "a verifier keeps no RSA key under 2048 bits" {
 /// audience. With one character of the signature changed, the signature fails first.
 fn expect_known_answer(jwk: []const u8, token: []const u8, after_signature: Error) !void {
     var verifier: Verifier = undefined;
-    try verifier.init(&.{ .issuer = rfc.issuer, .audience = "any" });
+    try verifier.init(&.{ .issuer = rfc.issuer, .audience = "any", .cpu_features = support.cpu_features });
     var buffer: [support.text_bytes]u8 = undefined;
     try verifier.set_keys(try std.fmt.bufPrint(&buffer, "{{\"keys\":[{s}]}}", .{jwk}));
     verifier.set_time(rfc.expires_unix_seconds - 1);
@@ -106,7 +107,7 @@ test "the RFCs' tokens verify under the RFCs' keys" {
 test "the RFC's claims pass the issuer and the time, and fail each alone" {
     const jwk = "{\"keys\":[{\"kty\":\"EC\",\"crv\":\"P-256\",\"x\":\"" ++ rfc.es256_x ++ "\",\"y\":\"" ++ rfc.es256_y ++ "\"}]}";
     var verifier: Verifier = undefined;
-    try verifier.init(&.{ .issuer = "jo", .audience = "any" });
+    try verifier.init(&.{ .issuer = "jo", .audience = "any", .cpu_features = support.cpu_features });
     try verifier.set_keys(jwk);
     verifier.set_time(rfc.expires_unix_seconds - 1);
     try testing.expectError(error.WrongIssuer, verify_into(&verifier, rfc.es256_token));
@@ -182,12 +183,12 @@ test "a verifier takes the algorithms its options state, and no other" {
         var fixture: Fixture = undefined;
         // The key's algorithm is off: the verifier keeps no key.
         const off: verifier_file.VerifierOptions.Algorithms = .{ .es256 = kind != .es256, .eddsa = kind != .eddsa };
-        try testing.expectError(error.NoKeys, fixture.init_with(kind, &.{ .issuer = support.issuer, .audience = support.audience, .algorithms = off }));
+        try testing.expectError(error.NoKeys, fixture.init_with(kind, &.{ .issuer = support.issuer, .audience = support.audience, .cpu_features = support.cpu_features, .algorithms = off }));
         fixture.verifier.set_time(support.now);
         try testing.expectError(error.UnsupportedAlgorithm, fixture.check(support.good_claims));
         // The key's algorithm alone is on.
         const on: verifier_file.VerifierOptions.Algorithms = .{ .rs256 = false, .es256 = kind == .es256, .eddsa = kind == .eddsa };
-        try fixture.init_with(kind, &.{ .issuer = support.issuer, .audience = support.audience, .algorithms = on });
+        try fixture.init_with(kind, &.{ .issuer = support.issuer, .audience = support.audience, .cpu_features = support.cpu_features, .algorithms = on });
         _ = try fixture.check(support.good_claims);
     }
 }
@@ -312,18 +313,18 @@ test "a token's length is bounded" {
 test "init copies its options, and refuses those out of range" {
     var issuer_buffer: [constants.issuer_bytes_max + 1]u8 = @splat('i');
     var verifier: Verifier = undefined;
-    try testing.expectError(error.IssuerInvalid, verifier.init(&.{ .issuer = "", .audience = "a" }));
-    try testing.expectError(error.IssuerInvalid, verifier.init(&.{ .issuer = &issuer_buffer, .audience = "a" }));
-    try testing.expectError(error.AudienceInvalid, verifier.init(&.{ .issuer = "i", .audience = "" }));
-    try testing.expectError(error.AudienceInvalid, verifier.init(&.{ .issuer = "i", .audience = &issuer_buffer }));
-    try testing.expectError(error.LeewayTooLong, verifier.init(&.{ .issuer = "i", .audience = "a", .leeway_s = constants.leeway_s_max + 1 }));
-    try testing.expectError(error.NoAlgorithm, verifier.init(&.{ .issuer = "i", .audience = "a", .algorithms = .{ .rs256 = false, .es256 = false, .eddsa = false } }));
+    try testing.expectError(error.IssuerInvalid, verifier.init(&.{ .issuer = "", .audience = "a", .cpu_features = support.cpu_features }));
+    try testing.expectError(error.IssuerInvalid, verifier.init(&.{ .issuer = &issuer_buffer, .audience = "a", .cpu_features = support.cpu_features }));
+    try testing.expectError(error.AudienceInvalid, verifier.init(&.{ .issuer = "i", .audience = "", .cpu_features = support.cpu_features }));
+    try testing.expectError(error.AudienceInvalid, verifier.init(&.{ .issuer = "i", .audience = &issuer_buffer, .cpu_features = support.cpu_features }));
+    try testing.expectError(error.LeewayTooLong, verifier.init(&.{ .issuer = "i", .audience = "a", .cpu_features = support.cpu_features, .leeway_s = constants.leeway_s_max + 1 }));
+    try testing.expectError(error.NoAlgorithm, verifier.init(&.{ .issuer = "i", .audience = "a", .cpu_features = support.cpu_features, .algorithms = .{ .rs256 = false, .es256 = false, .eddsa = false } }));
     for ([_]verifier_file.VerifierOptions.Algorithms{
         .{ .rs256 = true, .es256 = false, .eddsa = false },
         .{ .rs256 = false, .es256 = true, .eddsa = false },
         .{ .rs256 = false, .es256 = false, .eddsa = true },
-    }) |one| try verifier.init(&.{ .issuer = "i", .audience = "a", .algorithms = one });
-    try verifier.init(&.{ .issuer = issuer_buffer[0..constants.issuer_bytes_max], .audience = issuer_buffer[0..constants.audience_bytes_max], .leeway_s = constants.leeway_s_max });
+    }) |one| try verifier.init(&.{ .issuer = "i", .audience = "a", .cpu_features = support.cpu_features, .algorithms = one });
+    try verifier.init(&.{ .issuer = issuer_buffer[0..constants.issuer_bytes_max], .audience = issuer_buffer[0..constants.audience_bytes_max], .leeway_s = constants.leeway_s_max, .cpu_features = support.cpu_features });
     try testing.expect(verifier.keys_stale());
     verifier.deinit();
 
@@ -331,11 +332,18 @@ test "init copies its options, and refuses those out of range" {
     var fixture: Fixture = undefined;
     var issuer_copy: [support.issuer.len]u8 = support.issuer.*;
     var audience_copy: [support.audience.len]u8 = support.audience.*;
-    try fixture.init_with(.es256, &.{ .issuer = &issuer_copy, .audience = &audience_copy });
+    // The program's CPU features reach the verifier and the claims' lookups. They differ from the
+    // tests' own and from the claims' default.
+    const program_features: platform.CpuFeatures = .{ .ssse3 = true };
+    try testing.expect(!std.meta.eql(program_features, support.cpu_features));
+    try testing.expect(!std.meta.eql(program_features, @as(verifier_file.Claims, .{}).cpu_features));
+    try fixture.init_with(.es256, &.{ .issuer = &issuer_copy, .audience = &audience_copy, .cpu_features = program_features });
     @memset(&issuer_copy, 'x');
     @memset(&audience_copy, 'x');
     const claims = try fixture.check(support.good_claims);
     try testing.expectEqualStrings(support.issuer, claims.issuer);
+    try testing.expectEqual(program_features, fixture.verifier.cpu_features);
+    try testing.expectEqual(program_features, claims.cpu_features);
 }
 
 test "set_keys replaces the keys, and keeps the old ones after an error" {

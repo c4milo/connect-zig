@@ -89,7 +89,7 @@ pub fn main(init: std.process.Init) !void {
     const cwd = std.Io.Dir.cwd();
     const chain = try cwd.readFile(init.io, chain_path, &state.chain_pem);
     const key = try cwd.readFile(init.io, key_path, &state.key_pem);
-    try state.app.oidc.init(&.{ .issuer = "https://issuer.example", .audience = "quickstart" });
+    try state.app.oidc.init(&.{ .issuer = "https://issuer.example", .audience = "quickstart", .cpu_features = .detect() });
     std.debug.assert(state.app.oidc.keys_stale());
     // The Unix time when the server starts, which its TLS session tickets carry.
     const unix_seconds: u64 = @intCast(@max(std.Io.Clock.real.now(init.io).toSeconds(), 0));

@@ -6,6 +6,7 @@
 //! than its storage reads as `.long`.
 const std = @import("std");
 const assert = std.debug.assert;
+const platform = @import("platform");
 const constants = @import("constants.zig");
 const Reader = @import("reader.zig").Reader;
 
@@ -19,9 +20,9 @@ pub const Error = error{
 const decimal_base = 10;
 
 /// The string of the member `name`, in `storage`, or null when the payload holds no such member.
-pub fn string(payload: []const u8, name: []const u8, storage: []u8) Error!?[]const u8 {
+pub fn string(payload: []const u8, name: []const u8, storage: []u8, cpu_features: platform.CpuFeatures) Error!?[]const u8 {
     var reader: Reader = undefined;
-    if (!find(&reader, payload, name, storage)) return null;
+    if (!find(&reader, payload, name, storage, cpu_features)) return null;
     return switch (reader.next() catch unreachable) {
         .string => |octets| octets,
         .long => error.ClaimTooLong,
@@ -31,9 +32,9 @@ pub fn string(payload: []const u8, name: []const u8, storage: []u8) Error!?[]con
 
 /// The integer of the member `name`, or null when the payload holds no such member. A number
 /// with a fraction, with an exponent, or past an i64 is `error.WrongType`.
-pub fn integer(payload: []const u8, name: []const u8, storage: []u8) Error!?i64 {
+pub fn integer(payload: []const u8, name: []const u8, storage: []u8, cpu_features: platform.CpuFeatures) Error!?i64 {
     var reader: Reader = undefined;
-    if (!find(&reader, payload, name, storage)) return null;
+    if (!find(&reader, payload, name, storage, cpu_features)) return null;
     return switch (reader.next() catch unreachable) {
         .number => |digits| std.fmt.parseInt(i64, digits, decimal_base) catch error.WrongType,
         else => error.WrongType,
@@ -42,11 +43,11 @@ pub fn integer(payload: []const u8, name: []const u8, storage: []u8) Error!?i64 
 
 /// Whether the member `name` is the string `value`, or an array that holds it. An array's other
 /// values pass unread; a member of another type is `error.WrongType`.
-pub fn holds(payload: []const u8, name: []const u8, value: []const u8, storage: []u8) Error!bool {
+pub fn holds(payload: []const u8, name: []const u8, value: []const u8, storage: []u8, cpu_features: platform.CpuFeatures) Error!bool {
     // A value the storage cannot hold never compares equal, so the program asks for none.
     assert(value.len <= storage.len);
     var reader: Reader = undefined;
-    if (!find(&reader, payload, name, storage)) return false;
+    if (!find(&reader, payload, name, storage, cpu_features)) return false;
     switch (reader.next() catch unreachable) {
         .string => |octets| return std.mem.eql(u8, octets, value),
         // A string longer than the storage, which `value` is not.
@@ -72,14 +73,14 @@ pub fn holds(payload: []const u8, name: []const u8, value: []const u8, storage: 
 /// Moves `reader` to the value of the last member named `name`, or returns false when the
 /// payload holds none. RFC 7519 §4: a parser that takes a name twice returns the lexically last
 /// member. `verify` refuses a second "iss", "sub", "aud", "exp" or "nbf".
-fn find(reader: *Reader, payload: []const u8, name: []const u8, storage: []u8) bool {
+fn find(reader: *Reader, payload: []const u8, name: []const u8, storage: []u8, cpu_features: platform.CpuFeatures) bool {
     // A name the storage cannot hold reads as `.long`, and never compares equal.
     assert(name.len <= storage.len);
     // A `Claims` that no `verify` filled holds no payload.
     if (payload.len == 0) return false;
-    const count = count_of(reader, payload, name, storage);
+    const count = count_of(reader, payload, name, storage, cpu_features);
     if (count == 0) return false;
-    reader.init(payload, storage);
+    reader.init(payload, storage, cpu_features);
     reader.expect(.begin_object) catch unreachable;
     var seen: usize = 0;
     // Bounded: each member takes at least one octet of the payload.
@@ -94,8 +95,8 @@ fn find(reader: *Reader, payload: []const u8, name: []const u8, storage: []u8) b
 }
 
 /// The members named `name` in the payload.
-fn count_of(reader: *Reader, payload: []const u8, name: []const u8, storage: []u8) usize {
-    reader.init(payload, storage);
+fn count_of(reader: *Reader, payload: []const u8, name: []const u8, storage: []u8, cpu_features: platform.CpuFeatures) usize {
+    reader.init(payload, storage, cpu_features);
     reader.expect(.begin_object) catch unreachable;
     var count: usize = 0;
     // Bounded: each member takes at least one octet of the payload.

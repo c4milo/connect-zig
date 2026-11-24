@@ -28,6 +28,18 @@ pins. `protovalidate` takes `regex` from the same stdx: the second pin, `stdx_re
   the new type. Import stdx's `platform` in place of `codec`, and pin stdx at the commit
   connect-zig pins ([decision 47](docs/decisions.md)).
 
+- **Breaking.** `connect` and `oidc` read and write JSON and base64 with the program's CPU
+  features, never the build target's ([decisions 10 and 34](docs/decisions.md)):
+  - `connect.error_json.encode`, `connect.end_stream.encode`, `connect.trailers.write`,
+    `connect.get.write_query` and `connect.get.message_octets` take a last argument
+    `cpu_features`.
+  - `connect.error_json.Storage`, `connect.end_stream.Storage` and `connect.trailers.Storage`
+    take a field `cpu_features`, with no default.
+  - The server and the client take the features from `Encoders.cpu_features` and
+    `Decoders.cpu_features`, so a program that sets those needs no other change.
+  - `oidc.VerifierOptions` takes a field `cpu_features`, with no default. `Claims` takes the
+    verifier's when `verify` fills it, for `string`, `integer` and `holds`.
+
 - **Memory.** The guide and every example take the program's `State` from `rawAlloc`, not from
   `create`. In Debug and ReleaseSafe, `create` writes the undefined pattern over all of it, so
   each page is in memory from the start. The OTLP sink of the benchmarks took 318 MiB before its

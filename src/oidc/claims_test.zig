@@ -57,7 +57,7 @@ test "the audience is the verifier's, alone or among others" {
 }
 
 fn expect_at(fixture: *Fixture, comptime leeway_s: u32, claims: []const u8, at: i64, expected: ?verifier_file.Error) !void {
-    try fixture.init_with(.eddsa, &.{ .issuer = support.issuer, .audience = support.audience, .leeway_s = leeway_s });
+    try fixture.init_with(.eddsa, &.{ .issuer = support.issuer, .audience = support.audience, .cpu_features = support.cpu_features, .leeway_s = leeway_s });
     fixture.verifier.set_time(at);
     var payload: [payload_bytes]u8 = undefined;
     const outcome = fixture.check(try std.fmt.bufPrint(&payload, "{s},{s}}}", .{ head, claims }));

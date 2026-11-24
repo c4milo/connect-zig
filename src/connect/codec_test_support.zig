@@ -7,7 +7,13 @@
 //! zstd decoder alone takes about 8.7 MB, so a set in each test file overran that reach. A test
 //! uses a codec for one message at a time, so a server and a client in one test take turns.
 const brotli = @import("brotli");
+const platform = @import("platform");
 const compression = @import("compression.zig");
+
+/// The CPU features the tests run with: the build target's, which `Encoders` and `Decoders` take
+/// by default. The library takes a program's features and names the target's nowhere else, which
+/// the lint's rule `target-features` checks.
+pub const cpu_features = platform.CpuFeatures.target();
 
 pub threadlocal var gzip_encoder: compression.GzipEncoder align(@alignOf(compression.GzipEncoder)) = undefined;
 pub threadlocal var gzip_decoder: compression.GzipDecoder align(@alignOf(compression.GzipDecoder)) = undefined;

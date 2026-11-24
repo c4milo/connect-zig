@@ -2,6 +2,7 @@
 const std = @import("std");
 const assert = std.debug.assert;
 const chapulin = @import("chapulin");
+const platform = @import("platform");
 const constants = @import("constants.zig");
 const reader_file = @import("reader.zig");
 const Reader = reader_file.Reader;
@@ -38,12 +39,13 @@ pub const KeySet = struct {
     /// Replaces the set with the keys of `text` that verify a signature in one of `algorithms`.
     /// RFC 7517 §5: a reader passes over a key of a type it does not know, one that lacks a
     /// member, and one whose values are out of range. More than `keys_max` keys that remain is
-    /// `error.TooManyKeys`. After an error the set holds no key.
-    pub fn read(set: *KeySet, text: []const u8, scratch: []u8, algorithms: token.Algorithms) Error!void {
+    /// `error.TooManyKeys`. After an error the set holds no key. The JSON reader uses the
+    /// program's CPU features, `cpu_features`.
+    pub fn read(set: *KeySet, text: []const u8, scratch: []u8, algorithms: token.Algorithms, cpu_features: platform.CpuFeatures) Error!void {
         set.count = 0;
         errdefer set.count = 0;
         var reader: Reader = undefined;
-        reader.init(text, scratch);
+        reader.init(text, scratch, cpu_features);
         // RFC 7517 §5: a JWK Set is a JSON object.
         try reader.expect(.begin_object);
         var members: reader_file.Members(enum { keys }) = .{ .reader = &reader };

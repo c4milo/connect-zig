@@ -215,6 +215,16 @@ first. Cite an entry by number in code and commits ("decision 6").
     `compress` and `decompress`, which no program can raise; a default of `.detect()`, which is
     a probe in the library; and a field of the App, which a program with no connect_colibri
     does not have.
+    Amended on 2026-11-24 (https://github.com/c4milo/connect-zig/issues/14): Connect's error
+    body, its end-stream message, gRPC's "-bin" trailers and a GET's query read and write their
+    JSON and base64 with the same features. The server and the client take them from `Encoders`
+    and `Decoders`, which each call already holds. A call a program makes itself takes them as
+    its last argument, or in its `Storage`, with no default. stdx's JSON and base64 write the
+    same octets on every path, so no test sees the features a call took. The lint's rule
+    `target-features` refuses each call of `target()` in `src/connect` but the two defaults
+    above and the tests' one constant. Beaten: a field of `Scratch`, which an encode call does
+    not take; and a default of `.target()` in each `Storage`, which ruling 2 of issue 14
+    refuses.
 
 11. **Plain gRPC waits on colibri for the client.** colibri's `client.Response` holds no
     trailers, so a client cannot read `grpc-status` over h2. The server speaks gRPC now. The
@@ -536,6 +546,15 @@ first. Cite an entry by number in code and commits ("decision 6").
     - A program reads its own claims on demand, with `Claims.string`, `integer`, and `holds`
       over the payload's copy. A string a lookup returns stays valid until the next lookup on
       the same `Claims`. A claim nobody asks for costs nothing.
+    - The JSON readers take the program's CPU features (amended 2026-11-24,
+      https://github.com/c4milo/connect-zig/issues/14). `VerifierOptions.cpu_features` has no
+      default, and `init` copies it. `verify` writes it into the `Claims` it fills, so that a
+      lookup of the program's runs with it too. A `Claims` that no `verify` filled holds
+      `.none()`, and its lookups read no payload. The lint's rule `target-features` refuses each
+      call of `target()` in `src/oidc` but the tests' one constant. Beaten: a parameter of each
+      lookup, which a handler would have to pass at each call; and the verifier's features read
+      through a pointer in `Claims`, which a call's values would hold past the verifier's
+      `deinit`.
     - `Interceptor(.{ .exclude = ... })` takes its list at compile time, because a generated
       `Routes` gives one interceptor list to each method of a service. An entry is a method's
       path, or a service's prefix that ends in "/". Its `on_call` takes any call type with

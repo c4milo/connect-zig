@@ -56,8 +56,8 @@ pub const Messages = struct {
             // The octets `decode` reads must not sit in `scratch.work`, where reading JSON writes
             // its binary form: the output would overwrite input not yet read. With no coding the
             // query decodes straight into `scratch.message`.
-            if (coding == .identity) return try get.message_octets(query, messages.scratch.message);
-            const encoded = try get.message_octets(query, messages.scratch.work);
+            if (coding == .identity) return try get.message_octets(query, messages.scratch.message, messages.decoders.cpu_features);
+            const encoded = try get.message_octets(query, messages.scratch.work, messages.decoders.cpu_features);
             return try compression.decompress(coding, messages.decoders, encoded, messages.scratch.message);
         }
         return try compression.decompress(coding, messages.decoders, messages.body, messages.scratch.message);

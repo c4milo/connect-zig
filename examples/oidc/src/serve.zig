@@ -44,7 +44,7 @@ pub fn main(init: std.process.Init) !void {
     // start. A program that runs for long calls `set_time` again in each turn of its loop, or
     // the verifier accepts a token after its "exp".
     const now = std.Io.Clock.real.now(init.io).toSeconds();
-    try service.start(&state.app.oidc, issuer.jwks(&state.jwks_text, &.{issuer.first_key()}), now);
+    try service.start(&state.app.oidc, issuer.jwks(&state.jwks_text, &.{issuer.first_key()}), now, .detect());
     defer state.app.oidc.deinit();
     // A token to call Whoami with, which the test issuer signs with the key the verifier holds.
     const key = issuer.first_key();

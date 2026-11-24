@@ -20,7 +20,7 @@ const Sets = struct {
     /// The keys the set keeps from a JWK Set that holds `key` alone.
     fn count_of(sets: *Sets, key: []const u8) !usize {
         const text = try std.fmt.bufPrint(&sets.buffer, "{{\"keys\":[{s}]}}", .{key});
-        try sets.set.read(text, &sets.scratch, all);
+        try sets.set.read(text, &sets.scratch, all, support.cpu_features);
         return sets.set.count;
     }
 };
@@ -205,7 +205,7 @@ test "a set keeps the keys of the algorithms its caller takes" {
         .{ .{ .rs256 = false, .es256 = false }, 1 },
     };
     for (cases) |case| {
-        try sets.set.read(text, &sets.scratch, case[0]);
+        try sets.set.read(text, &sets.scratch, case[0], support.cpu_features);
         try testing.expectEqual(case[1], sets.set.count);
         for (sets.set.keys[0..sets.set.count]) |*key| try testing.expect(token.allows(case[0], key.algorithm));
     }
@@ -214,7 +214,7 @@ test "a set keeps the keys of the algorithms its caller takes" {
 test "find takes the key of the header's algorithm and identifier" {
     var sets: Sets = .{};
     const text = "{\"keys\":[{" ++ ec ++ ",\"kid\":\"a\"},{" ++ okp ++ ",\"kid\":\"a\"},{" ++ ec ++ ",\"kid\":\"b\"},{" ++ rsa_key ++ "}]}";
-    try sets.set.read(text, &sets.scratch, all);
+    try sets.set.read(text, &sets.scratch, all, support.cpu_features);
     const set = &sets.set;
     try testing.expectEqual(@as(usize, 4), set.count);
     // RFC 7517 §4.5: keys of two families may share an identifier, and the algorithm tells them

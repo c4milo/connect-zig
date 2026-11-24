@@ -12,13 +12,14 @@ const Detail = rpc_error.Detail;
 
 pub const EncodeError = json.EncodeError || error{NoSpaceLeft};
 
-pub fn encode(failure: *const RpcError, buffer: []u8) EncodeError![]const u8 {
-    var text = json.TextWriter.init(buffer, .text, platform.CpuFeatures.target());
-    try write(failure, &text);
+/// Writes `failure` as an error body into `buffer`, with the program's CPU features.
+pub fn encode(failure: *const RpcError, buffer: []u8, cpu_features: platform.CpuFeatures) EncodeError![]const u8 {
+    var text = json.TextWriter.init(buffer, .text, cpu_features);
+    try write(failure, &text, cpu_features);
     return text.written();
 }
 
-pub fn write(failure: *const RpcError, text: *json.TextWriter) EncodeError!void {
+pub fn write(failure: *const RpcError, text: *json.TextWriter, cpu_features: platform.CpuFeatures) EncodeError!void {
     std.debug.assert(failure.code != .ok);
     try text.begin_object();
     try text.name("code");
@@ -35,7 +36,7 @@ pub fn write(failure: *const RpcError, text: *json.TextWriter) EncodeError!void 
             try text.name("type");
             try text.string(detail.type_name);
             try text.name("value");
-            try json_read.write_base64(detail.value, text);
+            try json_read.write_base64(detail.value, text, cpu_features);
             try text.end_object();
         }
         try text.end_array();
@@ -50,6 +51,8 @@ pub const Storage = struct {
     /// The message, each detail's type and each detail's decoded value.
     octets: []u8,
     details: []Detail,
+    /// The program's CPU features, which the JSON reader and the base64 decoder use.
+    cpu_features: platform.CpuFeatures,
 };
 
 /// What `decode` and `read_object` return on a body they cannot read.
@@ -64,7 +67,7 @@ pub fn decode(body: []const u8, storage: *const Storage) DecodeError!RpcError {
 /// Reads an error body whose missing, null or unknown code reads as `fallback`: the code a
 /// client takes from the HTTP status (Connect protocol, "HTTP to Error Code").
 pub fn decode_or(body: []const u8, storage: *const Storage, fallback: Code) DecodeError!RpcError {
-    var tokens = json_read.Tokens.init(body, storage.tokens, storage.octets);
+    var tokens = json_read.Tokens.init(body, storage.tokens, storage.octets, storage.cpu_features);
     try tokens.start();
     try tokens.expect(.begin_object);
     const failure = try read_object(&tokens, storage.details, fallback);
@@ -148,13 +151,14 @@ fn read_detail(tokens: *json_read.Tokens) json_read.Error!Detail {
 }
 
 const testing = std.testing;
+const test_cpu_features = @import("codec_test_support.zig").cpu_features;
 
 test "an error body is written with its code's name and unpadded details" {
     var buffer: [256]u8 = undefined;
     const failure: RpcError = .{ .code = .unavailable, .message = "busy", .details = &.{.{ .type_name = "a.B", .value = &.{0xff} }} };
     try testing.expectEqualStrings(
         "{\"code\":\"unavailable\",\"message\":\"busy\",\"details\":[{\"type\":\"a.B\",\"value\":\"/w\"}]}",
-        try encode(&failure, &buffer),
+        try encode(&failure, &buffer, test_cpu_features),
     );
 }
 
@@ -162,7 +166,7 @@ test "an error body reads back, with padding, unknown members and an unknown cod
     var tokens: [64]u8 = undefined;
     var octets: [64]u8 = undefined;
     var details: [2]Detail = undefined;
-    const storage: Storage = .{ .tokens = &tokens, .octets = &octets, .details = &details };
+    const storage: Storage = .{ .tokens = &tokens, .octets = &octets, .details = &details, .cpu_features = test_cpu_features };
     const body = "{\"code\":\"not_found\",\"debug\":{\"x\":[1]},\"details\":[{\"type\":\"a.B\",\"value\":\"/w==\",\"debug\":1}]}";
     const failure = try decode(body, &storage);
     try testing.expectEqual(Code.not_found, failure.code);
@@ -179,13 +183,13 @@ test "a detail longer than one piece writes the base64 that std.base64 writes" {
     for (&value, 0..) |*octet, index| octet.* = @truncate(index * 7);
     const failure: RpcError = .{ .code = .internal, .details = &.{.{ .type_name = "a.B", .value = &value }} };
     var buffer: [512]u8 = undefined;
-    const body = try encode(&failure, &buffer);
+    const body = try encode(&failure, &buffer, test_cpu_features);
     var reference: [256]u8 = undefined;
     const want = std.base64.standard_no_pad.Encoder.encode(&reference, &value);
     try testing.expect(std.mem.indexOf(u8, body, want) != null);
     var tokens: [256]u8 = undefined;
     var octets: [256]u8 = undefined;
     var details: [2]Detail = undefined;
-    const back = try decode(body, &.{ .tokens = &tokens, .octets = &octets, .details = &details });
+    const back = try decode(body, &.{ .tokens = &tokens, .octets = &octets, .details = &details, .cpu_features = test_cpu_features });
     try testing.expectEqualSlices(u8, &value, back.details[0].value);
 }

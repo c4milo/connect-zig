@@ -103,7 +103,7 @@ pub fn main(init: std.process.Init) !void {
     state.second_key = issuer.second_key();
     // The verifier starts with the issuer's first key alone. A real program fetches the JWK Set
     // and reads its clock.
-    try service.start(&state.app.oidc, issuer.jwks(&state.jwks_text, &.{state.first_key}), now);
+    try service.start(&state.app.oidc, issuer.jwks(&state.jwks_text, &.{state.first_key}), now, .detect());
     defer state.app.oidc.deinit();
     try state.rounds.init(&state.app);
     defer state.rounds.deinit();

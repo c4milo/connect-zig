@@ -14,6 +14,9 @@ pub const audience = "service";
 pub const key_id = "key-1";
 /// The time of the fixture's verifier.
 pub const now: i64 = 1_700_000_000;
+/// The CPU features the tests run the JSON readers with: the build target's, which a test may
+/// name in place of the features a program detects.
+pub const cpu_features = @import("platform").CpuFeatures.target();
 /// Room for a token past the longest the verifier takes, and for a JWK Set of a few keys.
 const text_tokens = 3;
 pub const text_bytes = text_tokens * constants.token_bytes_max;
@@ -137,7 +140,7 @@ pub const Fixture = struct {
     buffer: [text_bytes]u8,
 
     pub fn init(fixture: *Fixture, kind: Kind) !void {
-        try fixture.init_with(kind, &.{ .issuer = issuer, .audience = audience });
+        try fixture.init_with(kind, &.{ .issuer = issuer, .audience = audience, .cpu_features = cpu_features });
     }
 
     pub fn init_with(fixture: *Fixture, kind: Kind, options: *const verifier_file.VerifierOptions) !void {

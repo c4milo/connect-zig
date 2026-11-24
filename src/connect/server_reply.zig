@@ -167,7 +167,7 @@ pub const Reply = struct {
         var result: Head = .{ .status = constants.protocol.status.ok };
         result.add("content-type", protocol.content_type(speaks));
         // The status trailers go in the head's own storage, after the content type.
-        const written = try trailers.write(failure.*, storage, result.storage[result.count..]);
+        const written = try trailers.write(failure.*, storage, result.storage[result.count..], reply.encoders.cpu_features);
         result.count += written.len;
         return result;
     }
@@ -175,7 +175,7 @@ pub const Reply = struct {
     /// Writes a Connect unary error's JSON body. A gRPC Trailers-Only error has no body.
     pub fn write_error_body(reply: *const Reply, failure: RpcError, body: *std.Io.Writer) Error!void {
         if (reply.accepted.speaks.protocol != .connect) return;
-        try body.writeAll(error_json.encode(&failure, reply.scratch.work) catch return error.NoSpaceLeft);
+        try body.writeAll(error_json.encode(&failure, reply.scratch.work, reply.encoders.cpu_features) catch return error.NoSpaceLeft);
     }
 
     /// How a response that carried messages ends: the octets its body still takes, as one slice,
@@ -195,15 +195,15 @@ pub const Reply = struct {
             .connect => {
                 const prefix_len = constants.protocol.envelope_prefix_len;
                 if (storage.len < prefix_len) return error.NoSpaceLeft;
-                const text = end_stream.encode(&.{ .failure = failure, .metadata = metadata }, storage[prefix_len..]) catch return error.NoSpaceLeft;
+                const text = end_stream.encode(&.{ .failure = failure, .metadata = metadata }, storage[prefix_len..], reply.encoders.cpu_features) catch return error.NoSpaceLeft;
                 assert(text.len == 0 or text.ptr == storage.ptr + prefix_len);
                 envelope.write_prefix(.{ .end_stream = true }, text.len, storage[0..prefix_len]);
                 return .{ .octets = storage[0 .. prefix_len + text.len] };
             },
-            .grpc => return .{ .trailers = try trailers.write(failure, storage, out) },
+            .grpc => return .{ .trailers = try trailers.write(failure, storage, out, reply.encoders.cpu_features) },
             .grpc_web => {
                 const half = storage.len / constants.storage_halves;
-                const status = try trailers.write(failure, storage[0..half], out);
+                const status = try trailers.write(failure, storage[0..half], out, reply.encoders.cpu_features);
                 // gRPC-Web carries the call's own trailers in the same frame as its status
                 // (PROTOCOL-WEB.md, "Message framing").
                 if (metadata.len > out.len - status.len) return error.NoSpaceLeft;

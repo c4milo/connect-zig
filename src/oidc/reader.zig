@@ -35,10 +35,12 @@ pub const Reader = struct {
         end,
     };
 
-    pub fn init(reader: *Reader, input: []const u8, storage: []u8) void {
+    /// Starts a reader of `input`, whose decoder's fast paths use what `cpu_features` names, the
+    /// program's CPU features.
+    pub fn init(reader: *Reader, input: []const u8, storage: []u8, cpu_features: platform.CpuFeatures) void {
         assert(storage.len >= constants.reader_storage_bytes_min);
         reader.* = .{ .decoder = undefined, .input = input, .consumed = 0, .storage = storage };
-        reader.decoder.init(.text, platform.CpuFeatures.target());
+        reader.decoder.init(.text, cpu_features);
     }
 
     /// The next token. A text that is not JSON (RFC 8259), one that ends early among them, is
@@ -170,11 +172,12 @@ fn item(kind: json.Kind, octets: []const u8) Reader.Item {
 }
 
 const testing = std.testing;
+const test_cpu_features = @import("test_support.zig").cpu_features;
 
 test "the reader returns each token, and a string longer than its storage as long" {
     var storage: [8]u8 = undefined;
     var reader: Reader = undefined;
-    reader.init("{\"a\":\"0123456789abcdef\",\"b\":[true,12],\"c\":\"\\u00e9\"}", &storage);
+    reader.init("{\"a\":\"0123456789abcdef\",\"b\":[true,12],\"c\":\"\\u00e9\"}", &storage, test_cpu_features);
     try reader.expect(.begin_object);
     try testing.expectEqualStrings("a", (try reader.next()).name);
     try testing.expectEqual(Reader.Item.long, try reader.next());
@@ -193,7 +196,7 @@ test "the reader refuses a text that is not JSON, and one that ends early" {
     var storage: [8]u8 = undefined;
     for ([_][]const u8{ "", "{", "{\"a\"", "{\"a\":\"b", "nul", "{'a':1}", "{\"a\":1}}" }) |text| {
         var reader: Reader = undefined;
-        reader.init(text, &storage);
+        reader.init(text, &storage, test_cpu_features);
         var failed = false;
         for (0..text.len + 2) |_| {
             const token = reader.next() catch {
@@ -209,21 +212,21 @@ test "the reader refuses a text that is not JSON, and one that ends early" {
 test "skip_value passes over one value, and refuses one nested too deep" {
     var storage: [8]u8 = undefined;
     var reader: Reader = undefined;
-    reader.init("[{\"a\":[1,{\"b\":null}],\"c\":\"0123456789\"},7]", &storage);
+    reader.init("[{\"a\":[1,{\"b\":null}],\"c\":\"0123456789\"},7]", &storage, test_cpu_features);
     try reader.expect(.begin_array);
     try reader.skip_value();
     try testing.expectEqualStrings("7", (try reader.next()).number);
     try reader.expect(.end_array);
 
     const deep = "[" ** (constants.json_depth_max + 1) ++ "]" ** (constants.json_depth_max + 1);
-    reader.init(deep, &storage);
+    reader.init(deep, &storage, test_cpu_features);
     try testing.expectError(error.Malformed, reader.skip_value());
-    reader.init(deep[1 .. deep.len - 1], &storage);
+    reader.init(deep[1 .. deep.len - 1], &storage, test_cpu_features);
     try reader.skip_value();
     try reader.expect(.end);
 
     // A container's end where a value starts is no value.
-    reader.init("[]", &storage);
+    reader.init("[]", &storage, test_cpu_features);
     try reader.expect(.begin_array);
     try testing.expectError(error.Malformed, reader.skip_value());
 }
@@ -231,7 +234,7 @@ test "skip_value passes over one value, and refuses one nested too deep" {
 test "string_or_skip returns a string, and passes over a value of another kind" {
     var storage: [8]u8 = undefined;
     var reader: Reader = undefined;
-    reader.init("[\"ab\",1,null,{\"a\":[2]},[3],\"0123456789\",\"cd\"]", &storage);
+    reader.init("[\"ab\",1,null,{\"a\":[2]},[3],\"0123456789\",\"cd\"]", &storage, test_cpu_features);
     try reader.expect(.begin_array);
     try testing.expectEqualStrings("ab", (try reader.string_or_skip()).?);
     for (0..5) |_| try testing.expectEqual(@as(?[]const u8, null), try reader.string_or_skip());
@@ -243,7 +246,7 @@ test "Members returns the members a caller reads, once each, and passes over the
     const Name = enum { alg, kid };
     var storage: [8]u8 = undefined;
     var reader: Reader = undefined;
-    reader.init("{\"x\":{\"alg\":1},\"kid\":\"k\",\"a-name-past-the-storage\":[1],\"alg\":\"a\",\"y\":2}", &storage);
+    reader.init("{\"x\":{\"alg\":1},\"kid\":\"k\",\"a-name-past-the-storage\":[1],\"alg\":\"a\",\"y\":2}", &storage, test_cpu_features);
     try reader.expect(.begin_object);
     var members: Members(Name) = .{ .reader = &reader };
     try testing.expectEqual(Name.kid, (try members.next()).?);
@@ -254,7 +257,7 @@ test "Members returns the members a caller reads, once each, and passes over the
     try reader.expect(.end);
 
     // RFC 7515 §4: a name that appears twice is refused.
-    reader.init("{\"kid\":\"a\",\"kid\":\"b\"}", &storage);
+    reader.init("{\"kid\":\"a\",\"kid\":\"b\"}", &storage, test_cpu_features);
     try reader.expect(.begin_object);
     var twice: Members(Name) = .{ .reader = &reader };
     try testing.expectEqual(Name.kid, (try twice.next()).?);

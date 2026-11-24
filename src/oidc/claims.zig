@@ -1,6 +1,7 @@
 //! The claims the verifier reads from a token's payload (RFC 7519 §4.1).
 const std = @import("std");
 const assert = std.debug.assert;
+const platform = @import("platform");
 const constants = @import("constants.zig");
 const reader_file = @import("reader.zig");
 const Reader = reader_file.Reader;
@@ -22,6 +23,9 @@ pub const Claims = struct {
     payload_storage: [constants.decoded_bytes_max]u8 = undefined,
     /// The octets of the string the last lookup returned.
     lookup_storage: [constants.claim_bytes_max]u8 = undefined,
+    /// The CPU features each lookup's JSON reader uses: the verifier's, which `verify` writes.
+    /// Claims that no `verify` filled hold no payload, and their lookups read nothing.
+    cpu_features: platform.CpuFeatures = .none(),
 
     pub const LookupError = lookup.Error;
 
@@ -39,18 +43,18 @@ pub const Claims = struct {
     /// stays valid until the next lookup on these claims. A name the token holds twice reads
     /// its last value (RFC 7519 §4).
     pub fn string(claims: *Claims, name: []const u8) LookupError!?[]const u8 {
-        return lookup.string(claims.payload(), name, &claims.lookup_storage);
+        return lookup.string(claims.payload(), name, &claims.lookup_storage, claims.cpu_features);
     }
 
     /// The integer of the claim `name`, such as "auth_time", or null when the token holds none.
     pub fn integer(claims: *Claims, name: []const u8) LookupError!?i64 {
-        return lookup.integer(claims.payload(), name, &claims.lookup_storage);
+        return lookup.integer(claims.payload(), name, &claims.lookup_storage, claims.cpu_features);
     }
 
     /// Whether the claim `name` is the string `value`, or an array that holds it, such as
     /// "admin" among "roles". False when the token holds no such claim.
     pub fn holds(claims: *Claims, name: []const u8, value: []const u8) LookupError!bool {
-        return lookup.holds(claims.payload(), name, value, &claims.lookup_storage);
+        return lookup.holds(claims.payload(), name, value, &claims.lookup_storage, claims.cpu_features);
     }
 };
 

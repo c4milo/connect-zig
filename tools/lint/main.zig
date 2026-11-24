@@ -58,6 +58,15 @@ pub const determinism = rules.forbidden_references.Rule(.{
     .reason = "time is a value the caller passes (docs/decisions.md entry 3)",
 });
 
+/// The owner's ruling of 2026-11-22 (https://github.com/c4milo/connect-zig/issues/14): `connect`
+/// and `oidc` take the program's CPU features, and their tests take the target's from the one
+/// constant of a test-support file. `protobuf` joins once its decode takes the program's features.
+pub const target_features = @import("target_features.zig").Rule(.{
+    .extensions = &.{lint.paths.zig_extension},
+    .include_directories = &.{ "src/connect", "src/oidc" },
+    .exclude_basenames = &.{ "codec_test_support.zig", "test_support.zig" },
+});
+
 /// CLAUDE.md, Conventions: every loop is bounded.
 pub const unbounded_loop = rules.unbounded_loop.Rule(.{
     .scope = .{ .extensions = &.{lint.paths.zig_extension}, .include_directories = &.{ "src", "examples", "bench", "conformance" } },
@@ -191,9 +200,10 @@ pub const state_fill = @import("state_fill.zig").Rule(.{
 });
 
 const Linter = lint.Linter(.{
-    heap,        io,              determinism,             unbounded_loop, file_length,  markdown,
-    layering,    relative_import, relative_import_outside, magic_numbers,  global_state, static_alignment,
-    defer_order, undefined_fill,  unreleased_acquire,      denied_words,   state_fill,   file_length_scripts,
+    heap,            io,              determinism,             unbounded_loop, file_length,  markdown,
+    layering,        relative_import, relative_import_outside, magic_numbers,  global_state, static_alignment,
+    defer_order,     undefined_fill,  unreleased_acquire,      denied_words,   state_fill,   file_length_scripts,
+    target_features,
 });
 
 pub fn main(init: std.process.Init) !void {
@@ -205,6 +215,7 @@ const harness = lint.harness;
 
 test {
     _ = @import("state_fill.zig");
+    _ = @import("target_features.zig");
 }
 
 /// A source of `count` lines, each `x = 1`, in the arena.

@@ -11,7 +11,7 @@
 //! protocol, "Query-Get"). A server reads them in any order.
 const std = @import("std");
 const base64 = @import("base64");
-const Features = @import("platform").CpuFeatures;
+const platform = @import("platform");
 const json_read = @import("json_read.zig");
 const assert = std.debug.assert;
 const protocol = @import("protocol.zig");
@@ -33,8 +33,9 @@ pub const Error = error{
     NoSpaceLeft,
 };
 
-/// Writes the query of a GET for an encoded message, without the "?".
-pub fn write_query(codec: Codec, coding: Coding, message: []const u8, buffer: []u8) error{NoSpaceLeft}![]const u8 {
+/// Writes the query of a GET for an encoded message, without the "?". The base64 encoder uses the
+/// program's CPU features, `cpu_features`.
+pub fn write_query(codec: Codec, coding: Coding, message: []const u8, buffer: []u8, cpu_features: platform.CpuFeatures) error{NoSpaceLeft}![]const u8 {
     // Connect protocol, "Query-Get": connect, base64, compression, encoding, then message.
     const head = if (coding == .identity)
         std.fmt.bufPrint(buffer, "connect=v1&base64=1&encoding={s}&message=", .{codec.name()})
@@ -43,7 +44,7 @@ pub fn write_query(codec: Codec, coding: Coding, message: []const u8, buffer: []
     const written = head catch return error.NoSpaceLeft;
     // Connect protocol, "Unary-Get-Request": the URL-safe alphabet, padding omitted.
     var encoder: base64.Encoder = undefined;
-    encoder.init(.{ .alphabet = .url_safe, .padding = false }, Features.target());
+    encoder.init(.{ .alphabet = .url_safe, .padding = false }, cpu_features);
     const len = try encoder.encode_all(message, buffer[written.len..]);
     return buffer[0 .. written.len + len];
 }
@@ -93,8 +94,8 @@ const QueryState = struct {
     }
 };
 
-/// The message's octets, decoded from the query into `buffer`.
-pub fn message_octets(query: Query, buffer: []u8) Error![]const u8 {
+/// The message's octets, decoded from the query into `buffer`, with the program's CPU features.
+pub fn message_octets(query: Query, buffer: []u8, cpu_features: platform.CpuFeatures) Error![]const u8 {
     if (!query.base64) return percent_decode(query.message, buffer);
     // Padding arrives as "=" or as "%3D", and either alphabet is read.
     var text = query.message;
@@ -103,7 +104,7 @@ pub fn message_octets(query: Query, buffer: []u8) Error![]const u8 {
         if (std.mem.endsWith(u8, text, escaped_padding)) text = text[0 .. text.len - escaped_padding.len];
         if (std.mem.endsWith(u8, text, "=")) text = text[0 .. text.len - 1];
     }
-    return json_read.decode_base64(.either, text, buffer);
+    return json_read.decode_base64(.either, text, buffer, cpu_features);
 }
 
 fn percent_decode(text: []const u8, buffer: []u8) Error![]const u8 {
@@ -133,24 +134,25 @@ fn decode_one(text: []const u8) Error!struct { octet: u8, len: usize } {
 }
 
 const testing = std.testing;
+const test_cpu_features = @import("codec_test_support.zig").cpu_features;
 
 test "a GET query carries the message in URL-safe base64 and reads back" {
     var buffer: [128]u8 = undefined;
-    const query = try write_query(.proto, .gzip, &.{ 0xfb, 0xff }, &buffer);
+    const query = try write_query(.proto, .gzip, &.{ 0xfb, 0xff }, &buffer, test_cpu_features);
     try testing.expectEqualStrings("connect=v1&base64=1&compression=gzip&encoding=proto&message=-_8", query);
     const read = try read_query(query);
     try testing.expectEqual(Codec.proto, read.codec);
     try testing.expectEqual(Coding.gzip, read.coding);
     var octets: [8]u8 = undefined;
-    try testing.expectEqualSlices(u8, &.{ 0xfb, 0xff }, try message_octets(read, &octets));
+    try testing.expectEqualSlices(u8, &.{ 0xfb, 0xff }, try message_octets(read, &octets, test_cpu_features));
 }
 
 test "a JSON message may be percent-encoded, and a bad query is refused" {
     const read = try read_query("encoding=json&message=%7B%22a%22%3A1%7D");
     var octets: [16]u8 = undefined;
-    try testing.expectEqualStrings("{\"a\":1}", try message_octets(read, &octets));
+    try testing.expectEqualStrings("{\"a\":1}", try message_octets(read, &octets, test_cpu_features));
     try testing.expectError(error.InvalidQuery, read_query("message=e30"));
     try testing.expectError(error.UnsupportedVersion, read_query("connect=v2&encoding=json&message=e30"));
     const padded = try read_query("encoding=proto&base64=1&message=-w%3D%3D");
-    try testing.expectEqualSlices(u8, &.{0xfb}, try message_octets(padded, &octets));
+    try testing.expectEqualSlices(u8, &.{0xfb}, try message_octets(padded, &octets, test_cpu_features));
 }

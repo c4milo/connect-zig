@@ -19,13 +19,14 @@ pub const EndStream = struct {
 pub const EncodeError = error_json.EncodeError;
 pub const DecodeError = error_json.DecodeError;
 
-pub fn encode(end: *const EndStream, buffer: []u8) EncodeError![]const u8 {
+/// Writes `end` into `buffer`, with the program's CPU features.
+pub fn encode(end: *const EndStream, buffer: []u8, cpu_features: platform.CpuFeatures) EncodeError![]const u8 {
     std.debug.assert(end.metadata.len <= constants.limits.metadata_max);
-    var text = json.TextWriter.init(buffer, .text, platform.CpuFeatures.target());
+    var text = json.TextWriter.init(buffer, .text, cpu_features);
     try text.begin_object();
     if (end.failure) |failure| {
         try text.name("error");
-        try error_json.write(&failure, &text);
+        try error_json.write(&failure, &text, cpu_features);
     }
     if (end.metadata.len != 0) {
         try text.name("metadata");
@@ -62,10 +63,12 @@ pub const Storage = struct {
     octets: []u8,
     details: []rpc_error.Detail,
     metadata: []Header,
+    /// The program's CPU features, which the JSON reader and the base64 decoder use.
+    cpu_features: platform.CpuFeatures,
 };
 
 pub fn decode(payload: []const u8, storage: *const Storage) DecodeError!EndStream {
-    var tokens = json_read.Tokens.init(payload, storage.tokens, storage.octets);
+    var tokens = json_read.Tokens.init(payload, storage.tokens, storage.octets, storage.cpu_features);
     try tokens.start();
     try tokens.expect(.begin_object);
     var end: EndStream = .{};
@@ -121,6 +124,7 @@ fn read_metadata(tokens: *json_read.Tokens, metadata: []Header) json_read.Error!
 }
 
 const testing = std.testing;
+const test_cpu_features = @import("codec_test_support.zig").cpu_features;
 
 test "an end-stream message holds the error and the trailers, grouped by name" {
     var buffer: [256]u8 = undefined;
@@ -128,15 +132,15 @@ test "an end-stream message holds the error and the trailers, grouped by name" {
         .failure = .{ .code = .aborted },
         .metadata = &.{ .{ .name = "x-a", .value = "1" }, .{ .name = "x-b", .value = "2" }, .{ .name = "x-a", .value = "3" } },
     };
-    const text = try encode(&end, &buffer);
+    const text = try encode(&end, &buffer, test_cpu_features);
     try testing.expectEqualStrings("{\"error\":{\"code\":\"aborted\"},\"metadata\":{\"x-a\":[\"1\",\"3\"],\"x-b\":[\"2\"]}}", text);
     var tokens: [32]u8 = undefined;
     var octets: [64]u8 = undefined;
     var details: [1]rpc_error.Detail = undefined;
     var metadata: [4]Header = undefined;
-    const back = try decode(text, &.{ .tokens = &tokens, .octets = &octets, .details = &details, .metadata = &metadata });
+    const back = try decode(text, &.{ .tokens = &tokens, .octets = &octets, .details = &details, .metadata = &metadata, .cpu_features = test_cpu_features });
     try testing.expectEqual(@import("code.zig").Code.aborted, back.failure.?.code);
     try testing.expectEqual(@as(usize, 3), back.metadata.len);
     try testing.expectEqualStrings("3", back.metadata[1].value);
-    try testing.expectEqualStrings("{}", try encode(&.{}, &buffer));
+    try testing.expectEqualStrings("{}", try encode(&.{}, &buffer, test_cpu_features));
 }

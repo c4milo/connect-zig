@@ -148,7 +148,7 @@ const header_storage_bytes = 256;
 fn header_of(text: []const u8, key_id_storage: *[constants.key_id_bytes_max]u8) Error!Header {
     var storage: [header_storage_bytes]u8 = undefined;
     var reader: Reader = undefined;
-    reader.init(text, &storage);
+    reader.init(text, &storage, @import("test_support.zig").cpu_features);
     return read_header(&reader, key_id_storage);
 }
 

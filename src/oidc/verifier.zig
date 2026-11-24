@@ -4,6 +4,7 @@
 const std = @import("std");
 const assert = std.debug.assert;
 const chapulin = @import("chapulin");
+const platform = @import("platform");
 const constants = @import("constants.zig");
 const claims_file = @import("claims.zig");
 const jwks = @import("jwks.zig");
@@ -22,6 +23,9 @@ pub const VerifierOptions = struct {
     /// `constants.leeway_s_max`.
     leeway_s: u32 = 0,
     algorithms: Algorithms = .{},
+    /// The program's CPU features, which every JSON reader of the verifier and of its `Claims`
+    /// uses. The program detects them once with stdx's `platform.CpuFeatures.detect`.
+    cpu_features: platform.CpuFeatures,
 
     pub const Algorithms = token_file.Algorithms;
 };
@@ -51,6 +55,7 @@ const key_sets = 2;
 pub const Verifier = struct {
     algorithms: VerifierOptions.Algorithms,
     leeway_s: u32,
+    cpu_features: platform.CpuFeatures,
     issuer_len: usize,
     audience_len: usize,
     now_unix_seconds: i64,
@@ -85,6 +90,7 @@ pub const Verifier = struct {
         verifier.* = .{
             .algorithms = algorithms,
             .leeway_s = options.leeway_s,
+            .cpu_features = options.cpu_features,
             .issuer_len = options.issuer.len,
             .audience_len = options.audience.len,
             .now_unix_seconds = 0,
@@ -111,7 +117,7 @@ pub const Verifier = struct {
     /// most, and no pointer to the text. After an error it holds the keys it held before.
     pub fn set_keys(verifier: *Verifier, jwks_text: []const u8) KeysError!void {
         const spare: u1 = ~verifier.active;
-        try verifier.sets[spare].read(jwks_text, &verifier.scratch, verifier.algorithms);
+        try verifier.sets[spare].read(jwks_text, &verifier.scratch, verifier.algorithms, verifier.cpu_features);
         assert(verifier.sets[spare].count <= constants.keys_max);
         if (verifier.sets[spare].count == 0) return error.NoKeys;
         verifier.active = spare;
@@ -146,6 +152,7 @@ pub const Verifier = struct {
         const key = try verifier.key_of(&parts);
         try verifier.signed_payload(&parts, key, claims);
         try verifier.check(claims);
+        claims.cpu_features = verifier.cpu_features;
         assert(claims.payload_len <= constants.decoded_bytes_max);
         assert(claims.expires_unix_seconds >= 0);
     }
@@ -157,7 +164,7 @@ pub const Verifier = struct {
         const text = chapulin.jws.base64url_decode(&verifier.decoded, parts.header) catch return error.Malformed;
         var key_id: [constants.key_id_bytes_max]u8 = @splat(0);
         var reader: Reader = undefined;
-        reader.init(text, &verifier.scratch);
+        reader.init(text, &verifier.scratch, verifier.cpu_features);
         const header = try token_file.read_header(&reader, &key_id);
         const algorithm = header.algorithm orelse return error.UnsupportedAlgorithm;
         // RFC 8725 §3.1: no algorithm but those the caller stated.
@@ -190,7 +197,7 @@ pub const Verifier = struct {
     fn check(verifier: *Verifier, claims: *Claims) Error!void {
         const issuer = verifier.issuer_storage[0..verifier.issuer_len];
         var reader: Reader = undefined;
-        reader.init(claims.payload(), &verifier.scratch);
+        reader.init(claims.payload(), &verifier.scratch, verifier.cpu_features);
         const found = try claims_file.read(&reader, &.{
             .issuer = issuer,
             .audience = verifier.audience_storage[0..verifier.audience_len],

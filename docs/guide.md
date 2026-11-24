@@ -235,8 +235,9 @@ its text and the time. Import it as the others, as `connect_zig.module("oidc")`:
 ```zig
 const oidc = @import("oidc");
 
-// The context of your routes holds the verifier, as `app.oidc`.
-try app.oidc.init(&.{ .issuer = "https://accounts.example.com", .audience = "my-service" });
+// The context of your routes holds the verifier, as `app.oidc`. Its JSON readers take the CPU
+// features your program detects once, with stdx's `platform.CpuFeatures.detect()`.
+try app.oidc.init(&.{ .issuer = "https://accounts.example.com", .audience = "my-service", .cpu_features = cpu_features });
 try app.oidc.set_keys(jwks_text); // again when app.oidc.keys_stale()
 app.oidc.set_time(unix_seconds); // when your clock moves
 

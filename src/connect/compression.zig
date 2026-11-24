@@ -251,7 +251,7 @@ test "each codec runs with the features its caller gives, and the target's by de
     var decoder: gzip.Decoder = undefined;
     var reference: gzip.Decoder = undefined;
     // The CRC-32 path each gzip codec takes shows the features it ran with.
-    inline for (.{ platform.CpuFeatures.none(), platform.CpuFeatures.target() }) |cpu_features| {
+    inline for (.{ platform.CpuFeatures.none(), codecs.cpu_features }) |cpu_features| {
         const packed_octets = try compress(.gzip, &.{ .gzip = &codecs.gzip_encoder, .cpu_features = cpu_features }, message, &compressed);
         const decoders: Decoders = .{ .gzip = &decoder, .cpu_features = cpu_features };
         try testing.expectEqualStrings(message, try decompress(.gzip, decoders, packed_octets, &output));
@@ -259,8 +259,8 @@ test "each codec runs with the features its caller gives, and the target's by de
         try testing.expectEqual(reference.crc32_path, decoder.crc32_path);
         try testing.expectEqual(reference.crc32_path, codecs.gzip_encoder.crc32_path);
     }
-    try testing.expectEqual(platform.CpuFeatures.target(), (Decoders{}).cpu_features);
-    try testing.expectEqual(platform.CpuFeatures.target(), (Encoders{}).cpu_features);
+    try testing.expectEqual(codecs.cpu_features, (Decoders{}).cpu_features);
+    try testing.expectEqual(codecs.cpu_features, (Encoders{}).cpu_features);
 }
 
 test "zstd round-trips through stdx's encoder and decoder" {
@@ -286,7 +286,7 @@ test "brotli round-trips through stdx's encoder and decoder" {
     const wbits_17 = 0x01;
     try testing.expectEqual(@as(u8, wbits_17), packed_octets[0] & wbits_mask);
     var output: [64]u8 = undefined;
-    codecs.brotli_window_decoder.init(platform.CpuFeatures.target());
+    codecs.brotli_window_decoder.init(codecs.cpu_features);
     const whole = try codecs.brotli_window_decoder.decode_all(packed_octets, &output);
     try testing.expectEqualStrings(message, output[0..whole.written]);
     // A stream the buffer does not hold is the caller's to make room for.

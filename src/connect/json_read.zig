@@ -11,12 +11,13 @@ pub const Error = json.DecodeError || error{ Truncated, NoSpaceLeft, UnexpectedT
 
 /// Decodes base64 in the alphabets `accept` names into the start of `buffer`, with its padding or
 /// without: a decoder accepts both (Connect protocol, "Error End-Stream"; gRPC PROTOCOL-HTTP2.md,
-/// "-bin" headers). The decoder may write past the octets it returns, in `buffer`'s free room.
-pub fn decode_base64(accept: base64.Accept, text: []const u8, buffer: []u8) error{ InvalidBase64, NoSpaceLeft }![]u8 {
+/// "-bin" headers). The decoder may write past the octets it returns, in `buffer`'s free room. Its
+/// fast paths use what `cpu_features` names, the program's CPU features.
+pub fn decode_base64(accept: base64.Accept, text: []const u8, buffer: []u8, cpu_features: platform.CpuFeatures) error{ InvalidBase64, NoSpaceLeft }![]u8 {
     const len = base64.Decoder.decoded_len(text) catch return error.InvalidBase64;
     if (len > buffer.len) return error.NoSpaceLeft;
     var decoder: base64.Decoder = undefined;
-    decoder.init(.{ .accept = accept, .padding = .optional }, platform.CpuFeatures.target());
+    decoder.init(.{ .accept = accept, .padding = .optional }, cpu_features);
     const decoded_len = decoder.decode_all(text, buffer) catch return error.InvalidBase64;
     assert(decoded_len == len);
     return buffer[0..len];
@@ -28,8 +29,9 @@ pub const Tokens = struct {
     storage: []u8,
     used: usize = 0,
 
-    pub fn init(text: []const u8, tokens: []u8, storage: []u8) Tokens {
-        return .{ .reader = json.TextReader.init(text, tokens, .text, platform.CpuFeatures.target()), .storage = storage };
+    /// Reads `text` with the program's CPU features, `cpu_features`.
+    pub fn init(text: []const u8, tokens: []u8, storage: []u8, cpu_features: platform.CpuFeatures) Tokens {
+        return .{ .reader = json.TextReader.init(text, tokens, .text, cpu_features), .storage = storage };
     }
 
     pub fn start(self: *Tokens) Error!void {
@@ -69,7 +71,7 @@ pub const Tokens = struct {
             .string => |octets| octets,
             else => return error.UnexpectedToken,
         };
-        const kept = try decode_base64(.standard, octets, self.storage[self.used..]);
+        const kept = try decode_base64(.standard, octets, self.storage[self.used..], self.reader.features);
         self.used += kept.len;
         return kept;
     }
@@ -108,11 +110,12 @@ const piece_len = 60;
 const base64_calls_extra = 2;
 
 /// Writes `octets` as one string of unpadded standard base64, in pieces. One encoder takes the
-/// whole value, and each call fills the staging buffer.
-pub fn write_base64(octets: []const u8, text: *json.TextWriter) (json.EncodeError || error{NoSpaceLeft})!void {
+/// whole value, and each call fills the staging buffer. The encoder's fast paths use what
+/// `cpu_features` names, the program's CPU features.
+pub fn write_base64(octets: []const u8, text: *json.TextWriter, cpu_features: platform.CpuFeatures) (json.EncodeError || error{NoSpaceLeft})!void {
     var buffer: [piece_len]u8 = undefined;
     var encoder: base64.Encoder = undefined;
-    encoder.init(.{ .alphabet = .standard, .padding = false }, platform.CpuFeatures.target());
+    encoder.init(.{ .alphabet = .standard, .padding = false }, cpu_features);
     var start: usize = 0;
     // Bounded: each call but the last fills the buffer. Base64 writes 4 letters for each 3 octets.
     for (0..octets.len / (piece_len / base64_chars * base64_octets) + base64_calls_extra) |_| {
@@ -126,16 +129,17 @@ pub fn write_base64(octets: []const u8, text: *json.TextWriter) (json.EncodeErro
 }
 
 const testing = std.testing;
+const test_cpu_features = @import("codec_test_support.zig").cpu_features;
 
 test "base64 decodes padded or not, in the alphabets asked, and refuses a partial padding" {
     var buffer: [8]u8 = undefined;
     // Connect protocol, "Error End-Stream", and gRPC's "-bin" headers: padded or not.
-    for ([_][]const u8{ "/w==", "/w" }) |text| try testing.expectEqualSlices(u8, &.{0xff}, try decode_base64(.standard, text, &buffer));
+    for ([_][]const u8{ "/w==", "/w" }) |text| try testing.expectEqualSlices(u8, &.{0xff}, try decode_base64(.standard, text, &buffer, test_cpu_features));
     // The URL-safe alphabet is read only where the caller names it.
-    try testing.expectError(error.InvalidBase64, decode_base64(.standard, "_w", &buffer));
-    try testing.expectEqualSlices(u8, &.{0xff}, try decode_base64(.either, "_w", &buffer));
+    try testing.expectError(error.InvalidBase64, decode_base64(.standard, "_w", &buffer, test_cpu_features));
+    try testing.expectEqualSlices(u8, &.{0xff}, try decode_base64(.either, "_w", &buffer, test_cpu_features));
     // RFC 4648 §4: pad characters complete a quantum of four, so one too few or too many fails.
-    try testing.expectError(error.InvalidBase64, decode_base64(.standard, "/w=", &buffer));
-    try testing.expectError(error.InvalidBase64, decode_base64(.standard, "/w===", &buffer));
-    try testing.expectError(error.NoSpaceLeft, decode_base64(.standard, "AAAA", buffer[0..2]));
+    try testing.expectError(error.InvalidBase64, decode_base64(.standard, "/w=", &buffer, test_cpu_features));
+    try testing.expectError(error.InvalidBase64, decode_base64(.standard, "/w===", &buffer, test_cpu_features));
+    try testing.expectError(error.NoSpaceLeft, decode_base64(.standard, "AAAA", buffer[0..2], test_cpu_features));
 }

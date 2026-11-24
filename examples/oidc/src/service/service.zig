@@ -11,6 +11,7 @@
 const connect = @import("connect");
 const rpc = @import("connect_colibri");
 const oidc = @import("oidc");
+const platform = @import("platform");
 const account = @import("account");
 const constants = @import("constants.zig");
 const AccountService = account.AccountService;
@@ -41,11 +42,12 @@ pub const route_options: rpc.RouteOptions = .{
 };
 
 /// Starts `verifier`, the field `oidc` of a program's `App`, with `keys_text`, the issuer's JWK
-/// Set, at `unix_seconds`. The program calls this before the server takes a call. It calls
+/// Set, at `unix_seconds`, with `cpu_features`, the CPU features the program detected once. The
+/// program calls this before the server takes a call. It calls
 /// `set_keys` again when `keys_stale` says a token named a key the verifier does not hold, and
 /// `set_time` when its clock moves. `deinit` on the verifier ends it.
-pub fn start(verifier: *oidc.Verifier, keys_text: []const u8, unix_seconds: i64) !void {
-    try verifier.init(&.{ .issuer = issuer.name, .audience = audience, .leeway_s = constants.leeway_s });
+pub fn start(verifier: *oidc.Verifier, keys_text: []const u8, unix_seconds: i64, cpu_features: platform.CpuFeatures) !void {
+    try verifier.init(&.{ .issuer = issuer.name, .audience = audience, .leeway_s = constants.leeway_s, .cpu_features = cpu_features });
     errdefer verifier.deinit();
     try verifier.set_keys(keys_text);
     verifier.set_time(unix_seconds);

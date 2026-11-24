@@ -99,7 +99,7 @@ pub const Response = struct {
 
     fn read_head_status(response: *Response) void {
         response.done = true;
-        response.failure = trailers.read(response.incoming.headers, find_lookup, status_storage(response.storage));
+        response.failure = trailers.read(response.incoming.headers, find_lookup, status_storage(response.storage, response.decoders));
     }
 
     speaks: protocol.Speaks,
@@ -229,6 +229,7 @@ pub const Response = struct {
                     .octets = response.storage.octets,
                     .details = response.storage.details,
                     .metadata = response.storage.metadata,
+                    .cpu_features = response.decoders.cpu_features,
                 }) catch {
                     response.failure = .{ .code = .internal, .message = "malformed end-stream message" };
                     return;
@@ -243,7 +244,7 @@ pub const Response = struct {
                     return;
                 };
                 response.metadata = lines;
-                response.failure = trailers.read(lines, rpc_error.find_header, status_storage(response.storage));
+                response.failure = trailers.read(lines, rpc_error.find_header, status_storage(response.storage, response.decoders));
             },
             .grpc => return error.InvalidEnvelope,
         }
@@ -268,7 +269,7 @@ pub const Response = struct {
             .connect => .{ .code = .internal, .message = "missing end-stream message" },
             .grpc_web => .{ .code = .internal, .message = "missing trailers frame" },
             .grpc => if (response.incoming.trailers) |lookup|
-                trailers.read(lookup, find_lookup, status_storage(response.storage))
+                trailers.read(lookup, find_lookup, status_storage(response.storage, response.decoders))
             else
                 .{ .code = .unimplemented, .message = "the HTTP client exposes no gRPC trailers" },
         };
@@ -296,9 +297,9 @@ fn head_failure(speaks: protocol.Speaks, incoming: *const Incoming) ?RpcError {
 /// The octets of an envelope's prefix: its flags and its length.
 const flag_prefix_len = constants.protocol.envelope_prefix_len;
 
-fn status_storage(storage: Storage) trailers.Storage {
+fn status_storage(storage: Storage, decoders: compression.Decoders) trailers.Storage {
     const half = storage.octets.len / constants.storage_halves;
-    return .{ .message = storage.octets[0..half], .status = storage.octets[half..], .details = storage.details };
+    return .{ .message = storage.octets[0..half], .status = storage.octets[half..], .details = storage.details, .cpu_features = decoders.cpu_features };
 }
 
 fn find_lookup(lookup: Lookup, name: []const u8) ?[]const u8 {
@@ -326,7 +327,7 @@ fn http_failure(speaks: protocol.Speaks, incoming: Incoming, storage: Storage, d
     const body = compression.decompress(coding, decoders, incoming.body, storage.scratch.message) catch return fallback;
     // Connect protocol, "HTTP to Error Code": an error body whose code is missing or unknown
     // takes the code of the HTTP status.
-    const failure = error_json.decode_or(body, &.{ .tokens = storage.scratch.tokens, .octets = storage.octets, .details = storage.details }, fallback.code) catch return fallback;
+    const failure = error_json.decode_or(body, &.{ .tokens = storage.scratch.tokens, .octets = storage.octets, .details = storage.details, .cpu_features = decoders.cpu_features }, fallback.code) catch return fallback;
     return failure;
 }
 
