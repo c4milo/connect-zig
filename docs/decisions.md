@@ -805,7 +805,7 @@ first. Cite an entry by number in code and commits ("decision 6").
     starts and uses them from then on, and no library names the build target's in their place.
     - `connect.Client` holds `cpu_features`, with no default, and `encoders` and `decoders`,
       which hold no codec by default. A program makes one as it starts:
-      `const calls: connect.Client = .{ .cpu_features = .detect() };`.
+      `const client: connect.Client = .{ .cpu_features = .detect() };`.
     - The client makes each call. `request` builds a request, `write_message` writes one
       message of a streamed request, and `response` starts the read of a response. Each is a
       declaration alias of a function in `client_call.zig` or `client_response.zig`, so each

@@ -214,7 +214,7 @@ It holds the CPU features your program detected and the codecs it placed, and it
 request for the pool. Make it once, as the program starts:
 
 ```zig
-const calls: connect.Client = .{ .cpu_features = .detect() };
+const client: connect.Client = .{ .cpu_features = .detect() };
 ```
 
 A client call is a `connect_colibri.ClientCall(method, .{})`. Its `.protocol` option picks
@@ -223,7 +223,7 @@ colibri's client connection pool, and `buffers` and `storage` are memory that yo
 [docs/guide.md](docs/guide.md) shows how to set up each one:
 
 ```zig
-try say.init(&calls, {}, &.{ .protocol = .grpc }, &.{.{ .sentence = "I feel tired" }}, &buffers);
+try say.init(&client, {}, &.{ .protocol = .grpc }, &.{.{ .sentence = "I feel tired" }}, &buffers);
 _ = try pool.request(&say.request, &say.response);
 // Once the pool reports the call finished:
 var response = say.read(storage);

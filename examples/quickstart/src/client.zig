@@ -23,7 +23,8 @@ comptime {
 
 pub const Error = error{ ArgumentMissing, CallWrong, ProtocolWrong };
 
-const Client = colibri.Client(.{}, .private);
+/// colibri's HTTP client, which opens the connections and sends each request.
+const HttpClient = colibri.Client(.{}, .private);
 const GreetCall = rpc.ClientCall(Service.greet, .{});
 
 /// The name the server's certificate carries, which the client asks for and judges it by.
@@ -52,18 +53,18 @@ const Handler = struct {
     spoken: ?client.Protocol = null,
     expected_calls: u32 = 0,
 
-    pub fn on_connected(self: *Handler, _: *Client, connected: client.Connected) void {
+    pub fn on_connected(self: *Handler, _: *HttpClient, connected: client.Connected) void {
         self.spoken = connected.protocol;
     }
 
-    pub fn on_finished(self: *Handler, running: *Client, _: client.Finished) void {
+    pub fn on_finished(self: *Handler, running: *HttpClient, _: client.Finished) void {
         self.finished += 1;
         if (self.finished == self.expected_calls) running.shutdown();
     }
 };
 
-/// One call and the buffers it writes its request into and reads its response into.
-const Call = struct {
+/// One Greet call, and the buffers it writes its request into and reads its response into.
+const Greet = struct {
     call: GreetCall,
     request_body: [constants.call_buffer_len]u8,
     message: [constants.call_buffer_len]u8,
@@ -73,7 +74,7 @@ const Call = struct {
     trailers: [constants.call_buffer_len]u8,
     body: [constants.call_buffer_len]u8,
 
-    fn init(self: *Call, shared: *const connect.Client, options: *const connect.client.Options) !void {
+    fn init(self: *Greet, shared: *const connect.Client, options: *const connect.client.Options) !void {
         const buffers: rpc.ClientCallBuffers = .{
             .request = .{ .body = &self.request_body, .scratch = .{ .message = &self.message, .work = &self.work, .tokens = &.{} }, .values = &self.values },
             .headers = &self.headers,
@@ -104,14 +105,17 @@ const Reading = struct {
 };
 
 /// All the program holds, which `main` allocates once before the first call (decision 42). Each
-/// round runs on a client of its own.
+/// round runs on an HTTP client of its own.
 const State = struct {
-    /// What the program's calls share: the CPU features it detects once, as it starts.
-    calls: connect.Client,
-    clients: [rounds.len]Client,
+    /// Connect's client, which the program's calls share: the CPU features it detects once, as
+    /// it starts.
+    client: connect.Client,
+    /// colibri's HTTP clients, one a round.
+    http_clients: [rounds.len]HttpClient,
     handler: Handler,
-    connect_call: Call,
-    grpc_call: Call,
+    /// The round's two calls of Greet, one in Connect and one in gRPC.
+    greet_connect: Greet,
+    greet_grpc: Greet,
     reading: Reading,
     ca_pem: [constants.pem_len_max]u8,
     anchor_der: [constants.der_len_max]u8,
@@ -128,18 +132,18 @@ pub fn main(init: std.process.Init) !void {
     const state_memory = init.arena.allocator().rawAlloc(@sizeOf(State), .of(State), @returnAddress()) orelse
         return error.OutOfMemory;
     const state: *State = @ptrCast(@alignCast(state_memory));
-    state.calls = .{ .cpu_features = .detect() };
+    state.client = .{ .cpu_features = .detect() };
     const ca = try std.Io.Dir.cwd().readFile(init.io, ca_path, &state.ca_pem);
     // The client judges the server's chain at this instant (RFC 5280 §4.1.2.5).
     const unix_seconds: u64 = @intCast(@max(std.Io.Clock.real.now(init.io).toSeconds(), 0));
     const anchors = try tls.pem.anchors(ca, &state.anchor_der, &state.anchor_room);
     const trust: tls.Trust = .{ .web_pki = .{ .anchors = anchors, .server_name = server_name } };
-    for (&state.clients, rounds) |*running, round| {
+    for (&state.http_clients, rounds) |*running, round| {
         try run_round(state, running, round, trust, port, unix_seconds);
     }
 }
 
-fn run_round(state: *State, running: *Client, round: Round, trust: tls.Trust, port: u16, unix_seconds: u64) !void {
+fn run_round(state: *State, running: *HttpClient, round: Round, trust: tls.Trust, port: u16, unix_seconds: u64) !void {
     state.handler = .{ .expected_calls = constants.calls_per_round };
     try running.init(&.{
         .destination = .{ .addresses = &addresses, .port = port },
@@ -147,19 +151,19 @@ fn run_round(state: *State, running: *Client, round: Round, trust: tls.Trust, po
         .unix_seconds = unix_seconds,
     }, &state.handler);
     defer running.deinit();
-    try state.connect_call.init(&state.calls, &.{});
-    try state.grpc_call.init(&state.calls, &.{ .protocol = .grpc });
-    _ = try running.request(&state.connect_call.call.request, &state.connect_call.call.response);
-    _ = try running.request(&state.grpc_call.call.request, &state.grpc_call.call.response);
+    try state.greet_connect.init(&state.client, &.{});
+    try state.greet_grpc.init(&state.client, &.{ .protocol = .grpc });
+    _ = try running.request(&state.greet_connect.call.request, &state.greet_connect.call.response);
+    _ = try running.request(&state.greet_grpc.call.request, &state.greet_grpc.call.response);
     try running.run();
     if (state.handler.spoken != round.expected) return error.ProtocolWrong;
-    try expect_greeting(state, &state.connect_call);
-    try expect_greeting(state, &state.grpc_call);
+    try expect_greeting(state, &state.greet_connect);
+    try expect_greeting(state, &state.greet_grpc);
     std.debug.print("the client read both answers over {s}, in Connect and in gRPC\n", .{@tagName(round.expected)});
 }
 
-fn expect_greeting(state: *State, call: *Call) !void {
-    var response = call.call.read(state.reading.storage());
+fn expect_greeting(state: *State, greet: *Greet) !void {
+    var response = greet.call.read(state.reading.storage());
     const answer = try response.next(greet_v1.GreetResponse) orelse return error.CallWrong;
     if (response.failure != null) return error.CallWrong;
     if (!std.mem.eql(u8, answer.greeting, greeting)) return error.CallWrong;

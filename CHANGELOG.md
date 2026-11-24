@@ -48,11 +48,11 @@ pins. `protovalidate` takes `regex` from the same stdx: the second pin, `stdx_re
 
 - **Breaking.** A program's calls share one `connect.Client`, which holds its CPU features and
   its codecs ([decision 51](docs/decisions.md)). Make it once, as your program starts:
-  `const calls: connect.Client = .{ .cpu_features = .detect() };`, with `.encoders` and
+  `const client: connect.Client = .{ .cpu_features = .detect() };`, with `.encoders` and
   `.decoders` for the codings your calls speak.
   - `connect_colibri.ClientCall.init` and `init_stream` take the client as their first
-    argument: `try say.init(&calls, {}, &.{ .protocol = .grpc }, &messages, &buffers)`.
-  - `calls.request`, `calls.write_message`, and `calls.response` replace
+    argument: `try say.init(&client, {}, &.{ .protocol = .grpc }, &messages, &buffers)`.
+  - The client's `request`, `write_message`, and `response` replace
     `connect.client.request`, `connect.client.write_message`, and
     `connect.client.Response.init`.
   - `connect.client.Options` holds what differs from call to call. Its fields `encoders` and
