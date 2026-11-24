@@ -6,6 +6,9 @@ spec/lean/.lake/
 ci-charts/
 # ruff's cache, when a person runs ruff by hand: tools/scripts_check.sh keeps none.
 .ruff_cache/
+# Python's bytecode cache, which a check script leaves beside each module it imports, such as
+# tools/cel_differential_check.sh in tools/cel_differential.
+__pycache__/
 
 # The packages of the validation benchmark's Node.js program, when a person installs them there:
 # tools/validate_compare_check.sh installs them in a copy.
