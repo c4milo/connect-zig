@@ -180,8 +180,9 @@ def title_of(held, over):
 
 def subtitle_of(held, transport, over):
     """The subtitle's lines, with a line for each mark a label carries."""
-    # The work a smaller export saves on the wire.
-    saved = "the TLS and HTTP/2" if transport == "tls" else "the HTTP/2"
+    # The work a smaller export saves: the kernel's, which moves fewer octets through the socket,
+    # most of all, then the decryption over TLS and HTTP/2's framing (docs/benchmarks.md).
+    saved = "the kernel, TLS, and HTTP/2 work" if transport == "tls" else "the kernel and HTTP/2 work"
     rounds = any("share" in item for item in held.values())
     subtitle = [
         f"Each receiver runs on one core {over}, on its library's own decoders. stdx's encoders wrote each export as a",

@@ -321,8 +321,8 @@ octets of each class's first export:
 
 Each bar is a receiver's rate as a share of the same receiver's rate with uncompressed exports. So
 a bar shows what a coding costs one library, and the bars of two libraries do not compare: the
-charts above compare the libraries. A coding costs the time of its decoder. It also saves the TLS
-and the HTTP/2 work on the octets it removes, and each share holds both.
+charts above compare the libraries. A coding costs the time of its decoder. It also saves the work
+on the octets it removes, in the kernel, in TLS, and in HTTP/2, and each share holds both.
 
 The compression parts run `otlp-sink-compression`, connect-zig's sink with room for 256 calls at
 once, where the other parts' sink holds 64. An uncompressed export holds its call longer while its
@@ -358,10 +358,31 @@ uncompressed:
 | connect-rust | zstd | +5% | +1% | +16% |
 | connect-rust | brotli | +13% | +9% | +24% |
 
-Over TLS, gzip and zstd save connect-zig more CPU than its decoders spend: a span of a gzip or a
-zstd export costs it 2% to 6% less CPU than an uncompressed one. In cleartext there is no TLS to
-save, and they cost it 7% to 9% more. Brotli costs it 13% to 25% more. Each coding costs
-connect-go 8% to 24% more CPU a span, and connect-rust 1% to 30% more.
+Over TLS, a span of a gzip or a zstd export costs connect-zig 2% to 6% less CPU than an
+uncompressed one. The saving lies in the kernel, not in the sink's own code. Measured on one Intel
+Xeon core at 2.10 GHz under Linux 6.18, outside CI, one call of the 512-span export took these
+times of CPU, over three rounds of 2,000 calls through h2load on 4 connections:
+
+| Export | Sink's own code | Kernel | Total |
+| --- | ---: | ---: | ---: |
+| Uncompressed, 233,192 octets | 665–685 µs | 70–80 µs | about 755 µs |
+| gzip, 30,927 octets | 640–670 µs | 15–20 µs | about 675 µs |
+
+The kernel moves 7.5 times fewer octets through the socket, so its share falls fourfold. In the
+sink's own code, gzip costs what it saves. Under callgrind, 40 such calls took 249.3 million
+instructions uncompressed and 250.9 million in gzip, on a sink built for x86-64-v3 with PCLMULQDQ
+and AES-NI:
+
+- Decompression adds 31.7 million: 27.0 million to inflate and 4.7 million for the CRC-32.
+- The smaller export removes 30.2 million: decryption falls from 24.9 to 3.3 million, HTTP/2 and
+  the router from 5.4 to 1.8 million, and copies from 6.4 to 3.4 million.
+- The protobuf decode takes 196.1 million in both. The sink decodes and checks every octet of each
+  export, whether it came compressed or not.
+
+In cleartext there is no decryption to save, which was most of what the sink's own code saved, and
+gzip and zstd cost it 7% to 9% more. Brotli costs it 13% to 25% more. Each coding costs connect-go
+8% to 24% more CPU a span, and connect-rust 1% to 30% more: for them a decoder costs more than the
+work a smaller export saves.
 
 Read the charts with three limits:
 
