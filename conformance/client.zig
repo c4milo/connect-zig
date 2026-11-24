@@ -130,7 +130,7 @@ fn dispatch(state: *State, request: *const Request, result: *result_module.Resul
     }
     const name = request.method orelse return error.NoMethod;
     const plan = try plan_module.plan_of(request, &state.client, &state.plan_memory);
-    try state.transport.begin(request.host, std.math.cast(u16, request.port) orelse return error.InvalidPort, plan.protocols, plan.tls);
+    try state.transport.begin(request.host, std.math.cast(u16, request.port) orelse return error.InvalidPort, plan.protocols, plan.tls, state.client.cpu_features);
     defer state.transport.end();
     inline for (@typeInfo(Slots).@"struct".fields) |field| {
         const method = @field(Service, field.name);

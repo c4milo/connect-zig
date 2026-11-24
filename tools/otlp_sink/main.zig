@@ -77,7 +77,7 @@ pub fn main(init: std.process.Init) !void {
         .identity = served,
         .cpu = cpu,
         .unix_seconds = unix_seconds,
-        .engine = if (command.cleartext) .{} else .{ .tls_buffer = &state.tls_buffer },
+        .engine = if (command.cleartext) .{ .cpu_features = cpu_features } else .{ .tls_buffer = &state.tls_buffer, .cpu_features = cpu_features },
     }, &state.router, &state.app);
     defer state.http_server.deinit();
     // A script that asked for port 0 reads the port from this line, and the CPU line says which

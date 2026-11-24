@@ -36,8 +36,9 @@ pub fn Rounds(comptime App: type, comptime Router: type) type {
             // The datagram link runs on the stream link's loops, so each side reads one clock.
             self.datagram_link.init(&self.link.loops);
             self.router.init();
-            try self.server.init(&self.link, &self.datagram_link, .of(&self.router, app));
-            try self.client.init(&self.server, &self.link, &self.datagram_link);
+            // Both sides state the CPU features the program detected once, which its App holds.
+            try self.server.init(&self.link, &self.datagram_link, .of(&self.router, app), app.cpu_features);
+            try self.client.init(&self.server, &self.link, &self.datagram_link, app.cpu_features);
         }
 
         pub fn deinit(self: *Self) void {

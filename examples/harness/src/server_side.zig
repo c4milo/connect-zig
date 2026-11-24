@@ -86,7 +86,9 @@ pub const ServerSide = struct {
     ended_count: u32,
     prng: std.Random.DefaultPrng,
 
-    pub fn init(self: *Self, link: *Link, datagram_link: *DatagramLink, router: RouterRef) !void {
+    /// Starts the endpoint. `cpu_features` are the program's, which its App holds: the engine's
+    /// codecs run on them (colibri decision 169).
+    pub fn init(self: *Self, link: *Link, datagram_link: *DatagramLink, router: RouterRef, cpu_features: server.CpuFeatures) !void {
         self.* = .{
             .link = link,
             .datagram_link = datagram_link,
@@ -98,7 +100,7 @@ pub const ServerSide = struct {
             .identities = undefined,
             .cookie_key = undefined,
             .ticket_key = undefined,
-            .config = .{},
+            .config = .{ .cpu_features = cpu_features },
             .endpoint = undefined,
             .router = router,
             .accepted = null,
@@ -113,7 +115,7 @@ pub const ServerSide = struct {
         self.identities[0] = .{ .chain = chain, .key = &self.key };
         // The identity serves QUIC, which names h3. A TCP socket the program accepts with `.tls =
         // false` stays in cleartext.
-        self.config = .{ .tls = .{
+        self.config = .{ .cpu_features = cpu_features, .tls = .{
             .identities = &self.identities,
             .cookie_key = &self.cookie_key,
             .ticket_key = &self.ticket_key,

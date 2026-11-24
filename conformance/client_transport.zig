@@ -73,8 +73,9 @@ pub const Transport = struct {
     /// Prepares the pool for a case's origin, `host` and `port`, over `protocols`, over TLS when
     /// `trust` is given. A TCP connection in cleartext speaks h11 when `protocols` allows it, and
     /// h2 with prior knowledge when it does not (RFC 9113 §3.3); over TLS, ALPN names the version
-    /// (RFC 7301 §3).
-    pub fn begin(self: *Self, host: []const u8, port: u16, protocols: client.Protocols, trust: ?tls.Client) BeginError!void {
+    /// (RFC 7301 §3). `cpu_features` are the program's, which the pool's configuration states
+    /// (colibri decision 169).
+    pub fn begin(self: *Self, host: []const u8, port: u16, protocols: client.Protocols, trust: ?tls.Client, cpu_features: client.CpuFeatures) BeginError!void {
         assert(self.stream == null);
         self.peer = std.Io.net.IpAddress.parse(host, port) catch return error.InvalidHost;
         self.addresses = .{switch (self.peer) {
@@ -86,7 +87,7 @@ pub const Transport = struct {
             .ip4 => std.fmt.bufPrint(&self.authority, "{s}:{d}", .{ host, port }),
             .ip6 => std.fmt.bufPrint(&self.authority, "[{s}]:{d}", .{ host, port }),
         } catch return error.AuthorityTooLong;
-        self.pool_config = .{ .tls = trust, .authority = written, .protocols = protocols, .tcp_connections = pool_counts.tcp_connections, .requests = pool_counts.requests };
+        self.pool_config = .{ .cpu_features = cpu_features, .tls = trust, .authority = written, .protocols = protocols, .tcp_connections = pool_counts.tcp_connections, .requests = pool_counts.requests };
         const destination: client.Destination = .{ .addresses = &self.addresses, .port = port };
         if (protocols.h3) {
             try self.pool.init(&self.pool_memory, &self.pool_config, &destination, self.receive_pool.storage());

@@ -147,7 +147,12 @@ fn run_round(state: *State, running: *HttpClient, round: Round, trust: tls.Trust
     state.handler = .{ .expected_calls = constants.calls_per_round };
     try running.init(&.{
         .destination = .{ .addresses = &addresses, .port = port },
-        .pool = .{ .tls = .{ .trust = trust, .cpu = cpu }, .authority = server_name, .protocols = round.protocols },
+        .pool = .{
+            .tls = .{ .trust = trust, .cpu = cpu },
+            .authority = server_name,
+            .protocols = round.protocols,
+            .cpu_features = state.client.cpu_features,
+        },
         .unix_seconds = unix_seconds,
     }, &state.handler);
     defer running.deinit();

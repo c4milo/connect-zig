@@ -840,6 +840,16 @@ first. Cite an entry by number in code and commits ("decision 6").
       since colibri's client removes HTTP content codings and knows no envelope, so a program
       would state its client in two places. A route reads the program's own `App`, never
       colibri's server configuration, and a call follows it.
+
+    Amended on 2026-11-24: colibri at 19a4b51 holds the features in `server.Config` and in
+    `client.Config`, with no default (colibri decision 169,
+    https://github.com/c4milo/colibri/issues/156). So a program states them to colibri too, for
+    the HTTP content codings colibri codes: a server in `.engine`, with the value of its `App`,
+    and a client in its pool's configuration, with the value of its `connect.Client`. No name
+    of connect-zig changes, and `connect.Client` stays. A call still reads no configuration of
+    a pool: `ClientCall`'s pool is any type with `request`, and a program on `connect` alone
+    has none. Beaten: the App's and the `Client`'s field read from colibri's configuration,
+    which makes a route and a call depend on which server or pool carries them.
     - The name `connect.client.Config`. A program makes each request through the value, as
       it does through `std.http.Client`, which a struct literal makes from an allocator and an
       `Io`, and whose `RequestOptions` hold what one request chooses. Pepegrillo's API guide

@@ -202,7 +202,7 @@ try state.http_server.init(&.{
     .identity = .{ .chain = chain_pem, .key = key_pem },
     .cpu = cpu,
     .unix_seconds = unix_seconds,
-    .engine = .{ .tls_buffer = &state.tls_buffer },
+    .engine = .{ .tls_buffer = &state.tls_buffer, .cpu_features = state.app.cpu_features },
 }, &state.router, &state.app);
 defer state.http_server.deinit();
 try state.http_server.run();
@@ -221,6 +221,10 @@ It serves h11 and h2 over TLS on a TCP socket, and h3 on the UDP socket of the s
 your program probed of its CPU. `tls_buffer` holds the TLS session of each TCP connection over
 TLS, about 83 KB each, for as many connections as it serves at once. With no `identity`, it serves
 h11 and h2 in cleartext and no h3, and needs no `tls_buffer`.
+
+`.engine` states the CPU features a second time, and has no default for them: colibri's engine
+codes HTTP content codings with them, as your routes code each message with the `App`'s. Give
+both the one value your program detected.
 
 ## 5. Call it
 
@@ -254,8 +258,15 @@ names what it trusts:
 ```zig
 const anchors = try tls.pem.anchors(ca_pem, &anchor_der, &anchor_room);
 const trust: tls.Trust = .{ .web_pki = .{ .anchors = anchors, .server_name = "api.example.com" } };
-const config: client.Config = .{ .tls = .{ .trust = trust, .cpu = cpu }, .authority = "api.example.com" };
+const config: client.Config = .{
+    .tls = .{ .trust = trust, .cpu = cpu },
+    .authority = "api.example.com",
+    .cpu_features = state.client.cpu_features,
+};
 ```
+
+The pool's configuration states the CPU features too, with no default: colibri decodes HTTP
+content codings with them. Give it the value your `connect.Client` holds.
 
 A client or bidirectional stream can stream both ways: `init_stream` builds the call, and its
 `Sender` sends each message while the program reads each answer as it arrives.

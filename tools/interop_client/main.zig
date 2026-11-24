@@ -236,7 +236,7 @@ fn run_all(state: *State, reporter: *Reporter, protocol: *const Protocol, origin
         .h11 => .{ .h11 = true, .h2 = false, .h3 = false },
         .h3 => unreachable,
     };
-    try state.transport.begin(origin.host, origin.port, versions, trust);
+    try state.transport.begin(origin.host, origin.port, versions, trust, state.client.cpu_features);
     defer state.transport.end();
     const run: Run = .{
         .client = &state.client,

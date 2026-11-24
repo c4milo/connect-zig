@@ -86,7 +86,7 @@ pub fn main(init: std.process.Init) !void {
         .cpu = cpu,
         // colibri issues TLS session tickets with it; this server runs no TLS, so 0 serves.
         .unix_seconds = 0,
-        .engine = .{ .timeouts = .{ .first_request_ns = constants.first_request_timeout_ns, .idle_ns = constants.idle_timeout_ns } },
+        .engine = .{ .cpu_features = state.app.cpu_features, .timeouts = .{ .first_request_ns = constants.first_request_timeout_ns, .idle_ns = constants.idle_timeout_ns } },
     }, &state.router, &state.app);
     defer state.http_server.deinit();
     try write_response(init.io, state, state.http_server.port());
