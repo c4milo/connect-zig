@@ -8,8 +8,8 @@
 //!   their numbers once the client ends its stream.
 //! - WatchEvents streams a repository's events after a cursor, each with a oneof payload.
 const std = @import("std");
-const connect = @import("connect");
-const rpc = @import("connect_colibri");
+const connect = @import("connect_zig").connect;
+const rpc = @import("connect_zig").connect_colibri;
 const github = @import("github");
 const store_file = @import("store.zig");
 const room_file = @import("room.zig");

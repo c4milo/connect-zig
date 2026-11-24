@@ -3,7 +3,7 @@
 //! port, under the test identity of the harness (decision 25). An OpenTelemetry SDK's gRPC
 //! exporter sends its spans to it, and `SpanStore/Received` reads them back. README.md shows how.
 const std = @import("std");
-const connect = @import("connect");
+const connect = @import("connect_zig").connect;
 const harness = @import("harness");
 const app_file = @import("app.zig");
 

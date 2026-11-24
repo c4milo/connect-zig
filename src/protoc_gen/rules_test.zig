@@ -66,7 +66,7 @@ test "a message's rules are written as its table, and their numbers as RuleNumbe
         .options = .{ .rules = .{ .oneof = .of(&.{.{ .fields = .of(&.{ "name", "plain" }), .required = true }}) } },
     };
     const code = try generated(arena, &.{user});
-    try expect_contains(code, "//! The build gives this file the modules protobuf, protovalidate.\nconst proto = @import(\"protobuf\");\nconst validate = @import(\"protovalidate\");\n");
+    try expect_contains(code, "//! The build gives this file the modules connect_zig.\nconst proto = @import(\"connect_zig\").protobuf;\nconst validate = @import(\"connect_zig\").protovalidate;\n");
     try expect_contains(code,
         \\    pub const protovalidate: validate.Rules = .{
         \\        .message = .{ .oneof = .of(&.{.{ .fields = .of(&.{ "name", "plain" }), .required = true }}) },

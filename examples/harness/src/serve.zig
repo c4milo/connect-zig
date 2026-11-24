@@ -6,8 +6,8 @@
 //! The certificate is for `localhost` and 127.0.0.1, signed by `tls/ca.pem`, so a client trusts
 //! that file: `curl --cacert examples/harness/tls/ca.pem https://127.0.0.1:8443/...`.
 const std = @import("std");
-const colibri = @import("colibri");
-const server = @import("server");
+const colibri = @import("connect_zig").colibri;
+const server = @import("connect_zig").server;
 const identity = @import("test_identity");
 const constants = @import("constants.zig");
 const server_side = @import("server_side.zig");

@@ -1,8 +1,8 @@
 //! A client call of `connect_colibri` with the buffers it writes and reads in. A program keeps
 //! each call in its state (decision 42), so the call and its buffers stay in place until the
 //! round ends.
-const connect = @import("connect");
-const rpc = @import("connect_colibri");
+const connect = @import("connect_zig").connect;
+const rpc = @import("connect_zig").connect_colibri;
 const CallBuffers = @import("client_side.zig").CallBuffers;
 
 pub fn Call(comptime method: connect.Method, comptime options: rpc.ClientCallOptions) type {

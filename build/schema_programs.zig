@@ -62,10 +62,8 @@ fn program(b: *std.Build, graph: Graph, name: []const u8, source: []const u8, ge
         .root_source_file = .{ .cwd_relative = generated },
         .target = graph.target,
         .optimize = graph.optimize,
-        .imports = &.{
-            .{ .name = "protobuf", .module = graph.protobuf },
-            .{ .name = "protovalidate", .module = graph.protovalidate },
-        },
+        // The code imports `connect_zig`, and the program serves no RPC (decision 52).
+        .imports = &.{.{ .name = "connect_zig", .module = graph.generated_imports }},
     });
     return b.addExecutable(.{ .name = name, .root_module = b.createModule(.{
         .root_source_file = b.path(source),

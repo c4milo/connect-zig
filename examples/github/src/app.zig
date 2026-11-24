@@ -1,8 +1,8 @@
 //! What both programs of the example share: the `App` the routes read, and the route table.
 //! `main.zig` serves it in memory, and `serve.zig` on a socket.
-const server = @import("server");
-const platform = @import("platform");
-const rpc = @import("connect_colibri");
+const server = @import("connect_zig").server;
+const platform = @import("connect_zig").platform;
+const rpc = @import("connect_zig").connect_colibri;
 const github = @import("github");
 const service = @import("github_service");
 const constants = @import("constants.zig");

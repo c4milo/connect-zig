@@ -8,8 +8,8 @@
 //! - Countdown is a server stream whose route asks it for one number at a time, so the stream
 //!   may be far longer than the router's response memory (decision 33).
 const std = @import("std");
-const connect = @import("connect");
-const rpc = @import("connect_colibri");
+const connect = @import("connect_zig").connect;
+const rpc = @import("connect_zig").connect_colibri;
 const streaming = @import("streaming");
 const constants = @import("constants.zig");
 const StreamingService = streaming.StreamingService;

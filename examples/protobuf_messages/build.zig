@@ -18,8 +18,9 @@ pub fn build(b: *std.Build) void {
     const plugin = b.addInstallArtifact(connect_zig.artifact("protoc-gen-connect-zig"), .{});
     b.step("plugin", "Install connect-zig's protoc plugin to zig-out/bin").dependOn(&plugin.step);
 
+    // A program that codes messages alone takes `protobuf`, which links no TLS library (decision
+    // 52). Its generated code declares no service and no rule, so it names `protobuf` too.
     const protobuf = connect_zig.module("protobuf");
-    const connect = connect_zig.module("connect");
     const shared = b.addModule("kitchen_v1_shared", .{
         .root_source_file = b.path("gen/kitchen/v1/shared.pb.zig"),
         .target = target,
@@ -34,7 +35,6 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
         .imports = &.{
             .{ .name = "protobuf", .module = protobuf },
-            .{ .name = "connect", .module = connect },
             .{ .name = "kitchen_v1_shared", .module = shared },
         },
     });
@@ -44,7 +44,6 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
         .imports = &.{
             .{ .name = "protobuf", .module = protobuf },
-            .{ .name = "connect", .module = connect },
             .{ .name = "kitchen_v1_shared", .module = shared },
         },
     });

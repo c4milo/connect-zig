@@ -6,9 +6,9 @@
 //! - `Counting` reports how many messages a call read and wrote, in trailers. A gRPC error before
 //!   any message is Trailers-Only, so its head carries these trailers too.
 const std = @import("std");
-const connect = @import("connect");
-const proto = @import("protobuf");
-const rpc = @import("connect_colibri");
+const connect = @import("connect_zig").connect;
+const proto = @import("connect_zig").protobuf;
+const rpc = @import("connect_zig").connect_colibri;
 const errors = @import("errors");
 const constants = @import("constants.zig");
 

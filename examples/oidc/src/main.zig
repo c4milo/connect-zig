@@ -20,7 +20,7 @@
 //! Anything other than the expected answers exits with an error, which is how `zig build test`
 //! and CI know the example works. Run it with `zig build run`.
 const std = @import("std");
-const connect = @import("connect");
+const connect = @import("connect_zig").connect;
 const harness = @import("harness");
 const account = @import("account");
 const service = @import("account_service");

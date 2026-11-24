@@ -17,9 +17,9 @@
 //! Anything other than the expected answers exits with an error, which is how `zig build test`
 //! and CI know the example works. Run it with `zig build run`.
 const std = @import("std");
-const connect = @import("connect");
-const client = @import("client");
-const rpc = @import("connect_colibri");
+const connect = @import("connect_zig").connect;
+const client = @import("connect_zig").client;
+const rpc = @import("connect_zig").connect_colibri;
 const harness = @import("harness");
 const eliza = @import("eliza");
 const service = @import("eliza_service");

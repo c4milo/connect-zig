@@ -3,8 +3,8 @@
 //! may serve ELIZA beside other services (decision 41). Say also answers a GET, since it has no
 //! side effects.
 const std = @import("std");
-const connect = @import("connect");
-const rpc = @import("connect_colibri");
+const connect = @import("connect_zig").connect;
+const rpc = @import("connect_zig").connect_colibri;
 const eliza = @import("eliza");
 const constants = @import("constants.zig");
 

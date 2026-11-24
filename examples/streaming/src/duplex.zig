@@ -8,9 +8,9 @@
 //! - Sum, over gRPC. The client hands each number as a piece of its own, once the pool took the
 //!   one before, and reads the sum and the status from the trailers.
 const std = @import("std");
-const connect = @import("connect");
-const client = @import("client");
-const rpc = @import("connect_colibri");
+const connect = @import("connect_zig").connect;
+const client = @import("connect_zig").client;
+const rpc = @import("connect_zig").connect_colibri;
 const harness = @import("harness");
 const streaming = @import("streaming");
 const service = @import("streaming_service");

@@ -10,8 +10,8 @@
 //! Anything other than the expected answers exits with an error, which is how `zig build test`
 //! and CI know the example works. Run it with `zig build run`.
 const std = @import("std");
-const connect = @import("connect");
-const client = @import("client");
+const connect = @import("connect_zig").connect;
+const client = @import("connect_zig").client;
 const harness = @import("harness");
 const otlp = @import("otlp");
 const trace = @import("otlp_trace");

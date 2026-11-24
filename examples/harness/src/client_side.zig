@@ -3,11 +3,11 @@
 //! over the stream link (decision 13). A round over h3 runs QUIC over the datagram link, and
 //! judges the server by the CA of `tls/` (decision 25).
 const std = @import("std");
-const connect = @import("connect");
-const client = @import("client");
-const tls = @import("tls");
+const connect = @import("connect_zig").connect;
+const client = @import("connect_zig").client;
+const tls = @import("connect_zig").tls;
 const identity = @import("test_identity");
-const rpc = @import("connect_colibri");
+const rpc = @import("connect_zig").connect_colibri;
 const constants = @import("constants.zig");
 const Link = @import("link.zig").Link;
 const datagram_module = @import("link_datagram.zig");

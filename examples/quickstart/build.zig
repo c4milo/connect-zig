@@ -21,8 +21,7 @@ pub fn build(b: *std.Build) void {
     b.step("plugin", "Install connect-zig's protoc plugin to zig-out/bin").dependOn(&plugin.step);
 
     const greet = b.createModule(.{ .root_source_file = b.path("gen/greet/v1/greet.pb.zig"), .target = target, .optimize = optimize });
-    greet.addImport("protobuf", connect_zig.module("protobuf"));
-    greet.addImport("connect", connect_zig.module("connect"));
+    greet.addImport("connect_zig", connect_zig.module("connect_zig"));
     const server = program(b, connect_zig, greet, "greet-server", "src/server.zig", target, optimize);
     const client = program(b, connect_zig, greet, "greet-client", "src/client.zig", target, optimize);
     const check = b.addSystemCommand(&.{"sh"});
@@ -35,13 +34,9 @@ pub fn build(b: *std.Build) void {
 
 fn program(b: *std.Build, connect_zig: *std.Build.Dependency, greet: *std.Build.Module, name: []const u8, path: []const u8, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode) *std.Build.Step.Compile {
     const module = b.createModule(.{ .root_source_file = b.path(path), .target = target, .optimize = optimize });
-    // The library's modules, and colibri's, which connect-zig exports (decision 39).
-    for ([_][]const u8{ "protobuf", "connect", "connect_colibri", "oidc", "server", "client", "tls", "colibri" }) |import| {
-        module.addImport(import, connect_zig.module(import));
-    }
+    // One module names the library's, colibri's and stdx's `platform` (decision 52).
+    module.addImport("connect_zig", connect_zig.module("connect_zig"));
     module.addImport("greet_v1", greet);
-    // stdx, with connect-zig's options, so its `platform` is the module connect-zig imports.
-    module.addImport("platform", b.dependency("stdx", .{ .target = target, .release = optimize == .ReleaseSafe }).module("platform"));
     const exe = b.addExecutable(.{ .name = name, .root_module = module });
     b.installArtifact(exe);
     return exe;

@@ -8,10 +8,10 @@
 //! - `Auth` checks the token of each call, and writes its claims into the values of the call.
 //! - A handler reads the claims from `ctx.values(Values).oidc`.
 //! - `issuer` is the test issuer, which signs the tokens of the example's client.
-const connect = @import("connect");
-const rpc = @import("connect_colibri");
-const oidc = @import("oidc");
-const platform = @import("platform");
+const connect = @import("connect_zig").connect;
+const rpc = @import("connect_zig").connect_colibri;
+const oidc = @import("connect_zig").oidc;
+const platform = @import("connect_zig").platform;
 const account = @import("account");
 const constants = @import("constants.zig");
 const AccountService = account.AccountService;

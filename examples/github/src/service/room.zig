@@ -4,9 +4,9 @@
 //! A failure names its cause in a typed detail: `NotFound`, `AlreadyExists` or `BadField`. A
 //! private repository reads as not found to anyone but its owner, as GitHub answers 404.
 const std = @import("std");
-const connect = @import("connect");
-const proto = @import("protobuf");
-const rpc = @import("connect_colibri");
+const connect = @import("connect_zig").connect;
+const proto = @import("connect_zig").protobuf;
+const rpc = @import("connect_zig").connect_colibri;
 const github = @import("github");
 const store_file = @import("store.zig");
 const constants = @import("constants.zig");

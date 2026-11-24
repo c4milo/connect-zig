@@ -7,8 +7,8 @@
 //!
 //! Whoami has no side effects, so it also answers a GET.
 const std = @import("std");
-const connect = @import("connect");
-const rpc = @import("connect_colibri");
+const connect = @import("connect_zig").connect;
+const rpc = @import("connect_zig").connect_colibri;
 const interceptors = @import("interceptors");
 const constants = @import("constants.zig");
 

@@ -11,7 +11,7 @@
 //!
 //! It reads gzip, zstd and br messages, and answers in the one a client accepts first.
 const std = @import("std");
-const connect = @import("connect");
+const connect = @import("connect_zig").connect;
 const harness = @import("harness");
 const account_service = @import("account_service");
 const app_file = @import("app.zig");

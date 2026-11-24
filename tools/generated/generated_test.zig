@@ -60,7 +60,6 @@ test "a split file's pieces name each other, and round-trip as one file would" {
     try testing.expectEqual(large.Account.Profile.Visibility.visibility_public, back.visibility);
     try testing.expectEqualStrings("t", back.owner.?.tag.?.value);
     try testing.expectEqual(@as(i64, 80), back.owner.?.field_80);
-    try testing.expectEqual(.unary, large.LedgerService.get_ledger.stream_type);
     try testing.expectEqual(@as(u32, 81), large.Ledger.protobuf.fields[80].number);
 }
 

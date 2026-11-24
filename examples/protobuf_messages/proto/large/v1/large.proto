@@ -191,7 +191,3 @@ enum Region {
   REGION_NORTH = 1;
   REGION_SOUTH = 2;
 }
-
-service LedgerService {
-  rpc GetLedger(Account) returns (Ledger) {}
-}

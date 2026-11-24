@@ -24,9 +24,9 @@
 //! Anything other than the expected answers exits with an error, which is how `zig build test`
 //! knows the example works. Run it with `zig build run`.
 const std = @import("std");
-const connect = @import("connect");
-const proto = @import("protobuf");
-const client = @import("client");
+const connect = @import("connect_zig").connect;
+const proto = @import("connect_zig").protobuf;
+const client = @import("connect_zig").client;
 const harness = @import("harness");
 const github = @import("github");
 const service = @import("github_service");

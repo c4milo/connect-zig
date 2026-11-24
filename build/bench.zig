@@ -129,14 +129,24 @@ fn add_validate(b: *std.Build, protobuf: *std.Build.Module, public_names: *std.B
             .{ .name = "platform", .module = platform },
         },
     });
-    const messages = b.createModule(.{
-        .root_source_file = b.path("bench/validate/gen/bench/validate/v1/validate.pb.zig"),
+    // The generated code imports `connect_zig`. The benchmark takes the build's stand-in, which
+    // names no colibri module, and needs none of `connect` (decision 52).
+    const generated_imports = b.createModule(.{
+        .root_source_file = b.path("tools/generated_imports/generated_imports.zig"),
         .target = target,
         .optimize = optimize,
         .imports = &.{
             .{ .name = "protobuf", .module = protobuf },
             .{ .name = "protovalidate", .module = protovalidate },
+            .{ .name = "buf_validate_validate", .module = rules },
+            .{ .name = "google_protobuf_descriptor", .module = descriptor },
         },
+    });
+    const messages = b.createModule(.{
+        .root_source_file = b.path("bench/validate/gen/bench/validate/v1/validate.pb.zig"),
+        .target = target,
+        .optimize = optimize,
+        .imports = &.{.{ .name = "connect_zig", .module = generated_imports }},
     });
     const exe = b.addExecutable(.{
         .name = "bench-validate",

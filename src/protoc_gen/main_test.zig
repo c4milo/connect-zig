@@ -197,7 +197,7 @@ test "a file past the hand-written line limit stays one file" {
     const content = files[0].content.?;
     // Longer than the hand-written code's limit, and still one file (decision 17).
     try testing.expect(std.mem.count(u8, content, "\n") > hand_written_lines_max);
-    try expect_contains(content, "//! The build gives this file the modules protobuf, connect.\n");
+    try expect_contains(content, "//! The build gives this file the modules connect_zig.\nconst proto = @import(\"connect_zig\").protobuf;\nconst connect = @import(\"connect_zig\").connect;\n");
     try expect_contains(content, "    pub const Inner = struct {\n");
     try expect_contains(content, "        pub const Kind = enum(i32) {\n");
     try expect_contains(content, "    link: proto.Lazy(Second) = .{},\n    kind: Outer.Inner.Kind = @enumFromInt(0),\n");
@@ -227,6 +227,49 @@ test "a type of another file is named through that file's module" {
     try expect_contains(text, "    tag: ?shared_v1_shared.Tag = null,\n    tags: RepeatedTag = .{},\n");
     // A repeated type is named by its path in its own file, without the module's name.
     try expect_contains(text, "const RepeatedTag = proto.Repeated(shared_v1_shared.Tag, .message);\n");
+}
+
+test "a type of connect-zig's own generated code is named through connect_zig (decision 52)" {
+    var arena_state = std.heap.ArenaAllocator.init(testing.allocator);
+    defer arena_state.deinit();
+    const arena = arena_state.allocator();
+    var violations = field("violations", 1, .message, .optional);
+    violations.type_name = ".buf.validate.Violations";
+    const rules: pb.FileDescriptorProto = .{ .name = "buf/validate/validate.proto", .package = "buf.validate", .message_type = .of(&.{.{ .name = "Violations" }}), .syntax = "proto2" };
+    const file: pb.FileDescriptorProto = .{
+        .name = "demo/v1/demo.proto",
+        .package = "demo.v1",
+        .dependency = .of(&.{"buf/validate/validate.proto"}),
+        .message_type = .of(&.{.{ .name = "Holder", .field = .of(&.{violations}) }}),
+        .syntax = "proto3",
+    };
+    const request: pb.CodeGeneratorRequest = .{ .file_to_generate = .of(&.{"demo/v1/demo.proto"}), .proto_file = .of(&.{ rules, file }) };
+    const text = try generated(arena, &request);
+    try expect_contains(text, "//! The build gives this file the modules connect_zig.\nconst proto = @import(\"connect_zig\").protobuf;\n");
+    try expect_contains(text, "const buf_validate_validate = @import(\"connect_zig\").buf_validate_validate;\n");
+    try testing.expect(std.mem.indexOf(u8, text, "@import(\"protobuf\")") == null);
+}
+
+test "connect-zig's own generated code names its other file by module, through protobuf" {
+    var arena_state = std.heap.ArenaAllocator.init(testing.allocator);
+    defer arena_state.deinit();
+    const arena = arena_state.allocator();
+    var options = field("options", 1, .message, .optional);
+    options.type_name = ".google.protobuf.FieldOptions";
+    const descriptor: pb.FileDescriptorProto = .{ .name = "google/protobuf/descriptor.proto", .package = "google.protobuf", .message_type = .of(&.{.{ .name = "FieldOptions" }}), .syntax = "proto2" };
+    const rules: pb.FileDescriptorProto = .{
+        .name = "buf/validate/validate.proto",
+        .package = "buf.validate",
+        .dependency = .of(&.{"google/protobuf/descriptor.proto"}),
+        .message_type = .of(&.{.{ .name = "Holder", .field = .of(&.{options}) }}),
+        .syntax = "proto2",
+    };
+    const request: pb.CodeGeneratorRequest = .{ .file_to_generate = .of(&.{"buf/validate/validate.proto"}), .proto_file = .of(&.{ descriptor, rules }) };
+    const files = try generated_files(arena, &request);
+    try testing.expectEqual(1, files.len);
+    const text = files[0].content.?;
+    try expect_contains(text, "//! The build gives this file the modules protobuf, google_protobuf_descriptor.\nconst proto = @import(\"protobuf\");\n");
+    try expect_contains(text, "const google_protobuf_descriptor = @import(\"google_protobuf_descriptor\");\n");
 }
 
 test "a file whose messages are delimited writes groups, but a map keeps its entries' lengths" {

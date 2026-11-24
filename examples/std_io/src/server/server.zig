@@ -32,9 +32,9 @@
 //! The program reads the clock and draws entropy through `std.Io`, and passes the engine each
 //! instant as a value: colibri reads no clock (decision 3).
 const std = @import("std");
-const platform = @import("platform");
-const server = @import("server");
-const rpc = @import("connect_colibri");
+const platform = @import("connect_zig").platform;
+const server = @import("connect_zig").server;
+const rpc = @import("connect_zig").connect_colibri;
 const eliza = @import("eliza");
 const eliza_service = @import("eliza_service");
 const constants = @import("constants.zig");

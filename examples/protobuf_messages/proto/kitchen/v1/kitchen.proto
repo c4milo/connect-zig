@@ -67,15 +67,3 @@ message Tree {
   google.protobuf.StringValue nickname = 13;
   string type = 14;
 }
-
-service KitchenService {
-  rpc Get(Tree) returns (Tree) {
-    option idempotency_level = NO_SIDE_EFFECTS;
-  }
-  rpc Put(Tree) returns (Tree) {
-    option idempotency_level = IDEMPOTENT;
-  }
-  rpc Upload(stream Scalars) returns (Tree) {}
-  rpc Watch(Tree) returns (stream Tree) {}
-  rpc Chat(stream Tree) returns (stream Tree) {}
-}

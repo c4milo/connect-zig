@@ -17,8 +17,8 @@
 //! token over Connect as a GET in JSON, and without one over gRPC-Web, which `Auth` refuses. Run
 //! it with `zig build run`.
 const std = @import("std");
-const connect = @import("connect");
-const client = @import("client");
+const connect = @import("connect_zig").connect;
+const client = @import("connect_zig").client;
 const harness = @import("harness");
 const interceptors = @import("interceptors");
 const constants = @import("constants.zig");

@@ -8,9 +8,9 @@
 //! elements of both (protobuf encoding guide, "Last One Wins"), so `Received` decodes all it kept
 //! as one request.
 const std = @import("std");
-const connect = @import("connect");
-const proto = @import("protobuf");
-const rpc = @import("connect_colibri");
+const connect = @import("connect_zig").connect;
+const proto = @import("connect_zig").protobuf;
+const rpc = @import("connect_zig").connect_colibri;
 const otlp = @import("otlp");
 const otlpstore = @import("otlpstore");
 const constants = @import("constants.zig");

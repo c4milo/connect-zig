@@ -1,9 +1,9 @@
 //! The `App` and the route table of the socket server: every example's service under one router,
 //! each with its room in the field it names (decision 41).
-const server = @import("server");
-const platform = @import("platform");
-const rpc = @import("connect_colibri");
-const oidc = @import("oidc");
+const server = @import("connect_zig").server;
+const platform = @import("connect_zig").platform;
+const rpc = @import("connect_zig").connect_colibri;
+const oidc = @import("connect_zig").oidc;
 const eliza = @import("eliza");
 const eliza_service = @import("eliza_service");
 const streaming_service = @import("streaming_service");

@@ -109,13 +109,11 @@ fn sink(b: *std.Build, graph: Graph, name: []const u8, comptime gen: []const u8,
     }) });
 }
 
-/// A generated module, with the modules its header names.
+/// A generated module, with the modules its header names. Generated code names `connect_zig`.
 fn generated(b: *std.Build, graph: Graph, path: []const u8, imports: []const std.Build.Module.Import) *std.Build.Module {
     const module = b.createModule(.{ .root_source_file = b.path(path), .target = graph.target, .optimize = graph.optimize });
     module.addImport("protobuf", graph.protobuf);
-    module.addImport("connect", graph.connect);
-    // The validated schema's code names `protovalidate`, and OpenTelemetry's names none.
-    module.addImport("protovalidate", graph.protovalidate);
+    module.addImport("connect_zig", graph.generated_imports);
     for (imports) |import| module.addImport(import.name, import.module);
     return module;
 }

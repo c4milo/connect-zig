@@ -14,8 +14,8 @@
 //! and writes a reply. Then the client reads that reply. The program checks every message and the
 //! outcome, and exits with an error otherwise. Run it with `zig build run`.
 const std = @import("std");
-const connect = @import("connect");
-const platform = @import("platform");
+const connect = @import("connect_zig").connect;
+const platform = @import("connect_zig").platform;
 const eliza = @import("eliza");
 const constants = @import("constants.zig");
 const Service = eliza.ElizaService;

@@ -7,12 +7,6 @@
         // A project of your own names connect-zig by URL: `zig fetch --save git+https://github.com/c4milo/connect-zig`.
         .connect_zig = .{ .path = "../.." },
         .harness = .{ .path = "../harness" },
-        // stdx, for `platform.CpuFeatures`, the CPU features the program detects and passes. It
-        // names the commit connect-zig pins, so the type is the one connect-zig takes.
-        .stdx = .{
-            .url = "git+https://github.com/c4milo/stdx#1df5f9f2fd51e8ebc1707e2e77c02afc6041f49f",
-            .hash = "stdx-0.3.0-BD60trf9VAAB3a_ji6iOnFA9BcC-aZPROZV2caFk9QQ4",
-        },
     },
     .paths = .{ "build.zig", "build.zig.zon", "buf.gen.yaml", "proto", "gen", "src" },
 }

@@ -10,9 +10,9 @@
 //! the first violation, and its detail is a `buf.validate.Violations` that holds each one.
 const std = @import("std");
 const assert = std.debug.assert;
-const connect = @import("connect");
-const rpc = @import("connect_colibri");
-const protovalidate = @import("protovalidate");
+const connect = @import("connect_zig").connect;
+const rpc = @import("connect_zig").connect_colibri;
+const protovalidate = @import("connect_zig").protovalidate;
 const signup = @import("signup");
 const constants = @import("constants.zig");
 const SignupService = signup.SignupService;

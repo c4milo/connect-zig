@@ -17,8 +17,8 @@
 //! that deadline fires only through the server's ticks. Anything other than the expected answers
 //! exits with an error, and the server stops with the program.
 const std = @import("std");
-const connect = @import("connect");
-const client = @import("client");
+const connect = @import("connect_zig").connect;
+const client = @import("connect_zig").client;
 const eliza = @import("eliza");
 const service = @import("eliza_service");
 const constants = @import("constants.zig");

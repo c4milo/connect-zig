@@ -34,8 +34,9 @@ pub fn build(b: *std.Build) void {
     // Each generated module, in the order the headers need them.
     inline for (generated) |file| {
         const module = b.addModule(file.name, .{ .root_source_file = b.path("gen/" ++ file.path), .target = target, .optimize = optimize });
+        // A file of messages alone names `protobuf`, and one with a service `connect_zig`.
         module.addImport("protobuf", connect_zig.module("protobuf"));
-        module.addImport("connect", connect_zig.module("connect"));
+        module.addImport("connect_zig", connect_zig.module("connect_zig"));
         inline for (file.imports) |import| module.addImport(import[0], b.modules.get(import[1]).?);
     }
     const service = b.addModule("otlp_service", .{
@@ -43,9 +44,7 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
         .imports = &.{
-            .{ .name = "connect", .module = connect_zig.module("connect") },
-            .{ .name = "protobuf", .module = connect_zig.module("protobuf") },
-            .{ .name = "connect_colibri", .module = connect_zig.module("connect_colibri") },
+            .{ .name = "connect_zig", .module = connect_zig.module("connect_zig") },
             .{ .name = "otlp", .module = b.modules.get("otlp").? },
             .{ .name = "otlpstore", .module = b.modules.get("otlpstore").? },
         },
@@ -62,12 +61,10 @@ pub fn build(b: *std.Build) void {
 
 fn program(b: *std.Build, connect_zig: *std.Build.Dependency, harness: *std.Build.Dependency, service: *std.Build.Module, name: []const u8, path: []const u8, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode) *std.Build.Step.Compile {
     const module = b.createModule(.{ .root_source_file = b.path(path), .target = target, .optimize = optimize });
-    for ([_][]const u8{ "connect", "connect_colibri", "server", "client" }) |import| module.addImport(import, connect_zig.module(import));
+    module.addImport("connect_zig", connect_zig.module("connect_zig"));
     for ([_][]const u8{ "otlp", "otlp_trace", "otlp_common", "otlpstore" }) |import| module.addImport(import, b.modules.get(import).?);
     module.addImport("otlp_service", service);
     module.addImport("harness", harness.module("harness"));
-    // stdx, with connect-zig's options, so its `platform` is the module connect-zig imports.
-    module.addImport("platform", b.dependency("stdx", .{ .target = target, .release = optimize == .ReleaseSafe }).module("platform"));
     const exe = b.addExecutable(.{ .name = name, .root_module = module });
     b.installArtifact(exe);
     return exe;

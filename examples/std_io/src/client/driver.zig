@@ -8,9 +8,9 @@
 //! round, it calls `begin` with the protocols the round may speak, `request` for each call, then
 //! `finish`, which runs the pool until every call finished and the socket closed.
 const std = @import("std");
-const connect = @import("connect");
-const client = @import("client");
-const rpc = @import("connect_colibri");
+const connect = @import("connect_zig").connect;
+const client = @import("connect_zig").client;
+const rpc = @import("connect_zig").connect_colibri;
 const constants = @import("constants.zig");
 const Io = std.Io;
 const net = std.Io.net;

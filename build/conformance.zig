@@ -112,7 +112,7 @@ fn generated(b: *std.Build, graph: Graph, comptime name: []const u8, extra: []co
         .optimize = graph.optimize,
     });
     module.addImport("protobuf", graph.protobuf);
-    module.addImport("connect", graph.connect);
+    module.addImport("connect_zig", graph.generated_imports);
     for (extra) |import| module.addImport(import.name, import.module);
     return module;
 }

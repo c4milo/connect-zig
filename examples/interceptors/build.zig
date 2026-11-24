@@ -18,8 +18,6 @@ pub fn build(b: *std.Build) void {
     const release = optimize == .ReleaseSafe;
     const connect_zig = b.dependency("connect_zig", .{ .target = target, .release = release, .rotor = true });
     const harness = b.dependency("harness", .{ .target = target, .release = release });
-    // With connect-zig's options, so its `platform` is the module connect-zig imports.
-    const stdx = b.dependency("stdx", .{ .target = target, .release = release });
     const plugin = b.addInstallArtifact(connect_zig.artifact("protoc-gen-connect-zig"), .{});
     b.step("plugin", "Install connect-zig's protoc plugin to zig-out/bin").dependOn(&plugin.step);
 
@@ -28,8 +26,7 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
         .imports = &.{
-            .{ .name = "protobuf", .module = connect_zig.module("protobuf") },
-            .{ .name = "connect", .module = connect_zig.module("connect") },
+            .{ .name = "connect_zig", .module = connect_zig.module("connect_zig") },
         },
     });
     const service = b.addModule("interceptors_service", .{
@@ -37,8 +34,7 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
         .imports = &.{
-            .{ .name = "connect", .module = connect_zig.module("connect") },
-            .{ .name = "connect_colibri", .module = connect_zig.module("connect_colibri") },
+            .{ .name = "connect_zig", .module = connect_zig.module("connect_zig") },
             .{ .name = "interceptors", .module = interceptors },
         },
     });
@@ -47,11 +43,7 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
         .imports = &.{
-            .{ .name = "platform", .module = stdx.module("platform") },
-            .{ .name = "connect", .module = connect_zig.module("connect") },
-            .{ .name = "connect_colibri", .module = connect_zig.module("connect_colibri") },
-            .{ .name = "server", .module = connect_zig.module("server") },
-            .{ .name = "client", .module = connect_zig.module("client") },
+            .{ .name = "connect_zig", .module = connect_zig.module("connect_zig") },
             .{ .name = "harness", .module = harness.module("harness") },
             .{ .name = "interceptors", .module = interceptors },
             .{ .name = "interceptors_service", .module = service },
@@ -68,9 +60,7 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
         .imports = &.{
-            .{ .name = "platform", .module = stdx.module("platform") },
-            .{ .name = "connect_colibri", .module = connect_zig.module("connect_colibri") },
-            .{ .name = "server", .module = connect_zig.module("server") },
+            .{ .name = "connect_zig", .module = connect_zig.module("connect_zig") },
             .{ .name = "harness", .module = harness.module("harness") },
             .{ .name = "interceptors", .module = interceptors },
             .{ .name = "interceptors_service", .module = service },

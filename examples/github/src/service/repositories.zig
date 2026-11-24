@@ -1,8 +1,8 @@
 //! RepositoryService of the GitHub-style service: repositories, over the store of `store.zig` and
 //! the replies of `room.zig`. Each handler takes the service's room, which `Service(App)` passes.
 const std = @import("std");
-const connect = @import("connect");
-const rpc = @import("connect_colibri");
+const connect = @import("connect_zig").connect;
+const rpc = @import("connect_zig").connect_colibri;
 const github = @import("github");
 const store_file = @import("store.zig");
 const room_file = @import("room.zig");

@@ -25,12 +25,7 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
         .imports = &.{
-            .{ .name = "connect", .module = connect_zig.module("connect") },
-            .{ .name = "connect_colibri", .module = connect_zig.module("connect_colibri") },
-            .{ .name = "server", .module = connect_zig.module("server") },
-            .{ .name = "client", .module = connect_zig.module("client") },
-            .{ .name = "tls", .module = connect_zig.module("tls") },
-            .{ .name = "colibri", .module = connect_zig.module("colibri") },
+            .{ .name = "connect_zig", .module = connect_zig.module("connect_zig") },
             .{ .name = "rotor", .module = rotor.module("rotor") },
             .{ .name = "test_identity", .module = identity },
         },

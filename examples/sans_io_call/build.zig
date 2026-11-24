@@ -16,15 +16,12 @@ pub fn build(b: *std.Build) void {
     // so Zig gives both requests one package, and `connect` is one module (decision 41).
     const connect_zig = b.dependency("connect_zig", .{ .target = target, .release = release, .rotor = true });
     const eliza = b.dependency("eliza", .{ .target = target, .release = release });
-    // With connect-zig's options, so its `platform` is the module connect-zig imports.
-    const stdx = b.dependency("stdx", .{ .target = target, .release = release });
     const exe = b.addExecutable(.{ .name = "sans_io_call", .root_module = b.createModule(.{
         .root_source_file = b.path("src/main.zig"),
         .target = target,
         .optimize = optimize,
         .imports = &.{
-            .{ .name = "platform", .module = stdx.module("platform") },
-            .{ .name = "connect", .module = connect_zig.module("connect") },
+            .{ .name = "connect_zig", .module = connect_zig.module("connect_zig") },
             .{ .name = "eliza", .module = eliza.module("eliza") },
         },
     }) });

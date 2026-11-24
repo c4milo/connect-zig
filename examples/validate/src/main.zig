@@ -15,11 +15,11 @@
 //! The client reads each refusal's `buf.validate.Violations` from the error's detail. Run it with
 //! `zig build run`.
 const std = @import("std");
-const proto = @import("protobuf");
-const connect = @import("connect");
-const client = @import("client");
+const proto = @import("connect_zig").protobuf;
+const connect = @import("connect_zig").connect;
+const client = @import("connect_zig").client;
 const harness = @import("harness");
-const pb = @import("buf_validate_validate");
+const pb = @import("connect_zig").buf_validate_validate;
 const signup = @import("signup");
 const constants = @import("constants.zig");
 const app_file = @import("app.zig");
