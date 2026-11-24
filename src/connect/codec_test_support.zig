@@ -10,9 +10,10 @@ const brotli = @import("brotli");
 const platform = @import("platform");
 const proto = @import("protobuf");
 const compression = @import("compression.zig");
+const Client = @import("client.zig").Client;
 
-/// The CPU features the tests run with: the build target's, which `Encoders` and `Decoders` take
-/// by default. The library takes a program's features and names the target's nowhere else, which
+/// The CPU features the tests run with: the build target's, which a test may name where a
+/// program names the features it detected. The library names the target's nowhere else, which
 /// the lint's rule `target-features` checks.
 pub const cpu_features = platform.CpuFeatures.target();
 /// The protobuf decoder the tests read what a server or a client wrote with.
@@ -34,6 +35,11 @@ pub threadlocal var brotli_window_decoder: BrotliWindowDecoder align(@alignOf(Br
 /// The decoders of the set, as a server or a client takes them.
 pub fn decoders() compression.Decoders {
     return .{ .gzip = &gzip_decoder, .zstd = &zstd_decoder };
+}
+
+/// A client with the set's codecs and the tests' CPU features.
+pub fn client() Client {
+    return .{ .cpu_features = cpu_features, .encoders = encoders(), .decoders = decoders() };
 }
 
 /// The encoders of the set that have a decoder in it, as a server or a client takes them.

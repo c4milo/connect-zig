@@ -45,6 +45,8 @@ const ConverseCall = driver_module.Call(Service.converse);
 /// each call until its round ends, so the calls live here.
 const State = struct {
     driver: Driver,
+    /// What the program's calls share: the CPU features it detects once, as it starts.
+    client: connect.Client,
     say_proto: SayCall,
     say_get: SayCall,
     introduce: IntroduceCall,
@@ -64,6 +66,7 @@ pub fn main(init: std.process.Init) !void {
         return error.OutOfMemory;
     const state: *State = @ptrCast(@alignCast(state_memory));
     state.driver.init(io);
+    state.client = .{ .cpu_features = .detect() };
     defer state.driver.deinit(io);
     var args = try init.minimal.args.iterateAllocator(init.arena.allocator());
     _ = args.skip();
@@ -114,12 +117,12 @@ fn port_of(io: Io, stderr: Io.File, line: []u8) !u16 {
 fn round(io: Io, state: *State, port: u16, protocols: client.Protocols, expected: client.Protocol) !void {
     const driver = &state.driver;
     try driver.begin(protocols, port);
-    try state.say_proto.init(&.{}, &.{.{ .sentence = service.said }});
-    try state.say_get.init(&.{ .codec = .json, .use_get = true }, &.{.{ .sentence = service.said }});
-    try state.introduce.init(&.{ .protocol = .grpc_web }, &.{.{ .name = service.name }});
-    try state.converse.init(&.{ .codec = .json }, &.{ .{ .sentence = service.conversation[0] }, .{ .sentence = service.conversation[1] } });
-    try state.say_grpc.init(&.{ .protocol = .grpc }, &.{.{ .sentence = service.said }});
-    try state.say_empty.init(&.{ .protocol = .grpc }, &.{.{}});
+    try state.say_proto.init(&state.client, &.{}, &.{.{ .sentence = service.said }});
+    try state.say_get.init(&state.client, &.{ .codec = .json, .use_get = true }, &.{.{ .sentence = service.said }});
+    try state.introduce.init(&state.client, &.{ .protocol = .grpc_web }, &.{.{ .name = service.name }});
+    try state.converse.init(&state.client, &.{ .codec = .json }, &.{ .{ .sentence = service.conversation[0] }, .{ .sentence = service.conversation[1] } });
+    try state.say_grpc.init(&state.client, &.{ .protocol = .grpc }, &.{.{ .sentence = service.said }});
+    try state.say_empty.init(&state.client, &.{ .protocol = .grpc }, &.{.{}});
     inline for (.{ "say_proto", "say_get", "introduce", "converse", "say_grpc", "say_empty" }) |field| {
         const call = &@field(state, field).call;
         try driver.request(&call.request, &call.response);

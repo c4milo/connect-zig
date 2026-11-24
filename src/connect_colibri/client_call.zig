@@ -67,6 +67,8 @@ pub fn ClientCall(comptime method: connect.Method, comptime call_options: Option
     return struct {
         const Self = @This();
 
+        /// A copy of the program's client: its CPU features and its codecs.
+        client: connect.Client,
         options: connect.client.Options,
         /// What the interceptors' hooks get first, from `init` until the call ends.
         context: call_options.Context,
@@ -103,14 +105,16 @@ pub fn ClientCall(comptime method: connect.Method, comptime call_options: Option
             }
         };
 
-        /// Builds the request of a call that sends `messages`. Each header name goes to colibri
-        /// in lowercase, the program's and its interceptors' included. The interceptors' hooks
-        /// get `context` first.
-        pub fn init(self: *Self, context: call_options.Context, options: *const connect.client.Options, messages: []const method.Request, buffers: *const Buffers) connect.client.RequestError!void {
+        /// Builds the request of a call that sends `messages`, with `shared`, the client the
+        /// program made once: its CPU features and its codecs (decision 51). The call copies
+        /// what it keeps of it. Each header name goes to colibri in lowercase, the program's
+        /// and its interceptors' included. The interceptors' hooks get `context` first.
+        pub fn init(self: *Self, shared: *const connect.Client, context: call_options.Context, options: *const connect.client.Options, messages: []const method.Request, buffers: *const Buffers) connect.client.RequestError!void {
             self.streamed = false;
+            self.client = shared.*;
             self.context = context;
             self.options = options.*;
-            self.call = try connect.client.request(method, options, messages, &buffers.request);
+            self.call = try shared.request(method, options, messages, &buffers.request);
             try run_on_request(interceptors, context, &self.call);
             self.request = .{
                 .method = self.call.http_method,
@@ -127,10 +131,10 @@ pub fn ClientCall(comptime method: connect.Method, comptime call_options: Option
 
         /// Builds the request of a client or bidirectional stream whose messages its `Sender`
         /// writes, and whose response arrives in pieces in `buffers.piece`.
-        pub fn init_stream(self: *Self, context: call_options.Context, options: *const connect.client.Options, buffers: *const Buffers) connect.client.RequestError!void {
+        pub fn init_stream(self: *Self, shared: *const connect.Client, context: call_options.Context, options: *const connect.client.Options, buffers: *const Buffers) connect.client.RequestError!void {
             comptime assert(method.stream_type == .client_stream or method.stream_type == .bidi_stream);
             assert(buffers.piece.len > 0);
-            try self.init(context, options, &.{}, buffers);
+            try self.init(shared, context, options, &.{}, buffers);
             self.streamed = true;
             // Colibri decision 153 ruling 7: both bodies go in pieces, and with no length stated
             // h2 and h3 end the request with its stream (RFC 9113 §8.1, RFC 9114 §4.1).
@@ -165,7 +169,7 @@ pub fn ClientCall(comptime method: connect.Method, comptime call_options: Option
         pub fn on_headers(self: *Self, storage: connect.client.Storage) void {
             assert(self.streamed and !self.incoming.headers_seen);
             self.incoming.headers_seen = true;
-            self.reader = connect.client.Response.init(self.call.speaks, &incoming_of(self, ""), &storage, &self.options.decoders, self.options.cpu_features);
+            self.reader = self.client.response(self.call.speaks, &incoming_of(self, ""), &storage);
             run_on_response(interceptors, self.context, &self.reader);
         }
 
@@ -246,12 +250,12 @@ fn read_response(self: anytype, storage: connect.client.Storage) connect.client.
     // reports it (colibri decision 153 ruling 7).
     assert(!self.streamed or self.response.result != .response);
     if (self.response.result != .response) {
-        var response = connect.client.Response.init(speaks, &.{ .status = connect.constants.protocol.status.ok, .headers = lookup, .body = "" }, &storage, &self.options.decoders, self.options.cpu_features);
+        var response = self.client.response(speaks, &.{ .status = connect.constants.protocol.status.ok, .headers = lookup, .body = "" }, &storage);
         response.done = true;
         response.failure = failure_of(&self.response);
         return response;
     }
-    return connect.client.Response.init(speaks, &incoming_of(self, self.response.body[0..self.response.body_len]), &storage, &self.options.decoders, self.options.cpu_features);
+    return self.client.response(speaks, &incoming_of(self, self.response.body[0..self.response.body_len]), &storage);
 }
 
 /// What `connect.client.Response` reads of a call's response: its status, its headers, and its

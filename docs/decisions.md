@@ -194,10 +194,10 @@ first. Cite an entry by number in code and commits ("decision 6").
     - The features go down a decode in its context, the value each mode carries to each level:
       a checked decode carries a pointer to them, a stored one its `Store`, which holds the
       pointer, and a shallow one nothing. `wire.Reader` stays as it was.
-    - `connect` makes a `Decoder` or an `Encoder` from the features of the call's server or
-      client options, which the program set once (decision 10 as amended). A test, a benchmark and a check program use the
-      build target's features. The lint's rule `target-features` refuses each other call of
-      `target()` in `src/protobuf`.
+    - `connect` makes a `Decoder` or an `Encoder` from the features of the call's server
+      options or of its `Client`, which the program set once (decisions 10 and 51). A test, a
+      benchmark and a check program use the build target's features. The lint's rule
+      `target-features` refuses each other call of `target()` in `src/protobuf`.
     - Counted by `tools/perf_check.sh` on 2026-11-24, built for x86-64-v3, against `main`
       counted the same day. Binary decode took 1.1% to 3.8% more instructions: a string of 32
       octets or more now hands stdx's check runtime features, which the compiler folded when
@@ -281,6 +281,8 @@ first. Cite an entry by number in code and commits ("decision 6").
       options are written for each call, 55 times in the examples, some in constant tables. A
       required field would state a CPU in each call. The client needs a value it sets once, as
       the server has its App, and that value is a new public type, which the owner rules first.
+      Decision 51 is that value, `connect.Client`: it took the default and the rule's one
+      passing line away the same day, and `Response.init` with them.
 
     Beaten: the fields in `Encoders` and `Decoders` with no default, which states the features
     twice and makes `codings` a field every App needs; a field `cpu_features` of `rpc.Codings`,
@@ -796,6 +798,40 @@ first. Cite an entry by number in code and commits ("decision 6").
     Beaten: a copy of the body into the call's state, with a new `RouteOptions.body_bytes` to
     size it, which cost the same within 0.7% and added a public option; and a function route for
     each unary method, which holds no state for the call.
+
+51. **A program's calls share one `connect.Client`, which holds its CPU features and its
+    codecs.** Ruled by the owner on 2026-11-24
+    (https://github.com/c4milo/connect-zig/issues/14): a program sets its CPU features as it
+    starts and uses them from then on, and no library names the build target's in their place.
+    - `connect.Client` holds `cpu_features`, with no default, and `encoders` and `decoders`,
+      which hold no codec by default. A program makes one as it starts:
+      `const calls: connect.Client = .{ .cpu_features = .detect() };`.
+    - The client makes each call. `request` builds a request, `write_message` writes one
+      message of a streamed request, and `response` starts the read of a response. Each is a
+      declaration alias of a function in `client_call.zig` or `client_response.zig`, so each
+      file stays under 500 lines.
+    - `connect.client.Options` holds what differs from call to call: the protocol, the codec,
+      the timeout, the choice of a GET, the request's coding and its floor, and the headers.
+      Each field has a default. A table of options stays constant data, and `&.{}` is a call
+      with the defaults.
+    - `connect_colibri.ClientCall.init` and `init_stream` take the client as their first
+      argument. The call keeps a copy of it, as an `init` of colibri copies what it keeps of
+      a pointer it takes (colibri decision 158 ruling 2). So a program's client may change or
+      end before its calls do.
+    - `connect.client.request`, `connect.client.write_message`, and
+      `connect.client.Response.init` are gone, and `Options` holds no `encoders`, `decoders`,
+      or `cpu_features`.
+    - No type of the library holds a default of the build target's features. The rule
+      `target-features` passes the test-support files alone.
+
+    Beaten: a required `cpu_features` in each call's `Options`, which states a CPU in each of
+    the examples' 55 calls, and makes a constant table of options read a value of the run;
+    the default of the build target's features, which the owner's ruling refuses, and which a
+    program built for a generic CPU keeps without a warning; the features of the call's
+    `Context`, as a route reads its App's, which a call with no interceptor does not have
+    (the decision 44 of this section), and which a program on `connect` alone has no place
+    for; and a pointer to the client in each call, which saves a copy of a few words and
+    makes each call depend on how long the client lives.
 
 ## Validation
 

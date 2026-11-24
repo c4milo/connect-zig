@@ -53,9 +53,9 @@ pub fn Call(comptime method: connect.Method) type {
         call: rpc.ClientCall(method, .{}),
         buffers: CallBuffers,
 
-        /// Builds a call that sends `messages` whole.
-        pub fn init(self: *Self, call_options: *const connect.client.Options, messages: []const method.Request) !void {
-            try self.call.init({}, call_options, messages, &CallBuffers.of(&self.buffers));
+        /// Builds a call that sends `messages` whole, with `shared`, the program's client.
+        pub fn init(self: *Self, shared: *const connect.Client, call_options: *const connect.client.Options, messages: []const method.Request) !void {
+            try self.call.init(shared, {}, call_options, messages, &CallBuffers.of(&self.buffers));
         }
     };
 }

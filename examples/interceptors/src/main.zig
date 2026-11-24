@@ -76,6 +76,8 @@ const Anonymous = harness.Call(WhoamiService.whoami, .{ .interceptors = &.{ Log,
 /// each call until its round ends, so the calls live here.
 const State = struct {
     app: App,
+    /// What the program's calls share: the CPU features it detected (decision 51).
+    client: connect.Client,
     rounds: harness.Rounds(App, Router),
     /// What the client's `Count` counted, across both rounds.
     tally: Tally,
@@ -92,6 +94,8 @@ pub fn main(init: std.process.Init) !void {
     const state: *State = @ptrCast(@alignCast(state_memory));
     // The program detects the CPU's features once, as it starts.
     state.app = .{ .cpu_features = .detect() };
+    // One client for every call, with the CPU features the program detected.
+    state.client = .{ .cpu_features = state.app.cpu_features };
     state.tally = .{};
     try state.rounds.init(&state.app);
     defer state.rounds.deinit();
@@ -110,9 +114,9 @@ fn round(state: *State, protocols: client.Protocols, expected: client.Protocol) 
     const tally_before = state.tally;
     const rounds = &state.rounds;
     try rounds.begin(protocols);
-    try state.signed_post.init(&state.tally, &.{}, &.{.{}});
-    try state.signed_get.init(&state.tally, &.{ .codec = .json, .use_get = true }, &.{.{}});
-    try state.anonymous.init(&state.tally, &.{ .protocol = .grpc_web }, &.{.{}});
+    try state.signed_post.init(&state.client, &state.tally, &.{}, &.{.{}});
+    try state.signed_get.init(&state.client, &state.tally, &.{ .codec = .json, .use_get = true }, &.{.{}});
+    try state.anonymous.init(&state.client, &state.tally, &.{ .protocol = .grpc_web }, &.{.{}});
     inline for (.{ "signed_post", "signed_get", "anonymous" }) |field| {
         const call = &@field(state, field).call;
         try rounds.request(&call.request, &call.response);

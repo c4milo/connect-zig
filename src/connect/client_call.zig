@@ -2,7 +2,7 @@
 //! PROTOCOL-HTTP2.md; PROTOCOL-WEB.md). Every octet goes into storage the caller owns.
 const std = @import("std");
 const assert = std.debug.assert;
-const platform = @import("platform");
+const Client = @import("client.zig").Client;
 const protocol = @import("protocol.zig");
 const compression = @import("compression.zig");
 const envelope = @import("envelope.zig");
@@ -17,6 +17,7 @@ const Protocol = protocol.Protocol;
 const Codec = protocol.Codec;
 const Coding = compression.Coding;
 
+/// What one call chooses. What the program's calls share is in `Client`.
 pub const Options = struct {
     protocol: Protocol = .connect,
     codec: Codec = .proto,
@@ -24,23 +25,14 @@ pub const Options = struct {
     timeout_ns: ?u64 = null,
     /// Send a unary call of a NO_SIDE_EFFECTS method as a GET (Connect protocol, "Unary-Get-Request").
     use_get: bool = false,
-    /// The coding each request message goes in, which `encoders` must write; identity sends
-    /// them as they are.
+    /// The coding each request message goes in, which the client's `encoders` must write;
+    /// identity sends them as they are.
     request_coding: Coding = .identity,
     /// The shortest request message that goes in `request_coding`; a shorter one goes as it is.
     /// 0 compresses every message, as connect-go does (decision 22).
     compress_len_min: usize = 0,
-    encoders: compression.Encoders = .{},
-    /// What the client decompresses, which it names in its accept header.
-    decoders: compression.Decoders = .{},
     /// Headers of the program's own, sent with the request: at most `extra_headers_max`.
     headers: []const Header = &.{},
-    /// The CPU features the client writes each request and reads each response with: the
-    /// program's, which it detects once, as it starts, with stdx's `platform.CpuFeatures.detect`.
-    /// The default is the build target's, the one such default left in the library: a client's
-    /// options are written for each call, and the value a client sets once is not designed yet
-    /// (decision 10 as amended, https://github.com/c4milo/connect-zig/issues/14).
-    cpu_features: platform.CpuFeatures = .target(),
 };
 
 pub const Buffers = struct {
@@ -94,25 +86,26 @@ fn speaks_of(comptime method: method_file.Method, options: Options) protocol.Spe
 }
 
 /// Builds the request of a call of `method` that sends `messages`: one for a unary or a server
-/// stream, any number for a client or bidirectional stream (decision 12).
-pub fn request(comptime method: method_file.Method, options: *const Options, messages: []const method.Request, buffers: *const Buffers) Error!Request {
+/// stream, any number for a client or bidirectional stream (decision 12). `Client.request` is
+/// this function.
+pub fn request(client: *const Client, comptime method: method_file.Method, options: *const Options, messages: []const method.Request, buffers: *const Buffers) Error!Request {
     const single = method.stream_type == .unary or method.stream_type == .server_stream;
     assert(!single or messages.len == 1);
-    assert(options.encoders.writes(options.request_coding));
+    assert(client.encoders.writes(options.request_coding));
     const speaks = speaks_of(method, options.*);
     const get_allowed = method.stream_type == .unary and method.idempotency == .no_side_effects;
-    if (options.use_get and options.protocol == .connect and get_allowed) return request_get(method, options.*, &messages[0], buffers.*);
+    if (options.use_get and options.protocol == .connect and get_allowed) return request_get(client, method, options.*, &messages[0], buffers.*);
     var result: Request = .{ .speaks = speaks, .http_method = "POST", .target = comptime method.path(), .body = "" };
     var compressed_any = false;
     var len: usize = 0;
     for (messages) |*message| {
-        const placed = try place(method.Request, speaks, options.*, message, buffers.body[len..], buffers.scratch.work);
+        const placed = try place(client, method.Request, speaks, options.*, message, buffers.body[len..], buffers.scratch.work);
         compressed_any = compressed_any or placed.compressed;
         len += placed.len;
     }
     result.body = buffers.body[0..len];
     result.add("content-type", protocol.content_type(speaks));
-    try add_protocol_headers(&result, speaks, options.*, compressed_any, buffers.values);
+    try add_protocol_headers(&result, speaks, client, options.*, compressed_any, buffers.values);
     try add_extra_headers(&result, options.headers);
     return result;
 }
@@ -120,11 +113,11 @@ pub fn request(comptime method: method_file.Method, options: *const Options, mes
 /// Writes one message of a streamed request into `room`, in its envelope, and returns its octets
 /// (Connect protocol, "Streaming-Request"; PROTOCOL-HTTP2.md, "Length-Prefixed-Message"). The
 /// request `request` built with no message holds the headers; each message then goes out as it
-/// is written. gzip compresses through `work`.
-pub fn write_message(comptime T: type, built: *const Request, options: *const Options, message: *const T, room: []u8, work: []u8) Error!usize {
+/// is written. gzip compresses through `work`. `Client.write_message` is this function.
+pub fn write_message(client: *const Client, comptime T: type, built: *const Request, options: *const Options, message: *const T, room: []u8, work: []u8) Error!usize {
     assert(built.speaks.enveloped);
     assert(built.body.len == 0);
-    const placed = try place(T, built.speaks, options.*, message, room, work);
+    const placed = try place(client, T, built.speaks, options.*, message, room, work);
     return placed.len;
 }
 
@@ -136,11 +129,11 @@ fn add_extra_headers(result: *Request, headers: []const Header) error{TooManyHea
 /// Writes one message into the body: bare for Connect unary, else in an envelope. It is encoded
 /// in place, after room for its prefix, so it is not copied from scratch storage; a compressed
 /// message goes into `work` and is copied back.
-fn place(comptime T: type, speaks: protocol.Speaks, options: Options, message: *const T, room: []u8, work: []u8) Error!struct { len: usize, compressed: bool } {
+fn place(client: *const Client, comptime T: type, speaks: protocol.Speaks, options: Options, message: *const T, room: []u8, work: []u8) Error!struct { len: usize, compressed: bool } {
     const prefix_len: usize = if (speaks.enveloped) flag_prefix_len else 0;
     if (room.len < prefix_len) return error.NoSpaceLeft;
-    const encoded = try message_codec.encode(T, options.codec, message, room[prefix_len..], options.cpu_features);
-    const result = try message_codec.compress_request(options.request_coding, &options.encoders, encoded, work, options.compress_len_min, options.cpu_features);
+    const encoded = try message_codec.encode(T, options.codec, message, room[prefix_len..], client.cpu_features);
+    const result = try message_codec.compress_request(options.request_coding, &client.encoders, encoded, work, options.compress_len_min, client.cpu_features);
     // A coding that cannot shrink the message makes it longer than the room it was encoded in.
     if (result.octets.len > room.len - prefix_len) return error.NoSpaceLeft;
     if (result.compressed) @memcpy(room[prefix_len..][0..result.octets.len], result.octets);
@@ -151,9 +144,9 @@ fn place(comptime T: type, speaks: protocol.Speaks, options: Options, message: *
 /// The octets of an envelope's prefix: its flags and its length.
 const flag_prefix_len = constants.protocol.envelope_prefix_len;
 
-fn add_protocol_headers(result: *Request, speaks: protocol.Speaks, options: Options, compressed: bool, values: []u8) error{NoSpaceLeft}!void {
+fn add_protocol_headers(result: *Request, speaks: protocol.Speaks, client: *const Client, options: Options, compressed: bool, values: []u8) error{NoSpaceLeft}!void {
     if (values.len < compression.accept_list_len_max + constants.protocol.connect_timeout_digits_max) return error.NoSpaceLeft;
-    const accept = options.decoders.accept_list(values[0..compression.accept_list_len_max]);
+    const accept = client.decoders.accept_list(values[0..compression.accept_list_len_max]);
     const timeout_room = values[compression.accept_list_len_max..][0..constants.protocol.connect_timeout_digits_max];
     switch (speaks.protocol) {
         .connect => add_connect_headers(result, speaks, options, compressed, accept, timeout_room),
@@ -182,18 +175,18 @@ fn add_grpc_headers(result: *Request, speaks: protocol.Speaks, options: Options,
     if (options.timeout_ns) |nanos| result.add("grpc-timeout", timeout.format_grpc(nanos, grpc_room));
 }
 
-fn request_get(comptime method: method_file.Method, options: Options, message: *const method.Request, buffers: Buffers) Error!Request {
-    const encoded = try message_codec.encode(method.Request, options.codec, message, buffers.scratch.message, options.cpu_features);
-    const packed_message = try message_codec.compress_request(options.request_coding, &options.encoders, encoded, buffers.scratch.work, options.compress_len_min, options.cpu_features);
+fn request_get(client: *const Client, comptime method: method_file.Method, options: Options, message: *const method.Request, buffers: Buffers) Error!Request {
+    const encoded = try message_codec.encode(method.Request, options.codec, message, buffers.scratch.message, client.cpu_features);
+    const packed_message = try message_codec.compress_request(options.request_coding, &client.encoders, encoded, buffers.scratch.work, options.compress_len_min, client.cpu_features);
     const path = comptime method.path();
     if (buffers.body.len < path.len + 1) return error.NoSpaceLeft;
     @memcpy(buffers.body[0..path.len], path);
     buffers.body[path.len] = '?';
     const coding: Coding = if (packed_message.compressed) options.request_coding else .identity;
-    const query = try get.write_query(options.codec, coding, packed_message.octets, buffers.body[path.len + 1 ..], options.cpu_features);
+    const query = try get.write_query(options.codec, coding, packed_message.octets, buffers.body[path.len + 1 ..], client.cpu_features);
     var result: Request = .{ .speaks = speaks_of(method, options), .http_method = "GET", .target = buffers.body[0 .. path.len + 1 + query.len], .body = "" };
     if (buffers.values.len < compression.accept_list_len_max) return error.NoSpaceLeft;
-    const accept = options.decoders.accept_list(buffers.values[0..compression.accept_list_len_max]);
+    const accept = client.decoders.accept_list(buffers.values[0..compression.accept_list_len_max]);
     if (accept.len != 0) result.add("accept-encoding", accept);
     try add_extra_headers(&result, options.headers);
     return result;
@@ -201,6 +194,8 @@ fn request_get(comptime method: method_file.Method, options: Options, message: *
 
 const testing = std.testing;
 const test_cpu_features = @import("codec_test_support.zig").cpu_features;
+/// A client with no codec, as most tests need.
+const test_client: Client = .{ .cpu_features = test_cpu_features };
 const proto = @import("protobuf");
 
 const Note = struct {
@@ -218,7 +213,7 @@ const find = @import("rpc_error.zig").find_header;
 
 test "a Connect unary request is the bare message with the protocol's headers" {
     var buffers: [4][128]u8 = undefined;
-    const call = try request(say, &.{ .timeout_ns = 1_500_000, .cpu_features = test_cpu_features }, &.{.{ .text = "hi" }}, &.{
+    const call = try request(&test_client, say, &.{ .timeout_ns = 1_500_000 }, &.{.{ .text = "hi" }}, &.{
         .body = &buffers[0],
         .scratch = .{ .message = &buffers[1], .work = &buffers[2], .tokens = &.{} },
         .values = &buffers[3],
@@ -229,7 +224,7 @@ test "a Connect unary request is the bare message with the protocol's headers" {
     try testing.expectEqualSlices(u8, &.{ 0x0a, 2, 'h', 'i' }, call.body);
     try testing.expectEqualStrings("application/proto", find(call.headers(), "content-type").?);
     try testing.expectEqualStrings("2", find(call.headers(), "connect-timeout-ms").?);
-    const with_token = try request(say, &.{ .headers = &.{.{ .name = "authorization", .value = "Bearer t" }}, .cpu_features = test_cpu_features }, &.{.{}}, &.{
+    const with_token = try request(&test_client, say, &.{ .headers = &.{.{ .name = "authorization", .value = "Bearer t" }} }, &.{.{}}, &.{
         .body = &buffers[0],
         .scratch = .{ .message = &buffers[1], .work = &buffers[2], .tokens = &.{} },
         .values = &buffers[3],
@@ -240,10 +235,10 @@ test "a Connect unary request is the bare message with the protocol's headers" {
 test "a client stream over gRPC-Web is envelopes, and a GET carries its message in the query" {
     var buffers: [4][128]u8 = undefined;
     const scratch: message_codec.Scratch = .{ .message = &buffers[1], .work = &buffers[2], .tokens = &.{} };
-    const stream = try request(upload, &.{ .protocol = .grpc_web, .cpu_features = test_cpu_features }, &.{ .{ .text = "a" }, .{} }, &.{ .body = &buffers[0], .scratch = scratch, .values = &buffers[3] });
+    const stream = try request(&test_client, upload, &.{ .protocol = .grpc_web }, &.{ .{ .text = "a" }, .{} }, &.{ .body = &buffers[0], .scratch = scratch, .values = &buffers[3] });
     try testing.expectEqualSlices(u8, &.{ 0, 0, 0, 0, 3, 0x0a, 1, 'a', 0, 0, 0, 0, 0 }, stream.body);
     try testing.expectEqualStrings("1", find(stream.headers(), "x-grpc-web").?);
-    const fetch = try request(say, &.{ .use_get = true, .codec = .json, .cpu_features = test_cpu_features }, &.{.{ .text = "x" }}, &.{ .body = &buffers[0], .scratch = scratch, .values = &buffers[3] });
+    const fetch = try request(&test_client, say, &.{ .use_get = true, .codec = .json }, &.{.{ .text = "x" }}, &.{ .body = &buffers[0], .scratch = scratch, .values = &buffers[3] });
     try testing.expectEqualStrings("GET", fetch.http_method);
     try testing.expectEqualStrings("/test.Svc/Say?connect=v1&base64=1&encoding=json&message=eyJ0ZXh0IjoieCJ9", fetch.target);
 }
@@ -257,7 +252,7 @@ test "a request carries the conformance runner's seven headers and a case's besi
         .{ .name = "x-expect-tls", .value = "false" },        .{ .name = "x-conformance-test", .value = "Value1" },
         .{ .name = "x-conformance-test", .value = "Value2" },
     };
-    const call = try request(say, &.{ .headers = &extra, .cpu_features = test_cpu_features }, &.{.{}}, &.{
+    const call = try request(&test_client, say, &.{ .headers = &extra }, &.{.{}}, &.{
         .body = &buffers[0],
         .scratch = .{ .message = &buffers[1], .work = &buffers[2], .tokens = &.{} },
         .values = &buffers[3],
@@ -270,26 +265,84 @@ const codecs = @import("codec_test_support.zig");
 
 test "a client asked for a coding compresses even a short message, and names the coding" {
     var buffers: [4][128]u8 = undefined;
-    const encoders: compression.Encoders = .{ .gzip = &codecs.gzip_encoder };
+    const gzip_client: Client = .{ .cpu_features = test_cpu_features, .encoders = .{ .gzip = &codecs.gzip_encoder } };
     const call_buffers: Buffers = .{
         .body = &buffers[0],
         .scratch = .{ .message = &buffers[1], .work = &buffers[2], .tokens = &.{} },
         .values = &buffers[3],
     };
-    const unary = try request(say, &.{ .request_coding = .gzip, .encoders = encoders, .cpu_features = test_cpu_features }, &.{.{ .text = "hi" }}, &call_buffers);
+    const unary = try request(&gzip_client, say, &.{ .request_coding = .gzip }, &.{.{ .text = "hi" }}, &call_buffers);
     try testing.expectEqualStrings("gzip", find(unary.headers(), "content-encoding").?);
     // RFC 1952 §2.3.1: a gzip member starts with ID1 and ID2.
     try testing.expectEqualSlices(u8, &.{ 0x1f, 0x8b }, unary.body[0..2]);
-    const stream = try request(upload, &.{ .protocol = .grpc, .request_coding = .gzip, .encoders = encoders, .cpu_features = test_cpu_features }, &.{.{ .text = "hi" }}, &call_buffers);
+    const stream = try request(&gzip_client, upload, &.{ .protocol = .grpc, .request_coding = .gzip }, &.{.{ .text = "hi" }}, &call_buffers);
     try testing.expectEqual(@as(u8, 1), stream.body[0]);
     // Below the program's floor the message goes as it is, and a Connect unary names no coding.
-    const floored = try request(say, &.{ .request_coding = .gzip, .encoders = encoders, .compress_len_min = 5, .cpu_features = test_cpu_features }, &.{.{ .text = "hi" }}, &call_buffers);
+    const floored = try request(&gzip_client, say, &.{ .request_coding = .gzip, .compress_len_min = 5 }, &.{.{ .text = "hi" }}, &call_buffers);
     try testing.expectEqual(@as(?[]const u8, null), find(floored.headers(), "content-encoding"));
     try testing.expectEqualSlices(u8, &.{ 0x0a, 2, 'h', 'i' }, floored.body);
     // Connect protocol, "Unary-Get-Request": a GET names its message's coding in its query.
-    const fetch = try request(say, &.{ .use_get = true, .request_coding = .gzip, .encoders = encoders, .cpu_features = test_cpu_features }, &.{.{ .text = "hi" }}, &call_buffers);
+    const fetch = try request(&gzip_client, say, &.{ .use_get = true, .request_coding = .gzip }, &.{.{ .text = "hi" }}, &call_buffers);
     try testing.expect(std.mem.indexOf(u8, fetch.target, "compression=gzip") != null);
     // gzip makes the message longer than the body's room, which then refuses it.
     const short_room: Buffers = .{ .body = buffers[0][0..8], .scratch = call_buffers.scratch, .values = &buffers[3] };
-    try testing.expectError(error.NoSpaceLeft, request(say, &.{ .request_coding = .gzip, .encoders = encoders, .cpu_features = test_cpu_features }, &.{.{ .text = "hi" }}, &short_room));
+    try testing.expectError(error.NoSpaceLeft, request(&gzip_client, say, &.{ .request_coding = .gzip }, &.{.{ .text = "hi" }}, &short_room));
+}
+
+const platform = @import("platform");
+
+/// Features that differ from `cpu_features`. An encoder that starts with them shows, by its
+/// path, whether a request started it again.
+fn other_than(cpu_features: platform.CpuFeatures) platform.CpuFeatures {
+    return if (std.meta.eql(cpu_features, platform.CpuFeatures.none())) test_cpu_features else .none();
+}
+
+test "a client writes each request with its own CPU features" {
+    var buffers: [4][128]u8 = undefined;
+    const call_buffers: Buffers = .{
+        .body = &buffers[0],
+        .scratch = .{ .message = &buffers[1], .work = &buffers[2], .tokens = &.{} },
+        .values = &buffers[3],
+    };
+    var reference: compression.GzipDecoder = undefined;
+    // The CRC-32 path the gzip encoder took shows the features it ran with. Where the build
+    // target holds a carry-less multiply, the two clients take two paths.
+    for ([_]platform.CpuFeatures{ .none(), test_cpu_features }) |cpu_features| {
+        const client: Client = .{ .cpu_features = cpu_features, .encoders = .{ .gzip = &codecs.gzip_encoder } };
+        reference.init(cpu_features);
+        // A POST, then a GET, then a streamed message.
+        for ([_]Options{ .{ .request_coding = .gzip }, .{ .request_coding = .gzip, .use_get = true } }) |options| {
+            codecs.gzip_encoder.init(other_than(cpu_features));
+            _ = try client.request(say, &options, &.{.{ .text = "hi" }}, &call_buffers);
+            try testing.expectEqual(reference.crc32_path, codecs.gzip_encoder.crc32_path);
+        }
+        const streamed: Options = .{ .protocol = .grpc, .request_coding = .gzip };
+        const stream = try client.request(upload, &streamed, &.{}, &call_buffers);
+        codecs.gzip_encoder.init(other_than(cpu_features));
+        _ = try client.write_message(Note, &stream, &streamed, &.{ .text = "hi" }, &buffers[1], &buffers[2]);
+        try testing.expectEqual(reference.crc32_path, codecs.gzip_encoder.crc32_path);
+    }
+}
+
+test "a request names the codings its client's decoders read, and a client with none names none" {
+    var buffers: [4][128]u8 = undefined;
+    const call_buffers: Buffers = .{
+        .body = &buffers[0],
+        .scratch = .{ .message = &buffers[1], .work = &buffers[2], .tokens = &.{} },
+        .values = &buffers[3],
+    };
+    const reads_gzip: Client = .{ .cpu_features = test_cpu_features, .decoders = .{ .gzip = &codecs.gzip_decoder } };
+    const post = try reads_gzip.request(say, &.{}, &.{.{}}, &call_buffers);
+    try testing.expectEqualStrings("gzip", find(post.headers(), "accept-encoding").?);
+    // Connect protocol, "Unary-Get-Request": a GET names them as a POST does.
+    const fetch = try reads_gzip.request(say, &.{ .use_get = true }, &.{.{}}, &call_buffers);
+    try testing.expectEqualStrings("GET", fetch.http_method);
+    try testing.expectEqualStrings("gzip", find(fetch.headers(), "accept-encoding").?);
+    // PROTOCOL-HTTP2.md, "Message-Accept-Encoding": gRPC names them in its own header.
+    const grpc = try reads_gzip.request(say, &.{ .protocol = .grpc }, &.{.{}}, &call_buffers);
+    try testing.expectEqualStrings("gzip", find(grpc.headers(), "grpc-accept-encoding").?);
+    for ([_]Options{ .{}, .{ .use_get = true } }) |options| {
+        const plain = try test_client.request(say, &options, &.{.{}}, &call_buffers);
+        try testing.expectEqual(@as(?[]const u8, null), find(plain.headers(), "accept-encoding"));
+    }
 }

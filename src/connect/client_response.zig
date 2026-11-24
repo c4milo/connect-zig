@@ -7,6 +7,7 @@
 const std = @import("std");
 const assert = std.debug.assert;
 const platform = @import("platform");
+const Client = @import("client.zig").Client;
 const protocol = @import("protocol.zig");
 const compression = @import("compression.zig");
 const envelope = @import("envelope.zig");
@@ -48,50 +49,6 @@ pub const Error = message_codec.DecodeError || compression.Error || envelope.Err
 };
 
 pub const Response = struct {
-    /// Starts reading the response of a call that spoke `speaks`, with `cpu_features`, the CPU
-    /// features of the client's `Options`.
-    pub fn init(speaks: protocol.Speaks, incoming: *const Incoming, storage: *const Storage, decoders: *const compression.Decoders, cpu_features: platform.CpuFeatures) Response {
-        var response: Response = .{
-            .speaks = speaks,
-            .incoming = incoming.*,
-            .storage = storage.*,
-            .decoders = decoders.*,
-            .cpu_features = cpu_features,
-            .coding = .identity,
-            .reader = .{ .body = incoming.body, .payload_len_max = storage.scratch.message.len },
-            .streaming = incoming.streamed,
-        };
-        // Only an enveloped stream arrives in pieces: a bare message is the whole body.
-        assert(!incoming.streamed or (speaks.enveloped and incoming.body.len == 0));
-        if (incoming.status != constants.protocol.status.ok) {
-            response.done = true;
-            response.failure = http_failure(speaks, incoming.*, storage.*, decoders.*, cpu_features);
-            return response;
-        }
-        response.body_seen = incoming.body.len > 0;
-        if (head_failure(speaks, incoming)) |failure| {
-            response.done = true;
-            response.failure = failure;
-            return response;
-        }
-        const coding_name = coding_header(speaks);
-        if (incoming.headers.find(coding_name)) |name| {
-            response.coding = compression.Coding.from_name(name) orelse {
-                response.done = true;
-                response.failure = .{ .code = .internal, .message = "unknown response compression" };
-                return response;
-            };
-        }
-        // PROTOCOL-HTTP2.md, "Responses": Trailers-Only puts the status in the head, and holds
-        // no body and no trailers. The head's status of a response with either is ignored. A
-        // streamed body may still come, so its head's status waits for the body's end.
-        if (speaks.protocol != .connect and incoming.headers.find("grpc-status") != null) {
-            response.head_status = true;
-            if (!incoming.streamed and response.trailers_only()) response.read_head_status();
-        }
-        return response;
-    }
-
     /// Whether the response is Trailers-Only, once its body ended: its head named a status, and
     /// neither a body nor trailers with a status followed (PROTOCOL-HTTP2.md, "Responses").
     fn trailers_only(response: *const Response) bool {
@@ -302,6 +259,50 @@ fn head_failure(speaks: protocol.Speaks, incoming: *const Incoming) ?RpcError {
 /// The octets of an envelope's prefix: its flags and its length.
 const flag_prefix_len = constants.protocol.envelope_prefix_len;
 
+/// Starts the read of the response of a call that spoke `speaks`, with the client's decoders and
+/// CPU features. `Client.response` is this function.
+pub fn start(client: *const Client, speaks: protocol.Speaks, incoming: *const Incoming, storage: *const Storage) Response {
+    var response: Response = .{
+        .speaks = speaks,
+        .incoming = incoming.*,
+        .storage = storage.*,
+        .decoders = client.decoders,
+        .cpu_features = client.cpu_features,
+        .coding = .identity,
+        .reader = .{ .body = incoming.body, .payload_len_max = storage.scratch.message.len },
+        .streaming = incoming.streamed,
+    };
+    // Only an enveloped stream arrives in pieces: a bare message is the whole body.
+    assert(!incoming.streamed or (speaks.enveloped and incoming.body.len == 0));
+    if (incoming.status != constants.protocol.status.ok) {
+        response.done = true;
+        response.failure = http_failure(speaks, incoming.*, storage.*, client.decoders, client.cpu_features);
+        return response;
+    }
+    response.body_seen = incoming.body.len > 0;
+    if (head_failure(speaks, incoming)) |failure| {
+        response.done = true;
+        response.failure = failure;
+        return response;
+    }
+    const coding_name = coding_header(speaks);
+    if (incoming.headers.find(coding_name)) |name| {
+        response.coding = compression.Coding.from_name(name) orelse {
+            response.done = true;
+            response.failure = .{ .code = .internal, .message = "unknown response compression" };
+            return response;
+        };
+    }
+    // PROTOCOL-HTTP2.md, "Responses": Trailers-Only puts the status in the head, and holds
+    // no body and no trailers. The head's status of a response with either is ignored. A
+    // streamed body may still come, so its head's status waits for the body's end.
+    if (speaks.protocol != .connect and incoming.headers.find("grpc-status") != null) {
+        response.head_status = true;
+        if (!incoming.streamed and response.trailers_only()) response.read_head_status();
+    }
+    return response;
+}
+
 fn status_storage(storage: Storage, cpu_features: platform.CpuFeatures) trailers.Storage {
     const half = storage.octets.len / constants.storage_halves;
     return .{ .message = storage.octets[0..half], .status = storage.octets[half..], .details = storage.details, .cpu_features = cpu_features };
@@ -364,9 +365,10 @@ test "a non-200 Connect response without a JSON body maps its status to a code" 
         .metadata = &metadata,
     };
     const lookup: Lookup = .{ .context = &buffers, .find_fn = Empty.find };
-    // The response reads with the CPU features its caller states.
+    // The response reads with the CPU features of its client.
     const program_features: platform.CpuFeatures = .{ .ssse3 = true, .bmi2 = true };
-    const response = Response.init(.{ .protocol = .connect, .codec = .proto, .enveloped = false }, &.{ .status = 503, .headers = lookup, .body = "busy" }, &storage, &.{}, program_features);
+    const client: Client = .{ .cpu_features = program_features };
+    const response = client.response(.{ .protocol = .connect, .codec = .proto, .enveloped = false }, &.{ .status = 503, .headers = lookup, .body = "busy" }, &storage);
     try std.testing.expectEqual(program_features, response.cpu_features);
     try std.testing.expectEqual(Code.unavailable, response.failure.?.code);
     try std.testing.expect(response.done);
@@ -409,7 +411,8 @@ fn streamed_response(room: *TestRoom, details: []rpc_error.Detail, metadata: []H
     };
     const lookup: Lookup = .{ .context = room, .find_fn = TestEmpty.find };
     const speaks: protocol.Speaks = .{ .protocol = .connect, .codec = .proto, .enveloped = true };
-    return Response.init(speaks, &.{ .status = constants.protocol.status.ok, .headers = lookup, .body = "", .streamed = true }, &storage, &.{}, test_cpu_features);
+    const client: Client = .{ .cpu_features = test_cpu_features };
+    return client.response(speaks, &.{ .status = constants.protocol.status.ok, .headers = lookup, .body = "", .streamed = true }, &storage);
 }
 
 test "a streamed response reads each whole envelope as it arrives, and keeps a partial one" {

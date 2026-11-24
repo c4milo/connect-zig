@@ -30,6 +30,8 @@ pub const Cancel = union(enum) {
 
 /// What a case asks of its call.
 pub const Plan = struct {
+    /// The program's client: its CPU features and its coders.
+    client: connect.Client,
     options: connect.client.Options,
     protocols: client.Protocols,
     cancel: Cancel,
@@ -67,7 +69,7 @@ pub const Memory = struct {
 };
 
 /// Reads the plan of `request`. The plan points into `memory`.
-pub fn plan_of(request: *const Request, codings: *const Codings, memory: *Memory) (Refusal || proto.Error)!Plan {
+pub fn plan_of(request: *const Request, shared: *const connect.Client, memory: *Memory) (Refusal || proto.Error)!Plan {
     // docs/testing_clients.md: raw_request is for the reference client alone.
     if (request.raw_request != null) return error.RawRequestUnsupported;
     // client_compat.proto: client_tls_creds asks for a client certificate, which the client
@@ -76,6 +78,7 @@ pub fn plan_of(request: *const Request, codings: *const Codings, memory: *Memory
     const protocol = try protocol_of(request.protocol);
     const coding = try coding_of(request.compression);
     return .{
+        .client = shared.*,
         .options = .{
             .protocol = protocol,
             .codec = try codec_of(request.codec),
@@ -83,8 +86,6 @@ pub fn plan_of(request: *const Request, codings: *const Codings, memory: *Memory
             // client_compat.proto: GET applies when the protocol is Connect.
             .use_get = request.use_get_http_method and protocol == .connect,
             .request_coding = coding,
-            .encoders = codings.encoders,
-            .decoders = codings.decoders,
             .headers = try headers_of(request, &memory.headers),
         },
         .protocols = try protocols_of(request.http_version),
@@ -117,11 +118,6 @@ const cpu: tls.Cpu = .{
 };
 
 /// The codings the client compresses and decompresses with.
-pub const Codings = struct {
-    encoders: connect.Encoders,
-    decoders: connect.Decoders,
-};
-
 fn timeout_ns_of(request: *const Request) ?u64 {
     const timeout_ms = request.timeout_ms orelse return null;
     return @as(u64, timeout_ms) * constants.nanos_per_milli;

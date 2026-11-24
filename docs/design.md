@@ -2216,17 +2216,35 @@ ran on Linux x86-64 with Zig 0.16.0.
   - A program that asks stdx with a `.release` other than connect-zig's fails its build with
     "file exists in modules 'platform' and 'platform0'". The quickstart project showed both
     results, and docs/guide.md states the rule.
+- **A `Client` that a program's calls share** (decision 51;
+  https://github.com/c4milo/connect-zig/issues/14). Public names: `connect.Client` joins. Each
+  program that makes a call needs it: it holds the program's CPU features and its codecs, and
+  its calls are `request`, `write_message`, and `response`. `connect.client.request`,
+  `connect.client.write_message`, and `connect.client.Response.init` leave, and
+  `connect.client.Options` loses `encoders`, `decoders`, and `cpu_features`.
+  `connect_colibri.ClientCall.init` and `init_stream` take the client as their first argument.
+  Each example, the conformance client, and the interop client make one `Client` as they
+  start. No default of the build target's features is left, and the rule `target-features`
+  passes the test-support files alone.
+  - `zig build test` passed, with the examples, and each check program built.
+  - Mutations, 13, each `CAUGHT`. Against `zig build test-connect`, 8: a GET's message, and
+    a POST's or a stream's, each compressed with no features; a response that keeps no
+    features of its client, and one that keeps no decoder; an HTTP failure read with no
+    decoder; a POST, and a GET, that names no coding the client's decoders read; and `Client`
+    off the list of public names. Against `zig build test-connect-colibri`, 3: a call that
+    keeps nothing of its client, one that keeps no codec, and one that keeps no features.
+    Against `zig build lint`, 2: a `Client` with the build target's features as its default,
+    and the rule passing a field's default again.
+  - Two of the 13 first passed every test: the GET's message compressed with no features,
+    and the GET that names no coding. Both lines are older than this step. Two tests of
+    `client_call.zig` now hold them: the gzip encoder's CRC-32 path names the features each
+    kind of request took, and each kind of request names the client's codings.
 
 ### Work not done yet
 
 - A stream that waits for an event of the program once its request ended (colibri issue 130).
   colibri v0.16.0 left it out, as ruled on 2026-11-10. No release up to v0.17.0 holds it, and
   the issue is still open.
-- For a client, one statement of the CPU's features. A client's `Options.cpu_features` still
-  takes the build target's features by default (decision 10 as amended). A client's options are
-  written for each call, so the client needs a value it sets once, such as
-  `std.http.Client` is for its requests. That value is a new public type, and the owner rules
-  its form first (https://github.com/c4milo/connect-zig/issues/14).
 - For `oidc`, a measurement before any change: a client sends one token with each call, and
   the verifier checks its signature each time. If that cost shows in a server's profile, a
   verifier may keep the last tokens it took.

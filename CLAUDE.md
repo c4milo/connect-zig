@@ -106,9 +106,8 @@ confirm a test fails. Report `CAUGHT` or `NOT CAUGHT` per mutation in the commit
   the Python, Go, Rust, and JavaScript of `bench/` and `tools/` (decision 49). The rule state-fill
   is this tree's own: a program takes its `State` from `rawAlloc` (decision 48). So is
   target-features: `src/protobuf`, `src/connect`, `src/connect_colibri`, and `src/oidc` call no
-  `target()` for CPU features, but in their test-support files and the default of a client's
-  `Options` (decisions 10, 34 and 50). The rules read `conformance/` as they read `examples/`, and
-  each `gen/` as generated code; `conformance/proto` holds connectrpc's copy and
+  `target()` for CPU features, but in their test-support files (decisions 10, 34, 50, and 51).
+  The rules read `conformance/` as they read `examples/`, and each `gen/` as generated code; `conformance/proto` holds connectrpc's copy and
   protobuf's test protos, which denied-words skips, as it skips protovalidate's schemas in
   `src/protovalidate/proto` and `conformance/protovalidate`. `zig build test` also requires `.githooks/pre-push` to equal pepegrillo's
   hook (`zig build hook-check`).

@@ -30,7 +30,7 @@ pub fn send(comptime T: type, call: anytype, message: *const T) client_call.Send
     // RFC 9110 §8.6 and RFC 9113 §8.1: nothing follows the end of the content.
     if (call.outgoing.closed) return error.BodyEnded;
     const room = call.outgoing.space();
-    const len = connect.client.write_message(T, &call.call, &call.options, message, room, call.work) catch |failure| switch (failure) {
+    const len = call.client.write_message(T, &call.call, &call.options, message, room, call.work) catch |failure| switch (failure) {
         // The message fits once the pool gives the held piece back.
         error.NoSpaceLeft => return if (call.outgoing.holding) error.PieceHeld else error.NoSpaceLeft,
         else => |other| return other,

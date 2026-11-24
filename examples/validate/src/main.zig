@@ -47,6 +47,8 @@ const three_wrong: signup.RegisterRequest = .{ .email = "kid@example.com", .name
 /// each call until its round ends, so the calls live here.
 const State = struct {
     app: App,
+    /// What the program's calls share: the CPU features it detected (decision 51).
+    client: connect.Client,
     /// Decodes the detail of an error, with the CPU features the program detected once.
     protobuf_decoder: proto.Decoder,
     rounds: harness.Rounds(App, Router),
@@ -64,6 +66,8 @@ pub fn main(init: std.process.Init) !void {
         return error.OutOfMemory;
     const state: *State = @ptrCast(@alignCast(state_memory));
     state.app = .{ .cpu_features = .detect() };
+    // One client for every call, with the CPU features the program detected.
+    state.client = .{ .cpu_features = state.app.cpu_features };
     state.protobuf_decoder = .init(state.app.cpu_features);
     try state.rounds.init(&state.app);
     defer state.rounds.deinit();
@@ -79,11 +83,11 @@ fn round(state: *State, protocols: client.Protocols, expected: client.Protocol) 
     const accepted_before = state.app.signup.accepted;
     const rounds = &state.rounds;
     try rounds.begin(protocols);
-    try state.valid.init({}, &.{}, &.{ada});
-    try state.email.init({}, &.{ .codec = .json }, &.{wrong_email});
-    try state.three.init({}, &.{ .protocol = .grpc }, &.{three_wrong});
-    try state.many.init({}, &.{ .protocol = .grpc_web }, &.{ ada, grace });
-    try state.many_cut.init({}, &.{}, &.{ ada, wrong_email, grace });
+    try state.valid.init(&state.client, {}, &.{}, &.{ada});
+    try state.email.init(&state.client, {}, &.{ .codec = .json }, &.{wrong_email});
+    try state.three.init(&state.client, {}, &.{ .protocol = .grpc }, &.{three_wrong});
+    try state.many.init(&state.client, {}, &.{ .protocol = .grpc_web }, &.{ ada, grace });
+    try state.many_cut.init(&state.client, {}, &.{}, &.{ ada, wrong_email, grace });
     inline for (.{ "valid", "email", "three", "many", "many_cut" }) |field| {
         const call = &@field(state, field).call;
         try rounds.request(&call.request, &call.response);

@@ -224,11 +224,19 @@ h11 and h2 in cleartext and no h3, and needs no `tls_buffer`.
 
 ## 5. Call it
 
-A client call is a `connect_colibri.ClientCall(method, .{})`. It writes a request for colibri's
-`client.ConnectionPool` and reads the response the pool fills in:
+Your calls share one `connect.Client`. It holds the CPU features your program detected, and
+the codecs it placed in `.encoders` and `.decoders`, none by default. Make it once, as the
+program starts. A program that serves too gives it the features of its `App`:
 
 ```zig
-try say.init({}, &.{ .protocol = .grpc }, &.{.{ .sentence = "I feel tired" }}, &buffers);
+state.client = .{ .cpu_features = state.app.cpu_features };
+```
+
+A client call is a `connect_colibri.ClientCall(method, .{})`. It takes the client first, writes
+a request for colibri's `client.ConnectionPool`, and reads the response the pool fills in:
+
+```zig
+try say.init(&state.client, {}, &.{ .protocol = .grpc }, &.{.{ .sentence = "I feel tired" }}, &buffers);
 _ = try pool.request(&say.request, &say.response);
 // Once the pool reports the call finished:
 var response = say.read(storage);

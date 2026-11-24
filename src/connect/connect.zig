@@ -22,6 +22,7 @@ const files = struct {
     pub const server_head = @import("server_head.zig");
     pub const server_request = @import("server_request.zig");
     pub const server_reply = @import("server_reply.zig");
+    pub const client = @import("client.zig");
     pub const client_call = @import("client_call.zig");
     pub const client_response = @import("client_response.zig");
 };
@@ -77,11 +78,13 @@ pub const server = struct {
     pub const refusal_reply = files.server_reply.refusal_reply;
 };
 
-/// A client's side of a call: the request, and the reading of the response.
+/// What the calls of one program share: its CPU features and its codecs. A program makes one as
+/// it starts, and builds each request and reads each response with it (decision 51).
+pub const Client = files.client.Client;
+
+/// What a client's calls choose one by one, write and read. `Client` builds each request and
+/// starts the read of each response.
 pub const client = struct {
-    pub const request = files.client_call.request;
-    /// One message of a streamed request, in its envelope.
-    pub const write_message = files.client_call.write_message;
     pub const Options = files.client_call.Options;
     pub const Buffers = files.client_call.Buffers;
     pub const Request = files.client_call.Request;
@@ -179,7 +182,7 @@ test "the root exports the names a program calls" {
         "GzipDecoder", "ZstdDecoder", "BrotliDecoder", "Envelope",    "EnvelopeFlags", "EnvelopeReader",
         "EndStream",   "envelope",    "protocol",      "timeout",     "compression",   "error_json",
         "end_stream",  "trailers",    "get",           "status",      "Scratch",       "Lookup",
-        "server",      "client",
+        "server",      "client",      "Client",
     });
 }
 

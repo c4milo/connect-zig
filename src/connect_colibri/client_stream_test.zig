@@ -112,7 +112,7 @@ const Fixture = struct {
     metadata: [entries_max]connect.Header = undefined,
 
     fn start(fixture: *Fixture, options: *const connect.client.Options) !void {
-        try fixture.call.init_stream(&fixture.seen, options, &.{
+        try fixture.call.init_stream(&support.client, &fixture.seen, options, &.{
             .request = .{
                 .body = &fixture.request_body,
                 .scratch = .{ .message = &fixture.request_message, .work = &fixture.request_work, .tokens = &.{} },
@@ -158,7 +158,7 @@ const Fixture = struct {
 
 test "a streamed call hands each message as a piece, and the next waits for body_taken" {
     var fixture: Fixture = .{};
-    try fixture.start(&.{ .cpu_features = support.cpu_features });
+    try fixture.start(&.{});
     try testing.expect(fixture.pool.streamed.request and fixture.pool.streamed.response);
     // The interceptors saw the request before any message.
     try testing.expectEqual(@as(usize, 0), fixture.seen.request_body_len);
@@ -182,7 +182,7 @@ test "a streamed call hands each message as a piece, and the next waits for body
 
 test "a stream closed with nothing queued ends with an empty last piece" {
     var fixture: Fixture = .{};
-    try fixture.start(&.{ .protocol = .grpc, .cpu_features = support.cpu_features });
+    try fixture.start(&.{ .protocol = .grpc });
     var sender = fixture.call.sender();
     try sender.close_send();
     try testing.expectEqual(@as(usize, 1), fixture.pool.count);
@@ -192,7 +192,7 @@ test "a stream closed with nothing queued ends with an empty last piece" {
 
 test "a message that does not fit after the held piece waits for body_taken" {
     var fixture: Fixture = .{};
-    try fixture.start(&.{ .cpu_features = support.cpu_features });
+    try fixture.start(&.{});
     var sender = fixture.call.sender();
     const long = "x" ** 100;
     try sender.send(&.{ .text = long });
@@ -204,7 +204,7 @@ test "a message that does not fit after the held piece waits for body_taken" {
 
 test "a streamed response reads each message as its pieces arrive, and the outcome at the end" {
     var fixture: Fixture = .{};
-    try fixture.start(&.{ .cpu_features = support.cpu_features });
+    try fixture.start(&.{});
     fixture.call.response.status = .ok;
     write_lines(&fixture.call.response.headers, &.{.{ .name = "content-type", .value = "application/connect+proto" }});
     const responses = fixture.seen.responses;
@@ -226,7 +226,7 @@ test "a streamed response reads each message as its pieces arrive, and the outco
 
 test "a streamed gRPC response reads its status from the trailers once it finished" {
     var fixture: Fixture = .{};
-    try fixture.start(&.{ .protocol = .grpc, .cpu_features = support.cpu_features });
+    try fixture.start(&.{ .protocol = .grpc });
     // PROTOCOL-HTTP2.md, "Requests": the client sends "te: trailers" once. colibri adds none of
     // its own when the request names TE (colibri decision 152).
     var te_count: usize = 0;
@@ -249,7 +249,7 @@ test "a streamed gRPC response reads its status from the trailers once it finish
 
 test "a streamed response cut inside an envelope, or reset, fails" {
     var fixture: Fixture = .{};
-    try fixture.start(&.{ .protocol = .grpc, .cpu_features = support.cpu_features });
+    try fixture.start(&.{ .protocol = .grpc });
     fixture.call.response.status = .ok;
     write_lines(&fixture.call.response.headers, &.{.{ .name = "content-type", .value = "application/grpc+proto" }});
     fixture.call.on_headers(fixture.storage());
@@ -269,7 +269,7 @@ test "a streamed response cut inside an envelope, or reset, fails" {
 
 test "a response envelope longer than the call gathers fails the call resource_exhausted" {
     var fixture: Fixture = .{};
-    try fixture.start(&.{ .cpu_features = support.cpu_features });
+    try fixture.start(&.{});
     fixture.call.response.status = .ok;
     write_lines(&fixture.call.response.headers, &.{.{ .name = "content-type", .value = "application/connect+proto" }});
     fixture.call.on_headers(fixture.storage());

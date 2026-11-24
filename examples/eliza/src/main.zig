@@ -42,6 +42,8 @@ const ConverseCall = harness.Call(ElizaService.converse, .{});
 /// each call until its round ends, so the calls live here.
 const State = struct {
     app: App,
+    /// What the program's calls share: the CPU features it detected (decision 51).
+    client: connect.Client,
     rounds: harness.Rounds(App, Router),
     say_proto: SayCall,
     say_get: SayCall,
@@ -60,6 +62,8 @@ pub fn main(init: std.process.Init) !void {
     const state: *State = @ptrCast(@alignCast(state_memory));
     // The program detects the CPU's features once, as it starts.
     state.app = .{ .cpu_features = .detect() };
+    // One client for every call, with the CPU features the program detected.
+    state.client = .{ .cpu_features = state.app.cpu_features };
     try state.rounds.init(&state.app);
     defer state.rounds.deinit();
     try round(state, .{ .h11 = false, .h3 = false }, .h2);
@@ -71,13 +75,13 @@ pub fn main(init: std.process.Init) !void {
 fn round(state: *State, protocols: client.Protocols, expected: client.Protocol) !void {
     const rounds = &state.rounds;
     try rounds.begin(protocols);
-    try state.say_proto.init({}, &.{}, &.{.{ .sentence = service.said }});
-    try state.say_get.init({}, &.{ .codec = .json, .use_get = true }, &.{.{ .sentence = service.said }});
-    try state.introduce.init({}, &.{ .protocol = .grpc_web }, &.{.{ .name = service.name }});
-    try state.converse.init({}, &.{ .codec = .json }, &.{ .{ .sentence = service.conversation[0] }, .{ .sentence = service.conversation[1] } });
-    try state.say_empty.init({}, &.{ .protocol = .grpc }, &.{.{}});
-    try state.say_grpc.init({}, &.{ .protocol = .grpc }, &.{.{ .sentence = service.said }});
-    try state.introduce_grpc.init({}, &.{ .protocol = .grpc }, &.{.{ .name = service.name }});
+    try state.say_proto.init(&state.client, {}, &.{}, &.{.{ .sentence = service.said }});
+    try state.say_get.init(&state.client, {}, &.{ .codec = .json, .use_get = true }, &.{.{ .sentence = service.said }});
+    try state.introduce.init(&state.client, {}, &.{ .protocol = .grpc_web }, &.{.{ .name = service.name }});
+    try state.converse.init(&state.client, {}, &.{ .codec = .json }, &.{ .{ .sentence = service.conversation[0] }, .{ .sentence = service.conversation[1] } });
+    try state.say_empty.init(&state.client, {}, &.{ .protocol = .grpc }, &.{.{}});
+    try state.say_grpc.init(&state.client, {}, &.{ .protocol = .grpc }, &.{.{ .sentence = service.said }});
+    try state.introduce_grpc.init(&state.client, {}, &.{ .protocol = .grpc }, &.{.{ .name = service.name }});
     inline for (.{ "say_proto", "say_get", "introduce", "converse", "say_empty", "say_grpc", "introduce_grpc" }) |field| {
         const call = &@field(state, field).call;
         try rounds.request(&call.request, &call.response);

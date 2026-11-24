@@ -136,7 +136,7 @@ const Client = struct {
         return .{ .body = &client.body, .scratch = .{ .message = &client.message, .work = &client.work, .tokens = &.{} }, .values = &client.values };
     }
 
-    fn response(client: *Client, speaks: connect.Speaks, server: *const Server) client_response.Response {
+    fn response(client: *Client, shared: *const connect.Client, speaks: connect.Speaks, server: *const Server) client_response.Response {
         client.head_list = .{ .entries = server.head.headers() };
         client.trailer_list = .{ .entries = server.trailers };
         const storage: client_response.Storage = .{
@@ -145,12 +145,12 @@ const Client = struct {
             .details = &client.details,
             .metadata = &client.metadata,
         };
-        return client_response.Response.init(speaks, &.{
+        return shared.response(speaks, &.{
             .status = server.head.status,
             .headers = client.head_list.lookup(),
             .body = server.body[0..server.body_len],
             .trailers = client.trailer_list.lookup(),
-        }, &storage, &test_codecs.decoders(), test_codecs.cpu_features);
+        }, &storage);
     }
 };
 
@@ -163,15 +163,16 @@ fn speaks_of(comptime method: connect.Method, options: client_call.Options) conn
 threadlocal var server_state: Server align(@alignOf(Server)) = .{};
 threadlocal var client_state: Client align(@alignOf(Client)) = .{};
 
+/// A round trip with a client of the set's codecs.
 fn round_trip(comptime method: connect.Method, options: client_call.Options, messages: []const Note, failure: ?connect.RpcError) !client_response.Response {
-    var with_codings = options;
-    // A case that names its decoders keeps them: its accept list is what the server chooses from.
-    const named = options.decoders.gzip != null or options.decoders.zstd != null;
-    if (!named) with_codings.decoders = test_codecs.decoders();
-    with_codings.encoders = test_codecs.encoders();
-    const request = try client_call.request(method, &with_codings, messages, &client_state.call_buffers());
+    return round_trip_of(&test_codecs.client(), method, options, messages, failure);
+}
+
+/// A round trip with `shared`: its accept list is what the server chooses from.
+fn round_trip_of(shared: *const connect.Client, comptime method: connect.Method, options: client_call.Options, messages: []const Note, failure: ?connect.RpcError) !client_response.Response {
+    const request = try shared.request(method, &options, messages, &client_state.call_buffers());
     try server_state.serve(method, &request, failure);
-    return client_state.response(speaks_of(method, options), &server_state);
+    return client_state.response(shared, speaks_of(method, options), &server_state);
 }
 
 const protocols = [_]connect.Protocol{ .connect, .grpc, .grpc_web };
@@ -179,7 +180,7 @@ const codecs = [_]connect.Codec{ .proto, .json };
 
 test "a unary call returns its message in every protocol and codec" {
     for (protocols) |protocol| for (codecs) |codec| {
-        var response = try round_trip(say, .{ .protocol = protocol, .codec = codec, .cpu_features = test_codecs.cpu_features }, &.{.{ .text = "hello" }}, null);
+        var response = try round_trip(say, .{ .protocol = protocol, .codec = codec }, &.{.{ .text = "hello" }}, null);
         const note = (try response.next(Note)).?;
         try testing.expectEqualStrings("hello", note.text);
         try testing.expectEqual(@as(?Note, null), try response.next(Note));
@@ -189,7 +190,7 @@ test "a unary call returns its message in every protocol and codec" {
 
 test "a server stream returns each message, then success and the metadata" {
     for (protocols) |protocol| {
-        var response = try round_trip(count_up, .{ .protocol = protocol, .cpu_features = test_codecs.cpu_features }, &.{.{ .text = "n", .count = 3 }}, null);
+        var response = try round_trip(count_up, .{ .protocol = protocol }, &.{.{ .text = "n", .count = 3 }}, null);
         for (0..3) |index| try testing.expectEqual(@as(i32, @intCast(index)), (try response.next(Note)).?.count);
         try testing.expectEqual(@as(?Note, null), try response.next(Note));
         try testing.expectEqual(@as(?connect.RpcError, null), response.failure);
@@ -197,7 +198,7 @@ test "a server stream returns each message, then success and the metadata" {
 }
 
 test "a client stream sends every message in one body, and its response holds one" {
-    var response = try round_trip(gather, .{ .protocol = .connect, .codec = .json, .cpu_features = test_codecs.cpu_features }, &.{ .{ .text = "a" }, .{ .text = "b" } }, null);
+    var response = try round_trip(gather, .{ .protocol = .connect, .codec = .json }, &.{ .{ .text = "a" }, .{ .text = "b" } }, null);
     try testing.expectEqualStrings("a", (try response.next(Note)).?.text);
     // The test server answers each message, and a client stream answers with one: the second is
     // a response cardinality violation (statuscodes.md, UNIMPLEMENTED).
@@ -208,51 +209,52 @@ test "a client stream sends every message in one body, and its response holds on
 test "an error reaches the client with its code and message in every protocol" {
     const failure: connect.RpcError = .{ .code = .permission_denied, .message = "nope: 100%", .details = &.{.{ .type_name = "a.B", .value = "v" }} };
     for (protocols) |protocol| {
-        var unary = try round_trip(say, .{ .protocol = protocol, .cpu_features = test_codecs.cpu_features }, &.{.{}}, failure);
+        var unary = try round_trip(say, .{ .protocol = protocol }, &.{.{}}, failure);
         try testing.expectEqual(@as(?Note, null), try unary.next(Note));
         try testing.expectEqual(connect.Code.permission_denied, unary.failure.?.code);
         try testing.expectEqualStrings("nope: 100%", unary.failure.?.message);
         try testing.expectEqualStrings("a.B", unary.failure.?.details[0].type_name);
-        var stream = try round_trip(count_up, .{ .protocol = protocol, .cpu_features = test_codecs.cpu_features }, &.{.{}}, failure);
+        var stream = try round_trip(count_up, .{ .protocol = protocol }, &.{.{}}, failure);
         try testing.expectEqual(@as(?Note, null), try stream.next(Note));
         try testing.expectEqual(connect.Code.permission_denied, stream.failure.?.code);
     }
 }
 
 test "a GET, gzip both ways, and a timeout pass through" {
-    var response = try round_trip(say, .{ .use_get = true, .codec = .json, .timeout_ns = 5_000_000, .cpu_features = test_codecs.cpu_features }, &.{.{ .text = "got" }}, null);
+    var response = try round_trip(say, .{ .use_get = true, .codec = .json, .timeout_ns = 5_000_000 }, &.{.{ .text = "got" }}, null);
     try testing.expectEqualStrings("got", (try response.next(Note)).?.text);
     const long = "z" ** 2000;
-    var compressed = try round_trip(say, .{ .protocol = .grpc, .request_coding = .gzip, .cpu_features = test_codecs.cpu_features }, &.{.{ .text = long }}, null);
+    var compressed = try round_trip(say, .{ .protocol = .grpc, .request_coding = .gzip }, &.{.{ .text = long }}, null);
     try testing.expectEqualStrings("gzip", server_state.head.headers()[1].value);
     try testing.expectEqualStrings(long, (try compressed.next(Note)).?.text);
-    var unary_gzip = try round_trip(say, .{ .request_coding = .gzip, .cpu_features = test_codecs.cpu_features }, &.{.{ .text = long }}, null);
+    var unary_gzip = try round_trip(say, .{ .request_coding = .gzip }, &.{.{ .text = long }}, null);
     try testing.expectEqualStrings(long, (try unary_gzip.next(Note)).?.text);
 }
 
 test "zstd both ways: the client sends it, and a server answers in it to a client that takes it alone" {
     const long = "zstd " ** 300;
-    const zstd_only: connect.Decoders = .{ .zstd = &test_codecs.zstd_decoder };
-    var compressed = try round_trip(say, .{ .protocol = .grpc, .request_coding = .zstd, .decoders = zstd_only, .cpu_features = test_codecs.cpu_features }, &.{.{ .text = long }}, null);
+    // A client that takes zstd alone, and writes what the set writes.
+    const zstd_only: connect.Client = .{ .cpu_features = test_codecs.cpu_features, .encoders = test_codecs.encoders(), .decoders = .{ .zstd = &test_codecs.zstd_decoder } };
+    var compressed = try round_trip_of(&zstd_only, say, .{ .protocol = .grpc, .request_coding = .zstd }, &.{.{ .text = long }}, null);
     try testing.expectEqualStrings("zstd", server_state.head.headers()[1].value);
     // The reply's envelope is flagged compressed, so the server wrote it in zstd.
     try testing.expectEqual(@as(u8, 1), server_state.body[0]);
     try testing.expectEqualStrings(long, (try compressed.next(Note)).?.text);
-    var unary = try round_trip(say, .{ .request_coding = .zstd, .decoders = zstd_only, .cpu_features = test_codecs.cpu_features }, &.{.{ .text = long }}, null);
+    var unary = try round_trip_of(&zstd_only, say, .{ .request_coding = .zstd }, &.{.{ .text = long }}, null);
     try testing.expectEqualStrings(long, (try unary.next(Note)).?.text);
     // A GET names its message's coding in its query (Connect protocol, "Unary-Get-Request").
-    var get = try round_trip(say, .{ .use_get = true, .request_coding = .zstd, .decoders = zstd_only, .cpu_features = test_codecs.cpu_features }, &.{.{ .text = long }}, null);
+    var get = try round_trip_of(&zstd_only, say, .{ .use_get = true, .request_coding = .zstd }, &.{.{ .text = long }}, null);
     try testing.expectEqualStrings(long, (try get.next(Note)).?.text);
 }
 
 test "a Connect stream with no end-stream message fails, and a short message is not compressed" {
-    var response = try round_trip(count_up, .{ .cpu_features = test_codecs.cpu_features }, &.{.{ .text = "n", .count = 1 }}, null);
+    var response = try round_trip(count_up, .{}, &.{.{ .text = "n", .count = 1 }}, null);
     // Cut the end-stream envelope off the body the server wrote.
     server_state.body_len = 5 + 3;
-    response = client_state.response(speaks_of(count_up, .{ .cpu_features = test_codecs.cpu_features }), &server_state);
+    response = client_state.response(&test_codecs.client(), speaks_of(count_up, .{}), &server_state);
     try testing.expectEqual(@as(i32, 0), (try response.next(Note)).?.count);
     try testing.expectEqual(@as(?Note, null), try response.next(Note));
     try testing.expectEqual(connect.Code.internal, response.failure.?.code);
-    _ = try round_trip(say, .{ .protocol = .grpc, .request_coding = .gzip, .cpu_features = test_codecs.cpu_features }, &.{.{ .text = "short" }}, null);
+    _ = try round_trip(say, .{ .protocol = .grpc, .request_coding = .gzip }, &.{.{ .text = "short" }}, null);
     try testing.expectEqual(@as(u8, 0), server_state.body[0]);
 }

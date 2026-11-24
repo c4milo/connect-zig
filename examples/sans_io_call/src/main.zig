@@ -54,6 +54,8 @@ const Wire = struct {
 const State = struct {
     /// The CPU's features, which the program detects once and gives the client and the server.
     cpu_features: platform.CpuFeatures,
+    /// What the program's calls share: those features, and no codec.
+    client: connect.Client,
     request_body: [constants.buffer_len]u8,
     request_message: [constants.buffer_len]u8,
     request_work: [constants.buffer_len]u8,
@@ -85,6 +87,7 @@ pub fn main(init: std.process.Init) !void {
         return error.OutOfMemory;
     const state: *State = @ptrCast(@alignCast(state_memory));
     state.cpu_features = .detect();
+    state.client = .{ .cpu_features = state.cpu_features };
     state.wire = .{};
     state.response_headers = .{ .entries = &.{} };
     try say(state);
@@ -93,8 +96,8 @@ pub fn main(init: std.process.Init) !void {
 }
 
 fn say(state: *State) !void {
-    const options: connect.client.Options = .{ .protocol = .connect, .codec = .json, .cpu_features = state.cpu_features };
-    const request = try connect.client.request(Service.say, &options, &.{.{ .sentence = "I feel tired" }}, &request_buffers(state));
+    const options: connect.client.Options = .{ .protocol = .connect, .codec = .json };
+    const request = try state.client.request(Service.say, &options, &.{.{ .sentence = "I feel tired" }}, &request_buffers(state));
     std.debug.print("client: {s} {s} {s}\n", .{ request.http_method, request.target, request.body });
     try serve_say(state, &request);
     var response = read(state, .{ .protocol = .connect, .codec = .json, .enveloped = false });
@@ -105,8 +108,8 @@ fn say(state: *State) !void {
 }
 
 fn introduce(state: *State) !void {
-    const options: connect.client.Options = .{ .protocol = .grpc_web, .cpu_features = state.cpu_features };
-    const request = try connect.client.request(Service.introduce, &options, &.{.{ .name = "Ada" }}, &request_buffers(state));
+    const options: connect.client.Options = .{ .protocol = .grpc_web };
+    const request = try state.client.request(Service.introduce, &options, &.{.{ .name = "Ada" }}, &request_buffers(state));
     std.debug.print("client: {s} {s}, {d} body bytes in envelopes\n", .{ request.http_method, request.target, request.body.len });
     try serve_introduce(state, &request);
     var response = read(state, .{ .protocol = .grpc_web, .codec = .proto, .enveloped = true });
@@ -189,5 +192,5 @@ fn read(state: *State, speaks: connect.Speaks) connect.client.Response {
         .metadata = &state.metadata,
     };
     const incoming: connect.client.Incoming = .{ .status = state.wire.status, .headers = state.response_headers.lookup(), .body = state.wire.body[0..state.wire.body_len] };
-    return connect.client.Response.init(speaks, &incoming, &storage, &.{}, state.cpu_features);
+    return state.client.response(speaks, &incoming, &storage);
 }

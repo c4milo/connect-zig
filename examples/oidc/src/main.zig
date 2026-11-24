@@ -74,6 +74,8 @@ fn Asked(comptime method: connect.Method) type {
 /// each call until its round ends, so the calls live here.
 const State = struct {
     app: App,
+    /// What the program's calls share: the CPU features it detected (decision 51).
+    client: connect.Client,
     rounds: Rounds,
     /// The issuer's first key, and the key it moves to between the rounds.
     first_key: issuer.Key,
@@ -100,6 +102,8 @@ pub fn main(init: std.process.Init) !void {
     const state: *State = @ptrCast(@alignCast(state_memory));
     // The program detects the CPU's features once, as it starts.
     state.app = .{ .cpu_features = .detect() };
+    // One client for every call, with the CPU features the program detected.
+    state.client = .{ .cpu_features = state.app.cpu_features };
     state.first_key = issuer.first_key();
     state.second_key = issuer.second_key();
     // The verifier starts with the issuer's first key alone. A real program fetches the JWK Set
@@ -118,11 +122,11 @@ pub fn main(init: std.process.Init) !void {
 fn round_first_key(state: *State) !void {
     const rounds = &state.rounds;
     try rounds.begin(.{ .h11 = false, .h3 = false });
-    try ask(rounds, &state.status, .{ .use_get = true }, null);
-    try ask(rounds, &state.missing, .{}, null);
-    try ask(rounds, &state.valid, .{ .protocol = .grpc }, issuer.token(&state.tokens, &state.first_key, &.{ .subject = "ada", .audience = service.audience, .expires_unix_seconds = now + constants.hour_s, .email = "ada@example.com", .admin = true }));
-    try ask(rounds, &state.expired, .{ .protocol = .grpc_web }, issuer.token(&state.tokens, &state.first_key, &.{ .subject = "ada", .audience = service.audience, .expires_unix_seconds = now - constants.hour_s }));
-    try ask(rounds, &state.second, .{ .codec = .json }, issuer.token(&state.tokens, &state.second_key, &.{ .subject = "grace", .audience = service.audience, .expires_unix_seconds = now + constants.hour_s }));
+    try ask(state, &state.status, .{ .use_get = true }, null);
+    try ask(state, &state.missing, .{}, null);
+    try ask(state, &state.valid, .{ .protocol = .grpc }, issuer.token(&state.tokens, &state.first_key, &.{ .subject = "ada", .audience = service.audience, .expires_unix_seconds = now + constants.hour_s, .email = "ada@example.com", .admin = true }));
+    try ask(state, &state.expired, .{ .protocol = .grpc_web }, issuer.token(&state.tokens, &state.first_key, &.{ .subject = "ada", .audience = service.audience, .expires_unix_seconds = now - constants.hour_s }));
+    try ask(state, &state.second, .{ .codec = .json }, issuer.token(&state.tokens, &state.second_key, &.{ .subject = "grace", .audience = service.audience, .expires_unix_seconds = now + constants.hour_s }));
     try rounds.finish(.h2);
 
     try expect_status(state);
@@ -145,10 +149,10 @@ fn round_both_keys(state: *State) !void {
     const rounds = &state.rounds;
     try rounds.begin(.{ .h11 = false, .h2 = false });
     // An excluded path reads no token, so one that the verifier would refuse changes nothing.
-    try ask(rounds, &state.status, .{}, "not-a-token");
+    try ask(state, &state.status, .{}, "not-a-token");
     // The token of the second key that the first round refused.
-    try ask(rounds, &state.second, .{}, issuer.token(&state.tokens, &state.second_key, &.{ .subject = "grace", .audience = service.audience, .expires_unix_seconds = now + constants.hour_s }));
-    try ask(rounds, &state.other_audience, .{ .protocol = .grpc }, issuer.token(&state.tokens, &state.second_key, &.{ .subject = "grace", .audience = "another-service", .expires_unix_seconds = now + constants.hour_s }));
+    try ask(state, &state.second, .{}, issuer.token(&state.tokens, &state.second_key, &.{ .subject = "grace", .audience = service.audience, .expires_unix_seconds = now + constants.hour_s }));
+    try ask(state, &state.other_audience, .{ .protocol = .grpc }, issuer.token(&state.tokens, &state.second_key, &.{ .subject = "grace", .audience = "another-service", .expires_unix_seconds = now + constants.hour_s }));
     try rounds.finish(.h3);
 
     try expect_status(state);
@@ -157,11 +161,11 @@ fn round_both_keys(state: *State) !void {
 }
 
 /// Adds the call of `asked` to the round, with `token` as its bearer credentials when it has one.
-fn ask(rounds: *Rounds, asked: anytype, call_options: connect.client.Options, token: ?[]const u8) !void {
+fn ask(state: *State, asked: anytype, call_options: connect.client.Options, token: ?[]const u8) !void {
     var options = call_options;
     if (token) |text| options.headers = try asked.bearer.of(text);
-    try asked.client.init({}, &options, &.{.{}});
-    try rounds.request(&asked.client.call.request, &asked.client.call.response);
+    try asked.client.init(&state.client, {}, &options, &.{.{}});
+    try state.rounds.request(&asked.client.call.request, &asked.client.call.response);
 }
 
 fn expect_status(state: *State) !void {

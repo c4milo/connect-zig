@@ -78,6 +78,8 @@ const State = struct {
     /// The client sends gzip when a scenario asks for it, and reads gzip.
     gzip_decoder: connect.GzipDecoder,
     gzip_encoder: connect.GzipEncoder,
+    /// What the program's calls share: the CPU features it detects once, and the coders above.
+    client: connect.Client,
     /// The pool and its socket, which every run starts afresh.
     transport: transport.Transport,
     /// The memory of the one call at a time, which every scenario uses.
@@ -129,6 +131,7 @@ pub fn main(init: std.process.Init) !void {
         return error.OutOfMemory;
     const state: *State = @ptrCast(@alignCast(state_memory));
     state.room.verdict = .{};
+    state.client = .{ .cpu_features = .detect(), .encoders = .{ .gzip = &state.gzip_encoder }, .decoders = .{ .gzip = &state.gzip_decoder } };
     var args = init.minimal.args.iterate();
     _ = args.skip();
     const left = try read_left_out(state, &args);
@@ -236,12 +239,8 @@ fn run_all(state: *State, reporter: *Reporter, protocol: *const Protocol, origin
     try state.transport.begin(origin.host, origin.port, versions, trust);
     defer state.transport.end();
     const run: Run = .{
-        .options = .{
-            .protocol = protocol.protocol,
-            .codec = protocol.codec,
-            .encoders = .{ .gzip = &state.gzip_encoder },
-            .decoders = .{ .gzip = &state.gzip_decoder },
-        },
+        .client = &state.client,
+        .options = .{ .protocol = protocol.protocol, .codec = protocol.codec },
         .full_duplex = rpc.full_duplex(protocol.http),
         .transport = &state.transport,
         .room = &state.room,

@@ -40,14 +40,24 @@ pins. `protovalidate` takes `regex` from the same stdx: the second pin, `stdx_re
     `state.app = .{ .cpu_features = .detect() }`.
   - `connect.server.Options` takes a field `cpu_features`, with no default. `accept` copies it
     into `Accepted`, which the call's `Messages` and `Reply` read, and into `Refused`, which
-    `refusal_reply` reads. `connect.client.Response.init` takes `cpu_features` as its last
-    argument.
+    `refusal_reply` reads.
   - `connect.compression.compress` and `decompress` take `cpu_features` as their last argument.
     `connect.Encoders` and `connect.Decoders` hold codecs alone.
-  - `connect.client.Options` takes a field `cpu_features`. Its default is the build target's
-    features, the one such default left: set it from the features your program detected.
   - `oidc.VerifierOptions` takes a field `cpu_features`, with no default. `Claims` takes the
     verifier's when `verify` fills it, for `string`, `integer` and `holds`.
+
+- **Breaking.** A program's calls share one `connect.Client`, which holds its CPU features and
+  its codecs ([decision 51](docs/decisions.md)). Make it once, as your program starts:
+  `const calls: connect.Client = .{ .cpu_features = .detect() };`, with `.encoders` and
+  `.decoders` for the codings your calls speak.
+  - `connect_colibri.ClientCall.init` and `init_stream` take the client as their first
+    argument: `try say.init(&calls, {}, &.{ .protocol = .grpc }, &messages, &buffers)`.
+  - `calls.request`, `calls.write_message`, and `calls.response` replace
+    `connect.client.request`, `connect.client.write_message`, and
+    `connect.client.Response.init`.
+  - `connect.client.Options` holds what differs from call to call. Its fields `encoders` and
+    `decoders` moved to the `Client`. Each field left has a default, so `&.{}` is a call with
+    the defaults.
 
 - **Breaking.** `protobuf` decodes and writes JSON through a `Decoder` and an `Encoder`, each made
   once with `init(cpu_features)`, the features the program detects as it starts

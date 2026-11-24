@@ -93,7 +93,7 @@ test "a client call writes its request for colibri and reads what colibri filled
     const Call = rpc.ClientCall(say, .{});
     var call: Call = undefined;
     var buffers: [7][512]u8 = undefined;
-    try call.init({}, &.{ .protocol = .grpc_web, .cpu_features = support.cpu_features }, &.{.{ .text = "hi" }}, &.{
+    try call.init(&support.client, {}, &.{ .protocol = .grpc_web }, &.{.{ .text = "hi" }}, &.{
         .request = .{ .body = &buffers[0], .scratch = .{ .message = &buffers[1], .work = &buffers[2], .tokens = &.{} }, .values = &buffers[3] },
         .headers = &buffers[4],
         .trailers = &buffers[5],
@@ -144,11 +144,44 @@ pub fn write_lines(section: anytype, lines: []const connect.Header) void {
     section.len = used;
 }
 
+test "a client call keeps a copy of its program's client, and reads its response with it" {
+    const Call = rpc.ClientCall(say, .{});
+    var call: Call = undefined;
+    var buffers: [7][512]u8 = undefined;
+    var gzip_decoder: connect.GzipDecoder = undefined;
+    // Features that no other client of the tests states. The call runs no code with them: its
+    // message is binary and goes uncompressed, and its response has no body.
+    var program: connect.Client = .{ .cpu_features = .{ .ssse3 = true, .bmi2 = true }, .decoders = .{ .gzip = &gzip_decoder } };
+    const stated = program;
+    try call.init(&program, {}, &.{ .codec = .proto }, &.{.{ .text = "hi" }}, &.{
+        .request = .{ .body = &buffers[0], .scratch = .{ .message = &buffers[1], .work = &buffers[2], .tokens = &.{} }, .values = &buffers[3] },
+        .headers = &buffers[4],
+        .trailers = &buffers[5],
+        .body = &buffers[6],
+    });
+    // The program's client may change before the call ends, and the call reads its own copy.
+    program = .{ .cpu_features = .none() };
+    try testing.expectEqual(stated.cpu_features, call.client.cpu_features);
+    try testing.expectEqual(stated.decoders.gzip, call.client.decoders.gzip);
+    var storage_buffers: [4][256]u8 = undefined;
+    var details: [2]connect.Detail = undefined;
+    var metadata: [4]connect.Header = undefined;
+    call.response.result = .closed;
+    const response = call.read(.{
+        .scratch = .{ .message = &storage_buffers[0], .work = &storage_buffers[1], .tokens = &storage_buffers[2] },
+        .octets = &storage_buffers[3],
+        .details = &details,
+        .metadata = &metadata,
+    });
+    try testing.expectEqual(stated.cpu_features, response.cpu_features);
+    try testing.expectEqual(stated.decoders.gzip, response.decoders.gzip);
+}
+
 test "a gRPC client call reads its status from the response's trailers (PROTOCOL-HTTP2.md, Responses)" {
     const Call = rpc.ClientCall(say, .{});
     var call: Call = undefined;
     var buffers: [7][512]u8 = undefined;
-    try call.init({}, &.{ .protocol = .grpc, .cpu_features = support.cpu_features }, &.{.{ .text = "hi" }}, &.{
+    try call.init(&support.client, {}, &.{ .protocol = .grpc }, &.{.{ .text = "hi" }}, &.{
         .request = .{ .body = &buffers[0], .scratch = .{ .message = &buffers[1], .work = &buffers[2], .tokens = &.{} }, .values = &buffers[3] },
         .headers = &buffers[4],
         .trailers = &buffers[5],

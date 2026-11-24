@@ -54,6 +54,8 @@ const CountdownCall = harness.Call(StreamingService.countdown, .{});
 /// each call until its round ends, so the calls live here.
 const State = struct {
     app: App,
+    /// What the program's calls share: the CPU features it detected (decision 51).
+    client: connect.Client,
     rounds: Rounds,
     chat: ChatCall,
     chat_silent: ChatCall,
@@ -74,6 +76,8 @@ pub fn main(init: std.process.Init) !void {
     const state: *State = @ptrCast(@alignCast(state_memory));
     // The program detects the CPU's features once, as it starts.
     state.app = .{ .cpu_features = .detect() };
+    // One client for every call, with the CPU features the program detected.
+    state.client = .{ .cpu_features = state.app.cpu_features };
     try state.rounds.init(&state.app);
     defer state.rounds.deinit();
     try round(state, .{ .h11 = false, .h3 = false }, .h2);
@@ -85,17 +89,17 @@ pub fn main(init: std.process.Init) !void {
 fn round(state: *State, protocols: client.Protocols, expected: client.Protocol) !void {
     const rounds = &state.rounds;
     try rounds.begin(protocols);
-    try state.chat.init({}, &.{ .codec = .json }, &lines);
-    try state.chat_silent.init({}, &.{ .protocol = .grpc_web }, &.{});
-    try state.chat_refused.init({}, &.{}, &.{ .{ .text = "x" }, .{ .text = "" }, .{ .text = "never read" } });
+    try state.chat.init(&state.client, {}, &.{ .codec = .json }, &lines);
+    try state.chat_silent.init(&state.client, {}, &.{ .protocol = .grpc_web }, &.{});
+    try state.chat_refused.init(&state.client, {}, &.{}, &.{ .{ .text = "x" }, .{ .text = "" }, .{ .text = "never read" } });
     // A body that stops inside an envelope fails the call, after the answers already sent.
-    try state.chat_cut.init({}, &.{}, &lines);
+    try state.chat_cut.init(&state.client, {}, &.{}, &lines);
     const cut = &state.chat_cut.call.request;
     cut.body = cut.body[0 .. cut.body.len - 1];
-    try state.sum.init({}, &.{}, &numbers);
-    try state.sum_web.init({}, &.{ .protocol = .grpc_web, .codec = .json }, &numbers);
-    try state.countdown.init({}, &.{}, &.{.{ .from = constants.countdown_from }});
-    try state.countdown_far.init({}, &.{ .protocol = .grpc_web }, &.{.{ .from = service.countdown_max + 1 }});
+    try state.sum.init(&state.client, {}, &.{}, &numbers);
+    try state.sum_web.init(&state.client, {}, &.{ .protocol = .grpc_web, .codec = .json }, &numbers);
+    try state.countdown.init(&state.client, {}, &.{}, &.{.{ .from = constants.countdown_from }});
+    try state.countdown_far.init(&state.client, {}, &.{ .protocol = .grpc_web }, &.{.{ .from = service.countdown_max + 1 }});
     inline for (.{ "chat", "chat_silent", "chat_refused", "chat_cut", "sum", "sum_web", "countdown", "countdown_far" }) |field| {
         const call = &@field(state, field).call;
         try rounds.request(&call.request, &call.response);
@@ -110,7 +114,7 @@ fn round(state: *State, protocols: client.Protocols, expected: client.Protocol) 
     // The server's router holds `constants.requests` calls at once, so the streamed calls take a
     // round of their own.
     try rounds.begin(protocols);
-    try state.streamed.begin(rounds, expected);
+    try state.streamed.begin(&state.client, rounds, expected);
     try rounds.finish(expected);
     try state.streamed.check();
     const mode = if (rpc.full_duplex(expected)) "full-duplex" else "half-duplex";

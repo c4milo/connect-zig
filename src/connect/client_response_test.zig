@@ -6,6 +6,7 @@ const std = @import("std");
 const testing = std.testing;
 const proto = @import("protobuf");
 const client_response = @import("client_response.zig");
+const Client = @import("client.zig").Client;
 const compression = @import("compression.zig");
 const protocol = @import("protocol.zig");
 const rpc_error = @import("rpc_error.zig");
@@ -71,8 +72,9 @@ const Room = struct {
     }
 };
 
-fn decoders() compression.Decoders {
-    return .{ .gzip = &codecs.gzip_decoder };
+/// A client that takes gzip, with the tests' CPU features.
+fn client() Client {
+    return .{ .cpu_features = codecs.cpu_features, .decoders = .{ .gzip = &codecs.gzip_decoder } };
 }
 
 /// `text` in gzip, written into `out`.
@@ -90,7 +92,7 @@ fn enveloped(flags: u8, payload: []const u8, out: []u8) []const u8 {
 
 fn read(speaks: protocol.Speaks, status: u16, head: *const Lines, body: []const u8, room: *Room) Response {
     const incoming: Incoming = .{ .status = status, .headers = head.lookup(), .body = body };
-    return Response.init(speaks, &incoming, &room.storage(), &decoders(), codecs.cpu_features);
+    return client().response(speaks, &incoming, &room.storage());
 }
 
 const connect_stream: protocol.Speaks = .{ .protocol = .connect, .codec = .proto, .enveloped = true };
@@ -176,7 +178,7 @@ test "a 200 response of another media type fails unknown, and of another codec i
 fn grpc_read(head_status: []const u8, body: []const u8, tail: *const Lines, room: *Room) Response {
     const head: Lines = .{ .lines = &.{ .{ .name = "content-type", .value = "application/grpc" }, .{ .name = "grpc-status", .value = head_status } } };
     const incoming: Incoming = .{ .status = ok, .headers = head.lookup(), .body = body, .trailers = tail.lookup() };
-    return Response.init(grpc, &incoming, &room.storage(), &decoders(), codecs.cpu_features);
+    return client().response(grpc, &incoming, &room.storage());
 }
 
 test "a head's gRPC status counts only for a Trailers-Only response" {
@@ -202,7 +204,7 @@ test "a streamed response's head status waits for its body to end empty" {
     var room: Room = .{};
     const head: Lines = .{ .lines = &.{ .{ .name = "content-type", .value = "application/grpc-web" }, .{ .name = "grpc-status", .value = "9" } } };
     const incoming: Incoming = .{ .status = ok, .headers = head.lookup(), .body = "", .streamed = true };
-    var response = Response.init(grpc_web, &incoming, &room.storage(), &decoders(), codecs.cpu_features);
+    var response = client().response(grpc_web, &incoming, &room.storage());
     try testing.expect(!response.done);
     response.end_body("");
     try testing.expectEqual(@as(?Note, null), try response.next(Note));
@@ -214,7 +216,7 @@ test "a streamed response's head status is ignored once a message arrived" {
     var body_room: [buffer_len]u8 = undefined;
     const head: Lines = .{ .lines = &.{ .{ .name = "content-type", .value = "application/grpc-web" }, .{ .name = "grpc-status", .value = "9" } } };
     const incoming: Incoming = .{ .status = ok, .headers = head.lookup(), .body = "", .streamed = true };
-    var response = Response.init(grpc_web, &incoming, &room.storage(), &decoders(), codecs.cpu_features);
+    var response = client().response(grpc_web, &incoming, &room.storage());
     const body = enveloped(0, &.{ 0x0a, 1, 'a' }, &body_room);
     try testing.expectEqual(body.len, try response.feed(body));
     try testing.expectEqualStrings("a", (try response.next(Note)).?.text);

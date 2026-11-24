@@ -64,8 +64,8 @@ const State = struct {
     zstd_encoder: connect.ZstdEncoder,
     brotli_decoder: connect.BrotliDecoder,
     brotli_encoder: connect.BrotliEncoder,
-    /// The coders above, as each call's options name them.
-    codings: plan_module.Codings,
+    /// What the program's calls share: the CPU features it detects once, and the coders above.
+    client: connect.Client,
     request_bytes: [constants.client_compat_request_bytes]u8,
     result_bytes: [constants.client_compat_response_bytes]u8,
     response_bytes: [constants.client_compat_response_bytes]u8,
@@ -80,7 +80,8 @@ pub fn main(init: std.process.Init) !void {
         return error.OutOfMemory;
     const state: *State = @ptrCast(@alignCast(state_memory));
     state.transport.init(init.io);
-    state.codings = .{
+    state.client = .{
+        .cpu_features = .detect(),
         .encoders = .{ .gzip = &state.gzip_encoder, .zstd = &state.zstd_encoder, .brotli = &state.brotli_encoder },
         .decoders = .{ .gzip = &state.gzip_decoder, .zstd = &state.zstd_decoder, .brotli = &state.brotli_decoder },
     };
@@ -128,7 +129,7 @@ fn dispatch(state: *State, request: *const Request, result: *result_module.Resul
         if (!std.mem.eql(u8, name, Service.service_name)) return error.UnknownService;
     }
     const name = request.method orelse return error.NoMethod;
-    const plan = try plan_module.plan_of(request, &state.codings, &state.plan_memory);
+    const plan = try plan_module.plan_of(request, &state.client, &state.plan_memory);
     try state.transport.begin(request.host, std.math.cast(u16, request.port) orelse return error.InvalidPort, plan.protocols, plan.tls);
     defer state.transport.end();
     inline for (@typeInfo(Slots).@"struct".fields) |field| {

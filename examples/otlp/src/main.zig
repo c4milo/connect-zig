@@ -34,6 +34,8 @@ const ReceivedCall = harness.Call(otlpstore.SpanStore.received, .{});
 /// All the program holds, which `main` allocates once (decision 42).
 const State = struct {
     app: App,
+    /// What the program's calls share: the CPU features it detected (decision 51).
+    client: connect.Client,
     rounds: harness.Rounds(App, app_file.Router),
     export_call: ExportCall,
     received_call: ReceivedCall,
@@ -58,6 +60,8 @@ pub fn main(init: std.process.Init) !void {
     const state: *State = @ptrCast(@alignCast(state_memory));
     // The program detects the CPU's features once, as it starts.
     state.app = .{ .cpu_features = .detect() };
+    // One client for every call, with the CPU features the program detected.
+    state.client = .{ .cpu_features = state.app.cpu_features };
     state.exports = 0;
     try state.rounds.init(&state.app);
     defer state.rounds.deinit();
@@ -72,7 +76,7 @@ pub fn main(init: std.process.Init) !void {
 /// Exports the trace once, and checks the receiver took every span.
 fn export_trace(state: *State, round: Round) !void {
     try state.rounds.begin(round.protocols);
-    try state.export_call.init({}, &round.options, &.{checkout});
+    try state.export_call.init(&state.client, {}, &round.options, &.{checkout});
     try state.rounds.request(&state.export_call.call.request, &state.export_call.call.response);
     try state.rounds.finish(round.expected);
     var response = state.export_call.call.read(state.rounds.storage());
@@ -86,7 +90,7 @@ fn export_trace(state: *State, round: Round) !void {
 /// Reads every export back, and checks it holds each export's spans, the first one whole.
 fn expect_received(state: *State, round: Round) !void {
     try state.rounds.begin(round.protocols);
-    try state.received_call.init({}, &round.options, &.{.{}});
+    try state.received_call.init(&state.client, {}, &round.options, &.{.{}});
     try state.rounds.request(&state.received_call.call.request, &state.received_call.call.response);
     try state.rounds.finish(round.expected);
     var response = state.received_call.call.read(state.rounds.storage());

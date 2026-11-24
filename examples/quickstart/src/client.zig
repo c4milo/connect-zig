@@ -73,14 +73,14 @@ const Call = struct {
     trailers: [constants.call_buffer_len]u8,
     body: [constants.call_buffer_len]u8,
 
-    fn init(self: *Call, options: *const connect.client.Options) !void {
+    fn init(self: *Call, shared: *const connect.Client, options: *const connect.client.Options) !void {
         const buffers: rpc.ClientCallBuffers = .{
             .request = .{ .body = &self.request_body, .scratch = .{ .message = &self.message, .work = &self.work, .tokens = &.{} }, .values = &self.values },
             .headers = &self.headers,
             .trailers = &self.trailers,
             .body = &self.body,
         };
-        try self.call.init({}, options, &.{.{ .name = name }}, &buffers);
+        try self.call.init(shared, {}, options, &.{.{ .name = name }}, &buffers);
     }
 };
 
@@ -106,6 +106,8 @@ const Reading = struct {
 /// All the program holds, which `main` allocates once before the first call (decision 42). Each
 /// round runs on a client of its own.
 const State = struct {
+    /// What the program's calls share: the CPU features it detects once, as it starts.
+    calls: connect.Client,
     clients: [rounds.len]Client,
     handler: Handler,
     connect_call: Call,
@@ -126,6 +128,7 @@ pub fn main(init: std.process.Init) !void {
     const state_memory = init.arena.allocator().rawAlloc(@sizeOf(State), .of(State), @returnAddress()) orelse
         return error.OutOfMemory;
     const state: *State = @ptrCast(@alignCast(state_memory));
+    state.calls = .{ .cpu_features = .detect() };
     const ca = try std.Io.Dir.cwd().readFile(init.io, ca_path, &state.ca_pem);
     // The client judges the server's chain at this instant (RFC 5280 §4.1.2.5).
     const unix_seconds: u64 = @intCast(@max(std.Io.Clock.real.now(init.io).toSeconds(), 0));
@@ -144,8 +147,8 @@ fn run_round(state: *State, running: *Client, round: Round, trust: tls.Trust, po
         .unix_seconds = unix_seconds,
     }, &state.handler);
     defer running.deinit();
-    try state.connect_call.init(&.{});
-    try state.grpc_call.init(&.{ .protocol = .grpc });
+    try state.connect_call.init(&state.calls, &.{});
+    try state.grpc_call.init(&state.calls, &.{ .protocol = .grpc });
     _ = try running.request(&state.connect_call.call.request, &state.connect_call.call.response);
     _ = try running.request(&state.grpc_call.call.request, &state.grpc_call.call.response);
     try running.run();

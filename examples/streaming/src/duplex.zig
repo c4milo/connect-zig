@@ -37,14 +37,14 @@ const Chat = struct {
     closed: bool,
     ended: bool,
 
-    fn begin(chat: *Chat, rounds: *program.Rounds, protocol: client.Protocol, rpc_protocol: connect.Protocol) !void {
+    fn begin(chat: *Chat, shared: *const connect.Client, rounds: *program.Rounds, protocol: client.Protocol, rpc_protocol: connect.Protocol) !void {
         chat.duplex = rpc.full_duplex(protocol);
         chat.sent = 0;
         chat.answered = 0;
         chat.closed = false;
         chat.ended = false;
         const call = &chat.call.call;
-        try chat.call.init_stream({}, &.{ .protocol = rpc_protocol });
+        try chat.call.init_stream(shared, {}, &.{ .protocol = rpc_protocol });
         try call.start(rounds.pool());
         try rounds.listen(.{ .id = call.id, .context = chat, .on_event = on_event });
         var sender = call.sender();
@@ -131,12 +131,12 @@ const Sum = struct {
     taken: u32,
     ended: bool,
 
-    fn begin(sum: *Sum, rounds: *program.Rounds) !void {
+    fn begin(sum: *Sum, shared: *const connect.Client, rounds: *program.Rounds) !void {
         sum.sent = 0;
         sum.taken = 0;
         sum.ended = false;
         const call = &sum.call.call;
-        try sum.call.init_stream({}, &.{ .protocol = .grpc });
+        try sum.call.init_stream(shared, {}, &.{ .protocol = .grpc });
         try call.start(rounds.pool());
         try rounds.listen(.{ .id = call.id, .context = sum, .on_event = on_event });
         try sum.send_next();
@@ -185,10 +185,10 @@ pub const Streamed = struct {
     chats: [chat_protocols.len]Chat,
     sum: Sum,
 
-    /// Starts the streamed calls of a round over `protocol`.
-    pub fn begin(streamed: *Streamed, rounds: *program.Rounds, protocol: client.Protocol) !void {
-        for (&streamed.chats, chat_protocols) |*chat, rpc_protocol| try chat.begin(rounds, protocol, rpc_protocol);
-        try streamed.sum.begin(rounds);
+    /// Starts the streamed calls of a round over `protocol`, with `shared`, the program's client.
+    pub fn begin(streamed: *Streamed, shared: *const connect.Client, rounds: *program.Rounds, protocol: client.Protocol) !void {
+        for (&streamed.chats, chat_protocols) |*chat, rpc_protocol| try chat.begin(shared, rounds, protocol, rpc_protocol);
+        try streamed.sum.begin(shared, rounds);
     }
 
     /// Checks what the streamed calls read, once the round finished.

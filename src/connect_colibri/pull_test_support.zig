@@ -10,6 +10,8 @@ const platform = @import("platform");
 /// The CPU features the tests' contexts and clients state: the build target's, which a test may
 /// name where a program names the features it detected.
 pub const cpu_features = platform.CpuFeatures.target();
+/// A client with no codec and the tests' CPU features, as a test's calls share one.
+pub const client: connect.Client = .{ .cpu_features = cpu_features };
 const protobuf_decoder: proto.Decoder = .init(cpu_features);
 const server = @import("server");
 const http = @import("http");

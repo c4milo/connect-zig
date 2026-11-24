@@ -20,6 +20,7 @@ const Transport = transport.Transport;
 /// What an exchange works with, which the program's `State` holds (decision 42): the transport
 /// its call runs on, the buffers of the call, and the verdict a failure writes.
 pub const Shared = struct {
+    client: *const connect.Client,
     transport: *Transport,
     buffers: *Buffers,
     verdict: *Verdict,
@@ -65,9 +66,9 @@ pub fn Exchange(comptime method: connect.Method, comptime Watcher: type) type {
                 .give_up_ns = shared.transport.now_ns() + constants.call_ns_max,
             };
             if (streamed) {
-                try self.call.init_stream({}, options, &self.buffers.call(true));
+                try self.call.init_stream(shared.client, {}, options, &self.buffers.call(true));
             } else {
-                try self.call.init({}, options, messages, &self.buffers.call(false));
+                try self.call.init(shared.client, {}, options, messages, &self.buffers.call(false));
             }
             try self.call.start(self.transport.pool_of());
             self.transport.listen(.{ .context = self, .on_event = on_event });

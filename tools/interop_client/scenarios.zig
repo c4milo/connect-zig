@@ -29,6 +29,8 @@ pub const Case = struct {
 /// What a run of the scenarios speaks: the call options of its protocol and codec, and whether
 /// its streams are full-duplex. Its calls run on `transport`, in `room`.
 pub const Run = struct {
+    /// The program's client: its CPU features and its gzip coders.
+    client: *const connect.Client,
     options: connect.client.Options,
     full_duplex: bool,
     transport: *Transport,
@@ -123,7 +125,7 @@ fn begin(comptime kind: Kind, run: *const Run, options: *const connect.client.Op
     const room = run.room;
     room.exchanges = @unionInit(Exchanges, @tagName(kind), undefined);
     const call = &@field(room.exchanges, @tagName(kind));
-    const shared: exchange.Shared = .{ .transport = run.transport, .buffers = &room.buffers, .verdict = &room.verdict };
+    const shared: exchange.Shared = .{ .client = run.client, .transport = run.transport, .buffers = &room.buffers, .verdict = &room.verdict };
     call.begin(shared, options, messages, watcher) catch |failure|
         return room.verdict.wrong("starting the call: {s}", .{@errorName(failure)});
     return call;

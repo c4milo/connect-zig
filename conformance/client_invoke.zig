@@ -180,7 +180,7 @@ fn outcome_at(failure: ?connect.RpcError, deadline_ns: ?u64, now_ns: u64) ?conne
 /// stream").
 fn run_whole(self: anytype) StartError!void {
     if (self.messages.len != 1) return error.WrongMessageCount;
-    try self.call.init({}, &self.plan.options, self.messages, &self.buffers.call(false));
+    try self.call.init(&self.plan.client, {}, &self.plan.options, self.messages, &self.buffers.call(false));
     try self.call.start(self.transport.pool_of());
     listen(self);
     cancel_after_close(self);
@@ -201,7 +201,7 @@ fn cancel_after_close(self: anytype) void {
 /// The steps of a client or bidirectional stream (docs/testing_clients.md, "Client stream",
 /// "Half-Duplex Bidi Stream" and "Full-Duplex Bidi Stream").
 fn run_stream(self: anytype) StartError!void {
-    try self.call.init_stream({}, &self.plan.options, &self.buffers.call(true));
+    try self.call.init_stream(&self.plan.client, {}, &self.plan.options, &self.buffers.call(true));
     try self.call.start(self.transport.pool_of());
     listen(self);
     send_all(self);
@@ -304,7 +304,8 @@ test "a finished call reads its outcome against the client's deadline" {
     };
     const speaks: connect.Speaks = .{ .protocol = .grpc, .codec = .proto, .enveloped = true };
     const lookup: connect.Lookup = .{ .context = &room, .find_fn = Finished.find };
-    var response = connect.client.Response.init(speaks, &.{ .status = connect.constants.protocol.status.ok, .headers = lookup, .body = "" }, &storage, &.{}, .target());
+    const shared: connect.Client = .{ .cpu_features = .target() };
+    var response = shared.response(speaks, &.{ .status = connect.constants.protocol.status.ok, .headers = lookup, .body = "" }, &storage);
     response.done = true;
     response.failure = .{ .code = .canceled, .message = "the server canceled the stream" };
     const lists = try testing.allocator.create(@import("client_result.zig").Lists);

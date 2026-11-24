@@ -48,6 +48,8 @@ const zero_options = [_]connect.client.Options{
 /// each call until its round ends, so the calls live here.
 const State = struct {
     app: App,
+    /// What the program's calls share: the CPU features it detected (decision 51).
+    client: connect.Client,
     /// Decodes the detail of an error, with the CPU features the program detected once.
     protobuf_decoder: proto.Decoder,
     rounds: harness.Rounds(App, Router),
@@ -64,6 +66,8 @@ pub fn main(init: std.process.Init) !void {
     const state: *State = @ptrCast(@alignCast(state_memory));
     // The program detects the CPU's features once, as it starts.
     state.app = .{ .cpu_features = .detect() };
+    // One client for every call, with the CPU features the program detected.
+    state.client = .{ .cpu_features = state.app.cpu_features };
     state.protobuf_decoder = .init(state.app.cpu_features);
     try state.rounds.init(&state.app);
     defer state.rounds.deinit();
@@ -76,12 +80,12 @@ fn round(state: *State, protocols: client.Protocols, expected: client.Protocol) 
     const rounds = &state.rounds;
     try rounds.begin(protocols);
     for (&state.by_zero, zero_options) |*by_zero, options| {
-        try by_zero.init({}, &options, &.{.{ .dividend = constants.dividend, .divisor = 0 }});
+        try by_zero.init(&state.client, {}, &options, &.{.{ .dividend = constants.dividend, .divisor = 0 }});
         try rounds.request(&by_zero.call.request, &by_zero.call.response);
     }
-    try state.by_two.init({}, &.{ .codec = .json }, &.{.{ .dividend = constants.dividend, .divisor = constants.divisor }});
+    try state.by_two.init(&state.client, {}, &.{ .codec = .json }, &.{.{ .dividend = constants.dividend, .divisor = constants.divisor }});
     try rounds.request(&state.by_two.call.request, &state.by_two.call.response);
-    try state.multiply.init({}, &.{}, &.{.{}});
+    try state.multiply.init(&state.client, {}, &.{}, &.{.{}});
     try rounds.request(&state.multiply.call.request, &state.multiply.call.response);
     try rounds.finish(expected);
 

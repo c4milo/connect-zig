@@ -62,6 +62,8 @@ const WatchEventsCall = harness.Call(Issues.watch_events, .{});
 /// each call until its round ends, so the calls live here.
 const State = struct {
     app: App,
+    /// What the program's calls share: the CPU features it detected (decision 51).
+    client: connect.Client,
     /// Decodes the detail of an error, with the CPU features the program detected once.
     protobuf_decoder: proto.Decoder,
     rounds: harness.Rounds(App, Router),
@@ -107,6 +109,8 @@ pub fn main(init: std.process.Init) !void {
     const state: *State = @ptrCast(@alignCast(state_memory));
     // The program detects the CPU's features once, as it starts.
     state.app = .{ .cpu_features = .detect() };
+    // One client for every call, with the CPU features the program detected.
+    state.client = .{ .cpu_features = state.app.cpu_features };
     state.protobuf_decoder = .init(state.app.cpu_features);
     try state.rounds.init(&state.app);
     defer state.rounds.deinit();
@@ -132,7 +136,7 @@ fn session(state: *State, protocols: client.Protocols, expected: client.Protocol
 /// Runs one call alone, so each step sees what the steps before it changed.
 fn call(state: *State, client_call: anytype, options: connect.client.Options, messages: MessagesOf(@TypeOf(client_call))) !void {
     try state.rounds.begin(state.protocols);
-    try client_call.init({}, &options, messages);
+    try client_call.init(&state.client, {}, &options, messages);
     try state.rounds.request(&client_call.call.request, &client_call.call.response);
     try state.rounds.finish(state.expected);
 }
@@ -319,7 +323,7 @@ fn rate_limit(state: *State) !void {
     try expect(left < constants.burst_len);
     try state.rounds.begin(state.protocols);
     for (&state.burst) |*client_call| {
-        try client_call.init({}, &.{}, &.{.{ .owner = "octocat", .name = "hello-world" }});
+        try client_call.init(&state.client, {}, &.{}, &.{.{ .owner = "octocat", .name = "hello-world" }});
         try state.rounds.request(&client_call.call.request, &client_call.call.response);
     }
     try state.rounds.finish(state.expected);

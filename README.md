@@ -208,13 +208,20 @@ memory the router holds.
 
 ### 5. Call it
 
+Your calls share one `connect.Client`, which holds the CPU features your program detected and
+the codecs it placed. Make it once, as the program starts:
+
+```zig
+const calls: connect.Client = .{ .cpu_features = .detect() };
+```
+
 A client call is a `connect_colibri.ClientCall(method, .{})`. Its `.protocol` option picks
 Connect, gRPC, or gRPC-Web, and the rest of the call stays the same. In this example, `pool` is
 colibri's client connection pool, and `buffers` and `storage` are memory that your program owns.
 [docs/guide.md](docs/guide.md) shows how to set up each one:
 
 ```zig
-try say.init({}, &.{ .protocol = .grpc }, &.{.{ .sentence = "I feel tired" }}, &buffers);
+try say.init(&calls, {}, &.{ .protocol = .grpc }, &.{.{ .sentence = "I feel tired" }}, &buffers);
 _ = try pool.request(&say.request, &say.response);
 // Once the pool reports the call finished:
 var response = say.read(storage);
