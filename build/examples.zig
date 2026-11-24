@@ -16,6 +16,7 @@ const projects = [_]Project{
     .{ .name = "harness", .description = "Run the harness's tests" },
     .{ .name = "protobuf_messages", .description = "Encode and decode generated messages in binary and JSON" },
     .{ .name = "sans_io_call", .description = "Run Connect and gRPC-Web calls through the connect module alone" },
+    .{ .name = "std_http", .description = "Serve ELIZA on std.http.Server and call it with std.http.Client, with no colibri" },
     .{ .name = "eliza", .description = "Run the ELIZA example over colibri's h2, h11 and h3" },
     .{ .name = "streaming", .description = "Run bidirectional, client and server streams" },
     .{ .name = "interceptors", .description = "Run calls through server and client interceptors" },

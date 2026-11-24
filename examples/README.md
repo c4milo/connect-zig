@@ -21,6 +21,7 @@ Start at the top: each project adds one layer to the one before it.
 | [quickstart](quickstart) | The README's "Use it in your project": a server and a client over TLS on h11, h2, and h3 |
 | [protobuf_messages](protobuf_messages) | Generated messages in binary and JSON, with no RPC |
 | [sans_io_call](sans_io_call) | A whole call through `connect` alone: no socket, no HTTP library |
+| [std_http](std_http) | ELIZA on Zig's `std.http.Server`, called with `std.http.Client`, with no colibri |
 | [eliza](eliza) | The ELIZA service, with a client and a server over colibri's h11, h2, and h3 |
 | [streaming](streaming) | Bidirectional, client, and server streams, a stream that fails, and full-duplex over h2 and h3 |
 | [interceptors](interceptors) | Server interceptors that log and authenticate, and a client interceptor |
@@ -88,6 +89,7 @@ certificate, and clock would be:
 
 A project that depends on another, as `socket_server` and `std_io` do, passes connect-zig the same
 options as the project it depends on. Zig builds one package for each set of options, so other
-options give a second `connect` module, and the compile fails with "file exists in modules".
+options give a second `connect_zig` module, and the compile fails with "file exists in modules".
 The projects on Rotor pass `.rotor = true`. `std_io` runs with no Rotor (decision 32), so it
-passes `.rotor = false` to connect-zig, to `eliza`, and to the harness.
+passes `.rotor = false` to connect-zig, to `eliza`, and to the harness. `sans_io_call` and `std_http` run with no colibri
+(decision 52), so they pass `.colibri = false` to connect-zig and to `eliza`.
