@@ -56,7 +56,7 @@ judge. The time of the small Connect call, in nanoseconds:
 | connect-rust, x86-64 | 1,505 | 1,533 | 1,522 |
 | connect-go, x86-64 | 2,938 | 2,912 | 2,925 |
 
-## Whole servers on a socket
+## Full server under load
 
 CI's [run 266](https://github.com/c4milo/connect-zig/actions/runs/45246119951), on an Arm
 Neoverse-N2 core. An OTLP receiver on one core, over TLS and h2, takes the traffic of one gateway
