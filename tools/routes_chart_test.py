@@ -8,6 +8,7 @@ import unittest
 
 sys.path.insert(0, str(pathlib.Path(__file__).parent))
 
+import chart_text
 import routes_chart
 
 header = "| message | operation | Zig ns/op | Go ns/op | Rust ns/op | Go time / Zig time | Rust time / Zig time |"
@@ -63,6 +64,26 @@ class RoutesChartTest(unittest.TestCase):
             routes_chart.spread([[50, 1, "b"], [45, 1, "a"], [100, 1, "c"]]),
             [[45, 1, "a"], [58, 1, "b"], [100, 1, "c"]],
         )
+
+    def test_reads_a_log_that_github_wrote(self):
+        text = table_text(every_row())
+        self.assertEqual(read(routes_chart.read, chart_text.github_log(text)), read(routes_chart.read, text))
+
+    def test_no_text_passes_an_edge_or_crosses_another(self):
+        times, machine = read(routes_chart.read, table_text(every_row()))
+        self.assertEqual(chart_text.faults(routes_chart.draw(times, machine, "run 1", "abc1234")), [])
+
+
+def every_row():
+    """A row of the small message for each protocol in tables of 1, 16, and 256 routes, each table
+    slower by a few nanoseconds, connect-rust absent from the largest."""
+    rows = []
+    for _, operation in routes_chart.protocols:
+        for routes, extra in ((1, 0), (16, 4), (256, 9)):
+            name = operation if routes == 1 else f"{operation}, {routes} routes"
+            rust = "absent" if routes == 256 else str(200 + extra)
+            rows.append(f"| small | {name} | {100 + extra} | {400 + extra} | {rust} | 4.0 | 2.0 |")
+    return rows
 
 
 if __name__ == "__main__":

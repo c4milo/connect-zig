@@ -22,6 +22,9 @@ import re
 import sys
 import types
 
+# The time GitHub writes before each line of a job's log, which a log saved from a run holds.
+stamp = re.compile(r"^\d{4}-\d\d-\d\dT[0-9:.]+Z ")
+
 # Each decode reads every field: Go's and Buffa's decodes build the whole message, and
 # connect-zig's leaves a repeated field to be parsed when it is read, so a decode alone would
 # time less work on connect-zig's side.
@@ -66,7 +69,8 @@ def read(table_path):
     # The architecture and the CPU's model, from tools/bench_check.sh's "Machine:" line.
     machine = None
     with open(table_path) as table:
-        for line in table:
+        for raw in table:
+            line = stamp.sub("", raw)
             if line.startswith("Machine: "):
                 machine = ", ".join(part.strip() for part in line[len("Machine: ") :].split(",")[:2])
             if not line.startswith("|"):

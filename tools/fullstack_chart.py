@@ -20,23 +20,13 @@ import re
 import sys
 import types
 
+from fullstack_chart_text import bar_ratio, limit_ms, subtitle_of, title_of
+
 # A lighter shade is too faint against the surface to show a bar's edge or a line, so a bar of one
 # takes an outline in its library's color, and its line is that color, dashed.
 outlines = {"--zigv": "--zig", "--gov": "--go", "--rustv": "--rust"}
-# Each receiver that validates, and its twin that does not.
-twins = {
-    "connect-zig + protovalidate": "connect-zig",
-    "connect-go + protovalidate-go": "connect-go",
-    "connect-rust + protovalidate-buffa": "connect-rust",
-}
-# The Connect libraries, which the title names when the table holds them (decision 46).
-libraries = ("connect-go", "connect-rust")
-limit_ms = 100
 # The time GitHub writes before each line of a job's log, which a log saved from a run holds.
 stamp = re.compile(r"^\d{4}-\d\d-\d\dT[0-9:.]+Z ")
-# The longest title the chart's width holds at its font: a longer one leaves out the limit, which
-# the subtitle states.
-title_len_max = 90
 # What the label of a climb's last step says when the step failed on anything but its p99.
 failures = {"refused": "refused", "rate": "short of the rate", "load": "load full"}
 
@@ -141,18 +131,6 @@ def read(log_path, over, looks):
     return reader.held, reader.steps, reader.machine
 
 
-def bound(held, top, bottom):
-    """How a ratio of two rates held reads: a ratio over a floor is at most its value, a ratio of a
-    floor at least, and a ratio of two floors is marked so."""
-    if held[top]["floor"] and held[bottom]["floor"]:
-        return "?", "about "
-    if held[top]["floor"]:
-        return "≥", "at least "
-    if held[bottom]["floor"]:
-        return "≤", "at most "
-    return "", ""
-
-
 def whisker(item, spans_high, bar_left, bar_w, width):
     """A bar's whisker, its start, its end, and its capped ends: the range of the rounds, or in a
     report of one climb the gap to the step that failed. None when the bar has neither."""
@@ -164,57 +142,6 @@ def whisker(item, spans_high, bar_left, bar_w, width):
         end = bar_left + width * (1 + item["gap"])
         return bar_left + width, end, (end,)
     return None
-
-
-def title_of(held, servers, validate):
-    """The chart's title: connect-zig's rate over each other's, or each share protovalidate keeps."""
-    if validate:
-        kept = [
-            f"{twin} {bound(held, name, twin)[0]}{held[name]['spans'] / held[twin]['spans'] * 100:.0f}%"
-            for name, twin in twins.items()
-            if name in held and twin in held
-        ]
-        return f"Rate kept with protovalidate: {', '.join(kept)}"
-    others = [name for name in servers if name != "connect-zig"]
-    # Four ratios do not fit one title, so a table with the Connect libraries names them alone, and
-    # each bar gives its own ratio.
-    titled = [name for name in others if name in libraries] or others
-    ratios = [
-        f"{bound(held, 'connect-zig', name)[1]}{held['connect-zig']['spans'] / held[name]['spans']:.1f} times "
-        f"{'the ' if name == 'Collector' else ''}{name}'s"
-        for name in titled
-    ]
-    title = f"One core holds {' and '.join(ratios)} spans a second, with p99 under {limit_ms} ms"
-    if len(title) > title_len_max:
-        title = f"One core holds {' and '.join(ratios)} spans a second"
-    return title
-
-
-def subtitle_of(held, validate, over):
-    """The subtitle's lines, which say what a whisker spans when a bar has one."""
-    subtitle = [
-        f"Each server holds 516 connections {over}, as one core of a 64-core gateway for 33,000 servers, and",
-        f"takes gzip OTLP exports of 16, 128 and 512 spans. The rate climbs until p99 passes {limit_ms} ms or a call is refused.",
-    ]
-    ranges = any("low" in item for item in held.values())
-    whiskers = ranges or any(item["gap"] is not None for item in held.values())
-    # What a whisker spans: the rates the rounds held, or, in a report of one climb, the gap to the
-    # step that failed.
-    whisker_text = (
-        "Each bar is the median of the rounds, and its whisker spans the rates they held."
-        if ranges
-        else "A whisker reaches the step that failed, so the rate a core holds lies inside it."
-    )
-    if validate:
-        subtitle.append(
-            "Each share is a receiver's spans a second with protovalidate over its own without. A dashed line is a"
-        )
-        subtitle.append("receiver that validates." + (f" {whisker_text}" if whiskers else ""))
-    elif whiskers:
-        subtitle.append(whisker_text)
-    if ranges:
-        subtitle.append("The right panel gives each server's first round, which climbs from the lowest rate.")
-    return subtitle
 
 
 def legend_rows_of(servers, looks, pad_l, chart_w):
@@ -340,16 +267,6 @@ def draw_legend(a, lay, looks):
             label, fill = looks[name]
             a(f'<rect x="{x}" y="{y - 10}" width="12" height="12" rx="2" fill="var({fill})"{edge(fill)}/>')
             a(f'<text class="legend" x="{x + 18}" y="{y}">{label}</text>')
-
-
-def bar_ratio(held, name, validate):
-    """The end of a bar's label: connect-zig's rate over the server's, or the share kept of its twin's."""
-    top, bottom = (name, twins.get(name)) if validate else ("connect-zig", name)
-    if bottom not in held or top == bottom:
-        return ""
-    if validate:
-        return f", {bound(held, top, bottom)[0]}{held[top]['spans'] / held[bottom]['spans'] * 100:.0f}%"
-    return f", connect-zig {bound(held, top, bottom)[0]}{held[top]['spans'] / held[bottom]['spans']:.1f}×"
 
 
 def draw_whisker(a, line, middle):

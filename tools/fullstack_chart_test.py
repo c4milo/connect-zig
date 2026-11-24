@@ -8,7 +8,12 @@ import unittest
 
 sys.path.insert(0, str(pathlib.Path(__file__).parent))
 
+import chart_text
 import fullstack_chart
+import fullstack_chart_text
+
+# The marks a label of the chart can carry.
+marks = ("≥", "≤", "?")
 
 held_header = (
     "| server | spans/s held | range | resolution | calls/s | p50 ms | p99 ms | core busy | load busy | CPU µs a span "
@@ -37,6 +42,41 @@ log_lines = [
     "| connect-zig | 7 | 7–7 | +1.0% | 1 | 1 | 1 | 1% | 1% | 1 | 1 | 1 | p99 past 100 ms |",
 ]
 log = "\n".join(log_lines)
+# The TLS table of every Connect receiver beside its twin that validates each export.
+validate_names = [
+    ("connect-zig", "800,000"),
+    ("connect-zig + protovalidate", "700,000"),
+    ("connect-go", "100,000"),
+    ("connect-go + protovalidate-go", "60,000"),
+    ("connect-rust", "300,000"),
+    ("connect-rust + protovalidate-buffa", "280,000"),
+]
+
+
+def validate_log_text():
+    """The TLS table of every Connect receiver beside its twin that validates, with each step."""
+    return "\n".join(
+        [
+            "## Full stack, production over TLS: one gateway core for 33,000 servers",
+            held_header,
+            "|---|--:|--:|--:|--:|--:|--:|--:|--:|--:|--:|--:|---|",
+            *(
+                f"| {name} | {spans} | {spans}–{spans} | +2.5% | 1 | 1 | 40.5 | 90% | 10% | 1 | 1 | 1 | p99 past 100 ms |"
+                for name, spans in validate_names
+            ),
+            "",
+            "| exports a connection a second | spans/s sent | "
+            + " | ".join(f"{name} p99 | {name} core" for name, _ in validate_names)
+            + " |",
+            "|--:|--:|" + "--:|--:|" * len(validate_names),
+            "| 1 | 35,600 | " + " | ".join("2.00 | 10%" for _ in validate_names) + " |",
+            "| 2 | 71,200 | " + " | ".join("150.00 (p99) | 99%" for _ in validate_names) + " |",
+            "Machine: aarch64, Neoverse-N2, 4 CPUs, Linux 6.8.",
+        ]
+    )
+
+
+validate_log = validate_log_text()
 
 
 def read(text, over="over TLS", validate=False):
@@ -94,9 +134,9 @@ class WhiskerTest(unittest.TestCase):
 class TitleTest(unittest.TestCase):
     def test_a_ratio_over_a_floor_is_at_most_its_value(self):
         held, _, _ = read(log)
-        self.assertEqual(fullstack_chart.bound(held, "connect-zig", "Collector"), ("≤", "at most "))
-        self.assertEqual(fullstack_chart.bound(held, "Collector", "connect-zig"), ("≥", "at least "))
-        self.assertEqual(fullstack_chart.bound(held, "connect-zig", "connect-zig"), ("", ""))
+        self.assertEqual(fullstack_chart_text.bound(held, "connect-zig", "Collector"), ("≤", "at most "))
+        self.assertEqual(fullstack_chart_text.bound(held, "Collector", "connect-zig"), ("≥", "at least "))
+        self.assertEqual(fullstack_chart_text.bound(held, "connect-zig", "connect-zig"), ("", ""))
         title = fullstack_chart.title_of(held, ["connect-zig", "Collector"], False)
         self.assertEqual(
             title, "One core holds at most 10.0 times the Collector's spans a second, with p99 under 100 ms"
@@ -125,6 +165,42 @@ class LabelTest(unittest.TestCase):
     def test_the_same_label_a_few_pixels_away_is_drawn_once(self):
         unique = fullstack_chart.unique_labels([[200, 400, "refused"], [203, 402, "refused"], [203, 402, "load full"]])
         self.assertEqual(unique, [[200, 400, "refused"], [203, 402, "load full"]])
+
+
+class DrawTest(unittest.TestCase):
+    def draw(self, held, steps, machine, transport="tls"):
+        return fullstack_chart.draw(transport, held, steps, machine, "run 1", "abc1234")
+
+    def test_no_text_passes_an_edge_or_crosses_another(self):
+        held, steps, machine = read(log)
+        self.assertEqual(chart_text.faults(self.draw(held, steps, machine)), [])
+        held, steps, machine = read(validate_log, validate=True)
+        self.assertEqual(chart_text.faults(self.draw(held, steps, machine, "validate")), [])
+
+    def test_the_subtitle_explains_each_mark_a_label_carries(self):
+        # The Collector's climb passed every step: its rate is at least its value, and connect-zig's
+        # ratio over it at most its value.
+        held, steps, machine = read(log)
+        svg = self.draw(held, steps, machine)
+        self.assertEqual(chart_text.unexplained_marks(svg, marks), [])
+        self.assertEqual(lines_of_marks(svg), ["≥", "≤"])
+        # Both climbs passed every step: the ratio of two floors is bounded by neither.
+        held["connect-zig"].update(gap=None, floor=True)
+        svg = self.draw(held, steps, machine)
+        self.assertEqual(chart_text.unexplained_marks(svg, marks), [])
+        self.assertEqual(lines_of_marks(svg), ["≥", "?"])
+        # No climb passed every step: no label carries a mark, and the subtitle explains none.
+        for item in held.values():
+            item.update(gap=0.05, floor=False)
+        svg = self.draw(held, steps, machine)
+        self.assertEqual(chart_text.unexplained_marks(svg, marks), [])
+        self.assertEqual(lines_of_marks(svg), [])
+
+
+def lines_of_marks(svg):
+    """The marks the subtitle explains, in its order."""
+    lines = [words for words, _, kind in chart_text.texts_of(svg) if kind == "sub"]
+    return [mark for line in lines for mark in marks if line.startswith(f"{mark} marks")]
 
 
 if __name__ == "__main__":

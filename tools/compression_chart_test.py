@@ -8,7 +8,11 @@ import unittest
 
 sys.path.insert(0, str(pathlib.Path(__file__).parent))
 
+import chart_text
 import compression_chart
+
+# The marks a label of the chart can carry.
+marks = ("≥", "slots full")
 
 climb_header = "| server | coding | spans/s held | range | share | share range | resolution | p99 ms | the next step |"
 peak_header = "| export | server | coding | calls/s | calls/s range | p99 ms | CPU µs a call |"
@@ -135,6 +139,71 @@ class ShareTest(unittest.TestCase):
         self.assertEqual(compression_chart.climb_label(item, (75, 70, 80), "gzip"), "75% · ≥1,500/s · slots full")
         item = {"spans": 1500, "gap": 0.1, "refused": False}
         self.assertEqual(compression_chart.climb_label(item, (100, 90, 110), "uncompressed"), "1,500/s")
+
+
+class DrawTest(unittest.TestCase):
+    def setUp(self):
+        self.held, self.peak, self.machine = read(log)
+
+    def draw(self):
+        return compression_chart.draw("tls", self.held, self.peak, self.machine, "run 1", "abc1234")
+
+    def test_no_text_passes_an_edge_or_crosses_another(self):
+        self.assertEqual(chart_text.faults(self.draw()), [])
+
+    def test_the_widest_labels_stay_in_their_panel(self):
+        # Each label at its longest: a rate of seven digits that is a floor, a share over 100%, and
+        # a climb that ended on a call refused, beside a peak bar in each row.
+        held, peak, machine = read(wide_log())
+        svg = compression_chart.draw("tls", held, peak, machine, "run 1", "abc1234")
+        self.assertIn("135% · ≥1,234,567/s · slots full", svg)
+        self.assertEqual(chart_text.faults(svg), [])
+
+    def test_the_subtitle_explains_each_mark_a_label_carries(self):
+        # zstd's climb passed every step, and connect-rust's ended on a call refused.
+        svg = self.draw()
+        self.assertEqual(chart_text.unexplained_marks(svg, marks), [])
+        self.assertEqual(lines_of_marks(svg), ["≥", "slots full"])
+        for item in self.held.values():
+            item["gap"] = item["gap"] if item["gap"] is not None else 0.01
+            item["refused"] = False
+        svg = self.draw()
+        self.assertEqual(chart_text.unexplained_marks(svg, marks), [])
+        self.assertEqual(lines_of_marks(svg), [])
+
+
+def wide_log():
+    """A report in which each label of the chart is as long as it gets."""
+    servers, codings = ("connect-zig", "connect-go", "connect-rust"), ("uncompressed", "gzip", "zstd", "brotli")
+    climbs = [
+        f"| {server} | {coding} | 1,234,567 | 1,200,000–1,300,000 | {'100' if coding == 'uncompressed' else '135'}% "
+        f"| {'' if coding == 'uncompressed' else '130–140%'} |  | 5.00 | a call refused |"
+        for server in servers
+        for coding in codings
+    ]
+    peaks = [
+        f"| 512 spans | {server} | {coding} | 1,234 | 1,200–1,300 | 1.00 | 1.0 |"
+        for server in servers
+        for coding in codings
+    ]
+    return "\n".join(
+        [
+            log_lines[0],
+            climb_header,
+            log_lines[2],
+            *climbs,
+            peak_header,
+            log_lines[9],
+            *peaks,
+            "Machine: x86_64, AMD EPYC 9V74 80-Core Processor.",
+        ]
+    )
+
+
+def lines_of_marks(svg):
+    """The marks the subtitle explains, in its order."""
+    lines = [words for words, _, kind in chart_text.texts_of(svg) if kind == "sub"]
+    return [mark for line in lines for mark in marks if line.startswith((f"{mark} marks", f'"{mark}" marks'))]
 
 
 if __name__ == "__main__":

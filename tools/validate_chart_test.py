@@ -11,6 +11,7 @@ import unittest.mock
 
 sys.path.insert(0, str(pathlib.Path(__file__).parent))
 
+import chart_text
 import validate_chart
 
 header = "| case | Zig total ns | Go total ns | Node total ns | buffa total ns | prost total ns |"
@@ -67,6 +68,15 @@ class ValidateChartTest(unittest.TestCase):
         self.assertIn("connect-zig is the fastest in 6 of 6 cases.", svg)
         self.assertIn(">10×, 10 ns</text>", svg)
         self.assertIn(">0.25×</text>", svg)
+
+    def test_reads_a_log_that_github_wrote(self):
+        self.assertEqual(read(chart_text.github_log(table)), read(table))
+
+    def test_no_text_passes_an_edge_or_crosses_another(self):
+        times, machine = read(table)
+        with contextlib.redirect_stdout(io.StringIO()):
+            svg = validate_chart.draw(times, machine, "7", "abc", ("v1.4.1", "1.1.0", "0.8.0", "0.6.1"))
+        self.assertEqual(chart_text.faults(svg), [])
 
 
 if __name__ == "__main__":

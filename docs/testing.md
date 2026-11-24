@@ -41,7 +41,10 @@ pull request. `tools/ci.sh` runs them all, as CI does, and writes a report.
   scripts, each a file `<script>_test.py` beside its script, under Python's `unittest`. They
   cover the climbs, the steps, and the reports of the full stack, the benchmark's median, and the
   reading of each chart. A test of a shell script sources it in sh: production.sh's climbs run
-  there against a stub step. Each rule a test covers was broken on purpose to prove the test
+  there against a stub step. Each chart's test also draws it, from a log that GitHub wrote too, and
+  `tools/chart_text.py` finds what a reader would see wrong: a text past an edge, over another
+  text, or over a bar, two tick labels closer than the chart allows, or a mark on a label that the
+  subtitle does not explain. Each rule a test covers was broken on purpose to prove the test
   catches it.
 - `tools/complexity_check.sh` holds each function of the Python, Go, Rust, and JavaScript of
   `bench/` and `tools/` to cognitive complexity 15, as `zig build lint` holds the Zig. It also

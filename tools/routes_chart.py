@@ -17,6 +17,9 @@ import re
 import sys
 import types
 
+# The time GitHub writes before each line of a job's log, which a log saved from a run holds.
+stamp = re.compile(r"^\d{4}-\d\d-\d\dT[0-9:.]+Z ")
+
 protocols = [("Connect", "Connect unary call"), ("gRPC", "gRPC unary call")]
 time_columns = [
     ("connect-zig", "Zig ns/op", "--zig"),
@@ -49,7 +52,8 @@ def read(table_path):
     small message's rows, and the machine."""
     columns, machine, times = None, None, {}
     with open(table_path) as table:
-        for line in table:
+        for raw in table:
+            line = stamp.sub("", raw)
             if line.startswith("Machine: "):
                 machine = ", ".join(part.strip() for part in line[len("Machine: ") :].split(",")[:2])
             if not line.startswith("|"):

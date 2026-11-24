@@ -8,6 +8,7 @@ import unittest
 
 sys.path.insert(0, str(pathlib.Path(__file__).parent))
 
+import chart_text
 import speed_chart
 
 header = "| message | operation | Zig ns/op | Go ns/op | Rust ns/op | Go time / Zig time | Rust time / Zig time |"
@@ -31,6 +32,20 @@ def speed_rows():
                 rust, rust_over_zig = "absent", "absent"
             rows.append(f"| {message} | {operation} | 10 | 40 | {rust} | 4.0 | {rust_over_zig} |")
     return rows
+
+
+# The versions the legend names, so a test reads no lock file.
+versions = ("v1.36.10", "0.5.0")
+# The least gap the chart keeps between the middles of two tick labels (speed_chart.layout_of).
+tick_gap_min = 28
+# The longest machine the subtitle has named.
+long_machine = "x86_64, AMD EPYC 9V74 80-Core Processor"
+
+
+def scaled(top):
+    """Each cell at `top` times Go's speed for connect-zig, and at half that for Buffa."""
+    keys = [(message, operation) for message in speed_chart.msg_keys for operation in speed_chart.op_keys]
+    return {key: float(top) for key in keys}, {key: top / 2 for key in keys}, {key: 2.0 for key in keys}
 
 
 def read(reader, text):
@@ -66,6 +81,23 @@ class SpeedChartTest(unittest.TestCase):
         tied = {key: 1.0 for key in buffa_over_zig}
         self.assertEqual(speed_chart.claim(list(tied.values()), "Buffa"), "Buffa beats connect-zig in no cell")
         self.assertEqual(speed_chart.claim([], "Buffa"), "Buffa did not run")
+
+    def test_reads_a_log_that_github_wrote(self):
+        text = table_text(speed_rows())
+        self.assertEqual(read(speed_chart.read, chart_text.github_log(text)), read(speed_chart.read, text))
+
+    def test_no_text_passes_an_edge_or_crosses_another(self):
+        zig_speed, buffa_speed, buffa_over_zig, machine = read(speed_chart.read, table_text(speed_rows()))
+        svg = speed_chart.draw(zig_speed, buffa_speed, buffa_over_zig, machine, "run 1", "abc1234", versions)
+        self.assertEqual(chart_text.faults(svg), [])
+
+    def test_tick_labels_stay_apart_at_every_scale(self):
+        for top in range(2, 61):
+            zig_speed, buffa_speed, buffa_over_zig = scaled(top)
+            svg = speed_chart.draw(zig_speed, buffa_speed, buffa_over_zig, long_machine, "run 1", "abc1234", versions)
+            with self.subTest(top=top):
+                self.assertGreaterEqual(chart_text.tick_gap(svg), tick_gap_min)
+                self.assertEqual(chart_text.faults(svg), [])
 
 
 if __name__ == "__main__":

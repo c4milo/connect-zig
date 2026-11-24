@@ -18,6 +18,9 @@ import pathlib
 import re
 import sys
 
+# The time GitHub writes before each line of a job's log, which a log saved from a run holds.
+stamp = re.compile(r"^\d{4}-\d\d-\d\dT[0-9:.]+Z ")
+
 cases = ["small valid", "small invalid", "medium valid", "medium invalid", "rules valid", "rules invalid"]
 # The implementations, as the table's columns name them, in the order of the bars.
 labels = ["Zig", "buffa", "prost", "Node"]
@@ -46,7 +49,8 @@ def read(table_path):
     machine."""
     columns, times, machine = None, {}, None
     with open(table_path) as table:
-        for line in table:
+        for raw in table:
+            line = stamp.sub("", raw)
             if line.startswith("Machine: "):
                 machine = line[len("Machine: ") :].strip()
             if not line.startswith("|"):
