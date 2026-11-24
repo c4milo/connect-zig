@@ -15,8 +15,10 @@
 # complexipy 9.0.0 by the SHA-256 of each wheel in requirements.txt, gocognit v1.3.0 in go.mod and
 # go.sum, eslint 9.39.5 with eslint-plugin-sonarjs 4.2.2 in package-lock.json, and
 # rust-code-analysis-cli 0.0.25 below. It needs python3 with venv, go, cargo, and node with npm.
-# package.json lifts the minimatch that eslint-plugin-sonarjs asks for, ^10.2.6, to 11.0.9, past
-# GHSA-g3hv-75wg-m249, a denial of service by a pattern; eslint takes the same through its peer.
+# package.json lifts each minimatch to 11.0.9, past GHSA-g3hv-75wg-m249, a denial of service by a
+# pattern: eslint-plugin-sonarjs asks for ^10.2.6. The override names no package, so npm 10 and
+# npm 11 write one lockfile from it. Under an override of the plugin alone, npm 11 lifted more
+# of eslint's packages than npm 10 did, and its `npm ci` refused the lockfile npm 10 wrote.
 set -eu
 cd "$(dirname "$0")/.."
 root="$(pwd)"
@@ -97,7 +99,11 @@ javascript_check() {
         rm -rf "${install}"
         mkdir -p "${install}"
         cp tools/complexity/package.json tools/complexity/package-lock.json "${install}/"
-        (cd "${install}" && npm ci --no-audit --no-fund --silent)
+        # npm says nothing when it installs, and says why when it refuses the lockfile.
+        if ! output="$(cd "${install}" && npm ci --no-audit --no-fund 2>&1)"; then
+            printf '%s\n' "${output}"
+            exit 1
+        fi
     fi
     # The configuration imports the plugin, which node finds beside the configuration.
     cp tools/complexity/eslint.config.mjs "${install}/"

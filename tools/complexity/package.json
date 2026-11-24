@@ -7,8 +7,6 @@
     "eslint-plugin-sonarjs": "4.2.2"
   },
   "overrides": {
-    "eslint-plugin-sonarjs": {
-      "minimatch": "11.0.9"
-    }
+    "minimatch": "11.0.9"
   }
 }
