@@ -102,7 +102,8 @@ The spans a second each core holds over TLS, the median of three rounds, with th
 | connect-go | 101,213 | 98,715–101,213 | 160,510 | 144,053–164,672 |
 | Vector | 82,310 | 80,261–82,310 | 132,786 | 86,782–137,462 |
 
-The most spans a second a step of the first round held with p99 at most 10 ms:
+The highest rate each server held with p99 at or under 10 ms, in spans a second, from the first
+round:
 
 | Server | arm64 | x86-64 |
 | --- | ---: | ---: |
