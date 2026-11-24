@@ -5,5 +5,10 @@
   "devDependencies": {
     "eslint": "9.39.5",
     "eslint-plugin-sonarjs": "4.2.2"
+  },
+  "overrides": {
+    "eslint-plugin-sonarjs": {
+      "minimatch": "11.0.9"
+    }
   }
 }

@@ -15,6 +15,8 @@
 # complexipy 9.0.0 by the SHA-256 of each wheel in requirements.txt, gocognit v1.3.0 in go.mod and
 # go.sum, eslint 9.39.5 with eslint-plugin-sonarjs 4.2.2 in package-lock.json, and
 # rust-code-analysis-cli 0.0.25 below. It needs python3 with venv, go, cargo, and node with npm.
+# package.json lifts the minimatch that eslint-plugin-sonarjs asks for, ^10.2.6, to 11.0.9, past
+# GHSA-g3hv-75wg-m249, a denial of service by a pattern; eslint takes the same through its peer.
 set -eu
 cd "$(dirname "$0")/.."
 root="$(pwd)"
