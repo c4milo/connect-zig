@@ -205,9 +205,12 @@ first. Cite an entry by number in code and commits ("decision 6").
     40 as amended that day moved from `codec`. connect-zig names no type of its own for it. A
     program detects the features once with `platform.CpuFeatures.detect()`, as it does for
     `protovalidate` (decision 47). The default is `.target()`, the build target's, so a program
-    that sets neither field codes as before. A build for a generic CPU then runs gzip's CRC-32
-    from a table: 35.0 million instructions under callgrind for the OTLP sink's 40 exports of 512
-    spans, against 4.7 million with PCLMULQDQ. connect-zig pins the stdx that colibri pins, now
+    that sets neither field codes as before. Under callgrind, the OTLP sink built for the
+    baseline x86-64 CPU took 315.9 million instructions for 40 gzip exports of 512 spans with the
+    target's features, and 269.4 million with the detected ones. gzip's CRC-32 fell from 36.2 to
+    5.3 million, from a table to PCLMULQDQ, and inflate from 40.9 to 27.3 million, on its x86-64
+    fast path. Valgrind runs a CPU of its own, with no AVX-512, so a real CPU may take other paths.
+    connect-zig pins the stdx that colibri pins, now
     once: `protovalidate` takes `regex` from it too. Beaten: the build target's features inside
     `compress` and `decompress`, which no program can raise; a default of `.detect()`, which is
     a probe in the library; and a field of the App, which a program with no connect_colibri
