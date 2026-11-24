@@ -2163,9 +2163,6 @@ ran on Linux x86-64 with Zig 0.16.0.
 - For `oidc`, a measurement before any change: a client sends one token with each call, and
   the verifier checks its signature each time. If that cost shows in a server's profile, a
   verifier may keep the last tokens it took.
-- For `protovalidate`, one pin of stdx. `stdx_regex` pins the commit that brought `regex`
-  beside the stdx that colibri pins (decision 47). The two become one when a colibri release
-  pins a stdx that holds `regex`.
 - For `protovalidate`, a DFA that the compiler builds whole from a pattern the build knows,
   which the owner approved for stdx on 2026-11-22 (stdx's decision 86). A kept searcher builds
   its states at its first checks; such a DFA would hold them all in the binary. The module

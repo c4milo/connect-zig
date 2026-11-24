@@ -6,21 +6,22 @@
 const std = @import("std");
 const assert = std.debug.assert;
 const regex = @import("regex");
-const codec = @import("codec");
+const platform = @import("platform");
 const constants = @import("constants.zig");
 
-// The CPU features a search takes are stdx's `codec.Features`, of the stdx `regex` comes from.
-// A program detects them once with `codec.Features.detect()`, or names the build target's with
-// `codec.Features.target()`. A search with AVX2 reads 32 octets a step where it reads 16 without.
+// The CPU features a search takes are stdx's `platform.CpuFeatures`, of the stdx `regex` comes
+// from. A program detects them once with `platform.CpuFeatures.detect()`, or names the build
+// target's with `platform.CpuFeatures.target()`. A search with AVX2 reads 32 octets a step where
+// it reads 16 without.
 comptime {
-    assert(@FieldType(regex.SearcherOptions, "features") == codec.Features);
+    assert(@FieldType(regex.SearcherOptions, "features") == platform.CpuFeatures);
 }
 
 /// Whether some part of `text` matches `pattern`. CEL language definition, "Regular
 /// Expressions": "matches succeed if they match a substring of the argument". A pattern
 /// states its own anchors. An octet of `text` that is not UTF-8 matches nothing. The caller
 /// checked the pattern with `problem_of`, as `rules_error` does.
-pub fn matches(comptime pattern: []const u8, text: []const u8, cpu_features: codec.Features) bool {
+pub fn matches(comptime pattern: []const u8, text: []const u8, cpu_features: platform.CpuFeatures) bool {
     const Kept = Searcher(pattern);
     // A searcher is made ready again for features that its last check did not name, so each
     // check searches with its caller's. A program passes the one value it detected, so a thread
@@ -29,7 +30,7 @@ pub fn matches(comptime pattern: []const u8, text: []const u8, cpu_features: cod
     return Kept.searcher.is_match(text);
 }
 
-fn make_ready(comptime Kept: type, cpu_features: codec.Features) void {
+fn make_ready(comptime Kept: type, cpu_features: platform.CpuFeatures) void {
     Kept.searcher.init(&Kept.program, &.{ .features = cpu_features }, &Kept.memory);
     Kept.ready_with = cpu_features;
     Kept.ready = true;
@@ -37,15 +38,15 @@ fn make_ready(comptime Kept: type, cpu_features: codec.Features) void {
 
 /// A set of features as its octets. Each field is a bool, one octet that holds 0 or 1, so the
 /// struct holds no padding and two equal sets hold equal octets.
-fn octets_of(cpu_features: *const codec.Features) *const [@sizeOf(codec.Features)]u8 {
-    comptime assert(@sizeOf(codec.Features) == std.meta.fields(codec.Features).len);
-    comptime for (std.meta.fields(codec.Features)) |field| assert(field.type == bool);
+fn octets_of(cpu_features: *const platform.CpuFeatures) *const [@sizeOf(platform.CpuFeatures)]u8 {
+    comptime assert(@sizeOf(platform.CpuFeatures) == std.meta.fields(platform.CpuFeatures).len);
+    comptime for (std.meta.fields(platform.CpuFeatures)) |field| assert(field.type == bool);
     return @ptrCast(cpu_features);
 }
 
 /// The features this thread's searcher of `pattern` was made ready with, or null before its
 /// first check. The tests read it to see that a check's features reach the searcher.
-pub fn kept_cpu_features(comptime pattern: []const u8) ?codec.Features {
+pub fn kept_cpu_features(comptime pattern: []const u8) ?platform.CpuFeatures {
     const Kept = Searcher(pattern);
     return if (Kept.ready) Kept.ready_with else null;
 }
@@ -70,7 +71,7 @@ fn SearcherOf(comptime octets: anytype) type {
         threadlocal var searcher: regex.Searcher align(@alignOf(regex.Searcher)) = undefined;
         /// Whether a check made the searcher ready, and with which features.
         threadlocal var ready: bool align(@alignOf(bool)) = false;
-        threadlocal var ready_with: codec.Features align(@alignOf(codec.Features)) = .{};
+        threadlocal var ready_with: platform.CpuFeatures align(@alignOf(platform.CpuFeatures)) = .{};
     };
 }
 
@@ -111,7 +112,7 @@ fn compile(comptime pattern: []const u8) regex.Error!regex.Program {
 
 const testing = std.testing;
 /// What the build target guarantees, which every CPU that runs the tests has.
-const testing_cpu_features = codec.Features.target();
+const testing_cpu_features = platform.CpuFeatures.target();
 
 test "a pattern matches any part of a text, and its anchors hold it to the whole" {
     try testing.expect(matches("foo.*", "foobar", testing_cpu_features));
@@ -172,7 +173,7 @@ test "a pattern reads Unicode's properties, and folds case past ASCII" {
 }
 
 /// The answer of a searcher made ready for `text` alone.
-fn fresh(comptime pattern: []const u8, text: []const u8, with: codec.Features) bool {
+fn fresh(comptime pattern: []const u8, text: []const u8, with: platform.CpuFeatures) bool {
     const Kept = Searcher(pattern);
     var memory: @TypeOf(Kept.memory) = undefined;
     var searcher: regex.Searcher = undefined;
@@ -195,10 +196,10 @@ test "a check searches with the features its caller passes" {
     const pattern = "^[a-z0-9._%+-]+@[a-z0-9.-]+\\.[a-z]{2,}$";
     const texts = [_][]const u8{ "ada@example.com", "ada@example", "ada.lovelace+notes@mail.example.org", "@example.com" };
     // Each set the CPU has: none, the build target's, and the detected one, which may name AVX2.
-    const sets = [_]codec.Features{ codec.Features.none(), codec.Features.target(), codec.Features.detect() };
+    const sets = [_]platform.CpuFeatures{ platform.CpuFeatures.none(), platform.CpuFeatures.target(), platform.CpuFeatures.detect() };
     for (sets) |set| {
         for (texts) |text| try testing.expectEqual(fresh(pattern, text, set), matches(pattern, text, set));
-        try testing.expect(std.meta.eql(kept_cpu_features(pattern), @as(?codec.Features, set)));
+        try testing.expect(std.meta.eql(kept_cpu_features(pattern), @as(?platform.CpuFeatures, set)));
         // The features reach the searcher: its forward DFA takes the paths a fresh one's takes.
         const Kept = Searcher(pattern);
         var memory: @TypeOf(Kept.memory) = undefined;

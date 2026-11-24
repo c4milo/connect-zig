@@ -26,7 +26,7 @@ const client_address: server.Address = .init(&constants.loopback, constants.clie
 /// What a program probes once and passes every TLS configuration: here no CPU feature is known
 /// and the thread's timing mode is not stated, so each session runs ChaCha20 alone.
 pub const cpu: tls.Cpu = .{
-    .probe = .{ .aes_clmul = .not_known, .dit = .not_known, .sha256 = .not_known, .sha512 = .not_known, .sha3 = .not_known, .ssse3 = .not_known, .sse4_1 = .not_known, .avx2 = .not_known, .vaes = .not_known },
+    .probe = .{ .aes_clmul = .not_known, .dit = .not_known, .sha256 = .not_known, .sha512 = .not_known, .sha3 = .not_known, .sve2 = .not_known, .ssse3 = .not_known, .sse4_1 = .not_known, .avx2 = .not_known, .vaes = .not_known, .midr = null },
     .timing = .not_stated,
 };
 

@@ -10,14 +10,14 @@
 const std = @import("std");
 const proto = @import("protobuf");
 const cel = @import("cel_expression");
-const codec = @import("codec");
+const platform = @import("platform");
 const cases = @import("cases");
 
 /// The suite's expressions read no names.
 const scope: cel.Scope = .{ .names = &.{}, .types = &.{} };
 /// The build target's CPU features, which `matches` searches with. The answers are the same
 /// with any features.
-const features: codec.Features = .target();
+const features: platform.CpuFeatures = .target();
 /// The room an expression writes its text into, and the room of one value's JSON.
 const room_len = 65_536;
 const value_text_len_max = 65_536;

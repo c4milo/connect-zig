@@ -12,7 +12,7 @@
 const std = @import("std");
 const proto = @import("protobuf");
 const protovalidate = @import("protovalidate");
-const codec = @import("codec");
+const platform = @import("platform");
 const rules = @import("schema");
 
 /// The most rules one schema of the check holds.
@@ -37,7 +37,7 @@ const State = struct {
     report_storage: [report_len]u8 align(@alignOf(protovalidate.Violation)),
     out_buffer: [io_buffer_len]u8,
     /// The CPU features each rule's regular expressions search with, detected once.
-    cpu_features: codec.Features,
+    cpu_features: platform.CpuFeatures,
 };
 
 pub const Error = error{ Usage, MessagesTooLarge, MessageTooLarge, WrongDigits };

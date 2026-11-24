@@ -9,7 +9,7 @@
 const std = @import("std");
 const assert = std.debug.assert;
 const rpc_error = @import("rpc_error.zig");
-const codec = @import("codec");
+const platform = @import("platform");
 const base64 = @import("base64");
 const json_read = @import("json_read.zig");
 const envelope = @import("envelope.zig");
@@ -47,7 +47,7 @@ pub fn write(failure: ?RpcError, buffer: []u8, out: []Header) Error![]const Head
     const status_bytes = try rpc_error.encode_status(status, buffer[used + half ..], buffer[used..][0..half]);
     // gRPC PROTOCOL-HTTP2.md: a "-bin" value is base64, written without padding.
     var encoder: base64.Encoder = undefined;
-    encoder.init(.{ .alphabet = .standard, .padding = false }, codec.Features.target());
+    encoder.init(.{ .alphabet = .standard, .padding = false }, platform.CpuFeatures.target());
     const details_len = try encoder.encode_all(status_bytes, buffer[used..][0..half]);
     const details = buffer[used..][0..details_len];
     count = add(out, count, "grpc-status-details-bin", details);

@@ -7,7 +7,7 @@
 const std = @import("std");
 const assert = std.debug.assert;
 const json = @import("json");
-const codec = @import("codec");
+const platform = @import("platform");
 const wire = @import("wire.zig");
 const descriptor = @import("descriptor.zig");
 const scalar = @import("scalar.zig");
@@ -38,7 +38,7 @@ pub const Transcoder = struct {
 /// with `tokens` as the reader's storage for one token's octets.
 pub fn transcode(comptime T: type, text: []const u8, binary: []u8, tokens: []u8, comptime registry: []const type) Error![]const u8 {
     var transcoder: Transcoder = .{
-        .reader = json.TextReader.init(text, tokens, .text, codec.Features.target()),
+        .reader = json.TextReader.init(text, tokens, .text, platform.CpuFeatures.target()),
         .writer = .{ .buffer = binary },
     };
     if (!transcoder.reader.next_text()) return error.UnexpectedToken;

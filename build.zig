@@ -42,9 +42,7 @@ pub fn build(b: *std.Build) void {
     // program asks with `.rotor = true` (decision 39). The library never needs Rotor (decision 32).
     const rotor = b.option(bool, "rotor", "Build colibri's .private kinds of colibri.Server and colibri.Client, on Rotor (decision 39)") orelse (b.pkg_hash.len == 0);
     const colibri = b.dependency("colibri", .{ .target = target, .release = release, .rotor = rotor });
-    // stdx's `regex`, for `protovalidate`'s patterns (build.zig.zon says why a second pin).
-    const stdx_regex = b.dependency("stdx_regex", .{ .target = target, .release = release });
-    const graph = modules(b, .{ .stdx = stdx, .stdx_regex = stdx_regex }, colibri, target, optimize);
+    const graph = modules(b, stdx, colibri, target, optimize);
     for (colibri_exports) |name| {
         b.modules.put(b.graph.arena, name, colibri.module(name)) catch @panic("OOM");
     }
@@ -86,12 +84,7 @@ pub fn build(b: *std.Build) void {
     schema_programs.add(b, graph);
 }
 
-/// The two pins of stdx: the one colibri pins, and the one whose `regex` module `protovalidate`
-/// reads.
-const Stdx = struct { stdx: *std.Build.Dependency, stdx_regex: *std.Build.Dependency };
-
-fn modules(b: *std.Build, packages: Stdx, colibri: *std.Build.Dependency, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode) Graph {
-    const stdx = packages.stdx;
+fn modules(b: *std.Build, stdx: *std.Build.Dependency, colibri: *std.Build.Dependency, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode) Graph {
     const public_names = b.createModule(.{
         .root_source_file = b.path("src/public_names/public_names.zig"),
         .target = target,
@@ -103,7 +96,7 @@ fn modules(b: *std.Build, packages: Stdx, colibri: *std.Build.Dependency, target
         .optimize = optimize,
         .imports = &.{
             .{ .name = "json", .module = stdx.module("json") },
-            .{ .name = "codec", .module = stdx.module("codec") },
+            .{ .name = "platform", .module = stdx.module("platform") },
             .{ .name = "base64", .module = stdx.module("base64") },
             .{ .name = "public_names", .module = public_names },
         },
@@ -115,7 +108,7 @@ fn modules(b: *std.Build, packages: Stdx, colibri: *std.Build.Dependency, target
         .imports = &.{
             .{ .name = "protobuf", .module = protobuf },
             .{ .name = "json", .module = stdx.module("json") },
-            .{ .name = "codec", .module = stdx.module("codec") },
+            .{ .name = "platform", .module = stdx.module("platform") },
             .{ .name = "gzip", .module = stdx.module("gzip") },
             .{ .name = "zstd", .module = stdx.module("zstd") },
             .{ .name = "brotli", .module = stdx.module("brotli") },
@@ -143,7 +136,7 @@ fn modules(b: *std.Build, packages: Stdx, colibri: *std.Build.Dependency, target
         .connect = connect,
         .connect_colibri = connect_colibri,
         .oidc = oidc_module(b, stdx, connect, public_names, target, optimize),
-        .protovalidate = protovalidate_module(b, protobuf, public_names, packages.stdx_regex, target, optimize),
+        .protovalidate = protovalidate_module(b, protobuf, public_names, stdx, target, optimize),
         .public_names = public_names,
         .colibri = colibri,
         .platform = stdx.module("platform"),
@@ -164,7 +157,7 @@ fn oidc_module(b: *std.Build, stdx: *std.Build.Dependency, connect: *std.Build.M
         .imports = &.{
             .{ .name = "connect", .module = connect },
             .{ .name = "json", .module = stdx.module("json") },
-            .{ .name = "codec", .module = stdx.module("codec") },
+            .{ .name = "platform", .module = stdx.module("platform") },
             .{ .name = "chapulin", .module = chapulin.object(b, target).module("chapulin") },
             .{ .name = "public_names", .module = public_names },
         },
@@ -175,7 +168,7 @@ fn oidc_module(b: *std.Build, stdx: *std.Build.Dependency, connect: *std.Build.M
 /// descriptor.proto that it reads its rules and writes its violations with. Each generated file
 /// is a module under the name the plugin gives its .proto file, so a program's generated code
 /// that names a `buf.validate` type imports the same one.
-fn protovalidate_module(b: *std.Build, protobuf: *std.Build.Module, public_names: *std.Build.Module, stdx_regex: *std.Build.Dependency, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode) *std.Build.Module {
+fn protovalidate_module(b: *std.Build, protobuf: *std.Build.Module, public_names: *std.Build.Module, stdx: *std.Build.Dependency, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode) *std.Build.Module {
     const descriptor = b.addModule("google_protobuf_descriptor", .{
         .root_source_file = b.path("src/protovalidate/gen/google/protobuf/descriptor.pb.zig"),
         .target = target,
@@ -201,9 +194,9 @@ fn protovalidate_module(b: *std.Build, protobuf: *std.Build.Module, public_names
             .{ .name = "google_protobuf_descriptor", .module = descriptor },
             .{ .name = "public_names", .module = public_names },
             // `pattern` and CEL's `matches` (design §8 step 35), and the CPU features a program
-            // passes them, stdx's `codec.Features` of the same pin.
-            .{ .name = "regex", .module = stdx_regex.module("regex") },
-            .{ .name = "codec", .module = stdx_regex.module("codec") },
+            // passes them, stdx's `platform.CpuFeatures`.
+            .{ .name = "regex", .module = stdx.module("regex") },
+            .{ .name = "platform", .module = stdx.module("platform") },
         },
     });
 }

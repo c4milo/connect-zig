@@ -9,7 +9,7 @@
 const std = @import("std");
 const assert = std.debug.assert;
 const json = @import("json");
-const codec = @import("codec");
+const platform = @import("platform");
 const wire = @import("wire.zig");
 const descriptor = @import("descriptor.zig");
 const constants = @import("constants.zig");
@@ -294,7 +294,7 @@ pub fn parse_float(comptime V: type, octets: []const u8, from_string: bool) Deco
 const testing = std.testing;
 
 fn written(comptime kind: Kind, comptime V: type, value: V, buffer: []u8) ![]const u8 {
-    var text = json.TextWriter.init(buffer, .text, codec.Features.target());
+    var text = json.TextWriter.init(buffer, .text, platform.CpuFeatures.target());
     try write(kind, V, value, &text);
     return text.written();
 }

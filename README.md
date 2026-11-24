@@ -225,8 +225,8 @@ The `protovalidate` module checks each message against the rules that its schema
    pub const route_options: rpc.RouteOptions = .{ .interceptors = &.{Validate} };
    ```
 
-3. Give your `App` a field `cpu_features: codec.Features`, and set it once when your program
-   starts, with stdx's `codec.Features.detect()`. The build fails without it.
+3. Give your `App` a field `cpu_features: platform.CpuFeatures`, and set it once when your
+   program starts, with stdx's `platform.CpuFeatures.detect()`. The build fails without it.
 
 A message that breaks a rule ends its call with `invalid_argument`, and with an error detail that
 lists each violation.

@@ -30,7 +30,7 @@
 const std = @import("std");
 const proto = @import("protobuf");
 const protovalidate = @import("protovalidate");
-const codec = @import("codec");
+const platform = @import("platform");
 const schema = @import("bench_validate_v1");
 const measure = @import("measure.zig");
 const constants = @import("constants.zig");
@@ -81,7 +81,7 @@ const State = struct {
     path: [constants.path_len]u8,
     output: [constants.output_len]u8 align(constants.buffer_align),
     /// The CPU features each validation's regular expressions search with, which `main` sets.
-    cpu_features: codec.Features,
+    cpu_features: platform.CpuFeatures,
 };
 
 /// What the command line asks for.

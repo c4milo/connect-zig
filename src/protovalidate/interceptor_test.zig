@@ -1,7 +1,7 @@
 //! Tests of `Interceptor` over a stand-in for the `connect` module: what its `on_message`
 //! answers for a message that passes, that breaks a rule, and that cannot be checked.
 const std = @import("std");
-const codec = @import("codec");
+const platform = @import("platform");
 const assert = std.debug.assert;
 const testing = std.testing;
 const proto = @import("protobuf");
@@ -49,7 +49,7 @@ fn Fixture(comptime options: interceptor.InterceptorOptions) type {
 
 const Plain = Fixture(.{});
 /// An App with the CPU features every App holds, and no time.
-const no_time = struct { cpu_features: codec.Features = .target() };
+const no_time = struct { cpu_features: platform.CpuFeatures = .target() };
 
 /// The rule ids of the violations an error's detail holds, joined with spaces.
 fn expect_detail(failure: stand_in.RpcError, expected: []const u8) !void {
@@ -145,7 +145,7 @@ test "a rule that reads the time takes it from the App, and fails closed without
     try testing.expectEqual(@as(usize, 0), failure.details.len);
     // The App's time decides: a timestamp at it passes, and one after it does not
     // (validate.proto, timestamp.lt_now: "this > now").
-    const Clock = struct { cpu_features: codec.Features = .target(), protovalidate_now: proto.wkt.Timestamp };
+    const Clock = struct { cpu_features: platform.CpuFeatures = .target(), protovalidate_now: proto.wkt.Timestamp };
     try testing.expectEqual(@as(?stand_in.RpcError, null), fixture.check(&Clock{ .protovalidate_now = .{ .seconds = second } }, Timed, &message));
     const late = fixture.check(&Clock{ .protovalidate_now = .{ .seconds = second - 1 } }, Timed, &message).?;
     try testing.expectEqual(stand_in.Code.invalid_argument, late.code);
@@ -169,11 +169,11 @@ const Capitalized = support.One([]const u8, .string, .{ .type = .{ .string = .{ 
 
 test "a rule's regular expression searches with the App's CPU features" {
     var fixture: Plain = .{};
-    const sets = [_]codec.Features{ codec.Features.none(), codec.Features.target(), codec.Features.detect() };
+    const sets = [_]platform.CpuFeatures{ platform.CpuFeatures.none(), platform.CpuFeatures.target(), platform.CpuFeatures.detect() };
     for (sets) |set| {
         const app: no_time = .{ .cpu_features = set };
         try testing.expectEqual(@as(?stand_in.RpcError, null), fixture.check(&app, Capitalized, &.{ .val = "Ada" }));
-        try testing.expect(std.meta.eql(pattern.kept_cpu_features(capitalized), @as(?codec.Features, set)));
+        try testing.expect(std.meta.eql(pattern.kept_cpu_features(capitalized), @as(?platform.CpuFeatures, set)));
         try testing.expectEqual(stand_in.Code.invalid_argument, fixture.check(&app, Capitalized, &.{ .val = "ada" }).?.code);
     }
 }

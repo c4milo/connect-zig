@@ -13,7 +13,7 @@
 //! // In the route options: .interceptors = &.{Validate}; in the route table: .Values = Values.
 //! ```
 const std = @import("std");
-const codec = @import("codec");
+const platform = @import("platform");
 const assert = std.debug.assert;
 const proto = @import("protobuf");
 const pb = @import("buf_validate_validate");
@@ -55,9 +55,9 @@ pub fn InterceptorRoom(comptime connect: type, comptime options: InterceptorOpti
 ///   `protovalidate_now: proto.wkt.Timestamp` that the program writes from its clock (decision
 ///   3). With no such field the call ends with `internal`.
 /// - A rule's regular expression searches with the CPU features in the `App`'s field
-///   `cpu_features: codec.Features`, stdx's type, which every module of the program reads. The
-///   program writes it once as it starts, from `codec.Features.detect()`. An `App` with no such
-///   field stops the build.
+///   `cpu_features: platform.CpuFeatures`, stdx's type, which every module of the program reads.
+///   The program writes it once as it starts, from `platform.CpuFeatures.detect()`. An `App` with
+///   no such field stops the build.
 /// - A message the module cannot check whole ends its call too: `resource_exhausted` for a
 ///   `unique` list or a map longer than `constants.compared_items_max`.
 /// - A message type with no rule costs its call no instruction.
@@ -95,15 +95,15 @@ pub fn values_error(comptime Values: type, comptime Room: type) ?[]const u8 {
 
 /// The CPU features the program's `App` holds for a rule's regular expression. The module
 /// probes no CPU and names none for the program, as stdx and colibri name none (decision 47).
-fn cpu_features_of(app: anytype) codec.Features {
+fn cpu_features_of(app: anytype) platform.CpuFeatures {
     comptime if (app_error(@TypeOf(app.*))) |problem| @compileError(problem);
     return app.cpu_features;
 }
 
 /// What is wrong with the program's `App` for the interceptor, or null.
 pub fn app_error(comptime App: type) ?[]const u8 {
-    if (@hasField(App, "cpu_features") and @FieldType(App, "cpu_features") == codec.Features) return null;
-    return "protovalidate.Interceptor: the program's App needs a field `cpu_features: codec.Features`, stdx's type, which the program sets once as it starts, from `codec.Features.detect()`";
+    if (@hasField(App, "cpu_features") and @FieldType(App, "cpu_features") == platform.CpuFeatures) return null;
+    return "protovalidate.Interceptor: the program's App needs a field `cpu_features: platform.CpuFeatures`, stdx's type, which the program sets once as it starts, from `platform.CpuFeatures.detect()`";
 }
 
 /// The time the program's `App` holds for the rules that read it, or none.

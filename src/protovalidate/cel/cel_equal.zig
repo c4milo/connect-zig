@@ -108,7 +108,7 @@ fn known_len(list: anytype) ?usize {
 
 const testing = std.testing;
 /// The build target's CPU features, which `matches` searches with in the tests.
-const testing_cpu_features = @import("codec").Features.target();
+const testing_cpu_features = @import("platform").CpuFeatures.target();
 const program = @import("cel_program.zig");
 
 const Message = struct {

@@ -9,7 +9,7 @@ const wire = @import("wire.zig");
 const descriptor = @import("descriptor.zig");
 const constants = @import("constants.zig");
 const json = @import("json");
-const codec = @import("codec");
+const platform = @import("platform");
 const Kind = descriptor.Kind;
 
 /// Reads one value of `kind` as `V`. The caller checked the wire type.
@@ -46,7 +46,7 @@ pub fn is_utf8(octets: []const u8) bool {
         if (is_ascii_short(octets)) return true;
         return std.unicode.utf8ValidateSlice(octets);
     }
-    return json.is_utf8(octets, codec.Features.target());
+    return json.is_utf8(octets, platform.CpuFeatures.target());
 }
 
 /// The bit no ASCII octet sets: an octet below 0x80 is a character alone (RFC 3629 §3).

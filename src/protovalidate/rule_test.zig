@@ -1,7 +1,7 @@
 //! Tests of each type's rules through `validate`: a value at each side of what a rule states,
 //! and the id of the rule it breaks.
 const std = @import("std");
-const codec = @import("codec");
+const platform = @import("platform");
 const testing = std.testing;
 const proto = @import("protobuf");
 const pb = @import("buf_validate_validate");
@@ -237,14 +237,14 @@ test "a string's and a bytes field's pattern match any part, and bytes that are 
 }
 
 test "a string's and a bytes field's pattern search with the CPU features of the options" {
-    const sets = [_]codec.Features{ codec.Features.none(), codec.Features.target(), codec.Features.detect() };
+    const sets = [_]platform.CpuFeatures{ platform.CpuFeatures.none(), platform.CpuFeatures.target(), platform.CpuFeatures.detect() };
     const word = "^[a-z]+[0-9]*$";
     const octet = "^[a-f]+$";
     for (sets) |set| {
         try support.expect_at(Text, .string, comptime string(.{ .pattern = word }), "abc12", .{ .cpu_features = set }, "");
-        try testing.expect(std.meta.eql(pattern.kept_cpu_features(word), @as(?codec.Features, set)));
+        try testing.expect(std.meta.eql(pattern.kept_cpu_features(word), @as(?platform.CpuFeatures, set)));
         try support.expect_at(Text, .bytes, comptime octets(.{ .pattern = octet }), "cafe", .{ .cpu_features = set }, "");
-        try testing.expect(std.meta.eql(pattern.kept_cpu_features(octet), @as(?codec.Features, set)));
+        try testing.expect(std.meta.eql(pattern.kept_cpu_features(octet), @as(?platform.CpuFeatures, set)));
     }
 }
 

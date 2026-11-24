@@ -9,8 +9,8 @@
 //! var storage: [protovalidate.constants.report_bytes_default]u8 align(@alignOf(protovalidate.Violation)) = undefined;
 //! var report: protovalidate.Report = .init(&storage);
 //! // Once, as the program starts: the CPU features a rule's regular expression may use, from
-//! // stdx's `codec`, of the stdx connect-zig pins as `stdx_regex`.
-//! const cpu_features: codec.Features = .detect();
+//! // stdx's `platform`, of the stdx connect-zig pins.
+//! const cpu_features: platform.CpuFeatures = .detect();
 //! protovalidate.validate(User, &user, .{ .cpu_features = cpu_features }, &report) catch |failure| switch (failure) {
 //!     error.Invalid => for (report.violations()) |violation| log(violation.rule_id.?, violation.message.?),
 //!     else => return failure,
@@ -36,8 +36,9 @@ pub const Report = files.report.Report;
 /// id and a message.
 pub const Violation = files.report.Violation;
 
-/// What `validate` reads beside the message: the CPU's features, stdx's `codec.Features`, for a
-/// rule's regular expression, and the time, for a rule that compares with it.
+/// What `validate` reads beside the message: the CPU's features, stdx's
+/// `platform.CpuFeatures`, for a rule's regular expression, and the time, for a rule that
+/// compares with it.
 pub const Options = files.validate.Options;
 /// What `validate` fails with: `Invalid` for a message that breaks a rule.
 pub const Error = files.validate.Error;

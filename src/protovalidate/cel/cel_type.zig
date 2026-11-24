@@ -10,7 +10,7 @@
 //!   last: an element that an index takes out of a list or a map;
 //! - a list and a map are views of a repeated field (`cel_list.zig`).
 const std = @import("std");
-const codec = @import("codec");
+const platform = @import("platform");
 const proto = @import("protobuf");
 const shape = @import("../shape.zig");
 const constants = @import("../constants.zig");
@@ -48,7 +48,7 @@ pub const Error = error{
 pub const Env = struct {
     /// The CPU features `matches` searches with: the walk's `Options.cpu_features`, which an
     /// expression reads through a pointer, so a rule copies none of them.
-    cpu_features: *const codec.Features,
+    cpu_features: *const platform.CpuFeatures,
     now: ?proto.wkt.Timestamp = null,
     steps: usize = constants.cel_steps_max,
     /// Where `format` writes its text, which only a rule whose expression formats is given

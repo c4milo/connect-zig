@@ -250,7 +250,7 @@ pub fn free(env: *Env, written: usize) void {
 
 const testing = std.testing;
 /// The build target's CPU features, which `matches` searches with in the tests.
-const testing_cpu_features = @import("codec").Features.target();
+const testing_cpu_features = @import("platform").CpuFeatures.target();
 
 fn expect_double(value: f64, expected: []const u8) !void {
     var room: [scientific_len_max]u8 = undefined;

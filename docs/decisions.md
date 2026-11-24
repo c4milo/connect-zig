@@ -199,6 +199,19 @@ first. Cite an entry by number in code and commits ("decision 6").
     places it in `Encoders.brotli`. Beaten: stdx's default window of 256 KiB at level 1, which
     costs 128 KiB more for the messages past 128 KiB alone, and level 5, which takes 3.2 MiB at
     the least.
+    Amended on 2026-11-24, ruled by the owner (https://github.com/c4milo/connect-zig/issues/18):
+    each codec takes the CPU features the program passes, in `Encoders.cpu_features` and
+    `Decoders.cpu_features`. Their type is stdx's `platform.CpuFeatures`, which stdx's decision
+    40 as amended that day moved from `codec`. connect-zig names no type of its own for it. A
+    program detects the features once with `platform.CpuFeatures.detect()`, as it does for
+    `protovalidate` (decision 47). The default is `.target()`, the build target's, so a program
+    that sets neither field codes as before. A build for a generic CPU then runs gzip's CRC-32
+    from a table: 35.0 million instructions under callgrind for the OTLP sink's 40 exports of 512
+    spans, against 4.7 million with PCLMULQDQ. connect-zig pins the stdx that colibri pins, now
+    once: `protovalidate` takes `regex` from it too. Beaten: the build target's features inside
+    `compress` and `decompress`, which no program can raise; a default of `.detect()`, which is
+    a probe in the library; and a field of the App, which a program with no connect_colibri
+    does not have.
 
 11. **Plain gRPC waits on colibri for the client.** colibri's `client.Response` holds no
     trailers, so a client cannot read `grpc-status` over h2. The server speaks gRPC now. The
@@ -911,6 +924,10 @@ first. Cite an entry by number in code and commits ("decision 6").
         second copy of stdx's `json` would export the same kernel symbols twice, and `regex`
         exports none. The two pins become one when colibri moves to a stdx that holds
         `regex`.
+      - Amended on 2026-11-24: the two pins are one. colibri at e5dd6ba pins stdx at 1df5f9f,
+        which holds `regex`, and `stdx_regex` goes. `Options.cpu_features` holds stdx's
+        `platform.CpuFeatures`, which stdx's decision 40 as amended that day moved from
+        `codec`, and the codecs take the same value (decision 10 as amended).
       - Beaten: one pin moved to the new stdx, whose `json` and colibri's would collide at
         the link; waiting for a colibri release; and a matcher alone, which costs less on a
         text of under about 18 octets and about 375 instructions an octet past it.

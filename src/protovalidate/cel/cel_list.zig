@@ -349,7 +349,7 @@ fn at_read(list: anytype, index: i64, env: *Env) Error!Taken(ElementOf(@TypeOf(l
 
 const testing = std.testing;
 /// The build target's CPU features, which `matches` searches with in the tests.
-const testing_cpu_features = @import("codec").Features.target();
+const testing_cpu_features = @import("platform").CpuFeatures.target();
 
 const Pair = struct {
     key: i32 = 0,

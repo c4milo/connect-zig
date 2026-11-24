@@ -1,7 +1,7 @@
 //! What every file of the walk shares: its state, what ends it, and how a broken rule is
 //! written into the report (decision 47).
 const std = @import("std");
-const codec = @import("codec");
+const platform = @import("platform");
 const proto = @import("protobuf");
 const pb = @import("buf_validate_validate");
 const report_file = @import("report.zig");
@@ -12,10 +12,11 @@ pub const Element = table.Element;
 
 pub const Options = struct {
     /// The CPU features that `pattern` and CEL's `matches` may search with. The module probes no
-    /// CPU (decision 47): a program detects them once as it starts, with `codec.Features.detect()`,
-    /// and passes the value to each call. `codec.Features.target()` names what the build target
-    /// guarantees, and `codec.Features.none()` keeps every search on its plain path.
-    cpu_features: codec.Features,
+    /// CPU (decision 47): a program detects them once as it starts, with
+    /// `platform.CpuFeatures.detect()`, and passes the value to each call.
+    /// `platform.CpuFeatures.target()` names what the build target guarantees, and
+    /// `platform.CpuFeatures.none()` keeps every search on its plain path.
+    cpu_features: platform.CpuFeatures,
     /// The time a rule such as `timestamp.lt_now` compares with. The module reads no clock
     /// (decision 3): a message whose rules read the time fails with `TimeMissing` without it.
     now: ?proto.wkt.Timestamp = null,

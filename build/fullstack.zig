@@ -52,6 +52,7 @@ pub fn add(b: *std.Build, graph: Graph) void {
         .imports = &.{
             .{ .name = "protobuf", .module = graph.protobuf },
             .{ .name = "protovalidate", .module = graph.protovalidate },
+            .{ .name = "platform", .module = graph.platform },
             .{ .name = "otlp", .module = otlp },
         },
     }) });

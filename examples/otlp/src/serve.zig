@@ -28,9 +28,10 @@ pub fn main(init: std.process.Init) !void {
     const state_memory = init.arena.allocator().rawAlloc(@sizeOf(State), .of(State), @returnAddress()) orelse
         return error.OutOfMemory;
     const state: *State = @ptrCast(@alignCast(state_memory));
+    // Each codec runs the fastest path the CPU it runs on holds (decision 10).
     state.app = .{ .codings = .{
-        .decoders = .{ .gzip = &state.gzip_decoder, .zstd = &state.zstd_decoder },
-        .encoders = .{ .gzip = &state.gzip_encoder, .zstd = &state.zstd_encoder },
+        .decoders = .{ .gzip = &state.gzip_decoder, .zstd = &state.zstd_decoder, .cpu_features = .detect() },
+        .encoders = .{ .gzip = &state.gzip_encoder, .zstd = &state.zstd_encoder, .cpu_features = .detect() },
     } };
     try state.served.run(init, &state.app);
 }

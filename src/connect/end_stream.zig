@@ -3,7 +3,7 @@
 //! "Streaming-Response" and "Error End-Stream"). Both members are optional.
 const std = @import("std");
 const json = @import("json");
-const codec = @import("codec");
+const platform = @import("platform");
 const rpc_error = @import("rpc_error.zig");
 const error_json = @import("error_json.zig");
 const json_read = @import("json_read.zig");
@@ -21,7 +21,7 @@ pub const DecodeError = error_json.DecodeError;
 
 pub fn encode(end: *const EndStream, buffer: []u8) EncodeError![]const u8 {
     std.debug.assert(end.metadata.len <= constants.limits.metadata_max);
-    var text = json.TextWriter.init(buffer, .text, codec.Features.target());
+    var text = json.TextWriter.init(buffer, .text, platform.CpuFeatures.target());
     try text.begin_object();
     if (end.failure) |failure| {
         try text.name("error");

@@ -9,7 +9,7 @@
 const std = @import("std");
 const proto = @import("protobuf");
 const protovalidate = @import("protovalidate");
-const codec = @import("codec");
+const platform = @import("platform");
 const harness = @import("harness");
 const cases = @import("cases");
 const constants = @import("constants.zig");
@@ -22,7 +22,7 @@ const State = struct {
     in_buffer: [constants.executor_io_buffer_len]u8,
     out_buffer: [constants.executor_io_buffer_len]u8,
     /// The CPU features each rule's regular expressions search with, detected once.
-    cpu_features: codec.Features,
+    cpu_features: platform.CpuFeatures,
 };
 
 const Result = @typeInfo(@FieldType(harness.TestResult, "result")).optional.child;

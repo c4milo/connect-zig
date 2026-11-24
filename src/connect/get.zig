@@ -11,7 +11,7 @@
 //! protocol, "Query-Get"). A server reads them in any order.
 const std = @import("std");
 const base64 = @import("base64");
-const Features = @import("codec").Features;
+const Features = @import("platform").CpuFeatures;
 const json_read = @import("json_read.zig");
 const assert = std.debug.assert;
 const protocol = @import("protocol.zig");

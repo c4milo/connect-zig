@@ -17,10 +17,8 @@ const protovalidate = @import("protovalidate");
 const otlp = @import("otlp");
 const service = @import("otlp_service");
 const sink_options = @import("sink_options");
+const platform = @import("platform");
 const constants = @import("constants.zig");
-
-/// stdx's CPU features, which `protovalidate.Interceptor` reads from the `App` by this name.
-pub const Features = @FieldType(protovalidate.Options, "cpu_features");
 
 /// What the routes read: the export calls the sink took, and the spans they held.
 pub const App = struct {
@@ -28,7 +26,8 @@ pub const App = struct {
     requests: u64 = 0,
     spans: u64 = 0,
     /// What the validating sink's rules search with, which `main` detects once.
-    cpu_features: Features = .none(),
+    /// `protovalidate.Interceptor` reads it from the `App` by this name.
+    cpu_features: platform.CpuFeatures = .none(),
     /// The exports whose lists did not all fit the route's storage, which connect_colibri counts
     /// here. Each such list is decoded again by each read of it.
     messages_past_storage: u64 = 0,

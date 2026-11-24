@@ -40,7 +40,7 @@ const Server = colibri.Server(.{ .tcp_connections = constants.tcp_connections, .
 /// What a program probes once and passes every TLS configuration. This one probes nothing, so
 /// each session runs ChaCha20 alone.
 const cpu: tls.Cpu = .{
-    .probe = .{ .aes_clmul = .not_known, .dit = .not_known, .sha256 = .not_known, .sha512 = .not_known, .sha3 = .not_known, .ssse3 = .not_known, .sse4_1 = .not_known, .avx2 = .not_known, .vaes = .not_known },
+    .probe = .{ .aes_clmul = .not_known, .dit = .not_known, .sha256 = .not_known, .sha512 = .not_known, .sha3 = .not_known, .sve2 = .not_known, .ssse3 = .not_known, .sse4_1 = .not_known, .avx2 = .not_known, .vaes = .not_known, .midr = null },
     .timing = .not_stated,
 };
 
@@ -66,9 +66,10 @@ pub fn main(init: std.process.Init) !void {
         return error.OutOfMemory;
     const state: *State = @ptrCast(@alignCast(state_memory));
     state.router.init();
+    // Each codec runs the fastest path the CPU it runs on holds (decision 10).
     state.app = .{ .codings = .{
-        .decoders = .{ .gzip = &state.gzip_decoder, .zstd = &state.zstd_decoder },
-        .encoders = .{ .gzip = &state.gzip_encoder, .zstd = &state.zstd_encoder },
+        .decoders = .{ .gzip = &state.gzip_decoder, .zstd = &state.zstd_decoder, .cpu_features = .detect() },
+        .encoders = .{ .gzip = &state.gzip_encoder, .zstd = &state.zstd_encoder, .cpu_features = .detect() },
     } };
     // The Unix time when the server starts, which its TLS session tickets carry.
     const unix_seconds: u64 = @intCast(@max(std.Io.Clock.real.now(init.io).toSeconds(), 0));

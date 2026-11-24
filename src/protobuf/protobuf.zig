@@ -8,7 +8,7 @@
 //! program that reads every field (decision 37). The caller owns every buffer.
 const std = @import("std");
 const json = @import("json");
-const codec = @import("codec");
+const platform = @import("platform");
 
 pub const constants = @import("constants.zig");
 
@@ -127,7 +127,7 @@ pub fn encode_json_with(comptime T: type, message: *const T, buffer: []u8, compt
 }
 
 fn encode_json_registry(comptime T: type, message: *const T, buffer: []u8, comptime registry: []const type) JsonEncodeError![]const u8 {
-    var text = json.TextWriter.init(buffer, .text, codec.Features.target());
+    var text = json.TextWriter.init(buffer, .text, platform.CpuFeatures.target());
     try files.json_encode.write_message(T, message, &text, registry);
     return text.written();
 }

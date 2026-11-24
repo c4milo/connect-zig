@@ -20,7 +20,7 @@ const std = @import("std");
 const assert = std.debug.assert;
 const testing = std.testing;
 const json = @import("json");
-const codec = @import("codec");
+const platform = @import("platform");
 const json_scalar = @import("json_scalar.zig");
 const json_float = @import("json_float.zig");
 const constants = @import("constants.zig");
@@ -250,10 +250,10 @@ fn reference_float(comptime V: type, value: V, text: *json.TextWriter) !void {
 
 fn check_float_as(comptime V: type, value: V) !void {
     var want_room: [float_room_len]u8 = undefined;
-    var want = json.TextWriter.init(&want_room, .text, codec.Features.target());
+    var want = json.TextWriter.init(&want_room, .text, platform.CpuFeatures.target());
     try reference_float(V, value, &want);
     var got_room: [float_room_len]u8 = undefined;
-    var got = json.TextWriter.init(&got_room, .text, codec.Features.target());
+    var got = json.TextWriter.init(&got_room, .text, platform.CpuFeatures.target());
     try json_scalar.write_float(V, value, &got);
     testing.expectEqualStrings(want.written(), got.written()) catch |failure| {
         std.debug.print("{s} {e}\n", .{ @typeName(V), value });

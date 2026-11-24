@@ -3,7 +3,7 @@
 //! both. It reads a text whose last letter sets pad bits too, as protobuf's parsers read it.
 const std = @import("std");
 const assert = std.debug.assert;
-const codec = @import("codec");
+const platform = @import("platform");
 const base64 = @import("base64");
 const wire = @import("wire.zig");
 const json_scalar = @import("json_scalar.zig");
@@ -23,7 +23,7 @@ pub fn write_base64_field(octets: []const u8, writer: *wire.Writer) DecodeError!
     // "BytesFieldBase64Url"), so the decoder drops them. It takes the free room after the
     // length, whose slack its vector step uses, and writes `len` octets.
     var decoder: base64.Decoder = undefined;
-    decoder.init(.{ .accept = .either, .padding = .optional, .pad_bits = .drop }, codec.Features.target());
+    decoder.init(.{ .accept = .either, .padding = .optional, .pad_bits = .drop }, platform.CpuFeatures.target());
     const decoded_len = decoder.decode_all(octets, writer.buffer[writer.len..]) catch return error.InvalidBase64;
     assert(decoded_len == len);
     writer.len += len;
@@ -34,7 +34,7 @@ const json = @import("json");
 
 /// The JSON text `json_scalar.write` gives for bytes: base64 between quotes.
 fn encoded(octets: []const u8, buffer: []u8) ![]const u8 {
-    var text = json.TextWriter.init(buffer, .text, codec.Features.target());
+    var text = json.TextWriter.init(buffer, .text, platform.CpuFeatures.target());
     try json_scalar.write(.bytes, []const u8, octets, &text);
     return text.written();
 }

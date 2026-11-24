@@ -3,7 +3,7 @@
 const server = @import("server");
 const rpc = @import("connect_colibri");
 const signup = @import("signup");
-const codec = @import("codec");
+const platform = @import("platform");
 const service = @import("signup_service");
 const constants = @import("constants.zig");
 
@@ -11,7 +11,7 @@ const constants = @import("constants.zig");
 /// `protovalidate.Interceptor` reads by this name. The program detects them once as it starts.
 pub const App = struct {
     signup: service.Room = .{},
-    cpu_features: codec.Features,
+    cpu_features: platform.CpuFeatures,
 };
 
 fn on_error(_: *App, _: *server.RequestContext, _: *const server.Request, _: anyerror, response: *server.Response) void {

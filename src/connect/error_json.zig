@@ -3,7 +3,7 @@
 //! encoding in standard base64, written without padding.
 const std = @import("std");
 const json = @import("json");
-const codec = @import("codec");
+const platform = @import("platform");
 const rpc_error = @import("rpc_error.zig");
 const json_read = @import("json_read.zig");
 const Code = @import("code.zig").Code;
@@ -13,7 +13,7 @@ const Detail = rpc_error.Detail;
 pub const EncodeError = json.EncodeError || error{NoSpaceLeft};
 
 pub fn encode(failure: *const RpcError, buffer: []u8) EncodeError![]const u8 {
-    var text = json.TextWriter.init(buffer, .text, codec.Features.target());
+    var text = json.TextWriter.init(buffer, .text, platform.CpuFeatures.target());
     try write(failure, &text);
     return text.written();
 }

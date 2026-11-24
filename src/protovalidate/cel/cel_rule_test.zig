@@ -1,7 +1,7 @@
 //! Tests of the CEL rules through `validate`: the violation each one reports, with its field,
 //! its rule's path, its id and its message, and what a rule that cannot run ends with.
 const std = @import("std");
-const codec = @import("codec");
+const platform = @import("platform");
 const testing = std.testing;
 const proto = @import("protobuf");
 const pb = @import("buf_validate_validate");
@@ -247,10 +247,10 @@ const Matched = struct {
 };
 
 test "matches searches with the CPU features of validate's options" {
-    const sets = [_]codec.Features{ codec.Features.none(), codec.Features.target(), codec.Features.detect() };
+    const sets = [_]platform.CpuFeatures{ platform.CpuFeatures.none(), platform.CpuFeatures.target(), platform.CpuFeatures.detect() };
     for (sets) |set| {
         try outcome(Matched, &.{ .name = "ada lovelace" }, .{ .cpu_features = set });
-        try testing.expect(std.meta.eql(pattern.kept_cpu_features(name_pattern), @as(?codec.Features, set)));
+        try testing.expect(std.meta.eql(pattern.kept_cpu_features(name_pattern), @as(?platform.CpuFeatures, set)));
         try testing.expectError(error.Invalid, outcome(Matched, &.{ .name = "Ada" }, .{ .cpu_features = set }));
     }
 }

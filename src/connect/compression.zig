@@ -6,7 +6,7 @@
 //! lists that it holds an encoder for.
 const std = @import("std");
 const assert = std.debug.assert;
-const codec = @import("codec");
+const platform = @import("platform");
 const gzip = @import("gzip");
 const zstd = @import("zstd");
 const brotli = @import("brotli");
@@ -52,6 +52,11 @@ pub const Encoders = struct {
     gzip: ?*GzipEncoder = null,
     zstd: ?*ZstdEncoder = null,
     brotli: ?*BrotliEncoder = null,
+    /// The CPU features each encoder's fast paths may use: the program's
+    /// `platform.CpuFeatures.detect()`, which it takes once as it starts. The default is the build
+    /// target's, which holds a build for a generic CPU to its slowest paths on any CPU (decision 10
+    /// as amended).
+    cpu_features: platform.CpuFeatures = .target(),
 
     pub fn writes(encoders: *const Encoders, coding: Coding) bool {
         return switch (coding) {
@@ -77,6 +82,9 @@ pub const Decoders = struct {
     gzip: ?*GzipDecoder = null,
     zstd: ?*ZstdDecoder = null,
     brotli: ?*BrotliDecoder = null,
+    /// The CPU features each decoder's fast paths may use, as for `Encoders.cpu_features`: gzip's
+    /// CRC-32 among them, which a generic build otherwise computes from a table.
+    cpu_features: platform.CpuFeatures = .target(),
 
     pub fn accepts(decoders: Decoders, coding: Coding) bool {
         return switch (coding) {
@@ -115,19 +123,19 @@ pub const Error = error{
 /// Decompresses `input` into `output` and returns the message.
 pub fn decompress(coding: Coding, decoders: Decoders, input: []const u8, output: []u8) Error![]const u8 {
     if (!decoders.accepts(coding)) return error.UnsupportedCoding;
-    const features = codec.Features.target();
+    const cpu_features = decoders.cpu_features;
     const whole = switch (coding) {
         .identity => return input,
         .gzip => whole: {
-            decoders.gzip.?.init(features);
+            decoders.gzip.?.init(cpu_features);
             break :whole decoders.gzip.?.decode_all(input, output);
         },
         .zstd => whole: {
-            decoders.zstd.?.init(features);
+            decoders.zstd.?.init(cpu_features);
             break :whole decoders.zstd.?.decode_all(input, output);
         },
         .br => whole: {
-            decoders.brotli.?.init(features);
+            decoders.brotli.?.init(cpu_features);
             break :whole decoders.brotli.?.decode_all(input, output);
         },
     } catch |failure| return switch (failure) {
@@ -140,18 +148,18 @@ pub fn decompress(coding: Coding, decoders: Decoders, input: []const u8, output:
 /// Compresses `input` with `coding`, which `encoders` writes, into `output`.
 pub fn compress(coding: Coding, encoders: *const Encoders, input: []const u8, output: []u8) error{NoSpaceLeft}![]const u8 {
     assert(coding != .identity and encoders.writes(coding));
-    const features = codec.Features.target();
+    const cpu_features = encoders.cpu_features;
     const len = switch (coding) {
         .gzip => len: {
-            encoders.gzip.?.init(features);
+            encoders.gzip.?.init(cpu_features);
             break :len try encoders.gzip.?.encode_all(input, output);
         },
         .zstd => len: {
-            encoders.zstd.?.init(features);
+            encoders.zstd.?.init(cpu_features);
             break :len try encoders.zstd.?.encode_all(input, output);
         },
         .br => len: {
-            encoders.brotli.?.init(features);
+            encoders.brotli.?.init(cpu_features);
             break :len try encoders.brotli.?.encode_all(input, output);
         },
         .identity => unreachable,
@@ -236,6 +244,25 @@ test "gzip round-trips, and a coding with no decoder or a small buffer is refuse
     try testing.expectEqualStrings("gzip", decoders.accept_list(&list));
 }
 
+test "each codec runs with the features its caller gives, and the target's by default" {
+    const message = "features features features features";
+    var compressed: [128]u8 = undefined;
+    var output: [64]u8 = undefined;
+    var decoder: gzip.Decoder = undefined;
+    var reference: gzip.Decoder = undefined;
+    // The CRC-32 path each gzip codec takes shows the features it ran with.
+    inline for (.{ platform.CpuFeatures.none(), platform.CpuFeatures.target() }) |cpu_features| {
+        const packed_octets = try compress(.gzip, &.{ .gzip = &codecs.gzip_encoder, .cpu_features = cpu_features }, message, &compressed);
+        const decoders: Decoders = .{ .gzip = &decoder, .cpu_features = cpu_features };
+        try testing.expectEqualStrings(message, try decompress(.gzip, decoders, packed_octets, &output));
+        reference.init(cpu_features);
+        try testing.expectEqual(reference.crc32_path, decoder.crc32_path);
+        try testing.expectEqual(reference.crc32_path, codecs.gzip_encoder.crc32_path);
+    }
+    try testing.expectEqual(platform.CpuFeatures.target(), (Decoders{}).cpu_features);
+    try testing.expectEqual(platform.CpuFeatures.target(), (Encoders{}).cpu_features);
+}
+
 test "zstd round-trips through stdx's encoder and decoder" {
     const message = "zstd zstd zstd zstd zstd zstd zstd zstd";
     var compressed: [128]u8 = undefined;
@@ -259,7 +286,7 @@ test "brotli round-trips through stdx's encoder and decoder" {
     const wbits_17 = 0x01;
     try testing.expectEqual(@as(u8, wbits_17), packed_octets[0] & wbits_mask);
     var output: [64]u8 = undefined;
-    codecs.brotli_window_decoder.init(codec.Features.target());
+    codecs.brotli_window_decoder.init(platform.CpuFeatures.target());
     const whole = try codecs.brotli_window_decoder.decode_all(packed_octets, &output);
     try testing.expectEqualStrings(message, output[0..whole.written]);
     // A stream the buffer does not hold is the caller's to make room for.

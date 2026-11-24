@@ -6,7 +6,7 @@
 const std = @import("std");
 const assert = std.debug.assert;
 const json = @import("json");
-const codec = @import("codec");
+const platform = @import("platform");
 const constants = @import("constants.zig");
 
 pub const Error = error{Malformed};
@@ -38,7 +38,7 @@ pub const Reader = struct {
     pub fn init(reader: *Reader, input: []const u8, storage: []u8) void {
         assert(storage.len >= constants.reader_storage_bytes_min);
         reader.* = .{ .decoder = undefined, .input = input, .consumed = 0, .storage = storage };
-        reader.decoder.init(.text, codec.Features.target());
+        reader.decoder.init(.text, platform.CpuFeatures.target());
     }
 
     /// The next token. A text that is not JSON (RFC 8259), one that ends early among them, is

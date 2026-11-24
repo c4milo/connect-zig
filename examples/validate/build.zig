@@ -18,7 +18,7 @@ pub fn build(b: *std.Build) void {
     const release = optimize == .ReleaseSafe;
     const connect_zig = b.dependency("connect_zig", .{ .target = target, .release = release, .rotor = true });
     const harness = b.dependency("harness", .{ .target = target, .release = release });
-    // With connect-zig's options, so its `codec` is the module protovalidate imports.
+    // With connect-zig's options, so its `platform` is the module protovalidate imports.
     const stdx = b.dependency("stdx", .{ .target = target, .release = release });
     const plugin = b.addInstallArtifact(connect_zig.artifact("protoc-gen-connect-zig"), .{});
     b.step("plugin", "Install connect-zig's protoc plugin to zig-out/bin").dependOn(&plugin.step);
@@ -62,7 +62,7 @@ pub fn build(b: *std.Build) void {
                 // `buf.validate.Violations` with it.
                 .{ .name = "buf_validate_validate", .module = connect_zig.module("buf_validate_validate") },
                 .{ .name = "harness", .module = harness.module("harness") },
-                .{ .name = "codec", .module = stdx.module("codec") },
+                .{ .name = "platform", .module = stdx.module("platform") },
                 .{ .name = "signup", .module = signup },
                 .{ .name = "signup_service", .module = service },
             },
@@ -82,7 +82,7 @@ pub fn build(b: *std.Build) void {
             .{ .name = "connect_colibri", .module = connect_zig.module("connect_colibri") },
             .{ .name = "server", .module = connect_zig.module("server") },
             .{ .name = "harness", .module = harness.module("harness") },
-            .{ .name = "codec", .module = stdx.module("codec") },
+            .{ .name = "platform", .module = stdx.module("platform") },
             .{ .name = "signup", .module = signup },
             .{ .name = "signup_service", .module = service },
         },

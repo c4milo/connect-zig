@@ -10,7 +10,23 @@ change the public API, and the entry marks each change that does.
 
 ## Unreleased
 
+It builds on colibri at e5dd6ba, on its `main`, and on stdx at 1df5f9f, the commit that colibri
+pins. `protovalidate` takes `regex` from the same stdx: the second pin, `stdx_regex`, is gone.
+
+### Added
+
+- `connect.Encoders` and `connect.Decoders` take a field `cpu_features`, the CPU features each
+  codec's fast paths may use. Set it from `platform.CpuFeatures.detect()` once, as the program
+  starts. Its default is the build target's features, so a program that sets neither codes as
+  before. A program built for a generic CPU computes gzip's CRC-32 with the carry-less multiply
+  where the CPU has one, in place of a table ([decision 10](docs/decisions.md)).
+
 ### Changed
+
+- **Breaking.** stdx moved its type of CPU features from `codec.Features` to
+  `platform.CpuFeatures`. `protovalidate.Options.cpu_features` and an `App`'s `cpu_features` take
+  the new type. Import stdx's `platform` in place of `codec`, and pin stdx at the commit
+  connect-zig pins ([decision 47](docs/decisions.md)).
 
 - **Memory.** The guide and every example take the program's `State` from `rawAlloc`, not from
   `create`. In Debug and ReleaseSafe, `create` writes the undefined pattern over all of it, so

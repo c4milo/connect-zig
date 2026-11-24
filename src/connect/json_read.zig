@@ -3,7 +3,7 @@
 const std = @import("std");
 const assert = std.debug.assert;
 const json = @import("json");
-const codec = @import("codec");
+const platform = @import("platform");
 const base64 = @import("base64");
 const constants = @import("constants.zig");
 
@@ -16,7 +16,7 @@ pub fn decode_base64(accept: base64.Accept, text: []const u8, buffer: []u8) erro
     const len = base64.Decoder.decoded_len(text) catch return error.InvalidBase64;
     if (len > buffer.len) return error.NoSpaceLeft;
     var decoder: base64.Decoder = undefined;
-    decoder.init(.{ .accept = accept, .padding = .optional }, codec.Features.target());
+    decoder.init(.{ .accept = accept, .padding = .optional }, platform.CpuFeatures.target());
     const decoded_len = decoder.decode_all(text, buffer) catch return error.InvalidBase64;
     assert(decoded_len == len);
     return buffer[0..len];
@@ -29,7 +29,7 @@ pub const Tokens = struct {
     used: usize = 0,
 
     pub fn init(text: []const u8, tokens: []u8, storage: []u8) Tokens {
-        return .{ .reader = json.TextReader.init(text, tokens, .text, codec.Features.target()), .storage = storage };
+        return .{ .reader = json.TextReader.init(text, tokens, .text, platform.CpuFeatures.target()), .storage = storage };
     }
 
     pub fn start(self: *Tokens) Error!void {
@@ -112,7 +112,7 @@ const base64_calls_extra = 2;
 pub fn write_base64(octets: []const u8, text: *json.TextWriter) (json.EncodeError || error{NoSpaceLeft})!void {
     var buffer: [piece_len]u8 = undefined;
     var encoder: base64.Encoder = undefined;
-    encoder.init(.{ .alphabet = .standard, .padding = false }, codec.Features.target());
+    encoder.init(.{ .alphabet = .standard, .padding = false }, platform.CpuFeatures.target());
     var start: usize = 0;
     // Bounded: each call but the last fills the buffer. Base64 writes 4 letters for each 3 octets.
     for (0..octets.len / (piece_len / base64_chars * base64_octets) + base64_calls_extra) |_| {

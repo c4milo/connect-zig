@@ -14,8 +14,8 @@ const std = @import("std");
 const proto = @import("protobuf");
 const protovalidate = @import("protovalidate");
 const otlp = @import("otlp");
+const platform = @import("platform");
 
-const Features = @FieldType(protovalidate.Options, "cpu_features");
 /// The sizes of storage the program times, in octets: the route's default for the sink, 256 KiB,
 /// then 512 KiB, 768 KiB, the sink's 1 MiB, and 4 MiB.
 const storage_default = 262_144;
@@ -53,20 +53,20 @@ fn count_spans(request: *const otlp.ExportTraceServiceRequest) !u64 {
     return total;
 }
 
-fn once(state: *State, bytes: []const u8, storage_len: usize, validate: bool, features: Features) !u64 {
+fn once(state: *State, bytes: []const u8, storage_len: usize, validate: bool, cpu_features: platform.CpuFeatures) !u64 {
     const message = try proto.decode_into(otlp.ExportTraceServiceRequest, bytes, state.storage[0..storage_len]);
     if (validate) {
         var report: protovalidate.Report = .init(&state.report);
-        try protovalidate.validate(otlp.ExportTraceServiceRequest, &message, .{ .cpu_features = features }, &report);
+        try protovalidate.validate(otlp.ExportTraceServiceRequest, &message, .{ .cpu_features = cpu_features }, &report);
     }
     return count_spans(&message);
 }
 
-fn median(io: std.Io, state: *State, bytes: []const u8, storage_len: usize, validate: bool, features: Features, iterations: u64) !f64 {
+fn median(io: std.Io, state: *State, bytes: []const u8, storage_len: usize, validate: bool, cpu_features: platform.CpuFeatures, iterations: u64) !f64 {
     var each: [runs]f64 = undefined;
     for (&each) |*value| {
         const start = std.Io.Timestamp.now(io, .awake);
-        for (0..iterations) |_| std.mem.doNotOptimizeAway(try once(state, bytes, storage_len, validate, features));
+        for (0..iterations) |_| std.mem.doNotOptimizeAway(try once(state, bytes, storage_len, validate, cpu_features));
         value.* = @as(f64, @floatFromInt(start.untilNow(io, .awake).toNanoseconds())) / @as(f64, @floatFromInt(iterations));
     }
     std.mem.sort(f64, &each, {}, std.sort.asc(f64));
@@ -84,12 +84,12 @@ pub fn main(init: std.process.Init) !void {
         return error.OutOfMemory;
     const state: *State = @ptrCast(@alignCast(state_memory));
     const bytes = try std.Io.Dir.cwd().readFile(init.io, path, &state.message);
-    const features = Features.detect();
-    const spans = try once(state, bytes, storages[0], false, features);
+    const cpu_features: platform.CpuFeatures = .detect();
+    const spans = try once(state, bytes, storages[0], false, cpu_features);
     std.debug.print("{d} octets, {d} spans\n", .{ bytes.len, spans });
     for (storages) |storage_len| {
-        const plain = try median(init.io, state, bytes, storage_len, false, features, iterations);
-        const checked = try median(init.io, state, bytes, storage_len, true, features, iterations);
+        const plain = try median(init.io, state, bytes, storage_len, false, cpu_features, iterations);
+        const checked = try median(init.io, state, bytes, storage_len, true, cpu_features, iterations);
         std.debug.print("storage {d:>8}: decode {d:>9.0} ns, with validate {d:>9.0} ns, validate adds {d:>9.0} ns, {d:.3} µs a span\n", .{
             storage_len, plain, checked, checked - plain, (checked - plain) / nanoseconds_a_microsecond / @as(f64, @floatFromInt(spans)),
         });
