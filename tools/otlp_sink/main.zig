@@ -59,14 +59,13 @@ pub fn main(init: std.process.Init) !void {
         return error.OutOfMemory;
     const state: *State = @ptrCast(@alignCast(state_memory));
     state.router.init();
-    // The CPU's features, taken once, for the decoders' fast paths and protovalidate's
-    // (decision 10 as amended): one value of stdx's `platform.CpuFeatures` for both.
+    // The CPU's features, taken once, for the routes, the decoders' fast paths and
+    // protovalidate's (decision 10 as amended): one value of stdx's `platform.CpuFeatures`.
     const cpu_features: platform.CpuFeatures = .detect();
     state.app = .{ .codings = .{ .decoders = .{
         .gzip = &state.gzip_decoder,
         .zstd = &state.zstd_decoder,
         .brotli = &state.brotli_decoder,
-        .cpu_features = cpu_features,
     } }, .cpu_features = cpu_features };
     const cpu = probe();
     // The Unix time when the server starts, which its TLS session tickets carry.

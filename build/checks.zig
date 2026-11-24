@@ -87,23 +87,28 @@ fn add_generated(b: *std.Build, graph: Graph) *std.Build.Step {
 }
 
 fn add_interop_server(b: *std.Build, graph: Graph, schemas: Schemas, hooks: *std.Build.Module, test_identity: *std.Build.Module) void {
-    const exe = b.addExecutable(.{ .name = "interop-server", .root_module = b.createModule(.{
-        .root_source_file = b.path("tools/interop_server/main.zig"),
-        .target = graph.target,
-        .optimize = graph.optimize,
-        .imports = &.{
-            .{ .name = "protobuf", .module = graph.protobuf },
-            .{ .name = "connect", .module = graph.connect },
-            .{ .name = "connect_colibri", .module = graph.connect_colibri },
-            .{ .name = "server", .module = graph.colibri.module("server") },
-            .{ .name = "colibri", .module = graph.colibri.module("colibri") },
-            .{ .name = "tls", .module = graph.colibri.module("tls") },
-            .{ .name = "test_identity", .module = test_identity },
-            .{ .name = "hooks", .module = hooks },
-            .{ .name = "coverage", .module = schemas.coverage },
-            .{ .name = "interop", .module = schemas.interop },
-        },
-    }) });
+    const exe = b.addExecutable(.{
+        .name = "interop-server",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("tools/interop_server/main.zig"),
+            .target = graph.target,
+            .optimize = graph.optimize,
+            .imports = &.{
+                // stdx's type of CPU features, which the server's context holds.
+                .{ .name = "platform", .module = graph.platform },
+                .{ .name = "protobuf", .module = graph.protobuf },
+                .{ .name = "connect", .module = graph.connect },
+                .{ .name = "connect_colibri", .module = graph.connect_colibri },
+                .{ .name = "server", .module = graph.colibri.module("server") },
+                .{ .name = "colibri", .module = graph.colibri.module("colibri") },
+                .{ .name = "tls", .module = graph.colibri.module("tls") },
+                .{ .name = "test_identity", .module = test_identity },
+                .{ .name = "hooks", .module = hooks },
+                .{ .name = "coverage", .module = schemas.coverage },
+                .{ .name = "interop", .module = schemas.interop },
+            },
+        }),
+    });
     b.installArtifact(exe);
     const serve = b.addRunArtifact(exe);
     if (b.args) |args| serve.addArgs(args);

@@ -9,6 +9,7 @@ const server = @import("server");
 const http = @import("http");
 const rpc = @import("connect_colibri.zig");
 const support = @import("pull_test_support.zig");
+const platform = @import("platform");
 const Note = support.Note;
 
 const say: connect.Method = .{ .service = "test.Svc", .name = "Say", .Request = Note, .Response = Note, .stream_type = .unary, .idempotency = .no_side_effects };
@@ -29,6 +30,7 @@ const five_seconds_ns = 5_000_000_000;
 
 /// What the handlers and the interceptor read.
 const App = struct {
+    cpu_features: platform.CpuFeatures = support.cpu_features,
     path: []const u8 = "",
     protocol: ?connect.Protocol = null,
     codec: ?connect.Codec = null,

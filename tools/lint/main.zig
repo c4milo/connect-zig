@@ -59,12 +59,12 @@ pub const determinism = rules.forbidden_references.Rule(.{
 });
 
 /// The owner's ruling of 2026-11-22 (https://github.com/c4milo/connect-zig/issues/14): `protobuf`,
-/// `connect` and `oidc` take the program's CPU features, and their tests take the target's from
-/// the one constant of a test-support file.
+/// `connect`, `connect_colibri` and `oidc` take the program's CPU features, and their tests take
+/// the target's from the one constant of a test-support file.
 pub const target_features = @import("target_features.zig").Rule(.{
     .extensions = &.{lint.paths.zig_extension},
-    .include_directories = &.{ "src/protobuf", "src/connect", "src/oidc" },
-    .exclude_basenames = &.{ "codec_test_support.zig", "test_support.zig" },
+    .include_directories = &.{ "src/protobuf", "src/connect", "src/connect_colibri", "src/oidc" },
+    .exclude_basenames = &.{ "codec_test_support.zig", "pull_test_support.zig", "test_support.zig" },
 });
 
 /// CLAUDE.md, Conventions: every loop is bounded.

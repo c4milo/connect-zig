@@ -38,13 +38,14 @@ pub fn main(init: std.process.Init) !void {
     const state_memory = init.arena.allocator().rawAlloc(@sizeOf(State), .of(State), @returnAddress()) orelse
         return error.OutOfMemory;
     const state: *State = @ptrCast(@alignCast(state_memory));
-    state.app = .{};
+    // The program detects the CPU's features once, as it starts.
+    state.app = .{ .cpu_features = .detect() };
     // The verifier starts with the issuer's first key and the time of the real clock. A real
     // program fetches the JWK Set from its provider. This program sets the time once, at the
     // start. A program that runs for long calls `set_time` again in each turn of its loop, or
     // the verifier accepts a token after its "exp".
     const now = std.Io.Clock.real.now(init.io).toSeconds();
-    try service.start(&state.app.oidc, issuer.jwks(&state.jwks_text, &.{issuer.first_key()}), now, .detect());
+    try service.start(&state.app.oidc, issuer.jwks(&state.jwks_text, &.{issuer.first_key()}), now, state.app.cpu_features);
     defer state.app.oidc.deinit();
     // A token to call Whoami with, which the test issuer signs with the key the verifier holds.
     const key = issuer.first_key();

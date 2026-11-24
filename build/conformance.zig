@@ -64,6 +64,8 @@ pub fn add(b: *std.Build, graph: Graph) *std.Build.Step {
         .{ .name = "connectrpc_conformance_v1_server_compat", .module = server_compat },
         .{ .name = "connectrpc_conformance_v1_client_compat", .module = client_compat },
         .{ .name = "client", .module = graph.colibri.module("client") },
+        // stdx's type of CPU features, which the server's context holds.
+        .{ .name = "platform", .module = graph.platform },
     };
     const exe = b.addExecutable(.{ .name = "conformance-server", .root_module = b.createModule(.{
         .root_source_file = b.path("conformance/server.zig"),

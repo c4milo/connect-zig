@@ -6,8 +6,11 @@ const assert = std.debug.assert;
 const testing = std.testing;
 const connect = @import("connect");
 const proto = @import("protobuf");
-/// The tests decode and encode with the build target's CPU features.
-const protobuf_decoder: proto.Decoder = .init(.target());
+const platform = @import("platform");
+/// The CPU features the tests' contexts and clients state: the build target's, which a test may
+/// name where a program names the features it detected.
+pub const cpu_features = platform.CpuFeatures.target();
+const protobuf_decoder: proto.Decoder = .init(cpu_features);
 const server = @import("server");
 const http = @import("http");
 const rpc = @import("connect_colibri.zig");
@@ -52,6 +55,8 @@ pub const message_long = "the stream gave up: " ++ "no more notes follow this on
 
 /// What a test asks of the handlers, and what they did.
 pub const App = struct {
+    cpu_features: platform.CpuFeatures = cpu_features,
+    codings: rpc.Codings = .{},
     next_calls: usize = 0,
     /// `on_request` refuses the call.
     refuse_request: bool = false,
@@ -358,8 +363,14 @@ pub const Fixture = struct {
 
     /// Sends the head of a request to `path`, with no note yet.
     pub fn open(fixture: *Fixture, path: []const u8, content_type: []const u8) void {
+        fixture.open_coded(path, content_type, null);
+    }
+
+    /// `open`, for a request whose messages are in `coding` when it is not null.
+    pub fn open_coded(fixture: *Fixture, path: []const u8, content_type: []const u8, coding: ?[]const u8) void {
         test_section.init();
         test_section.append("content-type", content_type) catch unreachable;
+        if (coding) |name| test_section.append("grpc-encoding", name) catch unreachable;
         // colibri's `Headers` reads the lines through this slice while the router handles the head.
         const lines = test_section.slice();
         // The route reads its body through `on_data`, so the head's reader holds no octet.
@@ -385,6 +396,11 @@ pub const Fixture = struct {
         const encoded = proto.encode(Note, &.{ .text = text }, &payload) catch unreachable;
         var envelope: [request_envelope_len]u8 = undefined;
         const bytes = connect.envelope.write(.{}, encoded, &envelope) catch unreachable;
+        fixture.handle(.{ .body = .{ .id = request_id, .user_data = fixture.engine.user_data, .bytes = bytes, .end = end } });
+    }
+
+    /// Sends the octets of one envelope a test built, and ends the request when `end`.
+    pub fn send_octets(fixture: *Fixture, bytes: []const u8, end: bool) void {
         fixture.handle(.{ .body = .{ .id = request_id, .user_data = fixture.engine.user_data, .bytes = bytes, .end = end } });
     }
 

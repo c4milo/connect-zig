@@ -1,6 +1,7 @@
 //! What both programs of the example share: the `App` the routes read, and the route table.
 //! `main.zig` serves it in memory, and `serve.zig` on a socket.
 const server = @import("server");
+const platform = @import("platform");
 const rpc = @import("connect_colibri");
 const errors = @import("errors");
 const service = @import("errors_service");
@@ -8,6 +9,9 @@ const constants = @import("constants.zig");
 
 /// What the routes read: the calculator service's room.
 pub const App = struct {
+    /// The CPU features the routes read and write each message with, stdx's type. The program
+    /// detects them once, as it starts.
+    cpu_features: platform.CpuFeatures,
     calculator: service.Room = .{},
 };
 

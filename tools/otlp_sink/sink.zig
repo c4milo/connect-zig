@@ -25,9 +25,10 @@ pub const App = struct {
     codings: rpc.Codings = .{},
     requests: u64 = 0,
     spans: u64 = 0,
-    /// What the validating sink's rules search with, which `main` detects once.
-    /// `protovalidate.Interceptor` reads it from the `App` by this name.
-    cpu_features: platform.CpuFeatures = .none(),
+    /// The CPU features the routes read and write each message with, and the validating sink's
+    /// rules search with, which `main` detects once. connect_colibri and
+    /// `protovalidate.Interceptor` read it from the `App` by this name.
+    cpu_features: platform.CpuFeatures,
     /// The exports whose lists did not all fit the route's storage, which connect_colibri counts
     /// here. Each such list is decoded again by each read of it.
     messages_past_storage: u64 = 0,

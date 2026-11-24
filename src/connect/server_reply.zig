@@ -9,6 +9,7 @@
 //! - gRPC-Web: envelopes, then the status in a trailers frame flagged 0x80.
 const std = @import("std");
 const assert = std.debug.assert;
+const platform = @import("platform");
 const protocol = @import("protocol.zig");
 const compression = @import("compression.zig");
 const envelope = @import("envelope.zig");
@@ -68,7 +69,7 @@ pub const Reply = struct {
         const scratch = reply.scratch;
         if (scratch.message.len < headroom or scratch.work.len < headroom) return error.NoSpaceLeft;
         const room: message_codec.Scratch = .{ .message = scratch.message[headroom..], .work = scratch.work[headroom..], .tokens = scratch.tokens };
-        return message_codec.prepare(T, reply.accepted.speaks.codec, reply.accepted.response_coding, &reply.encoders, message, room);
+        return message_codec.prepare(T, reply.accepted.speaks.codec, reply.accepted.response_coding, &reply.encoders, message, room, reply.accepted.cpu_features);
     }
 
     /// The envelope of a message `prepare` encoded: the prefix, written into the octets `prepare`
@@ -119,7 +120,7 @@ pub const Reply = struct {
         const prefix_len: usize = if (reply.accepted.speaks.enveloped) constants.protocol.envelope_prefix_len else 0;
         const room = body.unusedCapacitySlice();
         if (room.len <= prefix_len) return false;
-        const encoded = message_codec.encode(T, reply.accepted.speaks.codec, message, room[prefix_len..], reply.encoders.cpu_features) catch |failure| switch (failure) {
+        const encoded = message_codec.encode(T, reply.accepted.speaks.codec, message, room[prefix_len..], reply.accepted.cpu_features) catch |failure| switch (failure) {
             error.NoSpaceLeft => return false,
             else => |other| return other,
         };
@@ -136,7 +137,7 @@ pub const Reply = struct {
     fn shrink(reply: *const Reply, encoded: []const u8) Prepared {
         // An enveloped message is compressed one by one; a unary body only through `prepare`.
         if (!reply.accepted.speaks.enveloped) return .{ .octets = encoded, .compressed = false };
-        return message_codec.compress(reply.accepted.response_coding, &reply.encoders, encoded, reply.scratch.work);
+        return message_codec.compress(reply.accepted.response_coding, &reply.encoders, encoded, reply.scratch.work, reply.accepted.cpu_features);
     }
 
     /// Writes one message: the whole body of a Connect unary response, or one envelope. Either
@@ -167,7 +168,7 @@ pub const Reply = struct {
         var result: Head = .{ .status = constants.protocol.status.ok };
         result.add("content-type", protocol.content_type(speaks));
         // The status trailers go in the head's own storage, after the content type.
-        const written = try trailers.write(failure.*, storage, result.storage[result.count..], reply.encoders.cpu_features);
+        const written = try trailers.write(failure.*, storage, result.storage[result.count..], reply.accepted.cpu_features);
         result.count += written.len;
         return result;
     }
@@ -175,7 +176,7 @@ pub const Reply = struct {
     /// Writes a Connect unary error's JSON body. A gRPC Trailers-Only error has no body.
     pub fn write_error_body(reply: *const Reply, failure: RpcError, body: *std.Io.Writer) Error!void {
         if (reply.accepted.speaks.protocol != .connect) return;
-        try body.writeAll(error_json.encode(&failure, reply.scratch.work, reply.encoders.cpu_features) catch return error.NoSpaceLeft);
+        try body.writeAll(error_json.encode(&failure, reply.scratch.work, reply.accepted.cpu_features) catch return error.NoSpaceLeft);
     }
 
     /// How a response that carried messages ends: the octets its body still takes, as one slice,
@@ -195,15 +196,15 @@ pub const Reply = struct {
             .connect => {
                 const prefix_len = constants.protocol.envelope_prefix_len;
                 if (storage.len < prefix_len) return error.NoSpaceLeft;
-                const text = end_stream.encode(&.{ .failure = failure, .metadata = metadata }, storage[prefix_len..], reply.encoders.cpu_features) catch return error.NoSpaceLeft;
+                const text = end_stream.encode(&.{ .failure = failure, .metadata = metadata }, storage[prefix_len..], reply.accepted.cpu_features) catch return error.NoSpaceLeft;
                 assert(text.len == 0 or text.ptr == storage.ptr + prefix_len);
                 envelope.write_prefix(.{ .end_stream = true }, text.len, storage[0..prefix_len]);
                 return .{ .octets = storage[0 .. prefix_len + text.len] };
             },
-            .grpc => return .{ .trailers = try trailers.write(failure, storage, out, reply.encoders.cpu_features) },
+            .grpc => return .{ .trailers = try trailers.write(failure, storage, out, reply.accepted.cpu_features) },
             .grpc_web => {
                 const half = storage.len / constants.storage_halves;
-                const status = try trailers.write(failure, storage[0..half], out, reply.encoders.cpu_features);
+                const status = try trailers.write(failure, storage[0..half], out, reply.accepted.cpu_features);
                 // gRPC-Web carries the call's own trailers in the same frame as its status
                 // (PROTOCOL-WEB.md, "Message framing").
                 if (metadata.len > out.len - status.len) return error.NoSpaceLeft;
@@ -223,17 +224,19 @@ pub const Reply = struct {
 };
 
 /// The reply that carries the error of a request `server_head.accept` refused, or null when the
-/// refusal names no protocol: the server then answers `refusal.http_status` with no body.
+/// refusal names no protocol: the server then answers `refusal.http_status` with no body. The
+/// reply writes the error with the refusal's CPU features, the program's.
 pub fn refusal_reply(refusal: *const server_head.Refused, scratch: *const message_codec.Scratch) ?Reply {
     _ = refusal.failure orelse return null;
     const speaks = refusal.speaks.?;
     return .{
-        .accepted = .{ .speaks = speaks, .request_coding = .identity, .response_coding = .identity, .timeout_ns = null },
+        .accepted = .{ .speaks = speaks, .request_coding = .identity, .response_coding = .identity, .timeout_ns = null, .cpu_features = refusal.cpu_features },
         .scratch = scratch.*,
     };
 }
 
 const testing = std.testing;
+const test_cpu_features = @import("codec_test_support.zig").cpu_features;
 const proto = @import("protobuf");
 
 const Greeting = struct {
@@ -253,7 +256,7 @@ const TestBuffers = struct {
 
 fn reply_for(speaks: protocol.Speaks, buffers: *TestBuffers) Reply {
     return .{
-        .accepted = .{ .speaks = speaks, .request_coding = .identity, .response_coding = .identity, .timeout_ns = null },
+        .accepted = .{ .speaks = speaks, .request_coding = .identity, .response_coding = .identity, .timeout_ns = null, .cpu_features = test_cpu_features },
         .scratch = .{ .message = &buffers.message, .work = &buffers.work, .tokens = &buffers.tokens },
     };
 }
@@ -313,14 +316,18 @@ test "a Connect stream ends with an end-stream envelope, and gRPC-Web with a tra
 test "a refusal with a protocol becomes a reply, and one without has none" {
     var buffers: TestBuffers = .{};
     const scratch: message_codec.Scratch = .{ .message = &buffers.message, .work = &buffers.work, .tokens = &buffers.tokens };
-    try testing.expectEqual(@as(?Reply, null), refusal_reply(&.{ .http_status = 415 }, &scratch));
+    try testing.expectEqual(@as(?Reply, null), refusal_reply(&.{ .http_status = 415, .cpu_features = test_cpu_features }, &scratch));
+    // The reply writes the error with the CPU features of the refusal.
+    const program_features: platform.CpuFeatures = .{ .ssse3 = true, .bmi2 = true };
     const refused: server_head.Refused = .{
         .http_status = 200,
         .failure = .{ .code = .unimplemented },
         .speaks = .{ .protocol = .grpc_web, .codec = .proto, .enveloped = true },
+        .cpu_features = program_features,
     };
     const reply = refusal_reply(&refused, &scratch).?;
     try testing.expect(!reply.error_only());
+    try testing.expectEqual(program_features, reply.accepted.cpu_features);
 }
 
 test "a message is encoded straight into the body, and scratch storage stays untouched" {
@@ -357,7 +364,7 @@ test "a long message is gzipped in its envelope, and a unary gzip reply is not w
     var buffers: [3][message_codec.compress_len_min * 2]u8 = undefined;
     var encoder: compression.GzipEncoder = undefined;
     var reply: Reply = .{
-        .accepted = .{ .speaks = .{ .protocol = .grpc, .codec = .proto, .enveloped = true }, .request_coding = .identity, .response_coding = .gzip, .timeout_ns = null },
+        .accepted = .{ .speaks = .{ .protocol = .grpc, .codec = .proto, .enveloped = true }, .request_coding = .identity, .response_coding = .gzip, .timeout_ns = null, .cpu_features = test_cpu_features },
         .scratch = .{ .message = &buffers[0], .work = &buffers[1], .tokens = &buffers[2] },
         .encoders = .{ .gzip = &encoder },
     };
@@ -371,7 +378,7 @@ test "a long message is gzipped in its envelope, and a unary gzip reply is not w
     // The envelope holds the gzip of the message, which inflates back to it.
     var decoder: compression.GzipDecoder = undefined;
     var inflated: [message_codec.compress_len_min * 2]u8 = undefined;
-    const octets = try compression.decompress(.gzip, .{ .gzip = &decoder }, written[constants.protocol.envelope_prefix_len..], &inflated);
+    const octets = try compression.decompress(.gzip, .{ .gzip = &decoder }, written[constants.protocol.envelope_prefix_len..], &inflated, test_cpu_features);
     try testing.expectEqualStrings(&text, (try @import("codec_test_support.zig").protobuf_decoder.decode(Greeting, octets)).text);
     reply.accepted.speaks = .{ .protocol = .connect, .codec = .proto, .enveloped = false };
     try testing.expect(!reply.writes_direct());
@@ -418,7 +425,7 @@ test "an enveloped message leaves room for its prefix, and a unary one takes the
     var work: [16]u8 = undefined;
     var tokens: [16]u8 = undefined;
     var reply: Reply = .{
-        .accepted = .{ .speaks = .{ .protocol = .grpc, .codec = .proto, .enveloped = true }, .request_coding = .identity, .response_coding = .identity, .timeout_ns = null },
+        .accepted = .{ .speaks = .{ .protocol = .grpc, .codec = .proto, .enveloped = true }, .request_coding = .identity, .response_coding = .identity, .timeout_ns = null, .cpu_features = test_cpu_features },
         .scratch = .{ .message = &message, .work = &work, .tokens = &tokens },
     };
     // A tag, a length and nine octets fill the storage after the prefix.

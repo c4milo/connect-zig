@@ -67,9 +67,9 @@ pub fn main(init: std.process.Init) !void {
     const state: *State = @ptrCast(@alignCast(state_memory));
     state.router.init();
     // Each codec runs the fastest path the CPU it runs on holds (decision 10).
-    state.app = .{ .codings = .{
-        .decoders = .{ .gzip = &state.gzip_decoder, .zstd = &state.zstd_decoder, .cpu_features = .detect() },
-        .encoders = .{ .gzip = &state.gzip_encoder, .zstd = &state.zstd_encoder, .cpu_features = .detect() },
+    state.app = .{ .cpu_features = .detect(), .codings = .{
+        .decoders = .{ .gzip = &state.gzip_decoder, .zstd = &state.zstd_decoder },
+        .encoders = .{ .gzip = &state.gzip_encoder, .zstd = &state.zstd_encoder },
     } };
     // The Unix time when the server starts, which its TLS session tickets carry.
     const unix_seconds: u64 = @intCast(@max(std.Io.Clock.real.now(init.io).toSeconds(), 0));

@@ -1,6 +1,7 @@
 //! The `App` and the route table of the socket server: every example's service under one router,
 //! each with its room in the field it names (decision 41).
 const server = @import("server");
+const platform = @import("platform");
 const rpc = @import("connect_colibri");
 const oidc = @import("oidc");
 const eliza = @import("eliza");
@@ -16,6 +17,9 @@ const constants = @import("constants.zig");
 /// What the routes read: each service's room, the verifier of the account service's tokens, and
 /// the codings connect_colibri reads and writes messages in.
 pub const App = struct {
+    /// The CPU features the routes read and write each message with, stdx's type. The program
+    /// detects them once, as it starts.
+    cpu_features: platform.CpuFeatures,
     codings: rpc.Codings = .{},
     eliza: eliza_service.Room = .{},
     streaming: streaming_service.Room = .{},

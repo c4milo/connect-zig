@@ -51,6 +51,7 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
         .imports = &.{
+            .{ .name = "platform", .module = stdx.module("platform") },
             .{ .name = "connect", .module = connect_zig.module("connect") },
             .{ .name = "connect_colibri", .module = connect_zig.module("connect_colibri") },
             .{ .name = "server", .module = connect_zig.module("server") },
@@ -71,6 +72,7 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
         .imports = &.{
+            .{ .name = "platform", .module = stdx.module("platform") },
             .{ .name = "connect_colibri", .module = connect_zig.module("connect_colibri") },
             .{ .name = "server", .module = connect_zig.module("server") },
             .{ .name = "oidc", .module = connect_zig.module("oidc") },

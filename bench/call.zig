@@ -14,6 +14,7 @@
 //! other service as many. The calls never reach the other routes, which stand for the rest of
 //! an API, so a count shows what the router's match costs as a table grows.
 const std = @import("std");
+const platform = @import("platform");
 const assert = std.debug.assert;
 const connect = @import("connect");
 const rpc = @import("connect_colibri");
@@ -51,8 +52,10 @@ const prefix_len = connect.constants.protocol.envelope_prefix_len;
 const request_id: server.RequestId = @bitCast(@as(u128, 1));
 const h2_version: server.Version = .{ .major = constants.h2_major, .minor = 0 };
 
-/// What the route reads: nothing. A program's own state would live here.
-const App = struct {};
+/// What the route reads: the CPU features alone. A program's own state would live here too.
+const App = struct {
+    cpu_features: platform.CpuFeatures,
+};
 
 fn on_error(_: *App, _: *server.RequestContext, _: *const server.Request, _: anyerror, response: *server.Response) void {
     response.status = .internal_server_error;
@@ -121,7 +124,9 @@ pub fn Calls(comptime Message: type, comptime name: []const u8, comptime routes:
 
         /// Encodes `message`, writes each protocol's head and body, and checks one call of each.
         pub fn prepare(self: *Self, message: *const Message) !void {
-            self.app = .{};
+            // The build target's features, so that `tools/perf_check.sh` counts the same paths on
+            // every machine of an architecture. A program detects its CPU's.
+            self.app = .{ .cpu_features = .target() };
             self.router.init();
             // The reply's buffer holds the encoding until `prepare` copies it into each body.
             const reply = &self.exchange.reply;

@@ -1,6 +1,7 @@
 //! What both programs of the example share: the `App` the routes read, and the route table.
 //! `main.zig` serves it in memory, and `serve.zig` on a socket.
 const server = @import("server");
+const platform = @import("platform");
 const rpc = @import("connect_colibri");
 const otlp = @import("otlp");
 const service = @import("otlp_service");
@@ -9,6 +10,9 @@ const constants = @import("constants.zig");
 /// What the routes read: the receiver's room, and the codings it reads messages in. An
 /// OpenTelemetry exporter sends gzip, so a server for one sets them (`serve.zig`).
 pub const App = struct {
+    /// The CPU features the routes read and write each message with, stdx's type. The program
+    /// detects them once, as it starts.
+    cpu_features: platform.CpuFeatures,
     codings: rpc.Codings = .{},
     otlp: service.Room = .{},
 };

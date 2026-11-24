@@ -2,6 +2,8 @@
 //! client `ClientCall` reads what colibri wrote into its response. `zig build examples` runs both
 //! sides over colibri's h2 and h11 (design §8 step 5).
 const std = @import("std");
+const platform = @import("platform");
+const support = @import("pull_test_support.zig");
 const testing = std.testing;
 const connect = @import("connect");
 const proto = @import("protobuf");
@@ -27,7 +29,9 @@ const count = method("Count", .server_stream, .unknown);
 const gather = method("Gather", .client_stream, .unknown);
 const chat = method("Chat", .bidi_stream, .unknown);
 
-const App = struct {};
+const App = struct {
+    cpu_features: platform.CpuFeatures = support.cpu_features,
+};
 
 /// The messages a chat answers, at most.
 const chat_turns_max = 4;
@@ -89,7 +93,7 @@ test "a client call writes its request for colibri and reads what colibri filled
     const Call = rpc.ClientCall(say, .{});
     var call: Call = undefined;
     var buffers: [7][512]u8 = undefined;
-    try call.init({}, &.{ .protocol = .grpc_web }, &.{.{ .text = "hi" }}, &.{
+    try call.init({}, &.{ .protocol = .grpc_web, .cpu_features = support.cpu_features }, &.{.{ .text = "hi" }}, &.{
         .request = .{ .body = &buffers[0], .scratch = .{ .message = &buffers[1], .work = &buffers[2], .tokens = &.{} }, .values = &buffers[3] },
         .headers = &buffers[4],
         .trailers = &buffers[5],
@@ -144,7 +148,7 @@ test "a gRPC client call reads its status from the response's trailers (PROTOCOL
     const Call = rpc.ClientCall(say, .{});
     var call: Call = undefined;
     var buffers: [7][512]u8 = undefined;
-    try call.init({}, &.{ .protocol = .grpc }, &.{.{ .text = "hi" }}, &.{
+    try call.init({}, &.{ .protocol = .grpc, .cpu_features = support.cpu_features }, &.{.{ .text = "hi" }}, &.{
         .request = .{ .body = &buffers[0], .scratch = .{ .message = &buffers[1], .work = &buffers[2], .tokens = &.{} }, .values = &buffers[3] },
         .headers = &buffers[4],
         .trailers = &buffers[5],

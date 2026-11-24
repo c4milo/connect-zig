@@ -9,6 +9,7 @@
 //! the kernel choose. The server prints `listening on port <port>`, and serves until it is
 //! killed.
 const std = @import("std");
+const platform = @import("platform");
 const connect = @import("connect");
 const rpc = @import("connect_colibri");
 const server = @import("server");
@@ -29,6 +30,9 @@ pub const Error = error{ArgumentMissing};
 /// chapulin through `oidc`, in a program that links colibri's chapulin too, so the build proves
 /// that both ask for one chapulin object (decision 34).
 const App = struct {
+    /// The CPU features the routes read and write each message with, stdx's type. The program
+    /// detects them once, as it starts.
+    cpu_features: platform.CpuFeatures,
     text: [constants.greeting_len_max]u8 = undefined,
     oidc: oidc.Verifier = undefined,
 };
@@ -85,11 +89,12 @@ pub fn main(init: std.process.Init) !void {
         return error.OutOfMemory;
     const state: *State = @ptrCast(@alignCast(state_memory));
     state.router.init();
-    state.app = .{};
+    // The program detects the CPU's features once, as it starts.
+    state.app = .{ .cpu_features = .detect() };
     const cwd = std.Io.Dir.cwd();
     const chain = try cwd.readFile(init.io, chain_path, &state.chain_pem);
     const key = try cwd.readFile(init.io, key_path, &state.key_pem);
-    try state.app.oidc.init(&.{ .issuer = "https://issuer.example", .audience = "quickstart", .cpu_features = .detect() });
+    try state.app.oidc.init(&.{ .issuer = "https://issuer.example", .audience = "quickstart", .cpu_features = state.app.cpu_features });
     std.debug.assert(state.app.oidc.keys_stale());
     // The Unix time when the server starts, which its TLS session tickets carry.
     const unix_seconds: u64 = @intCast(@max(std.Io.Clock.real.now(init.io).toSeconds(), 0));

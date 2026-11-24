@@ -194,8 +194,8 @@ first. Cite an entry by number in code and commits ("decision 6").
     - The features go down a decode in its context, the value each mode carries to each level:
       a checked decode carries a pointer to them, a stored one its `Store`, which holds the
       pointer, and a shallow one nothing. `wire.Reader` stays as it was.
-    - `connect` makes a `Decoder` or an `Encoder` from the features of its `Decoders` or
-      `Encoders`, which the program set once. A test, a benchmark and a check program use the
+    - `connect` makes a `Decoder` or an `Encoder` from the features of the call's server or
+      client options, which the program set once (decision 10 as amended). A test, a benchmark and a check program use the
       build target's features. The lint's rule `target-features` refuses each other call of
       `target()` in `src/protobuf`.
     - Counted by `tools/perf_check.sh` on 2026-11-24, built for x86-64-v3, against `main`
@@ -261,6 +261,31 @@ first. Cite an entry by number in code and commits ("decision 6").
     above and the tests' one constant. Beaten: a field of `Scratch`, which an encode call does
     not take; and a default of `.target()` in each `Storage`, which ruling 2 of issue 14
     refuses.
+    Amended on 2026-11-24 again, as the owner asked that day: no server takes the build
+    target's features by default, and a program states its features once.
+    - `Encoders` and `Decoders` hold codecs alone again. The features were in both, so a
+      program stated them twice, and an App with no `codings` had no place to state them: its
+      routes took the build target's. A refused request's reply took them too.
+    - A server's `Options` holds `cpu_features`, with no default. `accept` copies it into its
+      decision: `Accepted`, where the call's `Messages` and `Reply` read it, and `Refused`,
+      where `refusal_reply` reads it. So a server names its features in one place, and no call
+      passes them on by hand. `compress`, `decompress`, and the client's `Response.init` take
+      them as an argument.
+    - A route of `connect_colibri` reads the field `cpu_features` of the program's App, as
+      `protovalidate.Interceptor` does (decision 47), and as issue 14 planned. An App without
+      the field stops the build, with a message that names the field. A program sets it once:
+      `state.app = .{ .cpu_features = .detect() }`. `rpc.Codings` holds codecs alone.
+    - The rule `target-features` holds `src/connect_colibri` too.
+    - A client's `Options.cpu_features` keeps the build target's features as its default, the
+      one such default left, and the rule passes that one line of that one file. A client's
+      options are written for each call, 55 times in the examples, some in constant tables. A
+      required field would state a CPU in each call. The client needs a value it sets once, as
+      the server has its App, and that value is a new public type, which the owner rules first.
+
+    Beaten: the fields in `Encoders` and `Decoders` with no default, which states the features
+    twice and makes `codings` a field every App needs; a field `cpu_features` of `rpc.Codings`,
+    a second place beside the one `protovalidate` reads; and a required field in a client's
+    `Options`, as above.
 
 11. **Plain gRPC waits on colibri for the client.** colibri's `client.Response` holds no
     trailers, so a client cannot read `grpc-status` over h2. The server speaks gRPC now. The

@@ -9,6 +9,7 @@ const server = @import("server");
 const http = @import("http");
 const rpc = @import("connect_colibri.zig");
 const support = @import("pull_test_support.zig");
+const platform = @import("platform");
 const Note = support.Note;
 
 const say: connect.Method = .{ .service = "test.Svc", .name = "Say", .Request = Note, .Response = Note, .stream_type = .unary, .idempotency = .unknown };
@@ -29,6 +30,7 @@ const response_bytes = 256;
 const note_bytes = 16;
 
 const App = struct {
+    cpu_features: platform.CpuFeatures = support.cpu_features,
     callers: u32 = 0,
     /// The calls whose values were not the defaults when the interceptor first saw them.
     dirty_starts: u32 = 0,

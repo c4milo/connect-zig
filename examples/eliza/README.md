@@ -73,6 +73,10 @@ The package exports `eliza`, the generated code, and `eliza_service`, the handle
 services, as [socket_server](../socket_server) does:
 
 ```zig
-const App = struct { eliza: eliza_service.Room = .{} };
+const App = struct {
+    /// The CPU features your program detected, which every route reads.
+    cpu_features: platform.CpuFeatures,
+    eliza: eliza_service.Room = .{},
+};
 const routes = eliza_service.Service(App).routes;
 ```

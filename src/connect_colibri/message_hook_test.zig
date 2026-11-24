@@ -11,6 +11,7 @@ const server = @import("server");
 const http = @import("http");
 const rpc = @import("connect_colibri.zig");
 const support = @import("pull_test_support.zig");
+const platform = @import("platform");
 const Note = support.Note;
 
 fn method_of(comptime name: []const u8, comptime stream_type: connect.StreamType) connect.Method {
@@ -35,6 +36,7 @@ const status_invalid_argument = "3";
 /// What ran, in order: 'a' the first interceptor read a message, 'b' the second one, 'h' the
 /// handler took it, and 'e' the handler saw the stream's end.
 const App = struct {
+    cpu_features: platform.CpuFeatures = support.cpu_features,
     events: [events_max]u8 = undefined,
     count: usize = 0,
     /// The outcome `on_finish` read, and whether it ran.

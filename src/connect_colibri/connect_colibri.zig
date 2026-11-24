@@ -8,6 +8,7 @@ pub const constants = @import("constants.zig");
 
 const files = struct {
     pub const route = @import("route.zig");
+    pub const route_app = @import("route_app.zig");
     pub const refusal = @import("refusal.zig");
     pub const call = @import("call.zig");
     pub const context = @import("context.zig");
@@ -20,7 +21,7 @@ const files = struct {
 /// The struct route that serves a method, and its router entries.
 pub const Route = files.route.Route;
 pub const RouteOptions = files.route.Options;
-pub const Codings = files.route.Codings;
+pub const Codings = files.route_app.Codings;
 pub const post = files.route.post;
 pub const get = files.route.get;
 /// The router entries that answer 405 for the HTTP methods Connect does not serve.
@@ -72,4 +73,5 @@ test {
     _ = @import("values_test.zig");
     _ = @import("context_test.zig");
     _ = @import("message_hook_test.zig");
+    _ = @import("route_app_test.zig");
 }

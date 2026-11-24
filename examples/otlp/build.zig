@@ -66,6 +66,8 @@ fn program(b: *std.Build, connect_zig: *std.Build.Dependency, harness: *std.Buil
     for ([_][]const u8{ "otlp", "otlp_trace", "otlp_common", "otlpstore" }) |import| module.addImport(import, b.modules.get(import).?);
     module.addImport("otlp_service", service);
     module.addImport("harness", harness.module("harness"));
+    // stdx, with connect-zig's options, so its `platform` is the module connect-zig imports.
+    module.addImport("platform", b.dependency("stdx", .{ .target = target, .release = optimize == .ReleaseSafe }).module("platform"));
     const exe = b.addExecutable(.{ .name = name, .root_module = module });
     b.installArtifact(exe);
     return exe;

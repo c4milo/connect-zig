@@ -1,6 +1,7 @@
 //! What both programs of the example share: the `App` the routes read, and the route table.
 //! `main.zig` serves it in memory, and `serve.zig` on a socket.
 const server = @import("server");
+const platform = @import("platform");
 const rpc = @import("connect_colibri");
 const oidc = @import("oidc");
 const account = @import("account");
@@ -11,6 +12,9 @@ const constants = @import("constants.zig");
 /// `service.start` starts before the first call (decision 34). `oidc.Interceptor` reads it by
 /// this name.
 pub const App = struct {
+    /// The CPU features the routes read and write each message with, stdx's type. The program
+    /// detects them once, as it starts.
+    cpu_features: platform.CpuFeatures,
     oidc: oidc.Verifier = undefined,
 };
 

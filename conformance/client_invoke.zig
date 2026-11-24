@@ -304,7 +304,7 @@ test "a finished call reads its outcome against the client's deadline" {
     };
     const speaks: connect.Speaks = .{ .protocol = .grpc, .codec = .proto, .enveloped = true };
     const lookup: connect.Lookup = .{ .context = &room, .find_fn = Finished.find };
-    var response = connect.client.Response.init(speaks, &.{ .status = connect.constants.protocol.status.ok, .headers = lookup, .body = "" }, &storage, &.{});
+    var response = connect.client.Response.init(speaks, &.{ .status = connect.constants.protocol.status.ok, .headers = lookup, .body = "" }, &storage, &.{}, .target());
     response.done = true;
     response.failure = .{ .code = .canceled, .message = "the server canceled the stream" };
     const lists = try testing.allocator.create(@import("client_result.zig").Lists);

@@ -105,9 +105,9 @@ confirm a test fails. Report `CAUGHT` or `NOT CAUGHT` per mutation in the commit
   denied-words, all from pepegrillo. file-length-scripts is pepegrillo's file-length again, over
   the Python, Go, Rust, and JavaScript of `bench/` and `tools/` (decision 49). The rule state-fill
   is this tree's own: a program takes its `State` from `rawAlloc` (decision 48). So is
-  target-features: `src/protobuf`, `src/connect` and `src/oidc` call no `target()` for CPU
-  features, but in their test-support files and the default of `Encoders` and `Decoders`
-  (decisions 10, 34 and 50). The rules read `conformance/` as they read `examples/`, and
+  target-features: `src/protobuf`, `src/connect`, `src/connect_colibri`, and `src/oidc` call no
+  `target()` for CPU features, but in their test-support files and the default of a client's
+  `Options` (decisions 10, 34 and 50). The rules read `conformance/` as they read `examples/`, and
   each `gen/` as generated code; `conformance/proto` holds connectrpc's copy and
   protobuf's test protos, which denied-words skips, as it skips protovalidate's schemas in
   `src/protovalidate/proto` and `conformance/protovalidate`. `zig build test` also requires `.githooks/pre-push` to equal pepegrillo's

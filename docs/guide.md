@@ -29,6 +29,21 @@ second colibri fails the build ([decision 39](decisions.md)). `.rotor = true` bu
 `colibri.Client` on [Rotor](https://github.com/c4milo/rotor), colibri's event loop. Without it,
 your program drives colibri's engine and pool on its own loop ([decision 32](decisions.md)).
 
+connect-zig probes no CPU. Your program detects its CPU's features once, as it starts, and
+states them in a field of its routes' context, in the type of [stdx](https://github.com/c4milo/stdx)'s
+`platform` module. So name stdx too, at the commit connect-zig pins:
+
+```sh
+zig fetch --save=stdx git+https://github.com/c4milo/stdx#1df5f9f2fd51e8ebc1707e2e77c02afc6041f49f
+```
+
+```zig
+// `.release` as you pass it to connect-zig, and false when you pass none: this `platform` is then
+// the module connect-zig imports. Another value fails the build with a file in two modules.
+const stdx = b.dependency("stdx", .{ .target = target, .release = false });
+module.addImport("platform", stdx.module("platform"));
+```
+
 A program that imports `connect_colibri` or `oidc` links
 [chapulin](https://github.com/c4milo/chapulin), the TLS library under colibri. chapulin reports
 a failed assertion through one hook, which your program defines once:
@@ -118,6 +133,19 @@ hold the headers, the query, and the trailers, with no message.
 
 ## 4. Route it
 
+The routes share one context, your `App`. It holds your program's state, and the CPU features
+your program detected: each route reads and writes its messages with them. An `App` with no
+field `cpu_features` stops the build.
+
+```zig
+const platform = @import("platform");
+
+/// What every route reads: your program's state, and the CPU features it detected as it started.
+const App = struct {
+    cpu_features: platform.CpuFeatures,
+};
+```
+
 Each generated service has a `Routes` function. It lists every method as a route of colibri's
 `server.Router`, with the handler of the same name. A unary method with no side effects is a GET
 too, and a method with no handler fails to compile. One route answers every protocol and codec:
@@ -167,7 +195,8 @@ const state_memory = init.arena.allocator().rawAlloc(@sizeOf(State), .of(State),
     return error.OutOfMemory;
 const state: *State = @ptrCast(@alignCast(state_memory));
 state.router.init();
-state.app = .{};
+// The routes read and write each message with the CPU features the program detects here, once.
+state.app = .{ .cpu_features = .detect() };
 try state.http_server.init(&.{
     .port = 8443,
     .identity = .{ .chain = chain_pem, .key = key_pem },
@@ -236,8 +265,8 @@ its text and the time. Import it as the others, as `connect_zig.module("oidc")`:
 const oidc = @import("oidc");
 
 // The context of your routes holds the verifier, as `app.oidc`. Its JSON readers take the CPU
-// features your program detects once, with stdx's `platform.CpuFeatures.detect()`.
-try app.oidc.init(&.{ .issuer = "https://accounts.example.com", .audience = "my-service", .cpu_features = cpu_features });
+// features your program detected once, the context's own.
+try app.oidc.init(&.{ .issuer = "https://accounts.example.com", .audience = "my-service", .cpu_features = app.cpu_features });
 try app.oidc.set_keys(jwks_text); // again when app.oidc.keys_stale()
 app.oidc.set_time(unix_seconds); // when your clock moves
 

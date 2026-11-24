@@ -72,6 +72,7 @@ pub fn main(init: std.process.Init) !void {
     if (request.message_receive_limit > constants.message_bytes) return error.ReceiveLimitTooLarge;
     state.router.init();
     state.app = .{
+        .cpu_features = .detect(),
         .message_receive_limit = request.message_receive_limit,
         .io = init.io,
         .codings = .{

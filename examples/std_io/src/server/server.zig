@@ -32,6 +32,7 @@
 //! The program reads the clock and draws entropy through `std.Io`, and passes the engine each
 //! instant as a value: colibri reads no clock (decision 3).
 const std = @import("std");
+const platform = @import("platform");
 const server = @import("server");
 const rpc = @import("connect_colibri");
 const eliza = @import("eliza");
@@ -51,6 +52,9 @@ const Engine = server.Engine(.{ .tcp_connections = constants.connections_max, .q
 
 /// What the routes read: ELIZA's room.
 const App = struct {
+    /// The CPU features the routes read and write each message with, stdx's type. The program
+    /// detects them once, as it starts.
+    cpu_features: platform.CpuFeatures,
     eliza: eliza_service.Room = .{},
 };
 
@@ -131,7 +135,8 @@ const State = struct {
     fn init(state: *State, io: Io) !void {
         state.config = .{ .timeouts = .{ .first_request_ns = constants.first_request_timeout_ns } };
         state.router.init();
-        state.app = .{};
+        // The program detects the CPU's features once, as it starts.
+        state.app = .{ .cpu_features = .detect() };
         state.entries = @splat(.{});
         state.random_source = .{ .io = io };
         state.queue = .init(&state.queue_buffer);

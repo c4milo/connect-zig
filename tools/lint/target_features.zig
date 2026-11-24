@@ -7,8 +7,9 @@
 //! code in its scope that calls `target()`, written as `platform.CpuFeatures.target()`, through an
 //! alias, through `@import("platform")` in place, or as the declaration literal `.target()`.
 //! A comment is no call. The scope leaves out the test-support files, whose one constant gives
-//! the tests the target's features. One line passes: the default of `Encoders.cpu_features` and
-//! `Decoders.cpu_features`, which decision 10 as amended rules.
+//! the tests the target's features. One line of one file passes: the default of
+//! `connect.client.Options.cpu_features`, which stays until a client sets its features once
+//! (decision 10 as amended).
 const std = @import("std");
 const pepegrillo = @import("pepegrillo");
 const lint = pepegrillo.lint;
@@ -16,8 +17,10 @@ const report = lint.report;
 
 /// The call the rule refuses.
 const refused_call = "target()";
-/// The one line that may call it: a field whose default decision 10 as amended rules.
+/// The one line that may call it, and the one file that may hold the line: the default of a
+/// client's options (decision 10 as amended).
 const ruled_default = "cpu_features: platform.CpuFeatures = .target(),";
+const ruled_default_file = "src/connect/client_call.zig";
 /// What starts a comment line.
 const comment_start = "//";
 
@@ -32,7 +35,7 @@ pub fn Rule(comptime scope: lint.Scope) type {
             while (lines.next()) |line| {
                 const code = std.mem.trim(u8, line.text, " \t");
                 if (std.mem.startsWith(u8, code, comment_start)) continue;
-                if (std.mem.eql(u8, code, ruled_default)) continue;
+                if (std.mem.eql(u8, code, ruled_default) and std.mem.endsWith(u8, file.path, ruled_default_file)) continue;
                 const index = std.mem.indexOf(u8, line.text, refused_call) orelse continue;
                 try context.findings.add(file.path, line.number, index + 1, name, "{s}{s}", .{
                     "a library takes the CPU features the program detects, not the build target's ",
@@ -65,9 +68,10 @@ test "the target-features rule refuses each way to call target()" {
     for (refused) |source| try testing.expectEqual(1, try findings_of(source, "src/connect/code.zig"));
 }
 
-test "the target-features rule passes the ruled default, comments, and other files" {
+test "the target-features rule passes the ruled default in its file alone, comments, and other files" {
     const ruled: [:0]const u8 = "const S = struct {\n    cpu_features: platform.CpuFeatures = .target(),\n};\n";
-    try testing.expectEqual(0, try findings_of(ruled, "src/connect/code.zig"));
+    try testing.expectEqual(0, try findings_of(ruled, ruled_default_file));
+    try testing.expectEqual(1, try findings_of(ruled, "src/connect/code.zig"));
     try testing.expectEqual(0, try findings_of("/// The default is `.target()`.\nconst f = 1;\n", "src/connect/code.zig"));
     try testing.expectEqual(0, try findings_of("const f = cpu_features;\n", "src/connect/code.zig"));
     try testing.expectEqual(0, try findings_of("const f = platform.CpuFeatures.target();\n", "src/protobuf/code.zig"));

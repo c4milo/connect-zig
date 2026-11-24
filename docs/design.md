@@ -2194,12 +2194,39 @@ ran on Linux x86-64 with Zig 0.16.0.
     string, a singular string and a `Lazy` message each read with no check. Against `zig build
     lint`, 4, each `CAUGHT` by `target-features`: `Decoder.init`, `encode_json`, `decode_json`
     and JSON bytes on the target's features.
+- **One statement of the CPU's features in a server** (decision 10, amended 2026-11-24 again;
+  https://github.com/c4milo/connect-zig/issues/14). No public name changes. The module graph
+  gains one edge: `connect_colibri` imports stdx's `platform`, for the type of the App's field.
+  `connect.server.Options`, `Accepted`, and `Refused` hold `cpu_features`; `connect.Encoders`
+  and `connect.Decoders` lose it. `compress`, `decompress`, and the client's `Response.init`
+  take it as their last argument. Each example's App holds the field, and each example names
+  stdx. `route.zig` passed 500 lines, so what a route reads of the App is `route_app.zig`.
+  - `zig build test` passed, with the examples, and each check program built.
+  - Mutations, 16, each `CAUGHT`. Against `zig build test-connect`, 8: a POST's `Accepted`, a
+    GET's, a refusal with an error, and one with no body each without the options' features;
+    a refusal's reply and a client's `Response` without theirs; `compress` and `decompress`
+    each on other features. Against `zig build test-connect-colibri`, 4: a route that reads no
+    features of the App, one that accepts with none, an envelope inflated with none, and an
+    App's field of another type that passes. `route_app_test.zig` catches the first three: a
+    route inflates a gzip request, and the decoder's CRC-32 path names the features it took.
+    Against `zig build lint`, 3: a route on the build target's features, a server's `Options`
+    with that default, and the rule's one passing line taken in any file. One more showed a
+    gap, and the design closed it: the features of a refused request went through two calls
+    by hand, where no output shows a wrong value. `Refused` now carries them from `accept`.
+  - A program that asks stdx with a `.release` other than connect-zig's fails its build with
+    "file exists in modules 'platform' and 'platform0'". The quickstart project showed both
+    results, and docs/guide.md states the rule.
 
 ### Work not done yet
 
 - A stream that waits for an event of the program once its request ended (colibri issue 130).
   colibri v0.16.0 left it out, as ruled on 2026-11-10. No release up to v0.17.0 holds it, and
   the issue is still open.
+- For a client, one statement of the CPU's features. A client's `Options.cpu_features` still
+  takes the build target's features by default (decision 10 as amended). A client's options are
+  written for each call, so the client needs a value it sets once, such as
+  `std.http.Client` is for its requests. That value is a new public type, and the owner rules
+  its form first (https://github.com/c4milo/connect-zig/issues/14).
 - For `oidc`, a measurement before any change: a client sends one token with each call, and
   the verifier checks its signature each time. If that cost shows in a server's profile, a
   verifier may keep the last tokens it took.

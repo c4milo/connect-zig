@@ -165,7 +165,7 @@ pub fn ClientCall(comptime method: connect.Method, comptime call_options: Option
         pub fn on_headers(self: *Self, storage: connect.client.Storage) void {
             assert(self.streamed and !self.incoming.headers_seen);
             self.incoming.headers_seen = true;
-            self.reader = connect.client.Response.init(self.call.speaks, &incoming_of(self, ""), &storage, &self.options.decoders);
+            self.reader = connect.client.Response.init(self.call.speaks, &incoming_of(self, ""), &storage, &self.options.decoders, self.options.cpu_features);
             run_on_response(interceptors, self.context, &self.reader);
         }
 
@@ -246,12 +246,12 @@ fn read_response(self: anytype, storage: connect.client.Storage) connect.client.
     // reports it (colibri decision 153 ruling 7).
     assert(!self.streamed or self.response.result != .response);
     if (self.response.result != .response) {
-        var response = connect.client.Response.init(speaks, &.{ .status = connect.constants.protocol.status.ok, .headers = lookup, .body = "" }, &storage, &self.options.decoders);
+        var response = connect.client.Response.init(speaks, &.{ .status = connect.constants.protocol.status.ok, .headers = lookup, .body = "" }, &storage, &self.options.decoders, self.options.cpu_features);
         response.done = true;
         response.failure = failure_of(&self.response);
         return response;
     }
-    return connect.client.Response.init(speaks, &incoming_of(self, self.response.body[0..self.response.body_len]), &storage, &self.options.decoders);
+    return connect.client.Response.init(speaks, &incoming_of(self, self.response.body[0..self.response.body_len]), &storage, &self.options.decoders, self.options.cpu_features);
 }
 
 /// What `connect.client.Response` reads of a call's response: its status, its headers, and its

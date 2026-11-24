@@ -72,7 +72,8 @@ pub fn main(init: std.process.Init) !void {
     const state_memory = init.arena.allocator().rawAlloc(@sizeOf(State), .of(State), @returnAddress()) orelse
         return error.OutOfMemory;
     const state: *State = @ptrCast(@alignCast(state_memory));
-    state.app = .{};
+    // The program detects the CPU's features once, as it starts.
+    state.app = .{ .cpu_features = .detect() };
     try state.rounds.init(&state.app);
     defer state.rounds.deinit();
     try round(state, .{ .h11 = false, .h3 = false }, .h2);

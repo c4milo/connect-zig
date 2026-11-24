@@ -19,6 +19,8 @@ pub fn build(b: *std.Build) void {
     const connect_zig = b.dependency("connect_zig", .{ .target = target, .release = release, .rotor = false });
     const eliza_project = b.dependency("eliza", .{ .target = target, .release = release, .rotor = false });
     const harness = b.dependency("harness", .{ .target = target, .release = release, .rotor = false });
+    // With connect-zig's options, so its `platform` is the module connect-zig imports.
+    const stdx = b.dependency("stdx", .{ .target = target, .release = release });
     const eliza = eliza_project.module("eliza");
     const eliza_service = eliza_project.module("eliza_service");
     // chapulin's hook alone: the `harness` module runs on Rotor.
@@ -29,6 +31,7 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
         .imports = &.{
+            .{ .name = "platform", .module = stdx.module("platform") },
             .{ .name = "connect_colibri", .module = connect_zig.module("connect_colibri") },
             .{ .name = "server", .module = connect_zig.module("server") },
             .{ .name = "hooks", .module = hooks },
@@ -46,6 +49,7 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
         .imports = &.{
+            .{ .name = "platform", .module = stdx.module("platform") },
             .{ .name = "connect", .module = connect_zig.module("connect") },
             .{ .name = "connect_colibri", .module = connect_zig.module("connect_colibri") },
             .{ .name = "client", .module = connect_zig.module("client") },

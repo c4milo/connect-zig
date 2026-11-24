@@ -25,6 +25,8 @@ pub fn build(b: *std.Build) void {
     const module = b.createModule(.{ .root_source_file = b.path("src/main.zig"), .target = target, .optimize = optimize });
     for ([_][]const u8{ "connect", "connect_colibri", "server", "oidc" }) |name| module.addImport(name, connect_zig.module(name));
     module.addImport("harness", harness.module("harness"));
+    // stdx, with connect-zig's options, so its `platform` is the module connect-zig imports.
+    module.addImport("platform", b.dependency("stdx", .{ .target = target, .release = release }).module("platform"));
     for (services) |service| {
         const project = b.dependency(service.project, .{ .target = target, .release = release });
         for (service.modules) |name| module.addImport(name, project.module(name));

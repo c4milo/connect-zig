@@ -41,8 +41,8 @@ pub fn Service(comptime App: type) type {
         }
 
         pub fn received(app: *App, _: *rpc.Context, _: *const rpc.Request(otlpstore.ReceivedRequest), response: *rpc.Response(otlp.ExportTraceServiceRequest)) ?connect.RpcError {
-            // The program's CPU features, which it set in its codings once, as it started.
-            const decoder: proto.Decoder = .init(app.codings.decoders.cpu_features);
+            // The program's CPU features, which it set once, as it started.
+            const decoder: proto.Decoder = .init(app.cpu_features);
             return received_in(&app.otlp, &decoder, response);
         }
     };

@@ -15,11 +15,10 @@ pins. `protovalidate` takes `regex` from the same stdx: the second pin, `stdx_re
 
 ### Added
 
-- `connect.Encoders` and `connect.Decoders` take a field `cpu_features`, the CPU features each
-  codec's fast paths may use. Set it from `platform.CpuFeatures.detect()` once, as the program
-  starts. Its default is the build target's features, so a program that sets neither codes as
-  before. A program built for a generic CPU computes gzip's CRC-32 with the carry-less multiply
-  where the CPU has one, in place of a table ([decision 10](docs/decisions.md)).
+- A server and a client code, read, and write each message with the CPU features the program
+  detects once, as it starts, with `platform.CpuFeatures.detect()`. A program built for a
+  generic CPU computes gzip's CRC-32 with the carry-less multiply where the CPU has one, in
+  place of a table ([decision 10](docs/decisions.md)).
 
 ### Changed
 
@@ -35,8 +34,18 @@ pins. `protovalidate` takes `regex` from the same stdx: the second pin, `stdx_re
     `cpu_features`.
   - `connect.error_json.Storage`, `connect.end_stream.Storage` and `connect.trailers.Storage`
     take a field `cpu_features`, with no default.
-  - The server and the client take the features from `Encoders.cpu_features` and
-    `Decoders.cpu_features`, so a program that sets those needs no other change.
+  - A route reads the features from a field `cpu_features: platform.CpuFeatures` of your
+    `App`, which `protovalidate.Interceptor` reads too. An `App` without it stops the build.
+    Name stdx in your `build.zig.zon`, for the type, and set the field once:
+    `state.app = .{ .cpu_features = .detect() }`.
+  - `connect.server.Options` takes a field `cpu_features`, with no default. `accept` copies it
+    into `Accepted`, which the call's `Messages` and `Reply` read, and into `Refused`, which
+    `refusal_reply` reads. `connect.client.Response.init` takes `cpu_features` as its last
+    argument.
+  - `connect.compression.compress` and `decompress` take `cpu_features` as their last argument.
+    `connect.Encoders` and `connect.Decoders` hold codecs alone.
+  - `connect.client.Options` takes a field `cpu_features`. Its default is the build target's
+    features, the one such default left: set it from the features your program detected.
   - `oidc.VerifierOptions` takes a field `cpu_features`, with no default. `Claims` takes the
     verifier's when `verify` fills it, for `string`, `integer` and `holds`.
 

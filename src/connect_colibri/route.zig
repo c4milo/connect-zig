@@ -24,6 +24,7 @@ const call_file = @import("call.zig");
 const context_file = @import("context.zig");
 const dispatch = @import("dispatch.zig");
 const pull = @import("pull.zig");
+const route_app = @import("route_app.zig");
 
 pub const Options = struct {
     /// The longest message the route reads or writes, encoded or decoded.
@@ -84,40 +85,6 @@ pub fn CallState(comptime spec: RouteSpec, comptime handler: anytype) type {
         /// Whether the route asks the handler for each message of the response.
         pub const pulls = dispatch.pulls(handler);
     };
-}
-
-/// The codings a server uses, which the program keeps in a field `codings` of its context. A
-/// context with no such field reads and writes uncompressed messages alone.
-pub const Codings = struct {
-    decoders: connect.Decoders = .{},
-    encoders: connect.Encoders = .{},
-};
-
-fn codings_of(app: anytype) Codings {
-    const App = @TypeOf(app.*);
-    if (comptime @hasField(App, "codings")) return app.codings;
-    return .{};
-}
-
-/// Where the decode counts a binary request message whose repeated fields did not all fit the
-/// route's storage: the context's field `messages_past_storage`, when it has one. A count that
-/// grows tells the program to raise `storage_bytes`.
-fn short_count_of(app: anytype) ?*u64 {
-    const App = @TypeOf(app.*);
-    if (comptime !@hasField(App, "messages_past_storage")) return null;
-    comptime if (@FieldType(App, "messages_past_storage") != u64) @compileError("connect_colibri: the context's field `messages_past_storage` is a u64");
-    return &app.messages_past_storage;
-}
-
-/// The longest request message a route reads: the context's field `message_receive_limit` when
-/// it has one and it is not 0, else `message_bytes`. The limit counts a message's octets once
-/// decompressed.
-fn receive_limit_of(app: anytype, comptime message_bytes: usize) usize {
-    const App = @TypeOf(app.*);
-    if (comptime !@hasField(App, "message_receive_limit")) return message_bytes;
-    const limit: usize = app.message_receive_limit;
-    if (limit == 0) return message_bytes;
-    return @min(limit, message_bytes);
 }
 
 /// The struct route of `method`, which calls `handler`. A handler takes the call's `Context`, its
@@ -188,8 +155,8 @@ pub const RouteSpec = struct { method: connect.Method, options: Options };
 /// Reads the head: copies the headers and the query, accepts or refuses the request, and starts
 /// the call.
 fn begin(comptime spec: RouteSpec, comptime handler: anytype, app: anytype, ctx: *server.RequestContext, state: *CallState(spec, handler), request: *const server.Request, response: *server.Response) !void {
-    const codings = codings_of(app);
-    state.limit = receive_limit_of(app, spec.options.message_bytes);
+    const codings = route_app.codings_of(app);
+    state.limit = route_app.receive_limit_of(app, spec.options.message_bytes);
     state.room.response_header_count = 0;
     state.room.metadata_count = 0;
     state.headers.copy(request.headers) catch {
@@ -210,6 +177,7 @@ fn begin(comptime spec: RouteSpec, comptime handler: anytype, app: anytype, ctx:
         .idempotency = spec.method.idempotency,
         .decoders = codings.decoders,
         .encoders = codings.encoders,
+        .cpu_features = route_app.cpu_features_of(app),
     });
     const accepted = switch (decision) {
         .accepted => |accepted| accepted,
@@ -259,7 +227,7 @@ fn serve_whole(comptime spec: RouteSpec, comptime handler: anytype, app: anytype
     if (read_in_place(state.call.reply.accepted) and body.len > state.limit) {
         return stop(dispatch.Interceptors(spec.options.interceptors), app, state, too_large);
     }
-    var messages = connect.server.Messages.init(&state.call.reply.accepted, body, &scratch_of(spec, handler, app, state, .request), &codings_of(app).decoders);
+    var messages = connect.server.Messages.init(&state.call.reply.accepted, body, &scratch_of(spec, handler, app, state, .request), &route_app.codings_of(app).decoders);
     return dispatch.whole(spec.method, handler, dispatch.Interceptors(spec.options.interceptors), app, &state.call, &messages);
 }
 
@@ -272,7 +240,7 @@ fn serve_streaming(comptime spec: RouteSpec, comptime handler: anytype, app: any
         const piece = body.next() orelse break;
         const whole_len = dispatch.whole_envelopes_len(piece, state.limit) catch |failure|
             return stop_reading(I, app, state, body, connect.server.failure_of(failure));
-        var messages = connect.server.Messages.init(&call.reply.accepted, piece[0..whole_len], &scratch_of(spec, handler, app, state, .request), &codings_of(app).decoders);
+        var messages = connect.server.Messages.init(&call.reply.accepted, piece[0..whole_len], &scratch_of(spec, handler, app, state, .request), &route_app.codings_of(app).decoders);
         if (dispatch.each_message(spec.method, handler, I, app, call, &state.handler_state, &messages)) |failure| return stop_reading(I, app, state, body, failure);
         // colibri gives the cut envelope's octets again, joined with the next piece.
         state.kept = piece.len - whole_len;
@@ -297,7 +265,7 @@ fn serve_request(comptime spec: RouteSpec, comptime handler: anytype, app: anyty
     const I = dispatch.Interceptors(spec.options.interceptors);
     const call = &state.call;
     if (start_once(I, app, state)) |refusal| return stop(I, app, state, refusal);
-    var messages = connect.server.Messages.init(&call.reply.accepted, body, &scratch_of(spec, handler, app, state, .request), &codings_of(app).decoders);
+    var messages = connect.server.Messages.init(&call.reply.accepted, body, &scratch_of(spec, handler, app, state, .request), &route_app.codings_of(app).decoders);
     var request: context_file.Request(spec.method.Request) = .{ .message = .{}, .any = .{ .call = call } };
     switch (call_file.read_one(spec.method.Request, call, &messages, &request.message)) {
         .failure => |failure| return stop(I, app, state, failure),
@@ -371,7 +339,7 @@ const Side = enum { request, reply };
 fn scratch_of(comptime spec: RouteSpec, comptime handler: anytype, app: anytype, state: *CallState(spec, handler), side: Side) connect.Scratch {
     assert(state.limit <= spec.options.message_bytes);
     return switch (side) {
-        .request => .{ .message = state.request_message[0..state.limit], .work = &state.request_work, .tokens = &state.tokens, .storage = &state.storage, .storage_short = short_count_of(app) },
+        .request => .{ .message = state.request_message[0..state.limit], .work = &state.request_work, .tokens = &state.tokens, .storage = &state.storage, .storage_short = route_app.short_count_of(app) },
         .reply => .{ .message = &state.reply_message, .work = &state.reply_work, .tokens = &state.tokens },
     };
 }
@@ -389,20 +357,6 @@ pub fn get(comptime App: type, comptime method: connect.Method, comptime handler
 }
 
 const testing = std.testing;
-
-test "the receive limit is the context's when it is set and smaller, else message_bytes" {
-    const message_bytes = 100;
-    const Limited = struct { message_receive_limit: u32 = 0 };
-    var limited: Limited = .{ .message_receive_limit = 40 };
-    try testing.expectEqual(@as(usize, 40), receive_limit_of(&limited, message_bytes));
-    limited.message_receive_limit = 0;
-    try testing.expectEqual(@as(usize, message_bytes), receive_limit_of(&limited, message_bytes));
-    limited.message_receive_limit = message_bytes + 1;
-    try testing.expectEqual(@as(usize, message_bytes), receive_limit_of(&limited, message_bytes));
-    const Plain = struct {};
-    var plain: Plain = .{};
-    try testing.expectEqual(@as(usize, message_bytes), receive_limit_of(&plain, message_bytes));
-}
 
 test "a request's scratch holds storage_per_message times message_bytes, or storage_bytes when set" {
     const Note = struct {
@@ -466,7 +420,7 @@ const Empty = struct {
 test "a request's decode counts in the context's messages_past_storage, when it has one" {
     const Counted = struct { messages_past_storage: u64 = 0 };
     var counted: Counted = .{};
-    try testing.expectEqual(&counted.messages_past_storage, short_count_of(&counted).?);
+    try testing.expectEqual(&counted.messages_past_storage, route_app.short_count_of(&counted).?);
     // The request's scratch carries the count to the decode; the reply's decodes nothing.
     const handler = struct {
         fn on_say(_: *Counted, _: *context_file.Context, _: *const context_file.Request(Empty), _: *context_file.Response(Empty)) ?connect.RpcError {
@@ -480,11 +434,11 @@ test "a request's decode counts in the context's messages_past_storage, when it 
     try testing.expectEqual(@as(?*u64, null), scratch_of(spec, handler, &counted, &state, .reply).storage_short);
     const Plain = struct {};
     var plain: Plain = .{};
-    try testing.expectEqual(@as(?*u64, null), short_count_of(&plain));
+    try testing.expectEqual(@as(?*u64, null), route_app.short_count_of(&plain));
 }
 
 test "only an uncompressed Connect unary POST is read in place" {
-    const unary: connect.server.Accepted = .{ .speaks = .{ .protocol = .connect, .codec = .proto, .enveloped = false }, .request_coding = .identity, .response_coding = .identity, .timeout_ns = null };
+    const unary: connect.server.Accepted = .{ .speaks = .{ .protocol = .connect, .codec = .proto, .enveloped = false }, .request_coding = .identity, .response_coding = .identity, .timeout_ns = null, .cpu_features = @import("pull_test_support.zig").cpu_features };
     try testing.expect(read_in_place(unary));
     var gzipped = unary;
     gzipped.request_coding = .gzip;

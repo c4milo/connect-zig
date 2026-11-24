@@ -41,16 +41,17 @@ pub fn main(init: std.process.Init) !void {
     const state_memory = init.arena.allocator().rawAlloc(@sizeOf(State), .of(State), @returnAddress()) orelse
         return error.OutOfMemory;
     const state: *State = @ptrCast(@alignCast(state_memory));
-    // Each codec runs the fastest path the CPU it runs on holds (decision 10).
-    state.app = .{ .codings = .{
-        .decoders = .{ .gzip = &state.gzip_decoder, .zstd = &state.zstd_decoder, .brotli = &state.brotli_decoder, .cpu_features = .detect() },
-        .encoders = .{ .gzip = &state.gzip_encoder, .zstd = &state.zstd_encoder, .brotli = &state.brotli_encoder, .cpu_features = .detect() },
+    // The program detects the CPU's features once, as it starts: each message and each codec
+    // then runs the fastest path the CPU holds (decision 10).
+    state.app = .{ .cpu_features = .detect(), .codings = .{
+        .decoders = .{ .gzip = &state.gzip_decoder, .zstd = &state.zstd_decoder, .brotli = &state.brotli_decoder },
+        .encoders = .{ .gzip = &state.gzip_encoder, .zstd = &state.zstd_encoder, .brotli = &state.brotli_encoder },
     } };
     // The account service's verifier, with the test issuer's first key, at the time the server
     // starts. A server that runs for long calls `set_time` again as its clock moves, and
     // `set_keys` when `keys_stale` asks for it.
     const started_seconds: i64 = @max(std.Io.Clock.real.now(init.io).toSeconds(), 0);
-    try account_service.start(&state.app.oidc, issuer.jwks(&state.jwks_text, &.{issuer.first_key()}), started_seconds, .detect());
+    try account_service.start(&state.app.oidc, issuer.jwks(&state.jwks_text, &.{issuer.first_key()}), started_seconds, state.app.cpu_features);
     defer state.app.oidc.deinit();
     try state.served.run(init, &state.app);
 }

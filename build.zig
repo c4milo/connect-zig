@@ -128,6 +128,8 @@ fn modules(b: *std.Build, stdx: *std.Build.Dependency, colibri: *std.Build.Depen
             .{ .name = "server", .module = colibri.module("server") },
             .{ .name = "client", .module = colibri.module("client") },
             .{ .name = "http", .module = colibri.module("http") },
+            // stdx's type of CPU features, which a route reads from the program's context.
+            .{ .name = "platform", .module = stdx.module("platform") },
             .{ .name = "public_names", .module = public_names },
         },
     });

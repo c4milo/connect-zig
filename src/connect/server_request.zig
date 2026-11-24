@@ -44,7 +44,7 @@ pub const Messages = struct {
     /// storage, which the next call overwrites.
     pub fn next(messages: *Messages, comptime T: type) Error!?T {
         const octets = try messages.next_octets() orelse return null;
-        return try message_codec.decode(T, messages.accepted.speaks.codec, octets, messages.scratch, messages.decoders.cpu_features);
+        return try message_codec.decode(T, messages.accepted.speaks.codec, octets, messages.scratch, messages.accepted.cpu_features);
     }
 
     fn next_octets(messages: *Messages) Error!?[]const u8 {
@@ -56,11 +56,11 @@ pub const Messages = struct {
             // The octets `decode` reads must not sit in `scratch.work`, where reading JSON writes
             // its binary form: the output would overwrite input not yet read. With no coding the
             // query decodes straight into `scratch.message`.
-            if (coding == .identity) return try get.message_octets(query, messages.scratch.message, messages.decoders.cpu_features);
-            const encoded = try get.message_octets(query, messages.scratch.work, messages.decoders.cpu_features);
-            return try compression.decompress(coding, messages.decoders, encoded, messages.scratch.message);
+            if (coding == .identity) return try get.message_octets(query, messages.scratch.message, messages.accepted.cpu_features);
+            const encoded = try get.message_octets(query, messages.scratch.work, messages.accepted.cpu_features);
+            return try compression.decompress(coding, messages.decoders, encoded, messages.scratch.message, messages.accepted.cpu_features);
         }
-        return try compression.decompress(coding, messages.decoders, messages.body, messages.scratch.message);
+        return try compression.decompress(coding, messages.decoders, messages.body, messages.scratch.message, messages.accepted.cpu_features);
     }
 
     fn next_envelope(messages: *Messages) Error!?[]const u8 {
@@ -68,7 +68,7 @@ pub const Messages = struct {
         // Connect protocol, "Streaming-Request": a client never sends the end-stream flag, and
         // gRPC-Web's trailers flag is the server's alone.
         if (next_one.flags.end_stream or next_one.flags.trailers) return error.InvalidEnvelope;
-        return try message_codec.open(next_one.flags.compressed, messages.accepted.request_coding, messages.decoders, next_one.payload, messages.scratch.message);
+        return try message_codec.open(next_one.flags.compressed, messages.accepted.request_coding, messages.decoders, next_one.payload, messages.scratch.message, messages.accepted.cpu_features);
     }
 };
 
@@ -88,6 +88,7 @@ pub fn failure_of(failure: Error) RpcError {
 }
 
 const testing = std.testing;
+const test_cpu_features = @import("codec_test_support.zig").cpu_features;
 const proto = @import("protobuf");
 
 const Note = struct {
@@ -99,7 +100,7 @@ const Note = struct {
 };
 
 fn accepted_for(protocol: @import("protocol.zig").Protocol, enveloped: bool) server_head.Accepted {
-    return .{ .speaks = .{ .protocol = protocol, .codec = .proto, .enveloped = enveloped }, .request_coding = .identity, .response_coding = .identity, .timeout_ns = null };
+    return .{ .speaks = .{ .protocol = protocol, .codec = .proto, .enveloped = enveloped }, .request_coding = .identity, .response_coding = .identity, .timeout_ns = null, .cpu_features = test_cpu_features };
 }
 
 test "a unary body is one message, and envelopes are read in order" {
@@ -119,7 +120,7 @@ test "a JSON token larger than the server's token buffer is resource_exhausted, 
     var buffers: [2][64]u8 = undefined;
     var tokens: [4]u8 = undefined;
     const scratch: message_codec.Scratch = .{ .message = &buffers[0], .work = &buffers[1], .tokens = &tokens };
-    const accepted: server_head.Accepted = .{ .speaks = .{ .protocol = .connect, .codec = .json, .enveloped = false }, .request_coding = .identity, .response_coding = .identity, .timeout_ns = null };
+    const accepted: server_head.Accepted = .{ .speaks = .{ .protocol = .connect, .codec = .json, .enveloped = false }, .request_coding = .identity, .response_coding = .identity, .timeout_ns = null, .cpu_features = test_cpu_features };
     var messages = Messages.init(&accepted, "{\"text\":\"a long sentence\"}", &scratch, &.{});
     if (messages.next(Note)) |_| return error.TestExpectedError else |failure| {
         try testing.expectEqual(Code.resource_exhausted, failure_of(failure).code);

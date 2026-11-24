@@ -117,6 +117,19 @@ module.addImport("tls", connect_zig.module("tls"));
 module.addImport("colibri", connect_zig.module("colibri"));
 ```
 
+connect-zig probes no CPU: your program detects its CPU's features once and states them. Their
+type is [stdx](https://github.com/c4milo/stdx)'s, so name stdx too, at the commit connect-zig
+pins, with the `.release` you pass connect-zig, or false when you pass none:
+
+```sh
+zig fetch --save=stdx git+https://github.com/c4milo/stdx#1df5f9f2fd51e8ebc1707e2e77c02afc6041f49f
+```
+
+```zig
+const stdx = b.dependency("stdx", .{ .target = target, .release = false });
+module.addImport("platform", stdx.module("platform"));
+```
+
 > [!IMPORTANT]
 > A program that imports `connect_colibri` or `oidc` links
 > [chapulin](https://github.com/c4milo/chapulin), colibri's TLS library. Define its assertion
@@ -166,6 +179,18 @@ pub fn say(app: *App, ctx: *rpc.Context, request: *const rpc.Request(eliza.SayRe
 Streams take a `RequestStream` or a `ResponseStream` in place of the request or the response.
 
 ### 4. Route it and serve it
+
+The routes share one context, your `App`, which holds the CPU features your program detected.
+Set the field once, as the program starts, with `.cpu_features = .detect()`:
+
+```zig
+const platform = @import("platform");
+
+/// What every route reads: your program's state, and the CPU features it detected as it started.
+const App = struct {
+    cpu_features: platform.CpuFeatures,
+};
+```
 
 Each generated service has a `Routes` function, which lists every method as a route of
 colibri's `server.Router`. One route answers every protocol and codec:
@@ -225,8 +250,7 @@ The `protovalidate` module checks each message against the rules that its schema
    pub const route_options: rpc.RouteOptions = .{ .interceptors = &.{Validate} };
    ```
 
-3. Give your `App` a field `cpu_features: platform.CpuFeatures`, and set it once when your
-   program starts, with stdx's `platform.CpuFeatures.detect()`. The build fails without it.
+3. The interceptor reads the `cpu_features` field of your `App`, the one your routes read.
 
 A message that breaks a rule ends its call with `invalid_argument`, and with an error detail that
 lists each violation.

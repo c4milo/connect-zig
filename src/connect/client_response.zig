@@ -6,6 +6,7 @@
 //! none, a gRPC response is readable only when the server answered Trailers-Only (decision 11).
 const std = @import("std");
 const assert = std.debug.assert;
+const platform = @import("platform");
 const protocol = @import("protocol.zig");
 const compression = @import("compression.zig");
 const envelope = @import("envelope.zig");
@@ -47,13 +48,15 @@ pub const Error = message_codec.DecodeError || compression.Error || envelope.Err
 };
 
 pub const Response = struct {
-    /// Starts reading the response of a call that spoke `speaks`.
-    pub fn init(speaks: protocol.Speaks, incoming: *const Incoming, storage: *const Storage, decoders: *const compression.Decoders) Response {
+    /// Starts reading the response of a call that spoke `speaks`, with `cpu_features`, the CPU
+    /// features of the client's `Options`.
+    pub fn init(speaks: protocol.Speaks, incoming: *const Incoming, storage: *const Storage, decoders: *const compression.Decoders, cpu_features: platform.CpuFeatures) Response {
         var response: Response = .{
             .speaks = speaks,
             .incoming = incoming.*,
             .storage = storage.*,
             .decoders = decoders.*,
+            .cpu_features = cpu_features,
             .coding = .identity,
             .reader = .{ .body = incoming.body, .payload_len_max = storage.scratch.message.len },
             .streaming = incoming.streamed,
@@ -62,7 +65,7 @@ pub const Response = struct {
         assert(!incoming.streamed or (speaks.enveloped and incoming.body.len == 0));
         if (incoming.status != constants.protocol.status.ok) {
             response.done = true;
-            response.failure = http_failure(speaks, incoming.*, storage.*, decoders.*);
+            response.failure = http_failure(speaks, incoming.*, storage.*, decoders.*, cpu_features);
             return response;
         }
         response.body_seen = incoming.body.len > 0;
@@ -99,13 +102,15 @@ pub const Response = struct {
 
     fn read_head_status(response: *Response) void {
         response.done = true;
-        response.failure = trailers.read(response.incoming.headers, find_lookup, status_storage(response.storage, response.decoders));
+        response.failure = trailers.read(response.incoming.headers, find_lookup, status_storage(response.storage, response.cpu_features));
     }
 
     speaks: protocol.Speaks,
     incoming: Incoming,
     storage: Storage,
     decoders: compression.Decoders,
+    /// The program's CPU features, which each read of the response decodes with.
+    cpu_features: platform.CpuFeatures,
     coding: compression.Coding,
     reader: envelope.Reader,
     /// The outcome, once it is known: null while messages may follow, and after a success.
@@ -179,7 +184,7 @@ pub const Response = struct {
             return null;
         }
         response.messages_read += 1;
-        return try message_codec.decode(T, response.speaks.codec, octets, response.storage.scratch, response.decoders.cpu_features);
+        return try message_codec.decode(T, response.speaks.codec, octets, response.storage.scratch, response.cpu_features);
     }
 
     /// Whether the method answers with exactly one message: a unary call or a client stream.
@@ -203,7 +208,7 @@ pub const Response = struct {
             // The bare message of a Connect unary response is bounded as an envelope's payload
             // is, whether it arrived compressed or not.
             if (response.coding == .identity and response.incoming.body.len > response.storage.scratch.message.len) return error.MessageTooLarge;
-            return try compression.decompress(response.coding, response.decoders, response.incoming.body, response.storage.scratch.message);
+            return try compression.decompress(response.coding, response.decoders, response.incoming.body, response.storage.scratch.message, response.cpu_features);
         }
         const next_one = try response.reader.next() orelse {
             // A streamed body waits for its next piece.
@@ -214,7 +219,7 @@ pub const Response = struct {
             try response.read_end(next_one);
             return null;
         }
-        return try message_codec.open(next_one.flags.compressed, response.coding, response.decoders, next_one.payload, response.storage.scratch.message);
+        return try message_codec.open(next_one.flags.compressed, response.coding, response.decoders, next_one.payload, response.storage.scratch.message, response.cpu_features);
     }
 
     fn read_end(response: *Response, last: envelope.Envelope) Error!void {
@@ -229,7 +234,7 @@ pub const Response = struct {
                     .octets = response.storage.octets,
                     .details = response.storage.details,
                     .metadata = response.storage.metadata,
-                    .cpu_features = response.decoders.cpu_features,
+                    .cpu_features = response.cpu_features,
                 }) catch {
                     response.failure = .{ .code = .internal, .message = "malformed end-stream message" };
                     return;
@@ -244,7 +249,7 @@ pub const Response = struct {
                     return;
                 };
                 response.metadata = lines;
-                response.failure = trailers.read(lines, rpc_error.find_header, status_storage(response.storage, response.decoders));
+                response.failure = trailers.read(lines, rpc_error.find_header, status_storage(response.storage, response.cpu_features));
             },
             .grpc => return error.InvalidEnvelope,
         }
@@ -255,7 +260,7 @@ pub const Response = struct {
     /// PROTOCOL-WEB.md, "Protocol differences vs gRPC over HTTP/2": the trailers frame is a
     /// message, so its compressed flag means the same.
     fn inflated(response: *const Response, last: envelope.Envelope) Error![]const u8 {
-        return message_codec.open(last.flags.compressed, response.coding, response.decoders, last.payload, response.storage.scratch.message);
+        return message_codec.open(last.flags.compressed, response.coding, response.decoders, last.payload, response.storage.scratch.message, response.cpu_features);
     }
 
     fn end_without_status(response: *Response) ?[]const u8 {
@@ -269,7 +274,7 @@ pub const Response = struct {
             .connect => .{ .code = .internal, .message = "missing end-stream message" },
             .grpc_web => .{ .code = .internal, .message = "missing trailers frame" },
             .grpc => if (response.incoming.trailers) |lookup|
-                trailers.read(lookup, find_lookup, status_storage(response.storage, response.decoders))
+                trailers.read(lookup, find_lookup, status_storage(response.storage, response.cpu_features))
             else
                 .{ .code = .unimplemented, .message = "the HTTP client exposes no gRPC trailers" },
         };
@@ -297,9 +302,9 @@ fn head_failure(speaks: protocol.Speaks, incoming: *const Incoming) ?RpcError {
 /// The octets of an envelope's prefix: its flags and its length.
 const flag_prefix_len = constants.protocol.envelope_prefix_len;
 
-fn status_storage(storage: Storage, decoders: compression.Decoders) trailers.Storage {
+fn status_storage(storage: Storage, cpu_features: platform.CpuFeatures) trailers.Storage {
     const half = storage.octets.len / constants.storage_halves;
-    return .{ .message = storage.octets[0..half], .status = storage.octets[half..], .details = storage.details, .cpu_features = decoders.cpu_features };
+    return .{ .message = storage.octets[0..half], .status = storage.octets[half..], .details = storage.details, .cpu_features = cpu_features };
 }
 
 fn find_lookup(lookup: Lookup, name: []const u8) ?[]const u8 {
@@ -315,7 +320,7 @@ fn coding_header(speaks: protocol.Speaks) []const u8 {
 
 /// The error of a response whose HTTP status is not 200: a Connect error body when there is one,
 /// else the code the status maps to (Connect protocol, "HTTP to Error Code").
-fn http_failure(speaks: protocol.Speaks, incoming: Incoming, storage: Storage, decoders: compression.Decoders) RpcError {
+fn http_failure(speaks: protocol.Speaks, incoming: Incoming, storage: Storage, decoders: compression.Decoders, cpu_features: platform.CpuFeatures) RpcError {
     const fallback: RpcError = .{ .code = Code.from_http_status(incoming.status) };
     if (speaks.protocol != .connect) return fallback;
     const content_type = incoming.headers.find("content-type") orelse return fallback;
@@ -324,10 +329,10 @@ fn http_failure(speaks: protocol.Speaks, incoming: Incoming, storage: Storage, d
     // error's JSON included.
     const coding_name = incoming.headers.find("content-encoding") orelse "identity";
     const coding = compression.Coding.from_name(coding_name) orelse return fallback;
-    const body = compression.decompress(coding, decoders, incoming.body, storage.scratch.message) catch return fallback;
+    const body = compression.decompress(coding, decoders, incoming.body, storage.scratch.message, cpu_features) catch return fallback;
     // Connect protocol, "HTTP to Error Code": an error body whose code is missing or unknown
     // takes the code of the HTTP status.
-    const failure = error_json.decode_or(body, &.{ .tokens = storage.scratch.tokens, .octets = storage.octets, .details = storage.details, .cpu_features = decoders.cpu_features }, fallback.code) catch return fallback;
+    const failure = error_json.decode_or(body, &.{ .tokens = storage.scratch.tokens, .octets = storage.octets, .details = storage.details, .cpu_features = cpu_features }, fallback.code) catch return fallback;
     return failure;
 }
 
@@ -340,6 +345,8 @@ pub fn failure_of(failure: Error) RpcError {
         else => .{ .code = .internal, .message = "malformed response" },
     };
 }
+
+const test_cpu_features = @import("codec_test_support.zig").cpu_features;
 
 test "a non-200 Connect response without a JSON body maps its status to a code" {
     const Empty = struct {
@@ -357,7 +364,10 @@ test "a non-200 Connect response without a JSON body maps its status to a code" 
         .metadata = &metadata,
     };
     const lookup: Lookup = .{ .context = &buffers, .find_fn = Empty.find };
-    const response = Response.init(.{ .protocol = .connect, .codec = .proto, .enveloped = false }, &.{ .status = 503, .headers = lookup, .body = "busy" }, &storage, &.{});
+    // The response reads with the CPU features its caller states.
+    const program_features: platform.CpuFeatures = .{ .ssse3 = true, .bmi2 = true };
+    const response = Response.init(.{ .protocol = .connect, .codec = .proto, .enveloped = false }, &.{ .status = 503, .headers = lookup, .body = "busy" }, &storage, &.{}, program_features);
+    try std.testing.expectEqual(program_features, response.cpu_features);
     try std.testing.expectEqual(Code.unavailable, response.failure.?.code);
     try std.testing.expect(response.done);
 }
@@ -399,7 +409,7 @@ fn streamed_response(room: *TestRoom, details: []rpc_error.Detail, metadata: []H
     };
     const lookup: Lookup = .{ .context = room, .find_fn = TestEmpty.find };
     const speaks: protocol.Speaks = .{ .protocol = .connect, .codec = .proto, .enveloped = true };
-    return Response.init(speaks, &.{ .status = constants.protocol.status.ok, .headers = lookup, .body = "", .streamed = true }, &storage, &.{});
+    return Response.init(speaks, &.{ .status = constants.protocol.status.ok, .headers = lookup, .body = "", .streamed = true }, &storage, &.{}, test_cpu_features);
 }
 
 test "a streamed response reads each whole envelope as it arrives, and keeps a partial one" {

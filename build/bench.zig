@@ -66,6 +66,7 @@ pub fn add(b: *std.Build, public_names: *std.Build.Module, target: std.Build.Res
                 .{ .name = "connect_colibri", .module = routed.connect_colibri },
                 .{ .name = "server", .module = routed.server },
                 .{ .name = "http", .module = routed.http },
+                .{ .name = "platform", .module = routed.platform },
             },
         }),
     });
@@ -168,6 +169,8 @@ const Routed = struct {
     connect_colibri: *std.Build.Module,
     server: *std.Build.Module,
     http: *std.Build.Module,
+    /// stdx's type of CPU features, which the route's context holds.
+    platform: *std.Build.Module,
 };
 
 /// `connect` and `connect_colibri` as the root build makes them, over copies of colibri's modules
@@ -177,6 +180,7 @@ fn routed_modules(b: *std.Build, copies: *Copies, stdx: *std.Build.Dependency, p
     const colibri = b.dependency("colibri", .{ .target = target, .release = true, .rotor = false });
     const server = release_fast(b, copies, colibri.module("server"));
     const http = release_fast(b, copies, colibri.module("http"));
+    const platform = release_fast(b, copies, stdx.module("platform"));
     const connect = b.createModule(.{
         .root_source_file = b.path("src/connect/connect.zig"),
         .target = target,
@@ -184,7 +188,7 @@ fn routed_modules(b: *std.Build, copies: *Copies, stdx: *std.Build.Dependency, p
         .imports = &.{
             .{ .name = "protobuf", .module = protobuf },
             .{ .name = "json", .module = release_fast(b, copies, stdx.module("json")) },
-            .{ .name = "platform", .module = release_fast(b, copies, stdx.module("platform")) },
+            .{ .name = "platform", .module = platform },
             .{ .name = "gzip", .module = release_fast(b, copies, stdx.module("gzip")) },
             .{ .name = "zstd", .module = release_fast(b, copies, stdx.module("zstd")) },
             .{ .name = "brotli", .module = release_fast(b, copies, stdx.module("brotli")) },
@@ -202,10 +206,11 @@ fn routed_modules(b: *std.Build, copies: *Copies, stdx: *std.Build.Dependency, p
             .{ .name = "server", .module = server },
             .{ .name = "client", .module = release_fast(b, copies, colibri.module("client")) },
             .{ .name = "http", .module = http },
+            .{ .name = "platform", .module = platform },
             .{ .name = "public_names", .module = public_names },
         },
     });
-    return .{ .connect = connect, .connect_colibri = connect_colibri, .server = server, .http = http };
+    return .{ .connect = connect, .connect_colibri = connect_colibri, .server = server, .http = http, .platform = platform };
 }
 
 /// Each module copied so far, by its original: a module two others import is copied once, as a

@@ -35,6 +35,7 @@ pub fn main(init: std.process.Init) !void {
         return error.OutOfMemory;
     const state: *State = @ptrCast(@alignCast(state_memory));
     // The store starts empty, as each session of `main.zig` does.
-    state.app = .{};
+    // The program detects the CPU's features once, as it starts.
+    state.app = .{ .cpu_features = .detect() };
     try state.served.run(init, &state.app);
 }

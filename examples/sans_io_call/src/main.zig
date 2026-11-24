@@ -15,6 +15,7 @@
 //! outcome, and exits with an error otherwise. Run it with `zig build run`.
 const std = @import("std");
 const connect = @import("connect");
+const platform = @import("platform");
 const eliza = @import("eliza");
 const constants = @import("constants.zig");
 const Service = eliza.ElizaService;
@@ -51,6 +52,8 @@ const Wire = struct {
 /// The memory of both sides, which `main` allocates once (decision 42). The library holds none of
 /// its own.
 const State = struct {
+    /// The CPU's features, which the program detects once and gives the client and the server.
+    cpu_features: platform.CpuFeatures,
     request_body: [constants.buffer_len]u8,
     request_message: [constants.buffer_len]u8,
     request_work: [constants.buffer_len]u8,
@@ -81,6 +84,7 @@ pub fn main(init: std.process.Init) !void {
     const state_memory = init.arena.allocator().rawAlloc(@sizeOf(State), .of(State), @returnAddress()) orelse
         return error.OutOfMemory;
     const state: *State = @ptrCast(@alignCast(state_memory));
+    state.cpu_features = .detect();
     state.wire = .{};
     state.response_headers = .{ .entries = &.{} };
     try say(state);
@@ -89,7 +93,7 @@ pub fn main(init: std.process.Init) !void {
 }
 
 fn say(state: *State) !void {
-    const options: connect.client.Options = .{ .protocol = .connect, .codec = .json };
+    const options: connect.client.Options = .{ .protocol = .connect, .codec = .json, .cpu_features = state.cpu_features };
     const request = try connect.client.request(Service.say, &options, &.{.{ .sentence = "I feel tired" }}, &request_buffers(state));
     std.debug.print("client: {s} {s} {s}\n", .{ request.http_method, request.target, request.body });
     try serve_say(state, &request);
@@ -101,7 +105,7 @@ fn say(state: *State) !void {
 }
 
 fn introduce(state: *State) !void {
-    const options: connect.client.Options = .{ .protocol = .grpc_web };
+    const options: connect.client.Options = .{ .protocol = .grpc_web, .cpu_features = state.cpu_features };
     const request = try connect.client.request(Service.introduce, &options, &.{.{ .name = "Ada" }}, &request_buffers(state));
     std.debug.print("client: {s} {s}, {d} body bytes in envelopes\n", .{ request.http_method, request.target, request.body.len });
     try serve_introduce(state, &request);
@@ -130,6 +134,7 @@ fn accept(state: *State, method: connect.Method, request: *const connect.client.
     const decision = connect.server.accept(request.http_method, null, headers.lookup(), &.{
         .stream_type = method.stream_type,
         .idempotency = method.idempotency,
+        .cpu_features = state.cpu_features,
     });
     const accepted = switch (decision) {
         .accepted => |accepted| accepted,
@@ -184,5 +189,5 @@ fn read(state: *State, speaks: connect.Speaks) connect.client.Response {
         .metadata = &state.metadata,
     };
     const incoming: connect.client.Incoming = .{ .status = state.wire.status, .headers = state.response_headers.lookup(), .body = state.wire.body[0..state.wire.body_len] };
-    return connect.client.Response.init(speaks, &incoming, &storage, &.{});
+    return connect.client.Response.init(speaks, &incoming, &storage, &.{}, state.cpu_features);
 }

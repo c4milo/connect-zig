@@ -47,10 +47,11 @@ pub fn main(init: std.process.Init) !void {
     if (message.len == state.message.len) return error.MessageTooLarge;
     const encoders: connect.Encoders = .{ .gzip = &state.gzip, .zstd = &state.zstd, .brotli = &state.brotli };
     const room = state.frame[prefix_len..];
+    // The program detects the CPU's features once, for the encoder's fast paths.
     const body = if (coding == .identity) identity: {
         @memcpy(room[0..message.len], message);
         break :identity room[0..message.len];
-    } else try connect.compression.compress(coding, &encoders, message, room);
+    } else try connect.compression.compress(coding, &encoders, message, room, .detect());
     state.frame[0] = @intFromBool(coding != .identity);
     std.mem.writeInt(u32, state.frame[1..prefix_len], @intCast(body.len), .big);
     try std.Io.Dir.cwd().writeFile(init.io, .{ .sub_path = out_path, .data = state.frame[0 .. prefix_len + body.len] });
