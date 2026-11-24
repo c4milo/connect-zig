@@ -224,9 +224,12 @@ h11 and h2 in cleartext and no h3, and needs no `tls_buffer`.
 
 ## 5. Call it
 
-Your calls share one `connect.Client`. It holds the CPU features your program detected, and
-the codecs it placed in `.encoders` and `.decoders`, none by default. Make it once, as the
-program starts. A program that serves too gives it the features of its `App`:
+Two clients make a call. colibri's `client.ConnectionPool` is the HTTP client: it opens each
+connection and sends each request. `connect.Client` is Connect's part, which your calls share.
+It opens no connection. It holds the CPU features your program detected, and the codecs it
+placed in `.encoders` and `.decoders`, none by default, and it builds each request for the
+pool. Make it once, as the program starts. A program that serves too gives it the features of
+its `App`:
 
 ```zig
 state.client = .{ .cpu_features = state.app.cpu_features };

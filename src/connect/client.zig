@@ -2,6 +2,9 @@
 //! features it detected and the codecs it placed, and makes each call with it from then on, as a
 //! program makes each request with its `std.http.Client` (decision 51). What differs from call
 //! to call is in `Options`.
+//!
+//! It is no HTTP client: it opens no connection and sends no request. The program's HTTP
+//! library does both, colibri's connection pool or another, with the request this client builds.
 const platform = @import("platform");
 const compression = @import("compression.zig");
 const client_call = @import("client_call.zig");

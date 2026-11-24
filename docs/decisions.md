@@ -832,6 +832,23 @@ first. Cite an entry by number in code and commits ("decision 6").
     (the decision 44 of this section), and which a program on `connect` alone has no place
     for; and a pointer to the client in each call, which saves a copy of a few words and
     makes each call depend on how long the client lives.
+    The owner asked on 2026-11-24 why colibri's client does not hold these, and agreed that
+    day to keep `connect.Client`. Beaten then:
+    - The features in colibri's `client.Config`, which `ClientCall.init` would read from the
+      pool. colibri's configuration holds none: each of its decoder pools takes them at its
+      `init`. A program on `connect` alone has no pool. The codecs would stay in connect-zig,
+      since colibri's client removes HTTP content codings and knows no envelope, so a program
+      would state its client in two places. A route reads the program's own `App`, never
+      colibri's server configuration, and a call follows it.
+    - The name `connect.client.Config`. A program makes each request through the value, as
+      it does through `std.http.Client`, which a struct literal makes from an allocator and an
+      `Io`, and whose `RequestOptions` hold what one request chooses. Pepegrillo's API guide
+      puts std's idioms before a project's own choice.
+    - What it costs: a program names colibri's `client` module, `colibri.Client`, and
+      `connect.Client`, so the README and the guide say which is which. A program hands its
+      features to TLS, to each decoder pool of colibri, to its `App`, and to its `Client`.
+      One field of colibri's `client.Config` that its own pools read would cut that, and that
+      change is colibri's.
 
 ## Validation
 

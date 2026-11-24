@@ -208,8 +208,10 @@ memory the router holds.
 
 ### 5. Call it
 
-Your calls share one `connect.Client`, which holds the CPU features your program detected and
-the codecs it placed. Make it once, as the program starts:
+Two clients make a call. colibri's connection pool is the HTTP client: it opens each
+connection and sends each request. `connect.Client` is Connect's part, which your calls share.
+It holds the CPU features your program detected and the codecs it placed, and it builds each
+request for the pool. Make it once, as the program starts:
 
 ```zig
 const calls: connect.Client = .{ .cpu_features = .detect() };
