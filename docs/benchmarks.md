@@ -28,7 +28,7 @@ connect-zig parses a repeated field when it is read, so connect-zig reads with `
 Buffa wins no cell the chart draws. Its wins are JSON cells and, on arm64, varints binary decode.
 On arm64 one more cell, varints JSON decode, is a tie within 0.3%.
 
-## The routed call
+## Request routing
 
 Run 265, on an Arm Neoverse-N2 core, with colibri v0.19.2.
 
