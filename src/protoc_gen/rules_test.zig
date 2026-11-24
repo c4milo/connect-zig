@@ -111,7 +111,7 @@ test "a message with no rule keeps its code, and one that holds a message with r
     const without = try generated(arena, &.{ loop, plain });
     try expect_absent(without, "protovalidate");
     try expect_absent(without, "RuleNumber");
-    try expect_contains(without, "//! The build gives this file the modules protobuf.\nconst proto = @import(\"protobuf\");\n\npub const Loop");
+    try expect_contains(without, "//! The build gives this file the modules connect_zig.\nconst proto = @import(\"connect_zig\").protobuf;\n\npub const Loop");
 }
 
 test "a rule of the message alone, of a field alone or of a oneof alone gives a table" {

@@ -38,13 +38,13 @@ pub fn add(b: *std.Build, graph: Graph) void {
     }) });
     b.step("otlp-compress", "Install the program that compresses the full-stack check's exports to zig-out/bin").dependOn(&b.addInstallArtifact(compress, .{}).step);
     const gen = "tools/fullstack/validate/gen/opentelemetry/proto/";
-    const common = generated(b, graph, gen ++ "common/v1/common.pb.zig", &.{});
-    const resource = generated(b, graph, gen ++ "resource/v1/resource.pb.zig", &.{.{ .name = "opentelemetry_proto_common_v1_common", .module = common }});
-    const trace = generated(b, graph, gen ++ "trace/v1/trace.pb.zig", &.{
+    const common = generated(b, graph.connect_zig_core, gen ++ "common/v1/common.pb.zig", &.{});
+    const resource = generated(b, graph.connect_zig_core, gen ++ "resource/v1/resource.pb.zig", &.{.{ .name = "opentelemetry_proto_common_v1_common", .module = common }});
+    const trace = generated(b, graph.connect_zig_core, gen ++ "trace/v1/trace.pb.zig", &.{
         .{ .name = "opentelemetry_proto_common_v1_common", .module = common },
         .{ .name = "opentelemetry_proto_resource_v1_resource", .module = resource },
     });
-    const otlp = generated(b, graph, gen ++ "collector/trace/v1/trace_service.pb.zig", &.{.{ .name = "opentelemetry_proto_trace_v1_trace", .module = trace }});
+    const otlp = generated(b, graph.connect_zig_core, gen ++ "collector/trace/v1/trace_service.pb.zig", &.{.{ .name = "opentelemetry_proto_trace_v1_trace", .module = trace }});
     const cost = b.addExecutable(.{ .name = "otlp-validate-cost", .root_module = b.createModule(.{
         .root_source_file = b.path("tools/otlp_sink/validate_cost.zig"),
         .target = graph.target,
@@ -65,22 +65,20 @@ const Kind = enum { plain, validate, compression };
 
 /// The sink of `kind` over the generated code of `gen`.
 fn sink(b: *std.Build, graph: Graph, name: []const u8, comptime gen: []const u8, kind: Kind) *std.Build.Step.Compile {
-    const common = generated(b, graph, gen ++ "common/v1/common.pb.zig", &.{});
-    const resource = generated(b, graph, gen ++ "resource/v1/resource.pb.zig", &.{.{ .name = "opentelemetry_proto_common_v1_common", .module = common }});
-    const trace = generated(b, graph, gen ++ "trace/v1/trace.pb.zig", &.{
+    const common = generated(b, graph.connect_zig, gen ++ "common/v1/common.pb.zig", &.{});
+    const resource = generated(b, graph.connect_zig, gen ++ "resource/v1/resource.pb.zig", &.{.{ .name = "opentelemetry_proto_common_v1_common", .module = common }});
+    const trace = generated(b, graph.connect_zig, gen ++ "trace/v1/trace.pb.zig", &.{
         .{ .name = "opentelemetry_proto_common_v1_common", .module = common },
         .{ .name = "opentelemetry_proto_resource_v1_resource", .module = resource },
     });
-    const otlp = generated(b, graph, gen ++ "collector/trace/v1/trace_service.pb.zig", &.{.{ .name = "opentelemetry_proto_trace_v1_trace", .module = trace }});
-    const otlpstore = generated(b, graph, "examples/otlp/gen/otlpstore/v1/otlpstore.pb.zig", &.{.{ .name = "opentelemetry_proto_collector_trace_v1_trace_service", .module = otlp }});
+    const otlp = generated(b, graph.connect_zig, gen ++ "collector/trace/v1/trace_service.pb.zig", &.{.{ .name = "opentelemetry_proto_trace_v1_trace", .module = trace }});
+    const otlpstore = generated(b, graph.connect_zig, "examples/otlp/gen/otlpstore/v1/otlpstore.pb.zig", &.{.{ .name = "opentelemetry_proto_collector_trace_v1_trace_service", .module = otlp }});
     const service = b.createModule(.{
         .root_source_file = b.path("examples/otlp/src/service/service.zig"),
         .target = graph.target,
         .optimize = graph.optimize,
         .imports = &.{
-            .{ .name = "connect", .module = graph.connect },
-            .{ .name = "protobuf", .module = graph.protobuf },
-            .{ .name = "connect_colibri", .module = graph.connect_colibri },
+            .{ .name = "connect_zig", .module = graph.connect_zig },
             .{ .name = "otlp", .module = otlp },
             .{ .name = "otlpstore", .module = otlpstore },
         },
@@ -110,10 +108,11 @@ fn sink(b: *std.Build, graph: Graph, name: []const u8, comptime gen: []const u8,
 }
 
 /// A generated module, with the modules its header names. Generated code names `connect_zig`.
-fn generated(b: *std.Build, graph: Graph, path: []const u8, imports: []const std.Build.Module.Import) *std.Build.Module {
-    const module = b.createModule(.{ .root_source_file = b.path(path), .target = graph.target, .optimize = graph.optimize });
-    module.addImport("protobuf", graph.protobuf);
-    module.addImport("connect_zig", graph.generated_imports);
+/// A sink compiles the example's receiver, which imports `connect_zig` with colibri, so its
+/// generated code takes that module too: one compilation holds one module of a root file.
+fn generated(b: *std.Build, connect_zig: *std.Build.Module, path: []const u8, imports: []const std.Build.Module.Import) *std.Build.Module {
+    const module = b.createModule(.{ .root_source_file = b.path(path), .target = connect_zig.resolved_target, .optimize = connect_zig.optimize });
+    module.addImport("connect_zig", connect_zig);
     for (imports) |import| module.addImport(import.name, import.module);
     return module;
 }

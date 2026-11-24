@@ -222,14 +222,14 @@ test "a type of another file is named through that file's module" {
     };
     const request: pb.CodeGeneratorRequest = .{ .file_to_generate = .of(&.{"demo/v1/demo.proto"}), .proto_file = .of(&.{ shared, file }) };
     const text = try generated(arena, &request);
-    try expect_contains(text, "//! The build gives this file the modules protobuf, shared_v1_shared.\n");
+    try expect_contains(text, "//! The build gives this file the modules connect_zig, shared_v1_shared.\nconst proto = @import(\"connect_zig\").protobuf;\n");
     try expect_contains(text, "const shared_v1_shared = @import(\"shared_v1_shared\");\n");
     try expect_contains(text, "    tag: ?shared_v1_shared.Tag = null,\n    tags: RepeatedTag = .{},\n");
     // A repeated type is named by its path in its own file, without the module's name.
     try expect_contains(text, "const RepeatedTag = proto.Repeated(shared_v1_shared.Tag, .message);\n");
 }
 
-test "a type of connect-zig's own generated code is named through connect_zig (decision 52)" {
+test "a file of messages alone imports connect_zig, and names connect-zig's own code through it" {
     var arena_state = std.heap.ArenaAllocator.init(testing.allocator);
     defer arena_state.deinit();
     const arena = arena_state.allocator();

@@ -21,8 +21,6 @@ pub fn build(b: *std.Build) void {
     const plugin = b.addInstallArtifact(connect_zig.artifact("protoc-gen-connect-zig"), .{});
     b.step("plugin", "Install connect-zig's protoc plugin to zig-out/bin").dependOn(&plugin.step);
 
-    // A generated file that holds rules names `protovalidate` in its header, beside `protobuf`
-    // and `connect`.
     const signup = b.addModule("signup", .{
         .root_source_file = b.path("gen/signup/v1/signup.pb.zig"),
         .target = target,

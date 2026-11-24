@@ -118,7 +118,7 @@ fn imports_of(arena: std.mem.Allocator, text: []const u8) []const []const u8 {
 /// The module a header names: one of the library's, or another generated file's.
 fn resolve(graph: Graph, generated: []const Generated, name: []const u8) *std.Build.Module {
     if (std.mem.eql(u8, name, "protobuf")) return graph.protobuf;
-    if (std.mem.eql(u8, name, "connect_zig")) return graph.generated_imports;
+    if (std.mem.eql(u8, name, "connect_zig")) return graph.connect_zig_core;
     if (std.mem.eql(u8, name, "connect")) return graph.connect;
     if (std.mem.eql(u8, name, "protovalidate")) return graph.protovalidate;
     if (graph.protovalidate.import_table.get(name)) |module| return module;

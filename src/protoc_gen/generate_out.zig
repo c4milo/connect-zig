@@ -104,23 +104,19 @@ pub const Out = struct {
         return text.items;
     }
 
-    /// Whether the file imports the module `connect_zig` (decision 52): it declares a service or
-    /// a table of rules, or names a type of connect-zig's own generated code. A file of messages
-    /// alone imports `protobuf`, so a program that only codes messages links no TLS library.
+    /// Whether the file imports the module `connect_zig` (decision 52). Every file does, but
+    /// the two files of connect-zig's own generated code: the library builds them, below
+    /// `connect_zig`, so they import `protobuf` and name each other by module.
     fn imports_connect_zig(out: *const Out) bool {
-        if (out.uses_connect or out.uses_protovalidate) return true;
-        for (out.used_modules.keys()) |module| {
-            if (out.library_module(module)) return true;
-        }
-        return false;
-    }
-
-    /// Whether `module` is generated code that `connect_zig` exports, named from a file outside
-    /// it. The two library files name each other by module, since the library builds them.
-    fn library_module(out: *const Out, module: []const u8) bool {
         for (library_files) |library_file| {
             if (std.mem.eql(u8, out.file, library_file.file)) return false;
         }
+        return true;
+    }
+
+    /// Whether `module` is generated code that `connect_zig` names, from a file outside it.
+    fn library_module(out: *const Out, module: []const u8) bool {
+        if (!out.imports_connect_zig()) return false;
         for (library_files) |library_file| {
             if (std.mem.eql(u8, module, library_file.module)) return true;
         }

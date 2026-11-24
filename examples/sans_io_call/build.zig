@@ -12,10 +12,11 @@ pub fn build(b: *std.Build) void {
     // Assertions stay on, as in connect-zig: Debug, or ReleaseSafe with `-Drelease`.
     const optimize = b.standardOptimizeOption(.{ .preferred_optimize_mode = .ReleaseSafe });
     const release = optimize == .ReleaseSafe;
-    // The program needs no Rotor. The eliza project asks for connect-zig with these three options,
-    // so Zig gives both requests one package, and `connect` is one module (decision 41).
-    const connect_zig = b.dependency("connect_zig", .{ .target = target, .release = release, .rotor = true });
-    const eliza = b.dependency("eliza", .{ .target = target, .release = release });
+    // The program runs the protocol on no HTTP library, so it asks for connect-zig without
+    // colibri and links no TLS library (decision 52). The eliza project asks for connect-zig with
+    // these four options, so Zig gives both requests one package (decision 41).
+    const connect_zig = b.dependency("connect_zig", .{ .target = target, .release = release, .rotor = true, .colibri = false });
+    const eliza = b.dependency("eliza", .{ .target = target, .release = release, .colibri = false });
     const exe = b.addExecutable(.{ .name = "sans_io_call", .root_module = b.createModule(.{
         .root_source_file = b.path("src/main.zig"),
         .target = target,

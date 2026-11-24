@@ -33,7 +33,7 @@ fn add_protobuf_testee(b: *std.Build, graph: Graph) *std.Build.Step {
     root.addImport("protobuf", graph.protobuf);
     for (protobuf_suite) |file| {
         const module = b.createModule(.{ .root_source_file = b.path(file.path), .target = graph.target, .optimize = graph.optimize });
-        module.addImport("protobuf", graph.protobuf);
+        module.addImport("connect_zig", graph.connect_zig_core);
         root.addImport(file.name, module);
     }
     const exe = b.addExecutable(.{ .name = "protobuf-testee", .root_module = root });
@@ -112,7 +112,7 @@ fn generated(b: *std.Build, graph: Graph, comptime name: []const u8, extra: []co
         .optimize = graph.optimize,
     });
     module.addImport("protobuf", graph.protobuf);
-    module.addImport("connect_zig", graph.generated_imports);
+    module.addImport("connect_zig", graph.connect_zig_core);
     for (extra) |import| module.addImport(import.name, import.module);
     return module;
 }

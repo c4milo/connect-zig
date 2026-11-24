@@ -14,19 +14,19 @@ pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     // Assertions stay on, as in connect-zig: Debug, or ReleaseSafe with `-Drelease`.
     const optimize = b.standardOptimizeOption(.{ .preferred_optimize_mode = .ReleaseSafe });
-    const connect_zig = b.dependency("connect_zig", .{ .target = target, .release = optimize == .ReleaseSafe });
+    // The program codes messages alone, so it asks for connect-zig without colibri, and links no
+    // TLS library (decision 52).
+    const connect_zig = b.dependency("connect_zig", .{ .target = target, .release = optimize == .ReleaseSafe, .colibri = false });
     const plugin = b.addInstallArtifact(connect_zig.artifact("protoc-gen-connect-zig"), .{});
     b.step("plugin", "Install connect-zig's protoc plugin to zig-out/bin").dependOn(&plugin.step);
 
-    // A program that codes messages alone takes `protobuf`, which links no TLS library (decision
-    // 52). Its generated code declares no service and no rule, so it names `protobuf` too.
-    const protobuf = connect_zig.module("protobuf");
+    const module = connect_zig.module("connect_zig");
     const shared = b.addModule("kitchen_v1_shared", .{
         .root_source_file = b.path("gen/kitchen/v1/shared.pb.zig"),
         .target = target,
         .optimize = optimize,
         .imports = &.{
-            .{ .name = "protobuf", .module = protobuf },
+            .{ .name = "connect_zig", .module = module },
         },
     });
     const kitchen = b.addModule("kitchen", .{
@@ -34,7 +34,7 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
         .imports = &.{
-            .{ .name = "protobuf", .module = protobuf },
+            .{ .name = "connect_zig", .module = module },
             .{ .name = "kitchen_v1_shared", .module = shared },
         },
     });
@@ -43,7 +43,7 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
         .imports = &.{
-            .{ .name = "protobuf", .module = protobuf },
+            .{ .name = "connect_zig", .module = module },
             .{ .name = "kitchen_v1_shared", .module = shared },
         },
     });
@@ -52,7 +52,7 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
         .imports = &.{
-            .{ .name = "protobuf", .module = protobuf },
+            .{ .name = "connect_zig", .module = module },
             .{ .name = "kitchen", .module = kitchen },
         },
     }) });

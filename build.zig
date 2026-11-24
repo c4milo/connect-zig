@@ -1,11 +1,11 @@
 //! connect-zig's build: the module graph of docs/design.md §3, the tests, the plugin, the
 //! examples and the tooling. Helpers live in build/.
 //!
-//! A project that depends on connect-zig takes two modules (decision 52):
-//! `dependency.module("connect_zig")`, which names every library module, colibri's `server`,
-//! `client`, `http`, `tls` and `colibri`, stdx's `platform`, and the generated code of
-//! validate.proto and descriptor.proto; and `dependency.module("protobuf")`, for a program that
-//! codes messages alone. `.rotor = true` builds colibri's `.private` kinds on Rotor (decision 39).
+//! A project that depends on connect-zig takes one module, `dependency.module("connect_zig")`
+//! (decision 52). It names every library module, colibri's `server`, `client`, `http`, `tls` and
+//! `colibri`, stdx's `platform`, and the generated code of validate.proto and descriptor.proto.
+//! `.colibri = false` leaves colibri and `oidc` out of it, so a program links no chapulin.
+//! `.rotor = true` builds colibri's `.private` kinds on Rotor (decision 39).
 const std = @import("std");
 const assert = std.debug.assert;
 const lint = @import("build/lint.zig");
@@ -36,7 +36,10 @@ pub fn build(b: *std.Build) void {
     // program asks with `.rotor = true` (decision 39). The library never needs Rotor (decision 32).
     const rotor = b.option(bool, "rotor", "Build colibri's .private kinds of colibri.Server and colibri.Client, on Rotor (decision 39)") orelse (b.pkg_hash.len == 0);
     const colibri = b.dependency("colibri", .{ .target = target, .release = release, .rotor = rotor });
-    const graph = modules(b, stdx, colibri, target, optimize);
+    // Decision 52: whether the module `connect_zig` names colibri. A program that codes messages
+    // or runs the protocol on an HTTP library of its own passes `.colibri = false`.
+    const with_colibri = b.option(bool, "colibri", "Name colibri, connect_colibri and oidc in the connect_zig module, which links chapulin (decision 52)") orelse true;
+    const graph = modules(b, stdx, colibri, with_colibri, target, optimize);
 
     const plugin = b.addExecutable(.{
         .name = "protoc-gen-connect-zig",
@@ -75,13 +78,13 @@ pub fn build(b: *std.Build) void {
     schema_programs.add(b, graph);
 }
 
-fn modules(b: *std.Build, stdx: *std.Build.Dependency, colibri: *std.Build.Dependency, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode) Graph {
+fn modules(b: *std.Build, stdx: *std.Build.Dependency, colibri: *std.Build.Dependency, with_colibri: bool, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode) Graph {
     const public_names = b.createModule(.{
         .root_source_file = b.path("src/public_names/public_names.zig"),
         .target = target,
         .optimize = optimize,
     });
-    const protobuf = b.addModule("protobuf", .{
+    const protobuf = b.createModule(.{
         .root_source_file = b.path("src/protobuf/protobuf.zig"),
         .target = target,
         .optimize = optimize,
@@ -126,45 +129,35 @@ fn modules(b: *std.Build, stdx: *std.Build.Dependency, colibri: *std.Build.Depen
     });
     const oidc = oidc_module(b, stdx, connect, public_names, target, optimize);
     const validate = protovalidate_module(b, protobuf, public_names, stdx, target, optimize);
+    const exports: Exports = .{
+        .protobuf = protobuf,
+        .connect = connect,
+        .connect_colibri = connect_colibri,
+        .protovalidate = validate,
+        .oidc = oidc,
+        .colibri = colibri,
+        .platform = stdx.module("platform"),
+        .public_names = public_names,
+    };
+    // The package exports the module as the program asked for it. The build's own checks build
+    // generated code over the module without colibri, so a check that serves no RPC links no
+    // chapulin, and over the module with it in `test-connect-zig`.
+    const connect_zig = connect_zig_module(b, exports, with_colibri, target, optimize);
+    b.modules.put(b.graph.arena, "connect_zig", connect_zig) catch @panic("OOM");
     return .{
         .protobuf = protobuf,
         .connect = connect,
         .connect_colibri = connect_colibri,
         .oidc = oidc,
         .protovalidate = validate,
-        .connect_zig = connect_zig_module(b, .{
-            .protobuf = protobuf,
-            .connect = connect,
-            .connect_colibri = connect_colibri,
-            .protovalidate = validate,
-            .oidc = oidc,
-            .colibri = colibri,
-            .platform = stdx.module("platform"),
-            .public_names = public_names,
-        }, target, optimize),
-        .generated_imports = generated_imports_module(b, protobuf, connect, validate, target, optimize),
+        .connect_zig = connect_zig,
+        .connect_zig_core = if (with_colibri) connect_zig_module(b, exports, false, target, optimize) else connect_zig,
         .public_names = public_names,
         .colibri = colibri,
         .platform = stdx.module("platform"),
         .target = target,
         .optimize = optimize,
     };
-}
-
-/// What the build's own generated code takes as `connect_zig`, as `build/graph.zig` describes.
-fn generated_imports_module(b: *std.Build, protobuf: *std.Build.Module, connect: *std.Build.Module, validate: *std.Build.Module, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode) *std.Build.Module {
-    return b.createModule(.{
-        .root_source_file = b.path("tools/generated_imports/generated_imports.zig"),
-        .target = target,
-        .optimize = optimize,
-        .imports = &.{
-            .{ .name = "protobuf", .module = protobuf },
-            .{ .name = "connect", .module = connect },
-            .{ .name = "protovalidate", .module = validate },
-            .{ .name = "buf_validate_validate", .module = validate.import_table.get("buf_validate_validate").? },
-            .{ .name = "google_protobuf_descriptor", .module = validate.import_table.get("google_protobuf_descriptor").? },
-        },
-    });
 }
 
 const Exports = struct {
@@ -178,13 +171,14 @@ const Exports = struct {
     public_names: *std.Build.Module,
 };
 
-/// Decision 52: the one module a program that serves or calls RPCs adds. It names the library's
-/// modules, colibri's (decision 39) and stdx's `platform`, each the copy the library itself
-/// builds on, so a program and its generated code hold one copy of each.
-fn connect_zig_module(b: *std.Build, exports: Exports, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode) *std.Build.Module {
+/// Decision 52: the module `connect_zig`. It names the library's modules and stdx's `platform`,
+/// each the copy the library itself builds on, so a program and its generated code hold one copy
+/// of each. With `with_colibri` it also names colibri's modules (decision 39) and those over them.
+fn connect_zig_module(b: *std.Build, exports: Exports, with_colibri: bool, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode) *std.Build.Module {
     const options = b.addOptions();
-    options.addOption(bool, "oidc", exports.oidc != null);
-    const module = b.addModule("connect_zig", .{
+    options.addOption(bool, "colibri", with_colibri);
+    options.addOption(bool, "oidc", with_colibri and exports.oidc != null);
+    const module = b.createModule(.{
         .root_source_file = b.path("src/connect_zig/connect_zig.zig"),
         .target = target,
         .optimize = optimize,
@@ -192,19 +186,18 @@ fn connect_zig_module(b: *std.Build, exports: Exports, target: std.Build.Resolve
             .{ .name = "connect_zig_options", .module = options.createModule() },
             .{ .name = "protobuf", .module = exports.protobuf },
             .{ .name = "connect", .module = exports.connect },
-            .{ .name = "connect_colibri", .module = exports.connect_colibri },
             .{ .name = "protovalidate", .module = exports.protovalidate },
-            .{ .name = "server", .module = exports.colibri.module("server") },
-            .{ .name = "client", .module = exports.colibri.module("client") },
-            .{ .name = "http", .module = exports.colibri.module("http") },
-            .{ .name = "tls", .module = exports.colibri.module("tls") },
-            .{ .name = "colibri", .module = exports.colibri.module("colibri") },
             .{ .name = "platform", .module = exports.platform },
             .{ .name = "buf_validate_validate", .module = exports.protovalidate.import_table.get("buf_validate_validate").? },
             .{ .name = "google_protobuf_descriptor", .module = exports.protovalidate.import_table.get("google_protobuf_descriptor").? },
             .{ .name = "public_names", .module = exports.public_names },
         },
     });
+    if (!with_colibri) return module;
+    module.addImport("connect_colibri", exports.connect_colibri);
+    for ([_][]const u8{ "server", "client", "http", "tls", "colibri" }) |name| {
+        module.addImport(name, exports.colibri.module(name));
+    }
     if (exports.oidc) |oidc| module.addImport("oidc", oidc);
     return module;
 }

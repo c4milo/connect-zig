@@ -18,7 +18,15 @@ pub fn build(b: *std.Build) void {
     // A project with no Rotor that serves ELIZA (decision 32) passes `.rotor = false`, so that
     // this project's connect-zig is its own.
     const rotor = b.option(bool, "rotor", "Build on Rotor, which the in-memory rounds and `serve` need") orelse true;
-    const connect_zig = b.dependency("connect_zig", .{ .target = target, .release = release, .rotor = rotor });
+    // A project that codes ELIZA's messages with no colibri, such as `sans_io_call`, passes
+    // `.colibri = false` (decision 52), so the `eliza` module takes its connect-zig.
+    const with_colibri = b.option(bool, "colibri", "Build connect-zig with colibri, which the rounds and `serve` need") orelse true;
+    // Zig keys a dependency by the options a request names, so the option is named only when it
+    // is false: a project that names none gets this request's package.
+    const connect_zig = if (with_colibri)
+        b.dependency("connect_zig", .{ .target = target, .release = release, .rotor = rotor })
+    else
+        b.dependency("connect_zig", .{ .target = target, .release = release, .rotor = rotor, .colibri = false });
     const harness = b.dependency("harness", .{ .target = target, .release = release, .rotor = rotor });
     const plugin = b.addInstallArtifact(connect_zig.artifact("protoc-gen-connect-zig"), .{});
     b.step("plugin", "Install connect-zig's protoc plugin to zig-out/bin").dependOn(&plugin.step);

@@ -63,7 +63,7 @@ fn program(b: *std.Build, graph: Graph, name: []const u8, source: []const u8, ge
         .target = graph.target,
         .optimize = graph.optimize,
         // The code imports `connect_zig`, and the program serves no RPC (decision 52).
-        .imports = &.{.{ .name = "connect_zig", .module = graph.generated_imports }},
+        .imports = &.{.{ .name = "connect_zig", .module = graph.connect_zig_core }},
     });
     return b.addExecutable(.{ .name = name, .root_module = b.createModule(.{
         .root_source_file = b.path(source),

@@ -157,7 +157,7 @@ fn add_interop_client(b: *std.Build, graph: Graph, schemas: Schemas, hooks: *std
 fn generated(b: *std.Build, graph: Graph, path: []const u8, extra: []const std.Build.Module.Import) *std.Build.Module {
     const module = b.createModule(.{ .root_source_file = b.path(path), .target = graph.target, .optimize = graph.optimize });
     module.addImport("protobuf", graph.protobuf);
-    module.addImport("connect_zig", graph.generated_imports);
+    module.addImport("connect_zig", graph.connect_zig_core);
     for (extra) |import| module.addImport(import.name, import.module);
     return module;
 }

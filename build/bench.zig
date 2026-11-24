@@ -32,7 +32,7 @@ pub fn add(b: *std.Build, public_names: *std.Build.Module, target: std.Build.Res
         .root_source_file = b.path("bench/gen/bench/v1/bench.pb.zig"),
         .target = target,
         .optimize = optimize,
-        .imports = &.{.{ .name = "protobuf", .module = protobuf }},
+        .imports = &.{.{ .name = "connect_zig", .module = without_colibri(b, &.{.{ .name = "protobuf", .module = protobuf }}, target) }},
     });
     const routed = routed_modules(b, &copies, stdx, protobuf, public_names, target);
     const exe = b.addExecutable(.{
@@ -129,24 +129,18 @@ fn add_validate(b: *std.Build, protobuf: *std.Build.Module, public_names: *std.B
             .{ .name = "platform", .module = platform },
         },
     });
-    // The generated code imports `connect_zig`. The benchmark takes the build's stand-in, which
-    // names no colibri module, and needs none of `connect` (decision 52).
-    const generated_imports = b.createModule(.{
-        .root_source_file = b.path("tools/generated_imports/generated_imports.zig"),
-        .target = target,
-        .optimize = optimize,
-        .imports = &.{
-            .{ .name = "protobuf", .module = protobuf },
-            .{ .name = "protovalidate", .module = protovalidate },
-            .{ .name = "buf_validate_validate", .module = rules },
-            .{ .name = "google_protobuf_descriptor", .module = descriptor },
-        },
-    });
+    const connect_zig = without_colibri(b, &.{
+        .{ .name = "protobuf", .module = protobuf },
+        .{ .name = "protovalidate", .module = protovalidate },
+        .{ .name = "platform", .module = platform },
+        .{ .name = "buf_validate_validate", .module = rules },
+        .{ .name = "google_protobuf_descriptor", .module = descriptor },
+    }, target);
     const messages = b.createModule(.{
         .root_source_file = b.path("bench/validate/gen/bench/validate/v1/validate.pb.zig"),
         .target = target,
         .optimize = optimize,
-        .imports = &.{.{ .name = "connect_zig", .module = generated_imports }},
+        .imports = &.{.{ .name = "connect_zig", .module = connect_zig }},
     });
     const exe = b.addExecutable(.{
         .name = "bench-validate",
@@ -171,6 +165,18 @@ fn add_validate(b: *std.Build, protobuf: *std.Build.Module, public_names: *std.B
     const install = b.addInstallArtifact(exe, .{});
     b.step("install-bench-validate", "Install the validation benchmark into zig-out/bin").dependOn(&install.step);
     return &install.step;
+}
+
+/// The module `connect_zig` without colibri (decision 52), over the benchmark's ReleaseFast copies
+/// in `imports`. Generated code imports it; a name the benchmark does not read needs no import.
+fn without_colibri(b: *std.Build, imports: []const std.Build.Module.Import, target: std.Build.ResolvedTarget) *std.Build.Module {
+    const options = b.addOptions();
+    options.addOption(bool, "colibri", false);
+    options.addOption(bool, "oidc", false);
+    const module = b.createModule(.{ .root_source_file = b.path("src/connect_zig/connect_zig.zig"), .target = target, .optimize = optimize });
+    module.addImport("connect_zig_options", options.createModule());
+    for (imports) |import| module.addImport(import.name, import.module);
+    return module;
 }
 
 /// The modules a routed call runs (bench/call.zig), in ReleaseFast.

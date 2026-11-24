@@ -15,7 +15,7 @@
 //! The program checks every value that it reads back, and exits with an error otherwise. That is
 //! how `zig build test` and CI know that the example works. Run it with `zig build run`.
 const std = @import("std");
-const proto = @import("protobuf");
+const proto = @import("connect_zig").protobuf;
 const kitchen = @import("kitchen");
 const constants = @import("constants.zig");
 

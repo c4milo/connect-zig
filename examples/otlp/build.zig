@@ -34,8 +34,6 @@ pub fn build(b: *std.Build) void {
     // Each generated module, in the order the headers need them.
     inline for (generated) |file| {
         const module = b.addModule(file.name, .{ .root_source_file = b.path("gen/" ++ file.path), .target = target, .optimize = optimize });
-        // A file of messages alone names `protobuf`, and one with a service `connect_zig`.
-        module.addImport("protobuf", connect_zig.module("protobuf"));
         module.addImport("connect_zig", connect_zig.module("connect_zig"));
         inline for (file.imports) |import| module.addImport(import[0], b.modules.get(import[1]).?);
     }

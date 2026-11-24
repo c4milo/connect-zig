@@ -9,13 +9,14 @@
 //! the kernel choose. The server prints `listening on port <port>`, and serves until it is
 //! killed.
 const std = @import("std");
-const platform = @import("platform");
-const connect = @import("connect");
-const rpc = @import("connect_colibri");
-const server = @import("server");
-const colibri = @import("colibri");
-const tls = @import("tls");
-const oidc = @import("oidc");
+const connect_zig = @import("connect_zig");
+const platform = connect_zig.platform;
+const connect = connect_zig.connect;
+const rpc = connect_zig.connect_colibri;
+const server = connect_zig.server;
+const colibri = connect_zig.colibri;
+const tls = connect_zig.tls;
+const oidc = connect_zig.oidc;
 const greet_v1 = @import("greet_v1");
 const constants = @import("constants.zig");
 const Service = greet_v1.GreetService;

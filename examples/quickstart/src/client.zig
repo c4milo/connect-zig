@@ -8,11 +8,12 @@
 //!
 //! It exits with an error unless each answer is right and each round spoke its protocol.
 const std = @import("std");
-const connect = @import("connect");
-const rpc = @import("connect_colibri");
-const client = @import("client");
-const colibri = @import("colibri");
-const tls = @import("tls");
+const connect_zig = @import("connect_zig");
+const connect = connect_zig.connect;
+const rpc = connect_zig.connect_colibri;
+const client = connect_zig.client;
+const colibri = connect_zig.colibri;
+const tls = connect_zig.tls;
 const greet_v1 = @import("greet_v1");
 const constants = @import("constants.zig");
 const Service = greet_v1.GreetService;
