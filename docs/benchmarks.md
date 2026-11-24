@@ -159,7 +159,7 @@ The limits of these numbers:
 - Vector and Rotel do not set `TCP_NODELAY`, so their p99 stays near 40 ms at low rates. The climb
   runs them as they ship.
 
-### With protovalidate
+### Validating every span
 
 Run 266, on an Arm Neoverse-N2 core over TLS. Each Connect receiver runs again and checks every
 span against OTLP's span rules, in `tools/fullstack/validate`, two of them CEL.
