@@ -20,6 +20,9 @@ const connect = @import("connect");
 const client = @import("client");
 const tls = @import("tls");
 const proto = @import("protobuf");
+/// A check program decodes and encodes with the build target's CPU features: it runs on the
+/// machine it was built for, and a library takes the features its program detected.
+const protobuf_decoder: proto.Decoder = .init(.target());
 const coverage = @import("coverage");
 const rpc = @import("connect_colibri");
 const transport = @import("client_transport");
@@ -209,7 +212,7 @@ fn read_cases(state: *State, io: std.Io, path: []const u8) ![]const Case {
         if (name.len > case_names.len - names_used) return error.CasesTooLarge;
         @memcpy(case_names[names_used..][0..name.len], name);
         const octets = directory.readFile(io, entry.name, case_octets[octets_used..]) catch return error.CasesTooLarge;
-        cases[count] = .{ .name = case_names[names_used..][0..name.len], .message = try proto.decode(coverage.Everything, octets) };
+        cases[count] = .{ .name = case_names[names_used..][0..name.len], .message = try protobuf_decoder.decode(coverage.Everything, octets) };
         names_used += name.len;
         octets_used += octets.len;
         count += 1;

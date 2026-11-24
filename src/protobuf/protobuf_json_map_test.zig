@@ -3,6 +3,7 @@
 const std = @import("std");
 const testing = std.testing;
 const proto = @import("protobuf.zig");
+const support = @import("test_support.zig");
 const constants = @import("constants.zig");
 const binary_test = @import("protobuf_test.zig");
 const All = binary_test.All;
@@ -42,7 +43,7 @@ test "a program's map that holds a key twice writes it once, with the last value
         .{ .key = "k", .value = 9 },
     }) };
     var text: [text_len]u8 = undefined;
-    try testing.expectEqualStrings("{\"counts\":{\"j\":2,\"k\":9}}", try proto.encode_json(All, &all, &text));
+    try testing.expectEqualStrings("{\"counts\":{\"j\":2,\"k\":9}}", try support.encoder.encode_json(All, &all, &text));
 }
 
 test "a decoded map that holds a key twice writes it once, with the last value" {
@@ -52,9 +53,9 @@ test "a decoded map that holds a key twice writes it once, with the last value" 
         .{ .key = "k", .value = 9 },
     }) };
     var binary: [text_len]u8 = undefined;
-    const decoded = try proto.decode(All, try proto.encode(All, &all, &binary));
+    const decoded = try support.decoder.decode(All, try proto.encode(All, &all, &binary));
     var text: [text_len]u8 = undefined;
-    try testing.expectEqualStrings("{\"counts\":{\"j\":2,\"k\":9}}", try proto.encode_json(All, &decoded, &text));
+    try testing.expectEqualStrings("{\"counts\":{\"j\":2,\"k\":9}}", try support.encoder.encode_json(All, &decoded, &text));
 }
 
 test "a map of integer keys that holds a key twice writes it once, with the last value" {
@@ -65,10 +66,10 @@ test "a map of integer keys that holds a key twice writes it once, with the last
         .{ .key = 3, .value = 7 },
     }) };
     var text: [text_len]u8 = undefined;
-    try testing.expectEqualStrings("{\"counts\":{\"1\":2,\"3\":7}}", try proto.encode_json(Tally, &tally, &text));
+    try testing.expectEqualStrings("{\"counts\":{\"1\":2,\"3\":7}}", try support.encoder.encode_json(Tally, &tally, &text));
     var binary: [text_len]u8 = undefined;
-    const decoded = try proto.decode(Tally, try proto.encode(Tally, &tally, &binary));
-    try testing.expectEqualStrings("{\"counts\":{\"1\":2,\"3\":7}}", try proto.encode_json(Tally, &decoded, &text));
+    const decoded = try support.decoder.decode(Tally, try proto.encode(Tally, &tally, &binary));
+    try testing.expectEqualStrings("{\"counts\":{\"1\":2,\"3\":7}}", try support.encoder.encode_json(Tally, &decoded, &text));
 }
 
 test "two keys of one fingerprint that differ are both written" {
@@ -80,7 +81,7 @@ test "two keys of one fingerprint that differ are both written" {
     var text: [text_len]u8 = undefined;
     try testing.expectEqualStrings(
         "{\"counts\":{\"aaaaaaaa-x-bbbbbbbb\":1,\"aaaaaaaa-y-bbbbbbbb\":2}}",
-        try proto.encode_json(All, &all, &text),
+        try support.encoder.encode_json(All, &all, &text),
     );
 }
 
@@ -89,11 +90,11 @@ test "a map at the check's bound writes a key once, and a larger one as received
     for (&entries, 0..) |*entry, index| entry.* = .{ .key = "k", .value = @intCast(index) };
     var text: [large_text_len]u8 = undefined;
     const at_bound: All = .{ .counts = .of(entries[0..entries_checked_max]) };
-    const once = try proto.encode_json(All, &at_bound, &text);
+    const once = try support.encoder.encode_json(All, &at_bound, &text);
     try testing.expectEqual(1, std.mem.count(u8, once, "\"k\":"));
     try testing.expect(std.mem.endsWith(u8, once, std.fmt.comptimePrint("\"k\":{d}}}}}", .{entries_checked_max - 1})));
     const past_bound: All = .{ .counts = .of(&entries) };
-    const each = try proto.encode_json(All, &past_bound, &text);
+    const each = try support.encoder.encode_json(All, &past_bound, &text);
     try testing.expectEqual(entries.len, std.mem.count(u8, each, "\"k\":"));
 }
 
@@ -103,10 +104,10 @@ test "a decoded map at the check's bound writes a key once, and a larger one as 
     var binary: [large_text_len]u8 = undefined;
     var text: [large_text_len]u8 = undefined;
     const at_bound: All = .{ .counts = .of(entries[0..entries_checked_max]) };
-    const decoded_at_bound = try proto.decode(All, try proto.encode(All, &at_bound, &binary));
-    try testing.expectEqual(1, std.mem.count(u8, try proto.encode_json(All, &decoded_at_bound, &text), "\"k\":"));
+    const decoded_at_bound = try support.decoder.decode(All, try proto.encode(All, &at_bound, &binary));
+    try testing.expectEqual(1, std.mem.count(u8, try support.encoder.encode_json(All, &decoded_at_bound, &text), "\"k\":"));
     const past_bound: All = .{ .counts = .of(&entries) };
-    const decoded_past_bound = try proto.decode(All, try proto.encode(All, &past_bound, &binary));
-    const each = try proto.encode_json(All, &decoded_past_bound, &text);
+    const decoded_past_bound = try support.decoder.decode(All, try proto.encode(All, &past_bound, &binary));
+    const each = try support.encoder.encode_json(All, &decoded_past_bound, &text);
     try testing.expectEqual(entries.len, std.mem.count(u8, each, "\"k\":"));
 }

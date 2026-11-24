@@ -3,6 +3,7 @@
 //! google/rpc/status.proto).
 const std = @import("std");
 const proto = @import("protobuf");
+const platform = @import("platform");
 const code_file = @import("code.zig");
 const constants = @import("constants.zig");
 const Code = code_file.Code;
@@ -72,9 +73,10 @@ pub fn encode_status(failure: RpcError, buffer: []u8, type_urls: []u8) (proto.En
 }
 
 /// Reads a google.rpc.Status into an error whose details go into `details`. Slices point into
-/// `bytes`.
-pub fn decode_status(bytes: []const u8, details: []Detail) (proto.Error || error{TooManyDetails})!RpcError {
-    const status = try proto.decode(Status, bytes);
+/// `bytes`. The decode checks `bytes` with the program's CPU features, `cpu_features`.
+pub fn decode_status(bytes: []const u8, details: []Detail, cpu_features: platform.CpuFeatures) (proto.Error || error{TooManyDetails})!RpcError {
+    const decoder: proto.Decoder = .init(cpu_features);
+    const status = try decoder.decode(Status, bytes);
     var anys = status.details.iterator();
     var count: usize = 0;
     for (0..constants.limits.details_max + 1) |_| {
@@ -105,7 +107,7 @@ test "an error round-trips through google.rpc.Status" {
     var urls: [64]u8 = undefined;
     const bytes = try encode_status(failure, &buffer, &urls);
     var details: [4]Detail = undefined;
-    const back = try decode_status(bytes, &details);
+    const back = try decode_status(bytes, &details, @import("codec_test_support.zig").cpu_features);
     try testing.expectEqual(Code.not_found, back.code);
     try testing.expectEqualStrings("no such user", back.message);
     try testing.expectEqualStrings("google.rpc.ErrorInfo", back.details[0].type_name);

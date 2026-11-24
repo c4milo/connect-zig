@@ -8,6 +8,9 @@ const std = @import("std");
 const assert = std.debug.assert;
 const connect = @import("connect");
 const proto = @import("protobuf");
+/// A check program decodes and encodes with the build target's CPU features: it runs on the
+/// machine it was built for, and a library takes the features its program detected.
+const protobuf_decoder: proto.Decoder = .init(.target());
 const rpc = @import("connect_colibri");
 const service = @import("connectrpc_conformance_v1_service");
 const echo_file = @import("echo.zig");
@@ -63,7 +66,7 @@ pub fn Received(comptime Request: type) type {
         /// The first request, decoded again. Its slices point into `first`.
         pub fn first_request(received: *const Self) ?Request {
             if (received.count_total == 0) return null;
-            return proto.decode(Request, received.first[0..received.first_len]) catch null;
+            return protobuf_decoder.decode(Request, received.first[0..received.first_len]) catch null;
         }
     };
 }
@@ -167,7 +170,7 @@ test "a stream keeps its first request across a clear, and echoes only those sin
     received.clear();
     try received.add(&.{ .request_data = "three" });
     try testing.expectEqual(@as(usize, 1), received.requests().len);
-    const echoed = try proto.decode(service.BidiStreamRequest, received.requests()[0].value);
+    const echoed = try protobuf_decoder.decode(service.BidiStreamRequest, received.requests()[0].value);
     try testing.expectEqualStrings("three", echoed.request_data);
     const first = received.first_request().?;
     try testing.expect(first.full_duplex);

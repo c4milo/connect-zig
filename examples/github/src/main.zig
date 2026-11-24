@@ -62,6 +62,8 @@ const WatchEventsCall = harness.Call(Issues.watch_events, .{});
 /// each call until its round ends, so the calls live here.
 const State = struct {
     app: App,
+    /// Decodes the detail of an error, with the CPU features the program detected once.
+    protobuf_decoder: proto.Decoder,
     rounds: harness.Rounds(App, Router),
     create_repository: CreateRepositoryCall,
     get_repository: GetRepositoryCall,
@@ -104,6 +106,7 @@ pub fn main(init: std.process.Init) !void {
         return error.OutOfMemory;
     const state: *State = @ptrCast(@alignCast(state_memory));
     state.app = .{};
+    state.protobuf_decoder = .init(.detect());
     try state.rounds.init(&state.app);
     defer state.rounds.deinit();
     try session(state, .{ .h11 = false, .h3 = false }, .h2);
@@ -165,10 +168,10 @@ fn failed_with(state: *State, comptime T: type, client_call: anytype, code: conn
 }
 
 /// The one detail of an error, decoded as `Detail`.
-fn detail(comptime Detail: type, failed: connect.RpcError) !Detail {
+fn detail(state: *const State, comptime Detail: type, failed: connect.RpcError) !Detail {
     if (failed.details.len != 1) return error.CallWrong;
     if (!std.mem.eql(u8, failed.details[0].type_name, Detail.protobuf.full_name)) return error.CallWrong;
-    return proto.decode(Detail, failed.details[0].value);
+    return state.protobuf_decoder.decode(Detail, failed.details[0].value);
 }
 
 fn expect(condition: bool) !void {
@@ -186,7 +189,7 @@ fn create_repositories(state: *State) !void {
     try expect(created.created_at.?.seconds == service.epoch_seconds + 1);
 
     try call(state, create, .{ .protocol = .grpc, .headers = &octocat }, &.{hello});
-    const exists = try detail(github.AlreadyExists, try failed_with(state, github.Repository, create, .already_exists));
+    const exists = try detail(state, github.AlreadyExists, try failed_with(state, github.Repository, create, .already_exists));
     try expect(std.mem.eql(u8, exists.resource_name, "hello-world"));
 
     try call(state, create, .{ .protocol = .grpc_web }, &.{hello});
@@ -203,7 +206,7 @@ fn private_repository(state: *State) !void {
     const get = &state.get_repository;
     const read: github.GetRepositoryRequest = .{ .owner = "octocat", .name = "secrets" };
     try call(state, get, .{ .codec = .json, .use_get = true }, &.{read});
-    const missing = try detail(github.NotFound, try failed_with(state, github.Repository, get, .not_found));
+    const missing = try detail(state, github.NotFound, try failed_with(state, github.Repository, get, .not_found));
     try expect(std.mem.eql(u8, missing.resource_name, "octocat/secrets"));
 
     try call(state, get, .{ .use_get = true, .headers = &octocat }, &.{read});
@@ -251,7 +254,7 @@ fn update_issues(state: *State) !void {
     // it does not know.
     color.update_mask = .{ .paths = .of(&.{ "title", "color" }) };
     try call(state, update, .{ .codec = .json, .headers = &octocat }, &.{color});
-    const bad = try detail(github.BadField, try failed_with(state, github.Issue, update, .invalid_argument));
+    const bad = try detail(state, github.BadField, try failed_with(state, github.Issue, update, .invalid_argument));
     try expect(std.mem.eql(u8, bad.field, "update_mask"));
     std.debug.print("github: octocat closed #1 through a field mask; hubot could not\n", .{});
 }
@@ -284,7 +287,7 @@ fn read_issues(state: *State) !void {
     try expect(try labeled.next() == null);
 
     try call(state, &state.get_issue, .{ .protocol = .grpc }, &.{.{ .owner = "octocat", .repository = "hello-world", .number = constants.missing_issue_number }});
-    const missing = try detail(github.NotFound, try failed_with(state, github.Issue, &state.get_issue, .not_found));
+    const missing = try detail(state, github.NotFound, try failed_with(state, github.Issue, &state.get_issue, .not_found));
     try expect(std.mem.eql(u8, missing.resource_name, std.fmt.comptimePrint("octocat/hello-world#{d}", .{constants.missing_issue_number})));
     std.debug.print("github: read {d} open issues in {d} pages, and the bugs #1 and #3\n", .{ seen, pages });
 }
@@ -327,7 +330,7 @@ fn rate_limit(state: *State) !void {
             answered += 1;
             continue;
         }
-        const limit = try detail(github.RateLimited, response.failure orelse return error.CallWrong);
+        const limit = try detail(state, github.RateLimited, response.failure orelse return error.CallWrong);
         try expect(response.failure.?.code == .resource_exhausted and limit.limit == service.limit_anonymous);
         limited += 1;
     }

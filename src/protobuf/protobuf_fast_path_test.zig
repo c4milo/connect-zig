@@ -10,6 +10,7 @@
 //! - Base64: every text of up to 4 letters over both alphabets, padding and a refused letter.
 //! - A fuzz property over the same checks, which `zig build test` runs over its corpus.
 const std = @import("std");
+const support = @import("test_support.zig");
 const testing = std.testing;
 const wire = @import("wire.zig");
 const scalar = @import("scalar.zig");
@@ -208,7 +209,7 @@ const utf8_letters = [_][]const u8{
 };
 
 fn check_utf8(octets: []const u8) !void {
-    try testing.expectEqual(std.unicode.utf8ValidateSlice(octets), scalar.is_utf8(octets));
+    try testing.expectEqual(std.unicode.utf8ValidateSlice(octets), scalar.is_utf8(octets, support.cpu_features));
 }
 
 test "a string is UTF-8 as the standard library judges it, on every input of one and two octets" {
@@ -277,7 +278,7 @@ fn check_base64(octets: []const u8) !void {
     const want_result = reference_base64(octets, &want);
     var got_room: [base64_room_len]u8 = @splat(0);
     var got: wire.Writer = .{ .buffer = &got_room };
-    const got_result = json_base64.write_base64_field(octets, &got);
+    const got_result = json_base64.write_base64_field(octets, &got, support.cpu_features);
     if (want_result) |_| try got_result else |refusal| try testing.expectError(refusal, got_result);
     // A refusal fails the whole decode, which drops the writer, so what it holds then is no result.
     if (want_result) |_| try testing.expectEqualSlices(u8, want.written(), got.written()) else |_| {}

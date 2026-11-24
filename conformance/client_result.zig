@@ -163,6 +163,9 @@ pub fn refusal(test_name: []const u8, reason: []const u8, output: []u8) proto.En
 }
 
 const testing = std.testing;
+/// A check program decodes and encodes with the build target's CPU features: it runs on the
+/// machine it was built for, and a library takes the features its program detected.
+const protobuf_decoder: proto.Decoder = .init(.target());
 
 test "payloads, metadata and an error merge into one result, with the test's name" {
     var room: [1024]u8 = undefined;
@@ -176,7 +179,7 @@ test "payloads, metadata and an error merge into one result, with the test's nam
     result.failure = .{ .code = .canceled, .message = "stop", .details = &.{.{ .type_name = "a.B", .value = "v" }} };
     result.unsent = 2;
     const bytes = try result.finish("case", &output);
-    const back = try proto.decode(client_compat.ClientCompatResponse, bytes);
+    const back = try protobuf_decoder.decode(client_compat.ClientCompatResponse, bytes);
     try testing.expectEqualStrings("case", back.test_name);
     const merged = back.result.?.response;
     try testing.expectEqual(@as(usize, 2), try merged.payloads.count());
@@ -192,7 +195,7 @@ test "payloads, metadata and an error merge into one result, with the test's nam
 
 test "a call the client cannot make reports its reason" {
     var output: [256]u8 = undefined;
-    const back = try proto.decode(client_compat.ClientCompatResponse, try refusal("case", "no such method", &output));
+    const back = try protobuf_decoder.decode(client_compat.ClientCompatResponse, try refusal("case", "no such method", &output));
     try testing.expectEqualStrings("no such method", back.result.?.@"error".message);
 }
 

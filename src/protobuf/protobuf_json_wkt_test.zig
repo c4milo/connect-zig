@@ -2,6 +2,7 @@
 const std = @import("std");
 const testing = std.testing;
 const proto = @import("protobuf.zig");
+const support = @import("test_support.zig");
 const binary_test = @import("protobuf_test.zig");
 const Inner = binary_test.Inner;
 const wkt = proto.wkt;
@@ -18,8 +19,8 @@ const Buffers = struct {
 /// Reads `text` as a `T`, writes it back, and checks the text comes back the same.
 fn round_trip(comptime T: type, text: []const u8, comptime any_types: []const type) !void {
     var buffers: Buffers = .{};
-    const message = try proto.decode_json_with(T, text, &buffers.binary, &buffers.tokens, any_types);
-    try testing.expectEqualStrings(text, try proto.encode_json_with(T, &message, &buffers.text, any_types));
+    const message = try support.decoder.decode_json_with(T, text, &buffers.binary, &buffers.tokens, any_types);
+    try testing.expectEqualStrings(text, try support.encoder.encode_json_with(T, &message, &buffers.text, any_types));
 }
 
 const Document = struct {
@@ -43,16 +44,16 @@ test "Struct, Value and ListValue read and write any JSON value" {
 
 test "a Value field holds null, where any other field reads null as absent" {
     var buffers: Buffers = .{};
-    const document = try proto.decode_json(Document, "{\"anyValue\":null,\"items\":[null,1]}", &buffers.binary, &buffers.tokens);
+    const document = try support.decoder.decode_json(Document, "{\"anyValue\":null,\"items\":[null,1]}", &buffers.binary, &buffers.tokens);
     try testing.expectEqual(wkt.NullValue.null_value, document.any_value.?.kind.?.null_value);
-    try testing.expectEqualStrings("{\"anyValue\":null,\"items\":[null,1]}", try proto.encode_json(Document, &document, &buffers.text));
+    try testing.expectEqualStrings("{\"anyValue\":null,\"items\":[null,1]}", try support.encoder.encode_json(Document, &document, &buffers.text));
 }
 
 test "a Value with no kind, or a number JSON cannot hold, is refused" {
     var buffers: Buffers = .{};
-    try testing.expectError(error.InvalidValue, proto.encode_json(wkt.Value, &.{}, &buffers.text));
+    try testing.expectError(error.InvalidValue, support.encoder.encode_json(wkt.Value, &.{}, &buffers.text));
     const nan: wkt.Value = .{ .kind = .{ .number_value = std.math.nan(f64) } };
-    try testing.expectError(error.InvalidValue, proto.encode_json(wkt.Value, &nan, &buffers.text));
+    try testing.expectError(error.InvalidValue, support.encoder.encode_json(wkt.Value, &nan, &buffers.text));
 }
 
 test "an Any holds a well-known type under value, and another type beside @type" {
@@ -67,11 +68,11 @@ test "an Any holds a well-known type under value, and another type beside @type"
 test "an Any's @type may follow its members" {
     var buffers: Buffers = .{};
     // Empty is read with "value" or without it.
-    const empty = try proto.decode_json(wkt.Any, "{\"value\":{},\"@type\":\"type.googleapis.com/google.protobuf.Empty\"}", &buffers.binary, &buffers.tokens);
+    const empty = try support.decoder.decode_json(wkt.Any, "{\"value\":{},\"@type\":\"type.googleapis.com/google.protobuf.Empty\"}", &buffers.binary, &buffers.tokens);
     try testing.expectEqualStrings("type.googleapis.com/google.protobuf.Empty", empty.type_url);
     const late = "{\"a\":7,\"tags\":[\"x\"],\"@type\":\"type.googleapis.com/test.Inner\"}";
-    const message = try proto.decode_json_with(wkt.Any, late, &buffers.binary, &buffers.tokens, &.{Inner});
-    const inner = try proto.decode(Inner, message.value);
+    const message = try support.decoder.decode_json_with(wkt.Any, late, &buffers.binary, &buffers.tokens, &.{Inner});
+    const inner = try support.decoder.decode(Inner, message.value);
     try testing.expectEqual(@as(i32, 7), inner.a);
     try testing.expectEqualStrings("type.googleapis.com/test.Inner", message.type_url);
 }
@@ -79,11 +80,11 @@ test "an Any's @type may follow its members" {
 test "an Any of a type the program did not name is refused both ways" {
     var buffers: Buffers = .{};
     const text = "{\"@type\":\"type.googleapis.com/test.Inner\",\"a\":7}";
-    try testing.expectError(error.UnknownAnyType, proto.decode_json(wkt.Any, text, &buffers.binary, &buffers.tokens));
+    try testing.expectError(error.UnknownAnyType, support.decoder.decode_json(wkt.Any, text, &buffers.binary, &buffers.tokens));
     const encoded = try proto.encode(Inner, &.{ .a = 7 }, &buffers.binary);
     const message: wkt.Any = .{ .type_url = "type.googleapis.com/test.Inner", .value = encoded };
-    try testing.expectError(error.UnknownAnyType, proto.encode_json(wkt.Any, &message, &buffers.text));
+    try testing.expectError(error.UnknownAnyType, support.encoder.encode_json(wkt.Any, &message, &buffers.text));
     // A second "value", or a member an Any of a well-known type does not have.
-    try testing.expectError(error.UnexpectedToken, proto.decode_json(wkt.Any, "{\"@type\":\"type.googleapis.com/google.protobuf.Empty\",\"value\":{},\"value\":{}}", &buffers.binary, &buffers.tokens));
-    try testing.expectError(error.UnknownField, proto.decode_json(wkt.Any, "{\"@type\":\"type.googleapis.com/google.protobuf.Empty\",\"other\":1}", &buffers.binary, &buffers.tokens));
+    try testing.expectError(error.UnexpectedToken, support.decoder.decode_json(wkt.Any, "{\"@type\":\"type.googleapis.com/google.protobuf.Empty\",\"value\":{},\"value\":{}}", &buffers.binary, &buffers.tokens));
+    try testing.expectError(error.UnknownField, support.decoder.decode_json(wkt.Any, "{\"@type\":\"type.googleapis.com/google.protobuf.Empty\",\"other\":1}", &buffers.binary, &buffers.tokens));
 }

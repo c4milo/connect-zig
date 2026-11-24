@@ -3,6 +3,7 @@
 const std = @import("std");
 const testing = std.testing;
 const proto = @import("protobuf.zig");
+const support = @import("test_support.zig");
 const json_decode = @import("json_decode.zig");
 const any = @import("any.zig");
 const binary_test = @import("protobuf_test.zig");
@@ -56,14 +57,14 @@ const Buffers = struct {
 };
 
 fn decode(comptime T: type, text: []const u8, buffers: *Buffers) proto.JsonDecodeError!T {
-    return proto.decode_json(T, text, &buffers.binary, &buffers.tokens);
+    return support.decoder.decode_json(T, text, &buffers.binary, &buffers.tokens);
 }
 
 test "a message is written with JSON names, defaults left off" {
     var buffers: Buffers = .{};
     const inner: Inner = .{ .a = 7, .tags = .of(&.{ "x", "y" }) };
-    try testing.expectEqualStrings("{\"a\":7,\"tags\":[\"x\",\"y\"]}", try proto.encode_json(Inner, &inner, &buffers.text));
-    try testing.expectEqualStrings("{}", try proto.encode_json(Inner, &.{}, &buffers.text));
+    try testing.expectEqualStrings("{\"a\":7,\"tags\":[\"x\",\"y\"]}", try support.encoder.encode_json(Inner, &inner, &buffers.text));
+    try testing.expectEqualStrings("{}", try support.encoder.encode_json(Inner, &.{}, &buffers.text));
 }
 
 test "a message writes {} only when no field of any kind writes a member" {
@@ -81,12 +82,12 @@ test "a message writes {} only when no field of any kind writes a member" {
         .{ .choice = .{ .name = "" } },
         .{ .node = .of(&node) },
     };
-    for (&alone) |*each| try testing.expect(!std.mem.eql(u8, "{}", try proto.encode_json(All, each, &buffers.text)));
-    try testing.expectEqualStrings("{}", try proto.encode_json(All, &.{}, &buffers.text));
+    for (&alone) |*each| try testing.expect(!std.mem.eql(u8, "{}", try support.encoder.encode_json(All, each, &buffers.text)));
+    try testing.expectEqualStrings("{}", try support.encoder.encode_json(All, &.{}, &buffers.text));
     // Empty messages as an array's elements, as the leaves of a tree are.
     const empties = [_]Inner{ .{}, .{} };
     const listed: All = .{ .inners = .of(&empties) };
-    try testing.expectEqualStrings("{\"inners\":[{},{}]}", try proto.encode_json(All, &listed, &buffers.text));
+    try testing.expectEqualStrings("{\"inners\":[{},{}]}", try support.encoder.encode_json(All, &listed, &buffers.text));
 }
 
 test "every kind round-trips through JSON" {
@@ -105,7 +106,7 @@ test "every kind round-trips through JSON" {
         .choice = .{ .name = "" },
         .node = .of(&node),
     };
-    const text = try proto.encode_json(All, &all, &buffers.text);
+    const text = try support.encoder.encode_json(All, &all, &buffers.text);
     try testing.expect(std.mem.indexOf(u8, text, "\"uint64Field\":\"18446744073709551615\"") != null);
     try testing.expect(std.mem.indexOf(u8, text, "\"counts\":{\"k\":9}") != null);
     try testing.expect(std.mem.indexOf(u8, text, "\"color\":\"COLOR_GREEN\"") != null);
@@ -129,11 +130,11 @@ test "a message decoded from binary writes the JSON of the message it came from"
         .counts = .of(&.{ .{ .key = "k", .value = 9 }, .{ .key = "j", .value = 8 } }),
         .node = .of(&node),
     };
-    const want = try proto.encode_json(All, &all, &buffers.text);
+    const want = try support.encoder.encode_json(All, &all, &buffers.text);
     try testing.expect(std.mem.indexOf(u8, want, "\"counts\":{\"k\":9,\"j\":8}") != null);
-    const decoded = try proto.decode(All, try proto.encode(All, &all, &buffers.binary));
+    const decoded = try support.decoder.decode(All, try proto.encode(All, &all, &buffers.binary));
     var again: [text_len]u8 = undefined;
-    try testing.expectEqualStrings(want, try proto.encode_json(All, &decoded, &again));
+    try testing.expectEqualStrings(want, try support.encoder.encode_json(All, &decoded, &again));
 }
 
 test "a parser takes .proto names, quoted numbers, enum numbers and null" {
@@ -153,7 +154,7 @@ test "a parser refuses unknown members, bad enums, fractions and nesting past th
     try testing.expectError(error.UnexpectedToken, decode(All, "[]", &buffers));
     const deep = "{\"next\":" ** 100 ++ "{}" ++ "}" ** 100;
     var big: [4096]u8 = undefined;
-    try testing.expectError(error.DepthExceeded, proto.decode_json(Node, deep, &big, &buffers.tokens));
+    try testing.expectError(error.DepthExceeded, support.decoder.decode_json(Node, deep, &big, &buffers.tokens));
 }
 
 test "the well-known types take their own forms both ways" {
@@ -166,7 +167,7 @@ test "the well-known types take their own forms both ways" {
         .empty = .{},
         .label = .{ .value = "hi" },
     };
-    const text = try proto.encode_json(Holder, &holder, &buffers.text);
+    const text = try support.encoder.encode_json(Holder, &holder, &buffers.text);
     try testing.expectEqualStrings(
         "{\"stamp\":\"1972-01-01T10:00:20.021Z\",\"span\":\"-1.500s\",\"wrapped\":0," ++
             "\"mask\":\"user.displayName,photo\",\"empty\":{},\"label\":\"hi\"}",
@@ -185,8 +186,8 @@ test "the well-known types take their own forms both ways" {
 /// checked: `decode_json` decodes it one level (decision 9). A text it refuses writes nothing.
 fn check_transcoded(comptime T: type, text: []const u8) !void {
     var buffers: Buffers = .{};
-    const bytes = json_decode.transcode(T, text, &buffers.binary, &buffers.tokens, any.types) catch return;
-    _ = try proto.decode(T, bytes);
+    const bytes = json_decode.transcode(T, text, &buffers.binary, &buffers.tokens, support.cpu_features, any.types) catch return;
+    _ = try support.decoder.decode(T, bytes);
 }
 
 test "the transcoder writes binary that decode accepts whole, so decode_json checks it once" {
@@ -211,7 +212,7 @@ test "an array of a packed field transcodes to one packed record, as the encoder
     var encoded: [text_len]u8 = undefined;
     // `numbers` is packed and `unpacked` is not; an empty array writes nothing.
     for ([_][]const u8{ "{\"numbers\":[1,2,300],\"unpacked\":[4,5]}", "{\"numbers\":[],\"unpacked\":[]}", "{\"numbers\":[7]}" }) |text| {
-        const bytes = try json_decode.transcode(All, text, &buffers.binary, &buffers.tokens, any.types);
+        const bytes = try json_decode.transcode(All, text, &buffers.binary, &buffers.tokens, support.cpu_features, any.types);
         const message = try decode(All, text, &buffers);
         try testing.expectEqualSlices(u8, try proto.encode(All, &message, &encoded), bytes);
     }
@@ -230,8 +231,8 @@ test "a field mask path that lowerCamelCase cannot carry back is refused" {
     // before a digit or a dot each leave no exact trace in lowerCamelCase.
     for ([_][]const u8{ "fooBar", "foo__bar", "foo_", "foo_3_bar", "foo_.bar" }) |path| {
         const holder: Holder = .{ .mask = .{ .paths = .of(&.{path}) } };
-        try testing.expectError(error.InvalidFieldMask, proto.encode_json(Holder, &holder, &buffers.text));
+        try testing.expectError(error.InvalidFieldMask, support.encoder.encode_json(Holder, &holder, &buffers.text));
     }
     const holder: Holder = .{ .mask = .{ .paths = .of(&.{"foo3_bar"}) } };
-    try testing.expectEqualStrings("{\"mask\":\"foo3Bar\"}", try proto.encode_json(Holder, &holder, &buffers.text));
+    try testing.expectEqualStrings("{\"mask\":\"foo3Bar\"}", try support.encoder.encode_json(Holder, &holder, &buffers.text));
 }

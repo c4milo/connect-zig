@@ -1,69 +1,69 @@
 # Instructions of one run of each benchmark operation, x86-64-v3, from tools/perf_check.sh.
-decode and validate medium invalid|6314
-decode and validate medium valid|6886
-decode and validate rules invalid|2262
-decode and validate rules valid|2279
-decode and validate small invalid|790
-decode and validate small valid|692
-deep JSON decode|48551
-deep JSON decode+walk|64388
+decode and validate medium invalid|6618
+decode and validate medium valid|7205
+decode and validate rules invalid|2291
+decode and validate rules valid|2329
+decode and validate small invalid|796
+decode and validate small valid|705
+deep JSON decode+walk|61991
+deep JSON decode|48503
 deep JSON encode|23876
-deep binary decode|14819
-deep binary decode+walk|17194
+deep binary decode+walk|17448
+deep binary decode|15169
 deep binary encode|10593
-large JSON decode|4952616
-large JSON decode+walk|6146639
+large JSON decode+walk|6121126
+large JSON decode|4966103
 large JSON encode|3171391
-large binary decode|789457
-large binary decode+walk|1117453
+large binary decode+walk|1131932
+large binary decode|798471
 large binary encode|706570
-medium Connect unary call|28089
-medium JSON decode|49137
-medium JSON decode+walk|64298
-medium JSON encode|33709
-medium binary decode|16542
-medium binary decode+walk|15309
+medium Connect unary call|28553
+medium JSON decode+walk|61408
+medium JSON decode|48049
+medium JSON encode|34230
+medium binary decode+walk|15687
+medium binary decode|16948
 medium binary encode|9194
-medium gRPC unary call|28564
-packed JSON decode|68202
+medium gRPC unary call|29024
 packed JSON decode+walk|77578
+packed JSON decode|68202
 packed JSON encode|57598
+packed binary decode+walk|8162
 packed binary decode|6819
-packed binary decode+walk|8198
 packed binary encode|8186
-small Connect unary call|4237
-small Connect unary call, 16 routes|4277
-small Connect unary call, 256 routes|4460
-small JSON decode|2694
-small JSON decode+walk|2698
+small Connect unary call, 16 routes|4242
+small Connect unary call, 256 routes|4417
+small Connect unary call|4165
+small JSON decode+walk|2657
+small JSON decode|2653
 small JSON encode|1320
-small binary decode|525
-small binary decode+walk|530
+small binary decode+walk|537
+small binary decode|532
 small binary encode|218
-small gRPC unary call|4743
-small gRPC unary call, 16 routes|4783
-small gRPC unary call, 256 routes|4965
-strings JSON decode|7019
-strings JSON decode+walk|7027
+small gRPC unary call, 16 routes|4746
+small gRPC unary call, 256 routes|4919
+small gRPC unary call|4668
+strings JSON decode+walk|5814
+strings JSON decode|5806
 strings JSON encode|3432
-strings binary decode|2073
-strings binary decode+walk|2082
+strings binary decode+walk|2161
+strings binary decode|2152
 strings binary encode|652
-tree JSON decode|90657
 tree JSON decode+walk|185400
+tree JSON decode|90657
 tree JSON encode|47880
+tree binary decode+walk|75569
 tree binary decode|41575
-tree binary decode+walk|76165
 tree binary encode|43336
-validate medium invalid|3642
-validate medium valid|3571
+validate medium invalid|3863
+validate medium valid|3774
 validate rules invalid|815
 validate rules valid|561
-validate small invalid|545
+validate small invalid|546
 validate small valid|353
-varints JSON decode|9225
 varints JSON decode+walk|9250
+varints JSON decode|9225
 varints JSON encode|4032
-varints binary decode|1995
 varints binary decode+walk|2022
+varints binary decode|1995
 varints binary encode|868

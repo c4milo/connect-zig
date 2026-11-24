@@ -58,12 +58,12 @@ pub const determinism = rules.forbidden_references.Rule(.{
     .reason = "time is a value the caller passes (docs/decisions.md entry 3)",
 });
 
-/// The owner's ruling of 2026-11-22 (https://github.com/c4milo/connect-zig/issues/14): `connect`
-/// and `oidc` take the program's CPU features, and their tests take the target's from the one
-/// constant of a test-support file. `protobuf` joins once its decode takes the program's features.
+/// The owner's ruling of 2026-11-22 (https://github.com/c4milo/connect-zig/issues/14): `protobuf`,
+/// `connect` and `oidc` take the program's CPU features, and their tests take the target's from
+/// the one constant of a test-support file.
 pub const target_features = @import("target_features.zig").Rule(.{
     .extensions = &.{lint.paths.zig_extension},
-    .include_directories = &.{ "src/connect", "src/oidc" },
+    .include_directories = &.{ "src/protobuf", "src/connect", "src/oidc" },
     .exclude_basenames = &.{ "codec_test_support.zig", "test_support.zig" },
 });
 

@@ -9,6 +9,9 @@
 //! payload, so a NaN whose bits differ compares the same in JSON.
 const std = @import("std");
 const proto = @import("protobuf");
+/// A check program decodes and encodes with the build target's CPU features: it runs on the
+/// machine it was built for, and a library takes the features its program detected.
+const protobuf_encoder: proto.Encoder = .init(.target());
 const constants = @import("constants.zig");
 const Verdict = @import("verdict.zig").Verdict;
 
@@ -30,8 +33,8 @@ pub fn expect(comptime T: type, comparison: *Comparison, verdict: *Verdict, want
     const wanted = proto.encode(T, want, &comparison.wanted_octets) catch |failure| return verdict.wrong("encoding the case: {s}", .{@errorName(failure)});
     const gotten = proto.encode(T, got, &comparison.gotten_octets) catch |failure| return verdict.wrong("encoding the answer: {s}", .{@errorName(failure)});
     if (std.mem.eql(u8, wanted, gotten)) return;
-    const wanted_text = proto.encode_json(T, want, &comparison.wanted_json) catch |failure| return verdict.wrong("the case in JSON: {s}", .{@errorName(failure)});
-    const gotten_text = proto.encode_json(T, got, &comparison.gotten_json) catch |failure| return verdict.wrong("the answer in JSON: {s}", .{@errorName(failure)});
+    const wanted_text = protobuf_encoder.encode_json(T, want, &comparison.wanted_json) catch |failure| return verdict.wrong("the case in JSON: {s}", .{@errorName(failure)});
+    const gotten_text = protobuf_encoder.encode_json(T, got, &comparison.gotten_json) catch |failure| return verdict.wrong("the answer in JSON: {s}", .{@errorName(failure)});
     if (try same_json(comparison, verdict, wanted_text, gotten_text, numbers)) return;
     return verdict.wrong("the answer differs: wanted {d} octets, got {d}; wanted {s}, got {s}", .{ wanted.len, gotten.len, wanted_text, gotten_text });
 }

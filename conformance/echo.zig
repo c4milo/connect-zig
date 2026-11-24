@@ -202,6 +202,9 @@ fn wait(io: std.Io, delay_ms: u64, slept_ms: *u64) ?connect.RpcError {
 }
 
 const testing = std.testing;
+/// A check program decodes and encodes with the build target's CPU features: it runs on the
+/// machine it was built for, and a library takes the features its program detected.
+const protobuf_decoder: proto.Decoder = .init(.target());
 
 test "headers group by name in any case, with each value in order" {
     const entries = [_]connect.Header{
@@ -253,7 +256,7 @@ test "an error carries its details, then the request info last" {
     try testing.expectEqual(@as(usize, 2), failure.details.len);
     try testing.expectEqualStrings("x.Y", failure.details[0].type_name);
     try testing.expectEqualStrings(RequestInfo.protobuf.full_name, failure.details[1].type_name);
-    const decoded = try proto.decode(RequestInfo, failure.details[1].value);
+    const decoded = try protobuf_decoder.decode(RequestInfo, failure.details[1].value);
     try testing.expectEqual(@as(?i64, 5), decoded.timeout_ms);
     try testing.expectEqual(@as(usize, 1), echo.failure(&wanted, null).details.len);
 }

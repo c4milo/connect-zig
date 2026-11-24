@@ -132,7 +132,7 @@ fn add_extra_headers(result: *Request, headers: []const Header) error{TooManyHea
 fn place(comptime T: type, speaks: protocol.Speaks, options: Options, message: *const T, room: []u8, work: []u8) Error!struct { len: usize, compressed: bool } {
     const prefix_len: usize = if (speaks.enveloped) flag_prefix_len else 0;
     if (room.len < prefix_len) return error.NoSpaceLeft;
-    const encoded = try message_codec.encode(T, options.codec, message, room[prefix_len..]);
+    const encoded = try message_codec.encode(T, options.codec, message, room[prefix_len..], options.encoders.cpu_features);
     const result = try message_codec.compress_request(options.request_coding, &options.encoders, encoded, work, options.compress_len_min);
     // A coding that cannot shrink the message makes it longer than the room it was encoded in.
     if (result.octets.len > room.len - prefix_len) return error.NoSpaceLeft;
@@ -176,7 +176,7 @@ fn add_grpc_headers(result: *Request, speaks: protocol.Speaks, options: Options,
 }
 
 fn request_get(comptime method: method_file.Method, options: Options, message: *const method.Request, buffers: Buffers) Error!Request {
-    const encoded = try message_codec.encode(method.Request, options.codec, message, buffers.scratch.message);
+    const encoded = try message_codec.encode(method.Request, options.codec, message, buffers.scratch.message, options.encoders.cpu_features);
     const packed_message = try message_codec.compress_request(options.request_coding, &options.encoders, encoded, buffers.scratch.work, options.compress_len_min);
     const path = comptime method.path();
     if (buffers.body.len < path.len + 1) return error.NoSpaceLeft;

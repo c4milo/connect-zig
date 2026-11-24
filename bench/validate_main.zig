@@ -29,6 +29,9 @@
 //! This is a program, not the library: it reads the clock and files through `init.io`.
 const std = @import("std");
 const proto = @import("protobuf");
+/// The benchmark decodes and encodes with the build target's CPU features, so that
+/// `tools/perf_check.sh` counts the same paths on every machine of an architecture.
+const protobuf_decoder: proto.Decoder = .init(.target());
 const protovalidate = @import("protovalidate");
 const platform = @import("platform");
 const schema = @import("bench_validate_v1");
@@ -147,7 +150,7 @@ fn run_case(io: std.Io, state: *State, settings: measure.Settings, folder: []con
     const path = try std.fmt.bufPrint(&state.path, "{s}/{s}.binpb", .{ folder, case.stem });
     const bytes = try std.Io.Dir.cwd().readFile(io, path, &state.message);
     if (bytes.len == state.message.len) return error.MessageTooLarge;
-    const message = try proto.decode_into(case.Message, bytes, &state.storage);
+    const message = try protobuf_decoder.decode_into(case.Message, bytes, &state.storage);
     const verdict = try verdict_of(case.Message, state, &message);
     const runner: Runner(case.Message) = .{ .message = &message, .storage = &state.report_storage, .options = .{ .cpu_features = state.cpu_features } };
     const validate_ns = try measure.median_ns(io, settings, runner);
@@ -169,7 +172,7 @@ fn BothRunner(comptime M: type) type {
             for (0..n) |_| {
                 var bytes = runner.bytes;
                 std.mem.doNotOptimizeAway(&bytes);
-                const message = try proto.decode_into(M, bytes, runner.elements);
+                const message = try protobuf_decoder.decode_into(M, bytes, runner.elements);
                 var report: protovalidate.Report = .init(runner.storage);
                 const result = protovalidate.validate(M, &message, runner.options, &report);
                 std.mem.doNotOptimizeAway(&report);
@@ -228,9 +231,9 @@ fn less(_: void, left: []const u8, right: []const u8) bool {
 /// warms them. The case's octets are the encoding of its JSON, which the program holds.
 fn count_case(state: *State, comptime case: Case) !void {
     const json = @embedFile("validate/cases/" ++ case.stem ++ ".json");
-    const decoded = try proto.decode_json(case.Message, json, &state.transcoded, &state.tokens);
+    const decoded = try protobuf_decoder.decode_json(case.Message, json, &state.transcoded, &state.tokens);
     const bytes = try proto.encode(case.Message, &decoded, &state.message);
-    const message = try proto.decode_into(case.Message, bytes, &state.storage);
+    const message = try protobuf_decoder.decode_into(case.Message, bytes, &state.storage);
     const runner: Runner(case.Message) = .{ .message = &message, .storage = &state.report_storage, .options = .{ .cpu_features = state.cpu_features } };
     try collect("validate " ++ case.name, runner);
     // `message` is done with: the decodes write their elements where it stood.
@@ -264,7 +267,7 @@ fn count_cases(io: std.Io, state: *State, options: Options, folder: []const u8, 
             const path = try std.fmt.bufPrint(&state.path, "{s}/{s}.binpb", .{ folder, case.stem });
             const bytes = try std.Io.Dir.cwd().readFile(io, path, &state.message);
             if (bytes.len == state.message.len) return error.MessageTooLarge;
-            const message = try proto.decode_into(case.Message, bytes, &state.storage);
+            const message = try protobuf_decoder.decode_into(case.Message, bytes, &state.storage);
             const runner: Runner(case.Message) = .{ .message = &message, .storage = &state.report_storage, .options = .{ .cpu_features = state.cpu_features } };
             try write_counts(writer, case.name, "validate", &counted, runner);
             // `message` is done with: the decodes write their elements where it stood.

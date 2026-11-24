@@ -7,6 +7,9 @@
 const std = @import("std");
 const connect = @import("connect");
 const proto = @import("protobuf");
+/// A check program decodes and encodes with the build target's CPU features: it runs on the
+/// machine it was built for, and a library takes the features its program detected.
+const protobuf_decoder: proto.Decoder = .init(.target());
 const rpc = @import("connect_colibri");
 const interop = @import("interop");
 const coverage = @import("coverage");
@@ -59,7 +62,7 @@ const Collect = struct {
     }
 
     pub fn on_end(_: *App, _: *rpc.Context, state: *State, _: *const rpc.AnyRequest, response: *rpc.Response(interop.CollectResponse)) ?connect.RpcError {
-        const last = proto.decode(coverage.Everything, state.last[0..state.last_len]) catch return .{ .code = .internal };
+        const last = protobuf_decoder.decode(coverage.Everything, state.last[0..state.last_len]) catch return .{ .code = .internal };
         response.message = .{ .count = state.count, .last = if (state.count == 0) null else last };
         return null;
     }

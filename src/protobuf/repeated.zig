@@ -195,7 +195,8 @@ fn element(comptime T: type, comptime element_kind: Kind, it: anytype, tag: wire
 
 fn read_scalar(comptime T: type, comptime element_kind: Kind, reader: *wire.Reader) wire.Error!T {
     if (comptime element_kind.holds_message()) unreachable;
-    return scalar.read(element_kind, T, reader);
+    // The decode that set the view checked its strings (`decode.Mode.shallow`).
+    return scalar.read(element_kind, T, reader, null);
 }
 
 /// Whether a repeated field's elements are numbers of a closed enum, or map entries whose values
@@ -224,7 +225,7 @@ pub fn entry_value_unknown(comptime Entry: type, payload: []const u8) wire.Error
             try reader.skip(tag, constants.limits.depth_max);
             continue;
         }
-        unknown = decode.unknown_to_closed(.@"enum", V, try scalar.read(.@"enum", V, &reader));
+        unknown = decode.unknown_to_closed(.@"enum", V, try scalar.read(.@"enum", V, &reader, null));
     }
     unreachable;
 }

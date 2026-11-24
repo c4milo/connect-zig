@@ -47,6 +47,8 @@ const three_wrong: signup.RegisterRequest = .{ .email = "kid@example.com", .name
 /// each call until its round ends, so the calls live here.
 const State = struct {
     app: App,
+    /// Decodes the detail of an error, with the CPU features the program detected once.
+    protobuf_decoder: proto.Decoder,
     rounds: harness.Rounds(App, Router),
     valid: RegisterCall,
     email: RegisterCall,
@@ -62,6 +64,7 @@ pub fn main(init: std.process.Init) !void {
         return error.OutOfMemory;
     const state: *State = @ptrCast(@alignCast(state_memory));
     state.app = .{ .cpu_features = .detect() };
+    state.protobuf_decoder = .init(state.app.cpu_features);
     try state.rounds.init(&state.app);
     defer state.rounds.deinit();
     try round(state, .{ .h11 = false, .h3 = false }, .h2);
@@ -128,7 +131,7 @@ fn expect_refused(state: *State, call: anytype, comptime Answer: type, rule_ids:
     // A detail names its message type, so a client decodes only the details it knows.
     if (!std.mem.eql(u8, detail.type_name, pb.Violations.protobuf.full_name)) return error.CallWrong;
     std.debug.print("validate: refused: {s}: {s}\n", .{ failure.code.name(), failure.message });
-    const decoded = try proto.decode(pb.Violations, detail.value);
+    const decoded = try state.protobuf_decoder.decode(pb.Violations, detail.value);
     var violations = decoded.violations.iterator();
     for (rule_ids) |rule_id| {
         const violation = try violations.next() orelse return error.CallWrong;

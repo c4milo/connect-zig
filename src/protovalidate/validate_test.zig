@@ -3,6 +3,8 @@
 const std = @import("std");
 const testing = std.testing;
 const proto = @import("protobuf");
+/// The tests decode and encode with the build target's CPU features.
+const protobuf_decoder: proto.Decoder = .init(.target());
 const pb = @import("buf_validate_validate");
 const table = @import("table.zig");
 const constants = @import("constants.zig");
@@ -261,7 +263,7 @@ test "a repeated field's size, its unique elements and each element's rules are 
     try testing.expectEqual(@as(u64, 1), violations[0].field.?.elements.items[0].subscript.?.index);
     // The same elements, as `decode` leaves them: a view of the message's octets.
     const packed_items = [_]u8{ 0x22, 0x03, 0x02, 0x01, 0x02 };
-    var decoded = try proto.decode(Outer, &packed_items);
+    var decoded = try protobuf_decoder.decode(Outer, &packed_items);
     decoded.id = 1;
     decoded.inner = .{ .count = 1 };
     decoded.choice = .{ .first = 1 };

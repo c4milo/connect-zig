@@ -4,6 +4,8 @@
 const std = @import("std");
 const testing = std.testing;
 const proto = @import("protobuf");
+/// The tests decode and encode with the build target's CPU features.
+const protobuf_decoder: proto.Decoder = .init(.target());
 const pb = @import("descriptor_pb.zig");
 const main = @import("main.zig");
 
@@ -23,7 +25,7 @@ fn generated(arena: std.mem.Allocator, request: *const pb.CodeGeneratorRequest) 
 
 fn generated_files(arena: std.mem.Allocator, request: *const pb.CodeGeneratorRequest) ![]const pb.GeneratedFile {
     const bytes = try proto.encode(pb.CodeGeneratorRequest, request, try arena.alloc(u8, try proto.encoded_len(pb.CodeGeneratorRequest, request)));
-    const response = try main.respond(arena, bytes);
+    const response = try main.respond(arena, &protobuf_decoder, bytes);
     if (response.@"error") |message| {
         std.debug.print("{s}\n", .{message});
         return error.GenerationFailed;
@@ -154,7 +156,7 @@ test "a request that names a missing file gets an error response" {
     const arena = arena_state.allocator();
     const request: pb.CodeGeneratorRequest = .{ .file_to_generate = .of(&.{"none.proto"}) };
     const bytes = try proto.encode(pb.CodeGeneratorRequest, &request, try arena.alloc(u8, 64));
-    const response = try main.respond(arena, bytes);
+    const response = try main.respond(arena, &protobuf_decoder, bytes);
     try testing.expectEqualStrings("protoc-gen-connect-zig: MissingFile", response.@"error".?);
 }
 

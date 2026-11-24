@@ -17,6 +17,10 @@
 //! An Any in the cases names coverage types, so the root file declares them (decision 21).
 const std = @import("std");
 const proto = @import("protobuf");
+/// A check program decodes and encodes with the build target's CPU features: it runs on the
+/// machine it was built for, and a library takes the features its program detected.
+const protobuf_decoder: proto.Decoder = .init(.target());
+const protobuf_encoder: proto.Encoder = .init(.target());
 const coverage = @import("coverage");
 const editions = @import("editions");
 const legacy = @import("legacy");
@@ -65,19 +69,19 @@ pub fn main(init: std.process.Init) !void {
 fn convert(comptime T: type, state: *State, direction: Direction, bytes: []const u8) ![]const u8 {
     switch (direction) {
         .@"json-to-binary" => {
-            const message = try proto.decode_json(T, bytes, &state.binary, &state.tokens);
+            const message = try protobuf_decoder.decode_json(T, bytes, &state.binary, &state.tokens);
             return proto.encode(T, &message, &state.output);
         },
         .@"binary-to-json" => {
-            const message = try proto.decode(T, bytes);
-            return proto.encode_json(T, &message, &state.output);
+            const message = try protobuf_decoder.decode(T, bytes);
+            return protobuf_encoder.encode_json(T, &message, &state.output);
         },
         .@"binary-to-binary" => {
-            const message = try proto.decode(T, bytes);
+            const message = try protobuf_decoder.decode(T, bytes);
             return proto.encode(T, &message, &state.output);
         },
         .@"through-partial" => {
-            const message = try proto.decode(coverage.Partial, bytes);
+            const message = try protobuf_decoder.decode(coverage.Partial, bytes);
             return proto.encode(coverage.Partial, &message, &state.output);
         },
     }

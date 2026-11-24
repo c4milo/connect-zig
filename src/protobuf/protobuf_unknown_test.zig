@@ -3,6 +3,7 @@
 const std = @import("std");
 const testing = std.testing;
 const proto = @import("protobuf.zig");
+const support = @import("test_support.zig");
 
 /// The newer schema: fields 1, 2 and 3.
 const Newer = struct {
@@ -41,7 +42,7 @@ const Dropping = struct {
 test "an older schema keeps a newer field and writes it back" {
     var newer_bytes: [64]u8 = undefined;
     const newer = try proto.encode(Newer, &.{ .a = 1, .b = "kept", .c = .of(&.{ 2, 3 }) }, &newer_bytes);
-    const older = try proto.decode(Older, newer);
+    const older = try support.decoder.decode(Older, newer);
     try testing.expectEqual(@as(i32, 1), older.a);
     var again_bytes: [64]u8 = undefined;
     const again = try proto.encode(Older, &older, &again_bytes);
@@ -49,7 +50,7 @@ test "an older schema keeps a newer field and writes it back" {
     try testing.expectEqual(newer.len, try proto.encoded_len(Older, &older));
     // Read back with the newer schema, every field is there. The unknown field now follows the
     // known ones, as Go writes it.
-    const back = try proto.decode(Newer, again);
+    const back = try support.decoder.decode(Newer, again);
     try testing.expectEqualStrings("kept", back.b);
     var numbers = back.c.iterator();
     try testing.expectEqual(@as(i32, 2), (try numbers.next()).?);
@@ -68,7 +69,7 @@ test "a known field inside the kept span is written once" {
         try writer.varint(text.len);
         try writer.bytes(text);
     }
-    const older = try proto.decode(Older, writer.written());
+    const older = try support.decoder.decode(Older, writer.written());
     var out: [64]u8 = undefined;
     const encoded = try proto.encode(Older, &older, &out);
     // a (2 octets, the last value 1) and the two b records (3 octets each).
@@ -78,7 +79,7 @@ test "a known field inside the kept span is written once" {
 test "a message with no room for unknown fields drops them" {
     var newer_bytes: [64]u8 = undefined;
     const newer = try proto.encode(Newer, &.{ .a = 1, .b = "dropped" }, &newer_bytes);
-    const dropping = try proto.decode(Dropping, newer);
+    const dropping = try support.decoder.decode(Dropping, newer);
     var out: [64]u8 = undefined;
     try testing.expectEqual(@as(usize, 2), (try proto.encode(Dropping, &dropping, &out)).len);
 }

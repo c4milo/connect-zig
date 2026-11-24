@@ -9,6 +9,7 @@
 //! and a decode refuses the same inputs either way.
 const std = @import("std");
 const assert = std.debug.assert;
+const platform = @import("platform");
 const wire = @import("wire.zig");
 const descriptor = @import("descriptor.zig");
 const scalar = @import("scalar.zig");
@@ -20,6 +21,9 @@ const Error = decode.Error;
 /// The caller's storage, which a decode fills from its start.
 pub const Store = struct {
     buffer: []u8,
+    /// The CPU features each string's UTF-8 check runs with: the program's, which its
+    /// `Decoder` holds.
+    cpu_features: *const platform.CpuFeatures,
     len: usize = 0,
     /// Whether a run or a `Lazy` message found no room, and so stays in the input, where each
     /// read of it parses it again.
@@ -60,14 +64,14 @@ pub fn read(comptime F: type, slot: *F, field_start: usize, bytes: []const u8, n
     if (store.buffer.len == 0 or slot.view.bytes.len != 0 or slot.items.len != 0) {
         // A second run of the field's records keeps them all in the view.
         slot.items = &.{};
-        return decode.read_repeated(F, slot, field_start, bytes, number, tag, reader, depth_left, .checked);
+        return decode.read_repeated(F, slot, field_start, bytes, number, tag, reader, depth_left, .checked, store.cpu_features);
     }
     if (comptime flat(F)) return read_appended(F, slot, field_start, bytes, number, tag, reader, depth_left, store);
     // A run the count cannot pass over is read as the view reads it, so its refusal is the same.
     const count = run_count(F, bytes, field_start, number) catch
-        return decode.read_repeated(F, slot, field_start, bytes, number, tag, reader, depth_left, .checked);
+        return decode.read_repeated(F, slot, field_start, bytes, number, tag, reader, depth_left, .checked, store.cpu_features);
     const items = store.reserve(F.Element, count) orelse
-        return decode.read_repeated(F, slot, field_start, bytes, number, tag, reader, depth_left, .checked);
+        return decode.read_repeated(F, slot, field_start, bytes, number, tag, reader, depth_left, .checked, store.cpu_features);
     const read_count = read_records(F, slot, items, field_start, bytes, number, tag, reader, depth_left, store) catch |failure| switch (failure) {
         // The count and the records disagree only in a malformed run.
         error.NoRoom => return error.Truncated,
@@ -94,7 +98,7 @@ fn read_appended(comptime F: type, slot: *F, field_start: usize, bytes: []const 
     const T = F.Element;
     const start = store.aligned(T) orelse {
         store.short = true;
-        return decode.read_repeated(F, slot, field_start, bytes, number, tag, reader, depth_left, .checked);
+        return decode.read_repeated(F, slot, field_start, bytes, number, tag, reader, depth_left, .checked, store.cpu_features);
     };
     const first: [*]T = @ptrCast(@alignCast(store.buffer.ptr + start));
     const room = first[0 .. (store.buffer.len - start) / @sizeOf(T)];
@@ -105,7 +109,7 @@ fn read_appended(comptime F: type, slot: *F, field_start: usize, bytes: []const 
             // view already starts at the run's first record, so reading the run again widens it.
             store.short = true;
             reader.* = before;
-            return decode.read_repeated(F, slot, field_start, bytes, number, tag, reader, depth_left, .checked);
+            return decode.read_repeated(F, slot, field_start, bytes, number, tag, reader, depth_left, .checked, store.cpu_features);
         },
         else => |other| return other,
     };
@@ -151,7 +155,7 @@ fn read_record(comptime F: type, items: []F.Element, index: usize, tag: wire.Tag
         items[index] = .{};
         try decode.merge_depth(F.Element, &items[index], payload, depth_left - 1, .stored, store);
     } else {
-        items[index] = try scalar.read(F.kind, F.Element, reader);
+        items[index] = try scalar.read(F.kind, F.Element, reader, store.cpu_features);
     }
     return index + 1;
 }
@@ -164,7 +168,8 @@ fn read_packed(comptime F: type, items: []F.Element, start_index: usize, payload
     for (0..payload.len + 1) |_| {
         if (packed_reader.at_end()) return index;
         if (index == items.len) return error.NoRoom;
-        items[index] = try scalar.read(F.kind, F.Element, &packed_reader);
+        // "Packed Repeated Fields": only scalar numeric types pack, so no element is a string.
+        items[index] = try scalar.read(F.kind, F.Element, &packed_reader, null);
         index += 1;
     }
     unreachable;

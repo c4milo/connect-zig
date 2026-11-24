@@ -216,12 +216,14 @@ fn is_lazy(comptime F: type) bool {
 }
 
 const testing = std.testing;
+/// The tests decode and encode with the build target's CPU features.
+const protobuf_decoder: proto.Decoder = .init(.target());
 const validate = @import("buf_validate_validate");
 
 fn written(arena: Allocator, writer: *Writer, rules: *const validate.FieldRules) ![]const u8 {
     // The plugin reads rules that `decode` gave it, so the test writes what a decode gives.
     const bytes = try proto.encode(validate.FieldRules, rules, try arena.alloc(u8, try proto.encoded_len(validate.FieldRules, rules)));
-    const decoded = try proto.decode(validate.FieldRules, bytes);
+    const decoded = try protobuf_decoder.decode(validate.FieldRules, bytes);
     try writer.path.append(arena, "val");
     try message(writer, validate.FieldRules, &decoded);
     return writer.text.items;
@@ -298,7 +300,7 @@ test "an enum's unnamed number and a rule the types do not know are both kept in
     // Field 1161 of StringRules is an extension's predefined rule, which the types do not hold.
     const extension_record = [_]u8{ 0xc8, 0x48, 0x01 };
     const string_rules = [_]u8{ 0x72, extension_record.len } ++ extension_record;
-    const decoded = try proto.decode(validate.FieldRules, &string_rules);
+    const decoded = try protobuf_decoder.decode(validate.FieldRules, &string_rules);
     var unknown: Writer = .{ .arena = arena };
     try message(&unknown, validate.FieldRules, &decoded);
     try testing.expectEqualStrings("buf.validate.StringRules holds field 1161, which neither the plugin's validate.proto nor an extension of the request states", unknown.unsupported.?);

@@ -6,6 +6,8 @@ const std = @import("std");
 const testing = std.testing;
 const Allocator = std.mem.Allocator;
 const proto = @import("protobuf");
+/// The tests decode and encode with the build target's CPU features.
+const protobuf_decoder: proto.Decoder = .init(.target());
 const validate = @import("buf_validate_validate");
 const pb = @import("descriptor_pb.zig");
 const index_file = @import("index.zig");
@@ -450,10 +452,10 @@ test "an extension's declaration is read at the numbers descriptor.proto and val
     // descriptor.proto: DescriptorProto.extension = 6 and FileDescriptorProto.extension = 7.
     const in_message = [_]u8{ 0x32, declared.len } ++ declared;
     const in_file = [_]u8{ 0x3a, declared.len } ++ declared;
-    const message = try proto.decode(pb.DescriptorProto, &in_message);
+    const message = try protobuf_decoder.decode(pb.DescriptorProto, &in_message);
     var of_message = message.extension.iterator();
     try testing.expectEqualStrings(".m", (try of_message.next()).?.extendee.?);
-    const file = try proto.decode(pb.FileDescriptorProto, &in_file);
+    const file = try protobuf_decoder.decode(pb.FileDescriptorProto, &in_file);
     var of_file = file.extension.iterator();
     try testing.expectEqualStrings("x", (try of_file.next()).?.name.?);
     // validate.proto: `predefined` extends FieldOptions at 1160, PredefinedRules.cel = 1 and
@@ -461,7 +463,7 @@ test "an extension's declaration is read at the numbers descriptor.proto and val
     const rule_bytes = [_]u8{ 0x0a, 0x01, 'i' };
     const predefined = [_]u8{ 0x0a, rule_bytes.len } ++ rule_bytes;
     const options_bytes = [_]u8{ 0xc2, 0x48, predefined.len } ++ predefined;
-    const options = try proto.decode(pb.FieldOptions, &options_bytes);
+    const options = try protobuf_decoder.decode(pb.FieldOptions, &options_bytes);
     var cel = options.predefined.?.cel.iterator();
     try testing.expectEqualStrings("i", (try cel.next()).?.id.?);
 }

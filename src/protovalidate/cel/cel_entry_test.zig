@@ -5,6 +5,8 @@ const testing = std.testing;
 /// The build target's CPU features, which `matches` searches with in the tests.
 const testing_cpu_features = @import("platform").CpuFeatures.target();
 const proto = @import("protobuf");
+/// The tests decode and encode with the build target's CPU features.
+const protobuf_decoder: proto.Decoder = .init(.target());
 const program = @import("cel_program.zig");
 const type_file = @import("cel_type.zig");
 const Scope = type_file.Scope;
@@ -90,7 +92,7 @@ const encoded_len_max = 128;
 
 test "a macro over a map that lies in the message's octets reads each entry's value" {
     var octets: [encoded_len_max]u8 = undefined;
-    const viewed = try proto.decode(Message, try proto.encode(Message, &sample, &octets));
+    const viewed = try protobuf_decoder.decode(Message, try proto.encode(Message, &sample, &octets));
     try testing.expect(viewed.counts.items.len == 0 and viewed.counts.view.bytes.len != 0);
     try expect("this.counts.all(k, this.counts[k] <= 2) && !this.counts.exists(k, this.counts[k] == 4)", &viewed, &second, true);
     try expect("this.items.all(k, this.items[k].a != 1) && this.items.exists_one(k, this.items[k].a == 4)", &viewed, &second, true);

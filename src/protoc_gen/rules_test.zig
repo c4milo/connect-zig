@@ -3,6 +3,8 @@
 const std = @import("std");
 const testing = std.testing;
 const proto = @import("protobuf");
+/// The tests decode and encode with the build target's CPU features.
+const protobuf_decoder: proto.Decoder = .init(.target());
 const pb = @import("descriptor_pb.zig");
 const main = @import("main.zig");
 
@@ -20,7 +22,7 @@ fn respond_extended(arena: std.mem.Allocator, messages: []const pb.DescriptorPro
     const file: pb.FileDescriptorProto = .{ .name = "demo/v1/demo.proto", .package = "demo.v1", .message_type = .of(messages), .extension = .of(extensions), .syntax = "proto3" };
     const request: pb.CodeGeneratorRequest = .{ .file_to_generate = .of(&.{"demo/v1/demo.proto"}), .proto_file = .of(&.{file}) };
     const bytes = try proto.encode(pb.CodeGeneratorRequest, &request, try arena.alloc(u8, try proto.encoded_len(pb.CodeGeneratorRequest, &request)));
-    return main.respond(arena, bytes);
+    return main.respond(arena, &protobuf_decoder, bytes);
 }
 
 fn generated(arena: std.mem.Allocator, messages: []const pb.DescriptorProto) ![]const u8 {
@@ -170,7 +172,7 @@ test "a rule the plugin's types do not know marks the table unsupported" {
     const string_rules = [_]u8{ 0xc8, 0x48, 0x01 };
     const field_rules = [_]u8{ 0x72, string_rules.len } ++ string_rules;
     var value = field("value", 1, .string, .optional);
-    value.options = .{ .rules = try proto.decode(@import("buf_validate_validate").FieldRules, &field_rules) };
+    value.options = .{ .rules = try protobuf_decoder.decode(@import("buf_validate_validate").FieldRules, &field_rules) };
     const code = try generated(arena, &.{.{ .name = "Extended", .field = .of(&.{value}) }});
     try expect_contains(code, "        .unsupported = \"buf.validate.StringRules holds field 1161, which neither the plugin's validate.proto nor an extension of the request states\",\n");
 }

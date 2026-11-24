@@ -6,6 +6,8 @@ const assert = std.debug.assert;
 const testing = std.testing;
 const connect = @import("connect");
 const proto = @import("protobuf");
+/// The tests decode and encode with the build target's CPU features.
+const protobuf_decoder: proto.Decoder = .init(.target());
 const server = @import("server");
 const http = @import("http");
 const rpc = @import("connect_colibri.zig");
@@ -310,7 +312,7 @@ pub const Notes = struct {
 
     pub fn next(notes: *Notes) !?Note {
         const envelope = (try notes.reader.next()) orelse return null;
-        return try proto.decode(Note, envelope.payload);
+        return try protobuf_decoder.decode(Note, envelope.payload);
     }
 
     /// Requires the next `total` notes to be those `note_text` names, from 0 on.

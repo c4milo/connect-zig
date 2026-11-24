@@ -40,6 +40,17 @@ pins. `protovalidate` takes `regex` from the same stdx: the second pin, `stdx_re
   - `oidc.VerifierOptions` takes a field `cpu_features`, with no default. `Claims` takes the
     verifier's when `verify` fills it, for `string`, `integer` and `holds`.
 
+- **Breaking.** `protobuf` decodes and writes JSON through a `Decoder` and an `Encoder`, each made
+  once with `init(cpu_features)`, the features the program detects as it starts
+  ([decision 50](docs/decisions.md)). `decode`, `decode_into`, `decode_into_use`, `merge`,
+  `decode_json` and `decode_json_with` are methods of `protobuf.Decoder`, and `encode_json` and
+  `encode_json_with` of `protobuf.Encoder`. Binary `encode` and `encoded_len` stay as they were.
+  `connect.status.decode` takes `cpu_features` as its last argument.
+
+- **Faster.** A repeated field's iterator and `Lazy.get` no longer check a string for UTF-8 a
+  second time: the decode checked it. A JSON decode of the benchmark's strings takes 17% fewer
+  instructions.
+
 - **Memory.** The guide and every example take the program's `State` from `rawAlloc`, not from
   `create`. In Debug and ReleaseSafe, `create` writes the undefined pattern over all of it, so
   each page is in memory from the start. The OTLP sink of the benchmarks took 318 MiB before its

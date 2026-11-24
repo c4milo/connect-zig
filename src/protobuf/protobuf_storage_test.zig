@@ -17,6 +17,7 @@
 const std = @import("std");
 const testing = std.testing;
 const proto = @import("protobuf.zig");
+const support = @import("test_support.zig");
 const Repeated = proto.Repeated;
 const Lazy = proto.Lazy;
 
@@ -150,7 +151,7 @@ const Outcome = union(enum) {
 };
 
 fn outcome(comptime T: type, bytes: []const u8, storage: ?[]u8, out: []u8) Outcome {
-    const decoded = if (storage) |room| proto.decode_into(T, bytes, room) else proto.decode(T, bytes);
+    const decoded = if (storage) |room| support.decoder.decode_into(T, bytes, room) else support.decoder.decode(T, bytes);
     const message = decoded catch |failure| return .{ .refusal = failure };
     return .{ .message = proto.encode(T, &message, out) catch |failure| return .{ .refusal = failure } };
 }
@@ -207,7 +208,7 @@ fn fold_text(text: []const u8) u64 {
 /// `bytes`: the outcome holds the refusal.
 fn reading(comptime T: type, bytes: []const u8, storage: ?[]u8) ?anyerror!u64 {
     if (T != Node) return null;
-    const decoded = if (storage) |room| proto.decode_into(Node, bytes, room) else proto.decode(Node, bytes);
+    const decoded = if (storage) |room| support.decoder.decode_into(Node, bytes, room) else support.decoder.decode(Node, bytes);
     const node = decoded catch return null;
     return fold_node(&node, fold_depth_max);
 }
@@ -276,7 +277,7 @@ test "a run of groups is counted, and read into the storage" {
     const bytes = try proto.encode(Crate, &.{ .bundles = .of(&bundles) }, &buffer);
     var storage: [storage_len_max]u8 align(storage_align) = @splat(0);
     // "Groups": a group's record has no length, so its count passes over it to its end tag.
-    const crate = try proto.decode_into(Crate, bytes, &storage);
+    const crate = try support.decoder.decode_into(Crate, bytes, &storage);
     try testing.expectEqual(bundles.len, crate.bundles.items.len);
     try testing.expectEqual(numbers.len, crate.bundles.items[bundles.len - 1].numbers.items.len);
     try check_each_change(Crate, bytes);
@@ -286,14 +287,14 @@ test "an iterator gives a message of the storage where it lies, and a view's mes
     var buffer: [encoded_len_max]u8 = @splat(0);
     const bytes = try encoded(&full, &buffer);
     var storage: [storage_len_max]u8 align(storage_align) = @splat(0);
-    const stored = try proto.decode_into(Node, bytes, &storage);
+    const stored = try support.decoder.decode_into(Node, bytes, &storage);
     var in_storage = stored.leaves.iterator();
     for (stored.leaves.items) |*leaf| try testing.expectEqual(leaf, (try in_storage.next()).?);
     // The end holds: each later call gives null again.
     try testing.expectEqual(@as(?*const Leaf, null), try in_storage.next());
     try testing.expectEqual(@as(?*const Leaf, null), try in_storage.next());
     // A view holds no message to point at, so each one is decoded into the iterator's slot.
-    const lazy = try proto.decode(Node, bytes);
+    const lazy = try support.decoder.decode(Node, bytes);
     var in_view = lazy.leaves.iterator();
     for (leaves) |want| {
         const got = (try in_view.next()).?;
@@ -317,7 +318,7 @@ test "with room, each repeated field and each Lazy child is read into the storag
     var buffer: [encoded_len_max]u8 = @splat(0);
     const bytes = try encoded(&full, &buffer);
     var storage: [storage_len_max]u8 align(storage_align) = @splat(0);
-    const node = try proto.decode_into(Node, bytes, &storage);
+    const node = try support.decoder.decode_into(Node, bytes, &storage);
     try testing.expectEqual(numbers.len, node.numbers.items.len);
     try testing.expectEqual(fixed.len, node.fixed.items.len);
     try testing.expectEqual(names.len, node.names.items.len);
@@ -329,7 +330,7 @@ test "with room, each repeated field and each Lazy child is read into the storag
     try testing.expect(node.next.value.?.next.value != null);
     try testing.expectEqualStrings("tail", node.next.value.?.next.value.?.label);
     // `decode` leaves each field in the input (decision 6).
-    const lazy = try proto.decode(Node, bytes);
+    const lazy = try support.decoder.decode(Node, bytes);
     try testing.expectEqual(@as(usize, 0), lazy.numbers.items.len);
     try testing.expect(lazy.next.value == null);
 }
@@ -345,7 +346,7 @@ test "decode_into_use is short exactly when the storage holds less than the mess
     // A message with no repeated field and no `Lazy` field takes no storage, so none is short.
     var leaf_buffer: [encoded_len_max]u8 = @splat(0);
     var use: proto.StorageUse = .{};
-    _ = try proto.decode_into_use(Leaf, try proto.encode(Leaf, &leaves[0], &leaf_buffer), &.{}, &use);
+    _ = try support.decoder.decode_into_use(Leaf, try proto.encode(Leaf, &leaves[0], &leaf_buffer), &.{}, &use);
     try testing.expectEqual(proto.StorageUse{}, use);
 }
 
@@ -355,14 +356,14 @@ test "decode_into_use is short exactly when the storage holds less than the mess
 fn expect_short_below_need(comptime T: type, bytes: []const u8) !void {
     var storage: [storage_len_max]u8 align(storage_align) = @splat(0);
     var roomy: proto.StorageUse = .{};
-    _ = try proto.decode_into_use(T, bytes, &storage, &roomy);
+    _ = try support.decoder.decode_into_use(T, bytes, &storage, &roomy);
     try testing.expect(!roomy.short);
     try testing.expect(roomy.octets > 0 and roomy.octets < storage.len);
     // One length past what the message takes, and the one after it.
     const past = 2;
     for (0..roomy.octets + past) |len| {
         var use: proto.StorageUse = .{};
-        _ = try proto.decode_into_use(T, bytes, storage[0..len], &use);
+        _ = try support.decoder.decode_into_use(T, bytes, storage[0..len], &use);
         try testing.expectEqual(len < roomy.octets, use.short);
         if (!use.short) try testing.expectEqual(roomy.octets, use.octets);
     }
@@ -406,10 +407,10 @@ test "a closed enum's field keeps its view, and its unknown numbers go back out"
     // the closed enum does not name.
     const bytes = "\x0a\x03\x01\x05\x00\x12\x05\x0a\x01a\x10\x01\x12\x05\x0a\x01b\x10\x05";
     var storage: [storage_len_max]u8 align(storage_align) = @splat(0);
-    const stored = try proto.decode_into(Shirt, bytes, &storage);
+    const stored = try support.decoder.decode_into(Shirt, bytes, &storage);
     try testing.expectEqual(@as(usize, 0), stored.sizes.items.len);
     try testing.expectEqual(@as(usize, 0), stored.by_name.items.len);
-    const lazy = try proto.decode(Shirt, bytes);
+    const lazy = try support.decoder.decode(Shirt, bytes);
     var want: [encoded_len_max]u8 = @splat(0);
     var got: [encoded_len_max]u8 = @splat(0);
     try testing.expectEqualSlices(u8, try proto.encode(Shirt, &lazy, &want), try proto.encode(Shirt, &stored, &got));

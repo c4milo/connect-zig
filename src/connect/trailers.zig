@@ -125,7 +125,7 @@ pub fn read(context: anytype, comptime find: fn (@TypeOf(context), []const u8) ?
     }
     const details_text = find(context, "grpc-status-details-bin") orelse return failure;
     const bytes = decode_bin(details_text, storage.status, storage.cpu_features) orelse return failure;
-    const status = rpc_error.decode_status(bytes, storage.details) catch return failure;
+    const status = rpc_error.decode_status(bytes, storage.details, storage.cpu_features) catch return failure;
     failure.details = status.details;
     return failure;
 }

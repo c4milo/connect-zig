@@ -56,12 +56,15 @@ imports no `connect` module (decision 47). Its two generated modules are the plu
 
 A generated message is a struct. Its `pub const protobuf: proto.Descriptor` names each field:
 the Zig name, the number, the kind, the JSON name, the .proto name, and the oneof that holds it.
-`encode`, `decode`, and `encoded_len` read the table at comptime (decisions 6 and 7).
+`encode`, `encoded_len`, and a `Decoder`'s `decode` read the table at comptime (decisions 6 and
+7). A program makes one `Decoder` and one `Encoder` as it starts, with the CPU features it
+detected once (decision 50).
 
 - `decode` copies nothing. Strings and bytes are slices of the input. `Repeated` fields are views,
   read by an iterator that accepts packed and unpacked elements.
 - `decode` checks every element when it reads the message: wire types, UTF-8, and nested
-  messages. An iterator over a decoded view therefore reads only checked bytes.
+  messages. An iterator over a decoded view therefore reads only checked bytes, and checks no
+  string again (decision 50).
 - Merge follows "Last One Wins": scalars keep the last value, messages merge, a oneof keeps the
   member read last. A merge that a view cannot hold fails closed (decision 6).
 - Unknown fields are kept in a generated message's `_unknown` and written back (decision 24);
@@ -71,8 +74,9 @@ the Zig name, the number, the kind, the JSON name, the .proto name, and the oneo
 
 ## 5. Proto3 JSON
 
-`encode_json` writes a message with stdx's `json.TextWriter`. `decode_json` transcodes JSON into
-the binary encoding in a caller scratch buffer and then calls `decode` (decision 9). Well-known
+`Encoder.encode_json` writes a message with stdx's `json.TextWriter`. `Decoder.decode_json`
+transcodes JSON into the binary encoding in a caller scratch buffer and then decodes it
+(decision 9). Well-known
 types live in `proto.wkt` and have their own JSON forms: Timestamp, Duration, the wrappers,
 Empty, FieldMask, Struct, Value, ListValue, and Any. An Any names its type from a comptime list
 (decision 21).
@@ -2173,20 +2177,29 @@ ran on Linux x86-64 with Zig 0.16.0.
     `Tokens` keeps, the error body, the end-stream message with `.target()`, a GET's query
     through an alias, and a "-bin" trailer. Three mutants of the rule, which reads comments,
     refuses the ruled default, or reads every directory, were each `CAUGHT`.
+- **A `Decoder` and an `Encoder` in `protobuf`** (decision 50;
+  https://github.com/c4milo/connect-zig/issues/14). Public names: `protobuf.Decoder` and
+  `protobuf.Encoder` join, each made once with `init(cpu_features)`. `decode`, `decode_into`,
+  `decode_into_use`, `merge`, `decode_json`, `decode_json_with`, `encode_json` and
+  `encode_json_with` leave the root and become their methods. Every program needs them: each
+  one that decodes or writes JSON. `connect.status.decode` takes `cpu_features`. The plugin and
+  the examples detect the features once and pass them.
+  - `zig build test` passed, with the examples, and each check program built.
+  - `tools/perf_check.sh` wrote a new `bench/instructions.txt`. `main`'s baseline already failed
+    four rows on this machine: validate medium valid and invalid, +5.5% and +5.8%, and decode
+    and validate medium, +2.9% and +3.3%. Against `main` counted here, binary decode took 1.1%
+    to 3.8% more instructions and JSON decode 1.5% to 17.3% fewer (decision 50).
+  - Mutations against `zig build test-protobuf`, 8, each `CAUGHT`: no string checked; a string
+    a decode checked checked again; `decode`, `decode_into`, a repeated string, a stored repeated
+    string, a singular string and a `Lazy` message each read with no check. Against `zig build
+    lint`, 4, each `CAUGHT` by `target-features`: `Decoder.init`, `encode_json`, `decode_json`
+    and JSON bytes on the target's features.
 
 ### Work not done yet
 
 - A stream that waits for an event of the program once its request ended (colibri issue 130).
   colibri v0.16.0 left it out, as ruled on 2026-11-10. No release up to v0.17.0 holds it, and
   the issue is still open.
-- For `protobuf`, the program's CPU features in `decode`, `decode_into`, `encode_json` and
-  `decode_json`: the UTF-8 check of a string, and the JSON and base64 of stdx. It changes the
-  decode API, so the owner rules its form first (https://github.com/c4milo/connect-zig/issues/14).
-  `tools/perf_check.sh`'s count, built with `-Dcpu=baseline`, gave the gain on 2026-11-24. The
-  build target's features were measured against x86-64-v3's, a literal in a patch that was not
-  kept. Large JSON decode fell 15.5%, from 5,838,289 instructions to 4,936,210, large JSON encode
-  14.4%, and large binary decode 3.6%. Small, medium, deep, packed, tree and varints moved 0.3% or
-  less. Strings JSON encode rose 12.1%, from 3,084 to 3,458: its strings are short.
 - For `oidc`, a measurement before any change: a client sends one token with each call, and
   the verifier checks its signature each time. If that cost shows in a server's profile, a
   verifier may keep the last tokens it took.

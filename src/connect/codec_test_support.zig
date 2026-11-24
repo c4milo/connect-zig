@@ -8,12 +8,15 @@
 //! uses a codec for one message at a time, so a server and a client in one test take turns.
 const brotli = @import("brotli");
 const platform = @import("platform");
+const proto = @import("protobuf");
 const compression = @import("compression.zig");
 
 /// The CPU features the tests run with: the build target's, which `Encoders` and `Decoders` take
 /// by default. The library takes a program's features and names the target's nowhere else, which
 /// the lint's rule `target-features` checks.
 pub const cpu_features = platform.CpuFeatures.target();
+/// The protobuf decoder the tests read what a server or a client wrote with.
+pub const protobuf_decoder: proto.Decoder = .init(cpu_features);
 
 pub threadlocal var gzip_encoder: compression.GzipEncoder align(@alignOf(compression.GzipEncoder)) = undefined;
 pub threadlocal var gzip_decoder: compression.GzipDecoder align(@alignOf(compression.GzipDecoder)) = undefined;

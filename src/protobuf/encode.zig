@@ -120,7 +120,7 @@ fn closed_value_unknown(comptime T: type, record: []const u8) Error!bool {
     inline for (T.protobuf.fields) |field| {
         if (comptime field.kind != .@"enum") continue;
         const V = comptime singular_enum(T, field) orelse continue;
-        if (tag.number == field.number) return decode.unknown_to_closed(.@"enum", V, try scalar.read(.@"enum", V, &reader));
+        if (tag.number == field.number) return decode.unknown_to_closed(.@"enum", V, try scalar.read(.@"enum", V, &reader, null));
     }
     return false;
 }
@@ -320,7 +320,7 @@ fn encode_unknown_numbers(comptime field: Field, comptime V: type, tag: wire.Tag
     var values: wire.Reader = if (tag.wire_type == .len) .{ .bytes = try reader.length_delimited() } else reader.*;
     // Each number takes at least one byte; an unpacked record holds one.
     for (0..values.bytes.len + 1) |_| {
-        const value = try scalar.read(.@"enum", V, &values);
+        const value = try scalar.read(.@"enum", V, &values, null);
         if (decode.unknown_to_closed(.@"enum", V, value)) {
             try sink.tag(field.number, .varint);
             try sink.value(.@"enum", V, value);

@@ -9,6 +9,9 @@
 const std = @import("std");
 const connect = @import("connect");
 const proto = @import("protobuf");
+/// A check program decodes and encodes with the build target's CPU features: it runs on the
+/// machine it was built for, and a library takes the features its program detected.
+const protobuf_decoder: proto.Decoder = .init(.target());
 const service = @import("connectrpc_conformance_v1_service");
 const client_compat = @import("connectrpc_conformance_v1_client_compat");
 const constants = @import("constants.zig");
@@ -85,7 +88,7 @@ pub fn main(init: std.process.Init) !void {
     var stdout = std.Io.File.stdout().writerStreaming(init.io, &state.stdout_buffer);
     for (0..constants.client_cases_max) |_| {
         const bytes = try read_request(state, &stdin.interface) orelse return;
-        const request = try proto.decode(Request, bytes);
+        const request = try protobuf_decoder.decode(Request, bytes);
         const response = try run_case(state, &request);
         try write_response(&stdout.interface, response);
     }

@@ -160,6 +160,8 @@ fn keep_text(report: *Report, message: []const u8) []const u8 {
 }
 
 const testing = std.testing;
+/// The tests decode and encode with the build target's CPU features.
+const protobuf_decoder: proto.Decoder = .init(.target());
 
 fn step_named(name: []const u8, parent: ?*const Path) Path {
     return .{ .parent = parent, .element = .{ .field_name = name } };
@@ -246,7 +248,7 @@ test "a report encodes as buf.validate.Violations" {
     var buffer: [256]u8 = undefined;
     const bytes = try report.encode(&buffer);
     try testing.expectEqual(bytes.len, try report.encoded_len());
-    const decoded = try proto.decode(pb.Violations, bytes);
+    const decoded = try protobuf_decoder.decode(pb.Violations, bytes);
     var each = decoded.violations.iterator();
     const violation = (try each.next()).?;
     try testing.expectEqualStrings("string.min_len", violation.rule_id.?);

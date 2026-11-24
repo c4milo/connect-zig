@@ -4,6 +4,7 @@
 const std = @import("std");
 const testing = std.testing;
 const proto = @import("protobuf.zig");
+const support = @import("test_support.zig");
 
 const Size = enum(i32) {
     unspecified = 0,
@@ -62,7 +63,7 @@ const Shirt = struct {
 const input = @embedFile("testdata/closed_enums.binpb");
 
 test "a number a closed enum does not name leaves the field as it was" {
-    const shirt = try proto.decode(Shirt, input);
+    const shirt = try support.decoder.decode(Shirt, input);
     try testing.expectEqual(Size.large, shirt.size.?);
     // The oneof's member was never set, so the oneof stays empty.
     try testing.expect(shirt.pick == null);
@@ -71,7 +72,7 @@ test "a number a closed enum does not name leaves the field as it was" {
 }
 
 test "a repeated closed enum and a map skip what the enum does not name" {
-    const shirt = try proto.decode(Shirt, input);
+    const shirt = try support.decoder.decode(Shirt, input);
     var sizes = shirt.sizes.iterator();
     try testing.expectEqual(Size.small, (try sizes.next()).?);
     try testing.expectEqual(Size.large, (try sizes.next()).?);
@@ -83,7 +84,7 @@ test "a repeated closed enum and a map skip what the enum does not name" {
 }
 
 test "what a closed enum did not take is written back" {
-    const shirt = try proto.decode(Shirt, input);
+    const shirt = try support.decoder.decode(Shirt, input);
     var buffer: [128]u8 = undefined;
     const again = try proto.encode(Shirt, &shirt, &buffer);
     try testing.expectEqual(again.len, try proto.encoded_len(Shirt, &shirt));
@@ -102,17 +103,17 @@ test "what a closed enum did not take is written back" {
 test "JSON takes no number a closed enum does not name" {
     var work: [256]u8 = undefined;
     var tokens: [64]u8 = undefined;
-    try testing.expectError(error.InvalidEnum, proto.decode_json(Shirt, "{\"size\":7}", &work, &tokens));
-    const shirt = try proto.decode_json(Shirt, "{\"size\":2,\"open\":5}", &work, &tokens);
+    try testing.expectError(error.InvalidEnum, support.decoder.decode_json(Shirt, "{\"size\":7}", &work, &tokens));
+    const shirt = try support.decoder.decode_json(Shirt, "{\"size\":2,\"open\":5}", &work, &tokens);
     try testing.expectEqual(Size.large, shirt.size.?);
 }
 
 test "a string whose utf8_validation is NONE is read unchecked, and JSON refuses it" {
     const bytes = [_]u8{ 0x3a, 0x02, 0xff, 0xfe };
-    const shirt = try proto.decode(Shirt, &bytes);
+    const shirt = try support.decoder.decode(Shirt, &bytes);
     try testing.expectEqualSlices(u8, &.{ 0xff, 0xfe }, shirt.raw);
     var text: [64]u8 = undefined;
-    try testing.expectError(error.InvalidUtf8, proto.encode_json(Shirt, &shirt, &text));
+    try testing.expectError(error.InvalidUtf8, support.encoder.encode_json(Shirt, &shirt, &text));
     // A map key whose utf8_validation is NONE is refused the same way.
     const Labels = struct {
         const LabelEntry = struct {
@@ -128,5 +129,5 @@ test "a string whose utf8_validation is NONE is read unchecked, and JSON refuses
         pub const protobuf: proto.Descriptor = .{ .full_name = "test.Labels", .fields = &.{proto.field_of(FieldNumber.by_name, .message, .{})} };
     };
     const labels: Labels = .{ .by_name = .of(&.{.{ .key = &.{ 0xff, 0xfe }, .value = 1 }}) };
-    try testing.expectError(error.InvalidUtf8, proto.encode_json(Labels, &labels, &text));
+    try testing.expectError(error.InvalidUtf8, support.encoder.encode_json(Labels, &labels, &text));
 }

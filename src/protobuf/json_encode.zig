@@ -153,7 +153,8 @@ fn write_any(message: *const wkt.Any, text: *json.TextWriter, comptime registry:
 }
 
 fn write_any_as(comptime A: type, message: *const wkt.Any, text: *json.TextWriter, comptime registry: []const type) Error!void {
-    const inner = try decode.decode_depth(A, message.value, constants.limits.depth_max, .checked, {});
+    // The writer checks each string it writes (RFC 8259 §8.1), so the decode checks none.
+    const inner = try decode.decode_depth(A, message.value, constants.limits.depth_max, .checked, null);
     try @call(.always_inline, json.TextWriter.begin_object, .{text});
     try @call(.always_inline, json.TextWriter.name, .{ text, "@type" });
     try @call(.always_inline, json.TextWriter.string, .{ text, message.type_url });

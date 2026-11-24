@@ -12,7 +12,8 @@ pub const DecodeError = json_scalar.DecodeError;
 
 /// The octets base64 text decodes to, written into `writer` after their length, in standard or
 /// URL-safe base64, with or without padding ("JSON Mapping", bytes).
-pub fn write_base64_field(octets: []const u8, writer: *wire.Writer) DecodeError!void {
+/// The decoder runs with the program's CPU features, `cpu_features`.
+pub fn write_base64_field(octets: []const u8, writer: *wire.Writer, cpu_features: platform.CpuFeatures) DecodeError!void {
     // The length and the pad characters give the octets' count, so the length goes first.
     const len = base64.Decoder.decoded_len(octets) catch return error.InvalidBase64;
     try writer.varint(len);
@@ -23,18 +24,19 @@ pub fn write_base64_field(octets: []const u8, writer: *wire.Writer) DecodeError!
     // "BytesFieldBase64Url"), so the decoder drops them. It takes the free room after the
     // length, whose slack its vector step uses, and writes `len` octets.
     var decoder: base64.Decoder = undefined;
-    decoder.init(.{ .accept = .either, .padding = .optional, .pad_bits = .drop }, platform.CpuFeatures.target());
+    decoder.init(.{ .accept = .either, .padding = .optional, .pad_bits = .drop }, cpu_features);
     const decoded_len = decoder.decode_all(octets, writer.buffer[writer.len..]) catch return error.InvalidBase64;
     assert(decoded_len == len);
     writer.len += len;
 }
 
 const testing = std.testing;
+const support = @import("test_support.zig");
 const json = @import("json");
 
 /// The JSON text `json_scalar.write` gives for bytes: base64 between quotes.
 fn encoded(octets: []const u8, buffer: []u8) ![]const u8 {
-    var text = json.TextWriter.init(buffer, .text, platform.CpuFeatures.target());
+    var text = json.TextWriter.init(buffer, .text, support.cpu_features);
     try json_scalar.write(.bytes, []const u8, octets, &text);
     return text.written();
 }
@@ -43,14 +45,14 @@ test "base64 decodes in either alphabet, padded or not" {
     var buffer: [16]u8 = undefined;
     for ([_][]const u8{ "AP8=", "AP8", "_w==", "_w" }, [_][]const u8{ &.{ 0, 255 }, &.{ 0, 255 }, &.{255}, &.{255} }) |input, want| {
         var writer: wire.Writer = .{ .buffer = &buffer };
-        try write_base64_field(input, &writer);
+        try write_base64_field(input, &writer, support.cpu_features);
         try testing.expectEqualSlices(u8, want, writer.written()[1..]);
     }
     var writer: wire.Writer = .{ .buffer = &buffer };
-    try testing.expectError(error.InvalidBase64, write_base64_field("A!", &writer));
+    try testing.expectError(error.InvalidBase64, write_base64_field("A!", &writer, support.cpu_features));
     // A text that mixes the alphabets is neither.
     var mixed: wire.Writer = .{ .buffer = &buffer };
-    try testing.expectError(error.InvalidBase64, write_base64_field("+_8=", &mixed));
+    try testing.expectError(error.InvalidBase64, write_base64_field("+_8=", &mixed, support.cpu_features));
 }
 
 test "base64 whose last letter sets pad bits reads as protobuf's parsers read it" {
@@ -58,13 +60,13 @@ test "base64 whose last letter sets pad bits reads as protobuf's parsers read it
     // "-_" is 0xfb and four pad bits set; "AP-_" and "AP_" set none. Each alphabet, padded or not.
     for ([_][]const u8{ "-_", "+/", "-_==", "AP8_", "AAAA-_", "AAA-" }, [_][]const u8{ &.{0xfb}, &.{0xfb}, &.{0xfb}, &.{ 0, 255, 63 }, &.{ 0, 0, 0, 0xfb }, &.{ 0, 0, 62 } }) |input, want| {
         var writer: wire.Writer = .{ .buffer = &buffer };
-        try write_base64_field(input, &writer);
+        try write_base64_field(input, &writer, support.cpu_features);
         try testing.expectEqualSlices(u8, want, writer.written()[1..]);
     }
     // Pad bits excuse nothing else: a letter neither alphabet has, or the two mixed.
     var bad: wire.Writer = .{ .buffer = &buffer };
-    try testing.expectError(error.InvalidBase64, write_base64_field("A!-_", &bad));
-    try testing.expectError(error.InvalidBase64, write_base64_field("+AAA-_", &bad));
+    try testing.expectError(error.InvalidBase64, write_base64_field("A!-_", &bad, support.cpu_features));
+    try testing.expectError(error.InvalidBase64, write_base64_field("+AAA-_", &bad, support.cpu_features));
 }
 
 test "bytes of each length write the base64 that std.base64 writes, and read back" {
@@ -79,7 +81,7 @@ test "bytes of each length write the base64 that std.base64 writes, and read bac
         try testing.expectEqualStrings(want, text[1 .. text.len - 1]);
         var room: [300]u8 = undefined;
         var writer: wire.Writer = .{ .buffer = &room };
-        try write_base64_field(want, &writer);
+        try write_base64_field(want, &writer, support.cpu_features);
         try testing.expectEqualSlices(u8, octets[0..len], writer.written()[writer.written().len - len ..]);
     }
 }

@@ -5,6 +5,8 @@ const platform = @import("platform");
 const assert = std.debug.assert;
 const testing = std.testing;
 const proto = @import("protobuf");
+/// The tests decode and encode with the build target's CPU features.
+const protobuf_decoder: proto.Decoder = .init(.target());
 const pb = @import("buf_validate_validate");
 const constants = @import("constants.zig");
 const interceptor = @import("interceptor.zig");
@@ -55,7 +57,7 @@ const no_time = struct { cpu_features: platform.CpuFeatures = .target() };
 fn expect_detail(failure: stand_in.RpcError, expected: []const u8) !void {
     try testing.expectEqual(@as(usize, 1), failure.details.len);
     try testing.expectEqualStrings("buf.validate.Violations", failure.details[0].type_name);
-    const decoded = try proto.decode(pb.Violations, failure.details[0].value);
+    const decoded = try protobuf_decoder.decode(pb.Violations, failure.details[0].value);
     var buffer: [constants.refusal_message_len_max]u8 = undefined;
     var writer: std.Io.Writer = .fixed(&buffer);
     var each = decoded.violations.iterator();

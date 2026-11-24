@@ -294,7 +294,7 @@ pub fn parse_float(comptime V: type, octets: []const u8, from_string: bool) Deco
 const testing = std.testing;
 
 fn written(comptime kind: Kind, comptime V: type, value: V, buffer: []u8) ![]const u8 {
-    var text = json.TextWriter.init(buffer, .text, platform.CpuFeatures.target());
+    var text = json.TextWriter.init(buffer, .text, @import("test_support.zig").cpu_features);
     try write(kind, V, value, &text);
     return text.written();
 }

@@ -107,6 +107,8 @@ fn known_len(list: anytype) ?usize {
 }
 
 const testing = std.testing;
+/// The tests decode and encode with the build target's CPU features.
+const protobuf_decoder: proto.Decoder = .init(.target());
 /// The build target's CPU features, which `matches` searches with in the tests.
 const testing_cpu_features = @import("platform").CpuFeatures.target();
 const program = @import("cel_program.zig");
@@ -154,7 +156,7 @@ test "two lists are equal when the elements at each place are" {
     var counted: Env = .{ .cpu_features = &testing_cpu_features, .steps = 0 };
     try testing.expect(try program.run("this.numbers != [2, 4, 6] && [1] != [1, 2]", scope, .{&sample}, &counted));
     var octets: [encoded_len_max]u8 = undefined;
-    const viewed = try proto.decode(Message, try proto.encode(Message, &sample, &octets));
+    const viewed = try protobuf_decoder.decode(Message, try proto.encode(Message, &sample, &octets));
     try testing.expect(viewed.numbers.items.len == 0 and viewed.numbers.view.bytes.len != 0);
     try expect_true("this.numbers == [2, 4] && this.numbers != [2] && this.names == ['ann', 'bob']", &viewed);
     // Behind `dyn` the elements are compared as they run: numbers of two types may be equal.

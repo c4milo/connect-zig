@@ -4,6 +4,7 @@
 const std = @import("std");
 const testing = std.testing;
 const proto = @import("protobuf.zig");
+const support = @import("test_support.zig");
 const Repeated = proto.Repeated;
 const Lazy = proto.Lazy;
 
@@ -108,7 +109,7 @@ test "the encoding guide's Test1 with a = 150 is 08 96 01" {
     var buffer: [8]u8 = undefined;
     const bytes = try proto.encode(Test1, &.{ .a = 150 }, &buffer);
     try testing.expectEqualSlices(u8, &.{ 0x08, 0x96, 0x01 }, bytes);
-    try testing.expectEqual(@as(i32, 150), (try proto.decode(Test1, bytes)).a);
+    try testing.expectEqual(@as(i32, 150), (try support.decoder.decode(Test1, bytes)).a);
     try testing.expectEqual(@as(usize, 0), try proto.encoded_len(Test1, &.{}));
 }
 
@@ -138,7 +139,7 @@ test "every kind round-trips, and a decoded message encodes to the same bytes" {
     var buffer: [512]u8 = undefined;
     const bytes = try proto.encode(All, &all, &buffer);
     try testing.expectEqual(bytes.len, try proto.encoded_len(All, &all));
-    const back = try proto.decode(All, bytes);
+    const back = try support.decoder.decode(All, bytes);
     try testing.expectEqual(all.int32_field, back.int32_field);
     try testing.expectEqual(all.uint64_field, back.uint64_field);
     try testing.expectEqual(all.sint32_field, back.sint32_field);
@@ -159,7 +160,7 @@ test "every kind round-trips, and a decoded message encodes to the same bytes" {
 test "packed and unpacked input decode alike, and each form is written as its field says" {
     // Field 14 packed {1, 2}, then field 14 unpacked 3; field 15 packed {4}.
     const bytes = [_]u8{ 0x72, 0x02, 0x01, 0x02, 0x70, 0x03, 0x7a, 0x01, 0x04 };
-    const all = try proto.decode(All, &bytes);
+    const all = try support.decoder.decode(All, &bytes);
     var numbers = all.numbers.iterator();
     for ([_]i32{ 1, 2, 3 }) |want| try testing.expectEqual(want, (try numbers.next()).?);
     var buffer: [32]u8 = undefined;
@@ -178,7 +179,7 @@ test "a scalar keeps its last value, a message merges, and a oneof keeps its las
         0x92, 0x01, 0x01, 'n', // name "n"
         0x98, 0x01, 0x04, // number 4
     };
-    const all = try proto.decode(All, &bytes);
+    const all = try support.decoder.decode(All, &bytes);
     try testing.expectEqual(@as(i32, 6), all.int32_field);
     try testing.expectEqual(@as(i32, 1), all.inner.?.a);
     try testing.expectEqual(@as(i32, 4), all.choice.?.number);
@@ -186,17 +187,17 @@ test "a scalar keeps its last value, a message merges, and a oneof keeps its las
 
 test "a repeated field inside a message that occurs twice is refused, not silently cut" {
     const bytes = [_]u8{ 0x6a, 0x03, 0x12, 0x01, 'a', 0x6a, 0x03, 0x12, 0x01, 'b' };
-    try testing.expectError(error.MergeUnsupported, proto.decode(All, &bytes));
+    try testing.expectError(error.MergeUnsupported, support.decoder.decode(All, &bytes));
 }
 
 test "unknown fields and groups are skipped, and bad strings and wire types are refused" {
     // Field 99 varint, field 98 group with a varint inside, then int32_field 1.
     const bytes = [_]u8{ 0x98, 0x06, 0x01, 0x93, 0x06, 0x08, 0x01, 0x94, 0x06, 0x08, 0x01 };
-    try testing.expectEqual(@as(i32, 1), (try proto.decode(All, &bytes)).int32_field);
-    try testing.expectError(error.InvalidUtf8, proto.decode(All, &.{ 0x4a, 0x01, 0xc0 }));
-    try testing.expectError(error.WireTypeMismatch, proto.decode(All, &.{ 0x0d, 0, 0, 0, 0 }));
-    try testing.expectError(error.LengthTooLarge, proto.decode(All, &.{ 0x4a, 0x05, 'a' }));
-    try testing.expectError(error.Truncated, proto.decode(All, &.{ 0x08, 0x80 }));
+    try testing.expectEqual(@as(i32, 1), (try support.decoder.decode(All, &bytes)).int32_field);
+    try testing.expectError(error.InvalidUtf8, support.decoder.decode(All, &.{ 0x4a, 0x01, 0xc0 }));
+    try testing.expectError(error.WireTypeMismatch, support.decoder.decode(All, &.{ 0x0d, 0, 0, 0, 0 }));
+    try testing.expectError(error.LengthTooLarge, support.decoder.decode(All, &.{ 0x4a, 0x05, 'a' }));
+    try testing.expectError(error.Truncated, support.decoder.decode(All, &.{ 0x08, 0x80 }));
 }
 
 test "messages nested past the depth limit are refused" {
@@ -223,15 +224,15 @@ test "messages nested past the depth limit are refused" {
     const nested = helpers.nested;
     var buffer: [512]u8 = undefined;
     const deep = nested(&buffer, proto.constants.limits.depth_max);
-    try testing.expectError(error.DepthExceeded, proto.decode(Node, deep));
+    try testing.expectError(error.DepthExceeded, support.decoder.decode(Node, deep));
     const shallow = nested(&buffer, proto.constants.limits.depth_max - 2);
-    _ = try proto.decode(Node, shallow);
+    _ = try support.decoder.decode(Node, shallow);
 }
 
 test "a oneof message member that repeats merges into the one already set" {
     // sub { a: 3 }, then sub {} merges and keeps a; field 20 is 0xa2 0x01.
     const bytes = [_]u8{ 0xa2, 0x01, 0x02, 0x08, 0x03, 0xa2, 0x01, 0x00 };
-    const all = try proto.decode(All, &bytes);
+    const all = try support.decoder.decode(All, &bytes);
     try testing.expectEqual(@as(i32, 3), all.choice.?.sub.a);
 }
 
@@ -249,12 +250,12 @@ test "a oneof's Lazy member that repeats is refused, as a Lazy field's second re
     // node { value: 3 }, then node {}. The two payloads lie apart in the input, so no one view
     // holds them, and the first must not vanish (decision 6).
     const twice = [_]u8{ 0x0a, 0x02, 0x08, 0x03, 0x0a, 0x00 };
-    try testing.expectError(error.MergeUnsupported, proto.decode(Pick, &twice));
+    try testing.expectError(error.MergeUnsupported, support.decoder.decode(Pick, &twice));
     var storage: [256]u8 align(16) = undefined;
-    try testing.expectError(error.MergeUnsupported, proto.decode_into(Pick, &twice, &storage));
+    try testing.expectError(error.MergeUnsupported, support.decoder.decode_into(Pick, &twice, &storage));
     // Another member between them: the oneof's last member wins, and the second node is it.
     const apart = [_]u8{ 0x0a, 0x02, 0x08, 0x03, 0x12, 0x01, 'x', 0x0a, 0x02, 0x08, 0x05 };
-    const pick = try proto.decode(Pick, &apart);
+    const pick = try support.decoder.decode(Pick, &apart);
     try testing.expectEqual(@as(i64, 5), (try pick.pick.?.node.get()).?.value);
 }
 
@@ -275,7 +276,7 @@ test "a nested message encodes alike into a roomy buffer and into one of its exa
 test "decode checks every level, and get reads one level and leaves the next to its own get" {
     // next { next { <a tag with no value> } }
     const malformed = [_]u8{ 0x12, 3, 0x12, 1, 0x08 };
-    try testing.expectError(error.Truncated, proto.decode(Node, &malformed));
+    try testing.expectError(error.Truncated, support.decoder.decode(Node, &malformed));
     // Bytes a program set itself fail at the level that holds the fault, when it is read.
     const lazy: Lazy(Node) = .{ .bytes = malformed[2..] };
     const level = (try lazy.get()).?;
@@ -307,7 +308,7 @@ test "a map entry writes its key and value even at their defaults, as Go and C++
 test "a decoded repeated field's view holds its own records, not the whole message" {
     const all: All = .{ .int32_field = 5, .numbers = .of(&.{ 1, 2 }), .choice = .{ .name = "x" } };
     var buffer: [64]u8 = undefined;
-    const decoded = try proto.decode(All, try proto.encode(All, &all, &buffer));
+    const decoded = try support.decoder.decode(All, try proto.encode(All, &all, &buffer));
     // Field 14 packed (72), length 2, then 1 and 2: the int32 before it and the name after it
     // are not in the view, so reading it scans its records alone.
     try testing.expectEqualSlices(u8, &.{ 0x72, 2, 1, 2 }, decoded.numbers.view.bytes);

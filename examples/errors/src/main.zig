@@ -48,6 +48,8 @@ const zero_options = [_]connect.client.Options{
 /// each call until its round ends, so the calls live here.
 const State = struct {
     app: App,
+    /// Decodes the detail of an error, with the CPU features the program detected once.
+    protobuf_decoder: proto.Decoder,
     rounds: harness.Rounds(App, Router),
     by_zero: [zero_options.len]DivideCall,
     by_two: DivideCall,
@@ -61,6 +63,7 @@ pub fn main(init: std.process.Init) !void {
         return error.OutOfMemory;
     const state: *State = @ptrCast(@alignCast(state_memory));
     state.app = .{};
+    state.protobuf_decoder = .init(.detect());
     try state.rounds.init(&state.app);
     defer state.rounds.deinit();
     try round(state, .{ .h11 = false, .h3 = false }, .h2);
@@ -99,7 +102,7 @@ fn expect_detail(state: *State, by_zero: *const DivideCall, protocol: connect.Pr
     const detail = failure.details[0];
     // A detail names its message type, so a client decodes only the details it knows.
     if (!std.mem.eql(u8, detail.type_name, errors.DivisionByZero.protobuf.full_name)) return error.CallWrong;
-    const decoded = try proto.decode(errors.DivisionByZero, detail.value);
+    const decoded = try state.protobuf_decoder.decode(errors.DivisionByZero, detail.value);
     if (decoded.dividend != constants.dividend) return error.CallWrong;
     std.debug.print("errors: over {s}: {s}: {s}, detail {s}{{ dividend: {d} }}\n", .{
         @tagName(protocol), failure.code.name(), failure.message, detail.type_name, decoded.dividend,

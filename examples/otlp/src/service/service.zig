@@ -41,7 +41,9 @@ pub fn Service(comptime App: type) type {
         }
 
         pub fn received(app: *App, _: *rpc.Context, _: *const rpc.Request(otlpstore.ReceivedRequest), response: *rpc.Response(otlp.ExportTraceServiceRequest)) ?connect.RpcError {
-            return received_in(&app.otlp, response);
+            // The program's CPU features, which it set in its codings once, as it started.
+            const decoder: proto.Decoder = .init(app.codings.decoders.cpu_features);
+            return received_in(&app.otlp, &decoder, response);
         }
     };
 }
@@ -62,9 +64,9 @@ fn export_in(room: *Room, request: *const rpc.Request(otlp.ExportTraceServiceReq
 }
 
 /// Answers with every request `Export` kept, as one request.
-fn received_in(room: *Room, response: *rpc.Response(otlp.ExportTraceServiceRequest)) ?connect.RpcError {
+fn received_in(room: *Room, decoder: *const proto.Decoder, response: *rpc.Response(otlp.ExportTraceServiceRequest)) ?connect.RpcError {
     std.debug.assert(room.kept_len <= constants.kept_len_max);
-    response.message = proto.decode(otlp.ExportTraceServiceRequest, room.kept[0..room.kept_len]) catch {
+    response.message = decoder.decode(otlp.ExportTraceServiceRequest, room.kept[0..room.kept_len]) catch {
         return .{ .code = .internal, .message = "the kept requests do not decode" };
     };
     return null;

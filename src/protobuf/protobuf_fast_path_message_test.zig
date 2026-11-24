@@ -10,6 +10,7 @@
 const std = @import("std");
 const testing = std.testing;
 const proto = @import("protobuf.zig");
+const support = @import("test_support.zig");
 const harness = @import("protobuf_fast_path_test.zig");
 const constants = @import("constants.zig");
 const Repeated = proto.Repeated;
@@ -279,7 +280,7 @@ fn decode_name(name: []const u8) !Names {
     const json_text = try std.fmt.bufPrint(&text, "{{\"{s}\":{d}}}", .{ name, member_value });
     var binary: [name_text_len_max]u8 = @splat(0);
     var tokens: [name_text_len_max]u8 = @splat(0);
-    return proto.decode_json(Names, json_text, &binary, &tokens);
+    return support.decoder.decode_json(Names, json_text, &binary, &tokens);
 }
 
 /// The name decodes into its field alone; with any octet changed, one cut or one added, it

@@ -8,6 +8,10 @@
 //! three. A refusal to read is a `parse_error`, and a refusal to write a `serialize_error`.
 const std = @import("std");
 const proto = @import("protobuf");
+/// A check program decodes and encodes with the build target's CPU features: it runs on the
+/// machine it was built for, and a library takes the features its program detected.
+const protobuf_decoder: proto.Decoder = .init(.target());
+const protobuf_encoder: proto.Encoder = .init(.target());
 const pb = @import("conformance_pb");
 const proto3 = @import("test_messages_proto3");
 const proto2 = @import("test_messages_proto2");
@@ -86,7 +90,7 @@ fn read_request(state: *State, reader: *std.Io.Reader) !?[]const u8 {
 }
 
 fn respond(state: *State, bytes: []const u8) Result {
-    const request = proto.decode(pb.ConformanceRequest, bytes) catch |failure| return .{ .runtime_error = @errorName(failure) };
+    const request = protobuf_decoder.decode(pb.ConformanceRequest, bytes) catch |failure| return .{ .runtime_error = @errorName(failure) };
     // The failure list file holds the tests expected to fail, so the set here is empty.
     if (std.mem.eql(u8, request.message_type, failure_set_name)) return .{ .protobuf_payload = "" };
     inline for (messages) |T| {
@@ -99,13 +103,13 @@ fn respond(state: *State, bytes: []const u8) Result {
 fn convert(comptime T: type, state: *State, request: *const pb.ConformanceRequest) Result {
     const payload = request.payload orelse return .{ .runtime_error = "the request holds no payload" };
     const message = switch (payload) {
-        .protobuf_payload => |binary| proto.decode(T, binary) catch |failure| return .{ .parse_error = @errorName(failure) },
+        .protobuf_payload => |binary| protobuf_decoder.decode(T, binary) catch |failure| return .{ .parse_error = @errorName(failure) },
         .json_payload => |text| read_json(T, state, request, text) catch |failure| return failure_of(failure),
         .jspb_payload, .text_payload => return .{ .skipped = "the program reads binary and JSON alone" },
     };
     return switch (request.requested_output_format) {
         .protobuf_ => .{ .protobuf_payload = proto.encode(T, &message, &state.output) catch |failure| return .{ .serialize_error = @errorName(failure) } },
-        .json => .{ .json_payload = proto.encode_json(T, &message, &state.output) catch |failure| return .{ .serialize_error = @errorName(failure) } },
+        .json => .{ .json_payload = protobuf_encoder.encode_json(T, &message, &state.output) catch |failure| return .{ .serialize_error = @errorName(failure) } },
         else => .{ .skipped = "the program writes binary and JSON alone" },
     };
 }
@@ -114,7 +118,7 @@ fn read_json(comptime T: type, state: *State, request: *const pb.ConformanceRequ
     // connect-zig's JSON decoder refuses a member the message does not name, and has no option
     // to pass over it.
     if (request.test_category == .json_ignore_unknown_parsing_test) return error.IgnoreUnknownAsked;
-    return proto.decode_json(T, text, &state.transcoded, &state.tokens);
+    return protobuf_decoder.decode_json(T, text, &state.transcoded, &state.tokens);
 }
 
 fn failure_of(failure: JsonReadError) Result {

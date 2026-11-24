@@ -3,6 +3,10 @@
 const std = @import("std");
 const testing = std.testing;
 const proto = @import("protobuf");
+/// The tests decode and encode with the build target's CPU features.
+/// machine it was built for, and a library takes the features its program detected.
+const protobuf_decoder: proto.Decoder = .init(.target());
+const protobuf_encoder: proto.Encoder = .init(.target());
 const kitchen = @import("kitchen");
 const eliza = @import("eliza");
 const large = @import("large");
@@ -32,15 +36,15 @@ test "a generated message with every shape round-trips through binary and JSON" 
     };
     var binary: [1024]u8 = undefined;
     const bytes = try proto.encode(kitchen.Tree, &tree, &binary);
-    const back = try proto.decode(kitchen.Tree, bytes);
+    const back = try protobuf_decoder.decode(kitchen.Tree, bytes);
     try testing.expectEqualStrings("root", (try back.parent.get()).?.name);
     try testing.expectEqual(@as(i64, -9), back.payload.?.scalars.a_sint64);
     try testing.expectEqualStrings("seven", (try proto.map_get(@TypeOf(back.labels), &back.labels, @as(i32, 7))).?);
     var text: [1024]u8 = undefined;
-    const json = try proto.encode_json(kitchen.Tree, &back, &text);
+    const json = try protobuf_encoder.encode_json(kitchen.Tree, &back, &text);
     var scratch: [2048]u8 = undefined;
     var tokens: [256]u8 = undefined;
-    const from_json = try proto.decode_json(kitchen.Tree, json, &scratch, &tokens);
+    const from_json = try protobuf_decoder.decode_json(kitchen.Tree, json, &scratch, &tokens);
     try testing.expectEqual(kitchen.Mood.mood_sad, from_json.payload.?.scalars.mood);
     var leaves = from_json.leaves.iterator();
     try testing.expectEqualStrings("t", (try leaves.next()).?.tag.?.value);
@@ -51,7 +55,7 @@ test "a split file's pieces name each other, and round-trip as one file would" {
     const owner: large.Account = .{ .field_80 = 80, .profile = .{ .display_name = "Ada", .visibility = .visibility_public }, .tag = .{ .value = "t" } };
     const ledger: large.Ledger = .{ .field_1 = -1, .owner = owner, .visibility = .visibility_public, .children = .of(&.{.{ .field_2 = 2 }}) };
     var binary: [1024]u8 = undefined;
-    const back = try proto.decode(large.Ledger, try proto.encode(large.Ledger, &ledger, &binary));
+    const back = try protobuf_decoder.decode(large.Ledger, try proto.encode(large.Ledger, &ledger, &binary));
     try testing.expectEqualStrings("Ada", back.owner.?.profile.?.display_name);
     try testing.expectEqual(large.Account.Profile.Visibility.visibility_public, back.visibility);
     try testing.expectEqualStrings("t", back.owner.?.tag.?.value);
@@ -72,16 +76,16 @@ test "a message of 1,200 fields round-trips through binary and JSON" {
     var binary: [wide_room]u8 = undefined;
     const bytes = try proto.encode(wide.Wide, &message, &binary);
     try testing.expectEqual(bytes.len, try proto.encoded_len(wide.Wide, &message));
-    const back = try proto.decode(wide.Wide, bytes);
+    const back = try protobuf_decoder.decode(wide.Wide, bytes);
     try testing.expectEqual(@as(i32, 1), back.f1);
     try testing.expectEqualStrings("last text", back.f598);
     try testing.expectEqualStrings("end", back.f600.?.name);
     var text: [wide_room]u8 = undefined;
-    const json = try proto.encode_json(wide.Wide, &back, &text);
+    const json = try protobuf_encoder.encode_json(wide.Wide, &back, &text);
     try testing.expectEqualStrings("{\"f1\":1,\"f2\":\"ab\",\"f299\":[1,0],\"f597\":1,\"f598\":\"last text\",\"f600\":{\"name\":\"end\"}}", json);
     var scratch: [wide_room]u8 = undefined;
     var tokens: [wide_room]u8 = undefined;
-    const again = try proto.decode_json(wide.Wide, json, &scratch, &tokens);
+    const again = try protobuf_decoder.decode_json(wide.Wide, json, &scratch, &tokens);
     try testing.expectEqual(@as(i32, 1), again.f597);
     var elements = again.f299.iterator();
     try testing.expectEqual(@as(?i32, 1), try elements.next());
@@ -120,10 +124,10 @@ test "a message of 1,100 repeated and map fields round-trips and is checked agai
     const message: wide.Lists = .{ .f1 = .of(&.{ 1, 2 }), .f1098 = .of(&.{"last"}), .f1099 = .of(&.{leaf}), .f1100 = .of(&.{.{ .key = "k", .value = 7 }}) };
     var binary: [wide_room]u8 = undefined;
     const bytes = try proto.encode(wide.Lists, &message, &binary);
-    const back = try proto.decode(wide.Lists, bytes);
+    const back = try protobuf_decoder.decode(wide.Lists, bytes);
     try testing.expectEqual(@as(?i32, 7), try proto.map_get(@TypeOf(back.f1100), &back.f1100, "k"));
     var text: [wide_room]u8 = undefined;
-    const json = try proto.encode_json(wide.Lists, &back, &text);
+    const json = try protobuf_encoder.encode_json(wide.Lists, &back, &text);
     try testing.expectEqualStrings("{\"f1\":[1,2],\"f1098\":[\"last\"],\"f1099\":[{\"name\":\"end\"}],\"f1100\":{\"k\":7}}", json);
 
     try testing.expect(comptime protovalidate.rules_error(wide.Lists) == null);

@@ -3,6 +3,7 @@
 const std = @import("std");
 const testing = std.testing;
 const proto = @import("protobuf.zig");
+const support = @import("test_support.zig");
 const Inner = @import("protobuf_test.zig").Inner;
 
 const Grouped = struct {
@@ -29,7 +30,7 @@ test "a group is written between its tags, with no length" {
 
 test "a group reads back, its repeated form too, and a field after it" {
     const encoded = [_]u8{ 0x0b, 0x08, 5, 0x0c, 0x13, 0x08, 1, 0x14, 0x13, 0x08, 2, 0x14, 0x18, 7 };
-    const message = try proto.decode(Grouped, &encoded);
+    const message = try support.decoder.decode(Grouped, &encoded);
     try testing.expectEqual(@as(i32, 5), message.item.?.a);
     var items = message.items.iterator();
     try testing.expectEqual(@as(i32, 1), (try items.next()).?.a);
@@ -40,10 +41,10 @@ test "a group reads back, its repeated form too, and a field after it" {
 
 test "a group whose end tag names another field, or that never ends, is refused" {
     // "Groups": the end tag carries the group's own field number.
-    try testing.expectError(error.GroupMismatch, proto.decode(Grouped, &.{ 0x0b, 0x08, 5, 0x14 }));
-    try testing.expectError(error.Truncated, proto.decode(Grouped, &.{ 0x0b, 0x08, 5 }));
+    try testing.expectError(error.GroupMismatch, support.decoder.decode(Grouped, &.{ 0x0b, 0x08, 5, 0x14 }));
+    try testing.expectError(error.Truncated, support.decoder.decode(Grouped, &.{ 0x0b, 0x08, 5 }));
     // A group field sent with a length is not the field's wire type.
-    try testing.expectError(error.WireTypeMismatch, proto.decode(Grouped, &.{ 0x0a, 2, 0x08, 5 }));
+    try testing.expectError(error.WireTypeMismatch, support.decoder.decode(Grouped, &.{ 0x0a, 2, 0x08, 5 }));
 }
 
 test "a group is an object in JSON" {
@@ -51,9 +52,9 @@ test "a group is an object in JSON" {
     const text = "{\"item\":{\"a\":5},\"items\":[{\"a\":1},{\"a\":2}],\"after\":7}";
     var binary: [128]u8 = undefined;
     var tokens: [64]u8 = undefined;
-    const message = try proto.decode_json(Grouped, text, &binary, &tokens);
+    const message = try support.decoder.decode_json(Grouped, text, &binary, &tokens);
     var out: [128]u8 = undefined;
-    try testing.expectEqualStrings(text, try proto.encode_json(Grouped, &message, &out));
+    try testing.expectEqualStrings(text, try support.encoder.encode_json(Grouped, &message, &out));
     var again: [64]u8 = undefined;
     try testing.expectEqualSlices(u8, &encoded, try proto.encode(Grouped, &message, &again));
 }

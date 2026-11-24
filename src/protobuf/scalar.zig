@@ -12,8 +12,10 @@ const json = @import("json");
 const platform = @import("platform");
 const Kind = descriptor.Kind;
 
-/// Reads one value of `kind` as `V`. The caller checked the wire type.
-pub fn read(comptime kind: Kind, comptime V: type, reader: *wire.Reader) wire.Error!V {
+/// Reads one value of `kind` as `V`. The caller checked the wire type. A string is checked for
+/// UTF-8 with `string_check`, the program's CPU features, or not at all when it is null: bytes a
+/// decode already checked, which a repeated field's iterator and `Lazy.get` read again.
+pub fn read(comptime kind: Kind, comptime V: type, reader: *wire.Reader, string_check: ?*const platform.CpuFeatures) wire.Error!V {
     comptime assert(!kind.holds_message());
     return switch (kind) {
         .int32, .uint32, .int64, .uint64, .sint32, .sint64, .bool, .@"enum" => from_varint(kind, V, try reader.varint()),
@@ -24,29 +26,31 @@ pub fn read(comptime kind: Kind, comptime V: type, reader: *wire.Reader) wire.Er
         .sfixed64 => @bitCast(try reader.fixed64()),
         .double => @bitCast(try reader.fixed64()),
         .bytes => try reader.length_delimited(),
-        .string => try read_string(reader),
+        .string => try read_string(reader, string_check),
         // Editions, "utf8_validation": NONE leaves the octets unchecked.
         .unvalidated_string => try reader.length_delimited(),
         .message, .group => unreachable,
     };
 }
 
-fn read_string(reader: *wire.Reader) wire.Error![]const u8 {
+fn read_string(reader: *wire.Reader, string_check: ?*const platform.CpuFeatures) wire.Error![]const u8 {
     const octets = try reader.length_delimited();
+    const cpu_features = string_check orelse return octets;
     // Language guide, "Scalar Value Types": a string must always contain UTF-8.
-    if (!is_utf8(octets)) return error.InvalidUtf8;
+    if (!is_utf8(octets, cpu_features.*)) return error.InvalidUtf8;
     return octets;
 }
 
 /// Whether `octets` is UTF-8 (RFC 3629 §4): stdx's vector check for a long string. A short one,
 /// where the vector path costs more than it saves, is checked for ASCII a word at a time, and
-/// only text that is not ASCII goes to the standard library's check.
-pub fn is_utf8(octets: []const u8) bool {
+/// only text that is not ASCII goes to the standard library's check. The vector check runs with
+/// the program's CPU features, `cpu_features`.
+pub fn is_utf8(octets: []const u8, cpu_features: platform.CpuFeatures) bool {
     if (octets.len < constants.limits.utf8_vector_len_min) {
         if (is_ascii_short(octets)) return true;
         return std.unicode.utf8ValidateSlice(octets);
     }
-    return json.is_utf8(octets, platform.CpuFeatures.target());
+    return json.is_utf8(octets, cpu_features);
 }
 
 /// The bit no ASCII octet sets: an octet below 0x80 is a character alone (RFC 3629 §3).
@@ -150,6 +154,7 @@ pub fn is_default(comptime V: type, value: V) bool {
 }
 
 const testing = std.testing;
+const support = @import("test_support.zig");
 
 test "a negative int32 takes ten bytes and reads back" {
     var buffer: [16]u8 = undefined;
@@ -158,7 +163,7 @@ test "a negative int32 takes ten bytes and reads back" {
     try testing.expectEqual(@as(usize, 10), writer.len);
     try testing.expectEqual(@as(usize, 10), len(.int32, i32, -1));
     var reader: wire.Reader = .{ .bytes = writer.written() };
-    try testing.expectEqual(@as(i32, -1), try read(.int32, i32, &reader));
+    try testing.expectEqual(@as(i32, -1), try read(.int32, i32, &reader, &support.cpu_features));
 }
 
 test "sint32 zigzags, and a string that is not UTF-8 is refused" {
@@ -167,16 +172,22 @@ test "sint32 zigzags, and a string that is not UTF-8 is refused" {
     try write(.sint32, i32, -2, &writer);
     try testing.expectEqualSlices(u8, &.{0x03}, writer.written());
     var reader: wire.Reader = .{ .bytes = writer.written() };
-    try testing.expectEqual(@as(i32, -2), try read(.sint32, i32, &reader));
+    try testing.expectEqual(@as(i32, -2), try read(.sint32, i32, &reader, &support.cpu_features));
     // A sint32 decodes from the varint's low 32 bits, whatever the bits above them hold.
     var wide_writer: wire.Writer = .{ .buffer = &buffer };
     // Bit 32 shifts into bit 31 if zigzag ran before the truncation.
     const high_bits: u64 = 1 << 32;
     try wide_writer.varint(high_bits | 0x03);
     var wide: wire.Reader = .{ .bytes = wide_writer.written() };
-    try testing.expectEqual(@as(i32, -2), try read(.sint32, i32, &wide));
+    try testing.expectEqual(@as(i32, -2), try read(.sint32, i32, &wide, &support.cpu_features));
     var bad: wire.Reader = .{ .bytes = &.{ 0x01, 0xff } };
-    try testing.expectError(error.InvalidUtf8, read(.string, []const u8, &bad));
+    try testing.expectError(error.InvalidUtf8, read(.string, []const u8, &bad, &support.cpu_features));
+}
+
+test "a string a decode already checked is read with no check" {
+    // A repeated field's iterator and `Lazy.get` read such bytes (`decode.Mode.shallow`).
+    var checked: wire.Reader = .{ .bytes = &.{ 0x01, 0xff } };
+    try testing.expectEqualSlices(u8, &.{0xff}, try read(.string, []const u8, &checked, null));
 }
 
 test "a string is checked as UTF-8 on both paths, short and long" {
@@ -185,16 +196,16 @@ test "a string is checked as UTF-8 on both paths, short and long" {
     // "ñ" in the middle of a long string, and in a short one.
     text[long_len / 2] = 0xc3;
     text[long_len / 2 + 1] = 0xb1;
-    try testing.expect(is_utf8(&text));
-    try testing.expect(is_utf8(text[long_len / 2 - 1 ..][0..4]));
+    try testing.expect(is_utf8(&text, support.cpu_features));
+    try testing.expect(is_utf8(text[long_len / 2 - 1 ..][0..4], support.cpu_features));
     // A lone continuation octet fails both.
     text[long_len / 2] = 0xb1;
-    try testing.expect(!is_utf8(&text));
-    try testing.expect(!is_utf8(text[long_len / 2 - 1 ..][0..4]));
+    try testing.expect(!is_utf8(&text, support.cpu_features));
+    try testing.expect(!is_utf8(text[long_len / 2 - 1 ..][0..4], support.cpu_features));
     // An overlong form, which UTF-8 forbids (RFC 3629 §3), fails the long path too.
     text[long_len - 2] = 0xc0;
     text[long_len - 1] = 0x80;
-    try testing.expect(!is_utf8(text[long_len - constants.limits.utf8_vector_len_min ..]));
+    try testing.expect(!is_utf8(text[long_len - constants.limits.utf8_vector_len_min ..], support.cpu_features));
 }
 
 test "defaults: +0.0 is default and -0.0 is not" {

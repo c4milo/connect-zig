@@ -44,7 +44,7 @@ pub const Messages = struct {
     /// storage, which the next call overwrites.
     pub fn next(messages: *Messages, comptime T: type) Error!?T {
         const octets = try messages.next_octets() orelse return null;
-        return try message_codec.decode(T, messages.accepted.speaks.codec, octets, messages.scratch);
+        return try message_codec.decode(T, messages.accepted.speaks.codec, octets, messages.scratch, messages.decoders.cpu_features);
     }
 
     fn next_octets(messages: *Messages) Error!?[]const u8 {

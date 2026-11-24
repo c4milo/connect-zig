@@ -2,6 +2,7 @@
 const std = @import("std");
 const assert = std.debug.assert;
 const proto = @import("protobuf");
+const platform = @import("platform");
 const protocol = @import("protocol.zig");
 const compression = @import("compression.zig");
 const Codec = protocol.Codec;
@@ -26,27 +27,35 @@ pub const Scratch = struct {
 pub const EncodeError = proto.EncodeError || proto.JsonEncodeError;
 pub const DecodeError = proto.Error || proto.JsonDecodeError;
 
-pub fn encode(comptime T: type, codec: Codec, message: *const T, buffer: []u8) EncodeError![]const u8 {
+/// Encodes `message` in `codec`. JSON is written with the program's CPU features, which the
+/// server and the client keep in their `Encoders`.
+pub fn encode(comptime T: type, codec: Codec, message: *const T, buffer: []u8, cpu_features: platform.CpuFeatures) EncodeError![]const u8 {
     return switch (codec) {
         .proto => proto.encode(T, message, buffer),
-        .json => proto.encode_json(T, message, buffer),
+        .json => {
+            const encoder: proto.Encoder = .init(cpu_features);
+            return encoder.encode_json(T, message, buffer);
+        },
     };
 }
 
 /// Decodes `octets`. A JSON message's strings point into `scratch.work`, a binary one's into
-/// `octets`, and its repeated fields into `scratch.storage` while it has room.
-pub fn decode(comptime T: type, codec: Codec, octets: []const u8, scratch: Scratch) DecodeError!T {
+/// `octets`, and its repeated fields into `scratch.storage` while it has room. The decode checks
+/// its input with the program's CPU features, which the server and the client keep in their
+/// `Decoders`.
+pub fn decode(comptime T: type, codec: Codec, octets: []const u8, scratch: Scratch, cpu_features: platform.CpuFeatures) DecodeError!T {
+    const decoder: proto.Decoder = .init(cpu_features);
     return switch (codec) {
-        .proto => if (scratch.storage.len == 0) proto.decode(T, octets) else decode_stored(T, octets, scratch),
-        .json => proto.decode_json(T, octets, scratch.work, scratch.tokens),
+        .proto => if (scratch.storage.len == 0) decoder.decode(T, octets) else decode_stored(T, &decoder, octets, scratch),
+        .json => decoder.decode_json(T, octets, scratch.work, scratch.tokens),
     };
 }
 
 /// Decodes a binary message into `scratch.storage`, and counts it in `scratch.storage_short` when
 /// a field found no room there.
-fn decode_stored(comptime T: type, octets: []const u8, scratch: Scratch) proto.Error!T {
+fn decode_stored(comptime T: type, decoder: *const proto.Decoder, octets: []const u8, scratch: Scratch) proto.Error!T {
     var use: proto.StorageUse = .{};
-    const message = try proto.decode_into_use(T, octets, scratch.storage, &use);
+    const message = try decoder.decode_into_use(T, octets, scratch.storage, &use);
     if (use.short) {
         if (scratch.storage_short) |count| count.* += 1;
     }
@@ -83,7 +92,7 @@ pub const Body = enum { plain, compressed };
 /// Encodes `message` into `scratch.message`, then compresses it into `scratch.work` as `compress`
 /// decides.
 pub fn prepare(comptime T: type, codec: Codec, coding: compression.Coding, encoders: *const compression.Encoders, message: *const T, scratch: Scratch) EncodeError!Prepared {
-    const octets = try encode(T, codec, message, scratch.message);
+    const octets = try encode(T, codec, message, scratch.message, encoders.cpu_features);
     return compress(coding, encoders, octets, scratch.work);
 }
 
@@ -109,6 +118,7 @@ pub fn compress_request(coding: compression.Coding, encoders: *const compression
 }
 
 const testing = std.testing;
+const test_cpu_features = @import("codec_test_support.zig").cpu_features;
 
 test "gzip is used only when it shrinks the message" {
     var encoder: compression.GzipEncoder = undefined;
@@ -159,11 +169,11 @@ test "a binary message's repeated fields go into the scratch's storage, and stay
     const encoded = try proto.encode(Bag, &.{ .numbers = .of(&numbers) }, &octets);
     var storage: [compress_len_min]u8 align(@alignOf(u64)) = undefined;
     const scratch: Scratch = .{ .message = &.{}, .work = &.{}, .tokens = &.{}, .storage = &storage };
-    const stored = try decode(Bag, .proto, encoded, scratch);
+    const stored = try decode(Bag, .proto, encoded, scratch, test_cpu_features);
     try testing.expectEqualSlices(u32, &numbers, stored.numbers.items);
     var none = scratch;
     none.storage = &.{};
-    const kept = try decode(Bag, .proto, encoded, none);
+    const kept = try decode(Bag, .proto, encoded, none, test_cpu_features);
     try testing.expectEqual(@as(usize, 0), kept.numbers.items.len);
     try testing.expectEqual(numbers.len, try kept.numbers.count());
 }
@@ -175,15 +185,15 @@ test "a binary message whose repeated fields do not fit the storage is counted, 
     var storage: [compress_len_min]u8 align(@alignOf(u64)) = undefined;
     var short: u64 = 0;
     var scratch: Scratch = .{ .message = &.{}, .work = &.{}, .tokens = &.{}, .storage = &storage, .storage_short = &short };
-    _ = try decode(Bag, .proto, encoded, scratch);
+    _ = try decode(Bag, .proto, encoded, scratch, test_cpu_features);
     try testing.expectEqual(@as(u64, 0), short);
     // Room for two of the three numbers.
     scratch.storage = storage[0 .. 2 * @sizeOf(u32)];
-    const kept = try decode(Bag, .proto, encoded, scratch);
+    const kept = try decode(Bag, .proto, encoded, scratch, test_cpu_features);
     try testing.expectEqual(@as(u64, 1), short);
     try testing.expectEqual(numbers.len, try kept.numbers.count());
     // A scratch with no storage keeps the fields in the message by choice, so none is counted.
     scratch.storage = &.{};
-    _ = try decode(Bag, .proto, encoded, scratch);
+    _ = try decode(Bag, .proto, encoded, scratch, test_cpu_features);
     try testing.expectEqual(@as(u64, 1), short);
 }

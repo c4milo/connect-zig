@@ -5,6 +5,8 @@ const testing = std.testing;
 /// The build target's CPU features, which `matches` searches with in the tests.
 const testing_cpu_features = @import("platform").CpuFeatures.target();
 const proto = @import("protobuf");
+/// The tests decode and encode with the build target's CPU features.
+const protobuf_decoder: proto.Decoder = .init(.target());
 const program = @import("cel_program.zig");
 const type_file = @import("cel_type.zig");
 const Scope = type_file.Scope;
@@ -100,7 +102,7 @@ test "two maps are equal when they hold the same keys with equal values" {
     try expect_true("this.counts == {'a': 1, 'b': 2} && {'b': 2, 'a': 1} == this.counts && this.counts != {'a': 1, 'b': 4}", &sample);
     try expect_true("this.counts == this.counts && this.counts != {'a': 1}", &sample);
     var octets: [encoded_len_max]u8 = undefined;
-    const viewed = try proto.decode(Message, try proto.encode(Message, &sample, &octets));
+    const viewed = try protobuf_decoder.decode(Message, try proto.encode(Message, &sample, &octets));
     try testing.expect(viewed.counts.items.len == 0 and viewed.counts.view.bytes.len != 0);
     try expect_true("this.counts == {'a': 1, 'b': 2} && this.counts != {'a': 1, 'b': 4}", &viewed);
     // Behind `dyn` the keys and the values are compared as they run.

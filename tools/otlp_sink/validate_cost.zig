@@ -12,6 +12,9 @@
 //! file and the clock through `init.io`.
 const std = @import("std");
 const proto = @import("protobuf");
+/// A check program decodes and encodes with the build target's CPU features: it runs on the
+/// machine it was built for, and a library takes the features its program detected.
+const protobuf_decoder: proto.Decoder = .init(.target());
 const protovalidate = @import("protovalidate");
 const otlp = @import("otlp");
 const platform = @import("platform");
@@ -54,7 +57,7 @@ fn count_spans(request: *const otlp.ExportTraceServiceRequest) !u64 {
 }
 
 fn once(state: *State, bytes: []const u8, storage_len: usize, validate: bool, cpu_features: platform.CpuFeatures) !u64 {
-    const message = try proto.decode_into(otlp.ExportTraceServiceRequest, bytes, state.storage[0..storage_len]);
+    const message = try protobuf_decoder.decode_into(otlp.ExportTraceServiceRequest, bytes, state.storage[0..storage_len]);
     if (validate) {
         var report: protovalidate.Report = .init(&state.report);
         try protovalidate.validate(otlp.ExportTraceServiceRequest, &message, .{ .cpu_features = cpu_features }, &report);

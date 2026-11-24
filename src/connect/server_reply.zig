@@ -119,7 +119,7 @@ pub const Reply = struct {
         const prefix_len: usize = if (reply.accepted.speaks.enveloped) constants.protocol.envelope_prefix_len else 0;
         const room = body.unusedCapacitySlice();
         if (room.len <= prefix_len) return false;
-        const encoded = message_codec.encode(T, reply.accepted.speaks.codec, message, room[prefix_len..]) catch |failure| switch (failure) {
+        const encoded = message_codec.encode(T, reply.accepted.speaks.codec, message, room[prefix_len..], reply.encoders.cpu_features) catch |failure| switch (failure) {
             error.NoSpaceLeft => return false,
             else => |other| return other,
         };
@@ -372,7 +372,7 @@ test "a long message is gzipped in its envelope, and a unary gzip reply is not w
     var decoder: compression.GzipDecoder = undefined;
     var inflated: [message_codec.compress_len_min * 2]u8 = undefined;
     const octets = try compression.decompress(.gzip, .{ .gzip = &decoder }, written[constants.protocol.envelope_prefix_len..], &inflated);
-    try testing.expectEqualStrings(&text, (try proto.decode(Greeting, octets)).text);
+    try testing.expectEqualStrings(&text, (try @import("codec_test_support.zig").protobuf_decoder.decode(Greeting, octets)).text);
     reply.accepted.speaks = .{ .protocol = .connect, .codec = .proto, .enveloped = false };
     try testing.expect(!reply.writes_direct());
 }

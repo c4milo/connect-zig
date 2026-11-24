@@ -3,6 +3,10 @@
 const std = @import("std");
 const assert = std.debug.assert;
 const proto = @import("protobuf");
+/// The benchmark decodes and encodes with the build target's CPU features, so that
+/// `tools/perf_check.sh` counts the same paths on every machine of an architecture.
+const protobuf_decoder: proto.Decoder = .init(.target());
+const protobuf_encoder: proto.Encoder = .init(.target());
 const constants = @import("constants.zig");
 
 const buffer_len = constants.buffer_len;
@@ -73,7 +77,7 @@ pub fn Case(comptime T: type, comptime walk: fn (*const T) proto.Error!u64) type
                 .input = input,
                 .buffers = buffers,
                 .binary = binary,
-                .json = try proto.encode_json(T, input, &buffers.json_storage),
+                .json = try protobuf_encoder.encode_json(T, input, &buffers.json_storage),
                 .sum = try walk(input),
             };
             try check(Self, &case);
@@ -96,16 +100,16 @@ pub fn Case(comptime T: type, comptime walk: fn (*const T) proto.Error!u64) type
 fn check(comptime C: type, case: *const C) !void {
     const T = C.Message;
     const buffers = case.buffers;
-    const decoded = try proto.decode(T, case.binary);
+    const decoded = try protobuf_decoder.decode(T, case.binary);
     if (try C.walk_message(&decoded) != case.sum) return error.WalkMismatch;
     // With storage, the decode gives the same message back.
-    const stored = try proto.decode_into(T, case.binary, &buffers.storage);
+    const stored = try protobuf_decoder.decode_into(T, case.binary, &buffers.storage);
     if (try C.walk_message(&stored) != case.sum) return error.WalkMismatch;
     const stored_again = try proto.encode(T, &stored, &buffers.encode_scratch);
     if (!std.mem.eql(u8, stored_again, case.binary)) return error.EncodingMismatch;
     const again = try proto.encode(T, &decoded, &buffers.encode_scratch);
     if (!std.mem.eql(u8, again, case.binary)) return error.EncodingMismatch;
-    const from_json = try proto.decode_json(T, case.json, &buffers.transcoded, &buffers.tokens);
+    const from_json = try protobuf_decoder.decode_json(T, case.json, &buffers.transcoded, &buffers.tokens);
     if (try C.walk_message(&from_json) != case.sum) return error.WalkMismatch;
 }
 
@@ -132,11 +136,11 @@ fn step(comptime C: type, case: *const C, buffers: *Buffers, comptime operation:
     const walk = C.walk_message;
     switch (operation) {
         .binary_encode => keep((try proto.encode(T, case.input, &buffers.encode_scratch)).len),
-        .binary_decode => keep(&try proto.decode(T, case.binary)),
-        .binary_decode_walk => keep(try walk(&try proto.decode_into(T, case.binary, &buffers.storage))),
-        .json_encode => keep((try proto.encode_json(T, case.input, &buffers.json_scratch)).len),
-        .json_decode => keep(&try proto.decode_json(T, case.json, &buffers.transcoded, &buffers.tokens)),
-        .json_decode_walk => keep(try walk(&try proto.decode_json(T, case.json, &buffers.transcoded, &buffers.tokens))),
+        .binary_decode => keep(&try protobuf_decoder.decode(T, case.binary)),
+        .binary_decode_walk => keep(try walk(&try protobuf_decoder.decode_into(T, case.binary, &buffers.storage))),
+        .json_encode => keep((try protobuf_encoder.encode_json(T, case.input, &buffers.json_scratch)).len),
+        .json_decode => keep(&try protobuf_decoder.decode_json(T, case.json, &buffers.transcoded, &buffers.tokens)),
+        .json_decode_walk => keep(try walk(&try protobuf_decoder.decode_json(T, case.json, &buffers.transcoded, &buffers.tokens))),
     }
 }
 

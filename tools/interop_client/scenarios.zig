@@ -4,6 +4,9 @@
 const std = @import("std");
 const connect = @import("connect");
 const proto = @import("protobuf");
+/// A check program decodes and encodes with the build target's CPU features: it runs on the
+/// machine it was built for, and a library takes the features its program detected.
+const protobuf_decoder: proto.Decoder = .init(.target());
 const coverage = @import("coverage");
 const interop = @import("interop");
 const constants = @import("constants.zig");
@@ -221,7 +224,7 @@ pub fn fail(run: *const Run) Error!void {
     if (failure.details.len != 1) return verdict.wrong("got {d} details, wanted 1", .{failure.details.len});
     const detail = failure.details[0];
     if (!std.mem.eql(u8, detail.type_name, interop.FailRequest.protobuf.full_name)) return verdict.wrong("the detail is a {s}", .{detail.type_name});
-    const decoded = proto.decode(interop.FailRequest, detail.value) catch return verdict.wrong("the detail does not decode", .{});
+    const decoded = protobuf_decoder.decode(interop.FailRequest, detail.value) catch return verdict.wrong("the detail does not decode", .{});
     if (decoded.code != fail_code or !std.mem.eql(u8, decoded.message, fail_message)) {
         return verdict.wrong("the detail holds code {d} and message \"{s}\"", .{ decoded.code, decoded.message });
     }

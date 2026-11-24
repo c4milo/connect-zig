@@ -178,6 +178,42 @@ first. Cite an entry by number in code and commits ("decision 6").
    packed record, as an encoder writes it, where each element was a record of its own. The
    binary is canonical then, as an Any keeps it, and the decode reads one record for the array.
 
+50. **A program decodes and encodes with a `Decoder` and an `Encoder`, which take its CPU
+    features once.** Ruled by the owner on 2026-11-24
+    (https://github.com/c4milo/connect-zig/issues/14): a library takes the CPU features its
+    program detects, and a program sets them as it starts and uses them from then on.
+    - `protobuf.Decoder.init(cpu_features)` makes the value that holds `decode`, `decode_into`,
+      `decode_into_use`, `merge`, `decode_json` and `decode_json_with`. Each checks a string for
+      UTF-8 with those features. `protobuf.Encoder` holds `encode_json` and `encode_json_with`.
+      Binary `encode` and `encoded_len` use no feature and stay free functions.
+    - A decode checks each string of its input once. A repeated field's iterator and `Lazy.get`
+      read bytes a decode checked, and check no string again, as they check no nested message
+      again (decision 9 as amended). A view or a `Lazy` a program sets itself is the
+      program's to keep well formed, as the strings of `items` are, which `encode` does not
+      check either.
+    - The features go down a decode in its context, the value each mode carries to each level:
+      a checked decode carries a pointer to them, a stored one its `Store`, which holds the
+      pointer, and a shallow one nothing. `wire.Reader` stays as it was.
+    - `connect` makes a `Decoder` or an `Encoder` from the features of its `Decoders` or
+      `Encoders`, which the program set once. A test, a benchmark and a check program use the
+      build target's features. The lint's rule `target-features` refuses each other call of
+      `target()` in `src/protobuf`.
+    - Counted by `tools/perf_check.sh` on 2026-11-24, built for x86-64-v3, against `main`
+      counted the same day. Binary decode took 1.1% to 3.8% more instructions: a string of 32
+      octets or more now hands stdx's check runtime features, which the compiler folded when
+      they were the build target's. JSON decode took 1.5% to 17.3% fewer, since a transcoded
+      string is no longer checked twice. Built for the baseline CPU, x86-64-v3's features in
+      place of the build target's cut large JSON decode by 15.5% and large binary decode by
+      3.6%, measured that day with a patch that was not kept.
+
+    Beaten: free functions on the build target's features, which the owner's ruling refuses; a
+    `cpu_features` argument of each call, which the owner refused, since the features are set
+    once; `protobuf.Codec`, a name `connect.Codec` holds; the iterator and `Lazy.get` checking
+    each string again, with no features or with the decoder passed to each read; a flag in
+    each `View` of the bytes a decode checked, which `Lazy` has no room for; and the features
+    in `wire.Reader`, which counted within 0.5% of the context but gives every reader a field
+    only a decode's strings read.
+
 ## Connect
 
 10. **Compression comes from stdx.** gzip and zstd encode and decode; brotli decodes only, since

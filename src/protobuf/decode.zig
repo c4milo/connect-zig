@@ -11,6 +11,7 @@ const wire = @import("wire.zig");
 const descriptor = @import("descriptor.zig");
 const scalar = @import("scalar.zig");
 const repeated = @import("repeated.zig");
+const platform = @import("platform");
 const constants = @import("constants.zig");
 const decode_run = @import("decode_run.zig");
 const Field = descriptor.Field;
@@ -22,9 +23,9 @@ pub const Error = wire.Error;
 pub const Store = decode_run.Store;
 
 /// Decodes `bytes` as a `T`, following messages at most `depth_left` deep.
-pub fn decode_depth(comptime T: type, bytes: []const u8, depth_left: u32, comptime mode: Mode, store: StoreOf(mode)) Error!T {
+pub fn decode_depth(comptime T: type, bytes: []const u8, depth_left: u32, comptime mode: Mode, context: ContextOf(mode)) Error!T {
     var message: T = .{};
-    try merge_depth(T, &message, bytes, depth_left, mode, store);
+    try merge_depth(T, &message, bytes, depth_left, mode, context);
     return message;
 }
 
@@ -39,16 +40,36 @@ pub const Mode = enum {
     stored,
     /// Kept payloads are not decoded. `Lazy.get` and a repeated field's iterator use it for
     /// bytes `decode` already checked: checking again at every level would cost each level its
-    /// whole subtree. Bytes a program set itself fail when that level is read, never earlier.
+    /// whole subtree. Their strings are not checked again either. Bytes a program set itself are
+    /// the program's to keep well formed, as the strings of `items` are: a record that is not
+    /// the encoding still fails when its level is read, never earlier.
     shallow,
 };
 
-/// What a decode in `mode` keeps its storage in: a `Store` when it stores, and nothing otherwise.
-pub fn StoreOf(comptime mode: Mode) type {
-    return if (mode == .stored) *Store else void;
+/// What a decode in `mode` carries to each level it reads. A checked decode carries the CPU
+/// features each string's UTF-8 check runs with, the program's, or null where a caller checks
+/// the strings itself. A stored decode carries the caller's `Store`, which holds the features. A
+/// shallow decode carries nothing: it reads bytes a decode already checked, and checks no string
+/// again, so a repeated field's iterator and `Lazy.get` pay nothing for the check.
+pub fn ContextOf(comptime mode: Mode) type {
+    return switch (mode) {
+        .checked => ?*const platform.CpuFeatures,
+        .stored => *Store,
+        .shallow => void,
+    };
 }
 
-/// Decodes one level of `bytes`, which leaves its `Lazy` and repeated message payloads unchecked.
+/// The CPU features a decode in `mode` checks each string with, or null when it checks none.
+pub inline fn string_check(comptime mode: Mode, context: ContextOf(mode)) ?*const platform.CpuFeatures {
+    return switch (mode) {
+        .checked => context,
+        .stored => context.cpu_features,
+        .shallow => null,
+    };
+}
+
+/// Decodes one level of `bytes`, which a decode already checked: it leaves the `Lazy` and repeated
+/// message payloads unchecked, and checks no string again.
 pub fn decode_shallow(comptime T: type, bytes: []const u8) Error!T {
     var message: T = .{};
     try merge_depth(T, &message, bytes, constants.limits.depth_max, .shallow, {});
@@ -56,7 +77,7 @@ pub fn decode_shallow(comptime T: type, bytes: []const u8) Error!T {
 }
 
 /// Merges `bytes` into `message`, as a second occurrence of the message would merge.
-pub fn merge_depth(comptime T: type, message: *T, bytes: []const u8, depth_left: u32, comptime mode: Mode, store: StoreOf(mode)) Error!void {
+pub fn merge_depth(comptime T: type, message: *T, bytes: []const u8, depth_left: u32, comptime mode: Mode, context: ContextOf(mode)) Error!void {
     comptime descriptor.check(T);
     assert(bytes.len <= constants.limits.message_len_max);
     if (depth_left == 0) return error.DepthExceeded;
@@ -66,7 +87,7 @@ pub fn merge_depth(comptime T: type, message: *T, bytes: []const u8, depth_left:
         if (reader.at_end()) return;
         const field_start = reader.position;
         const tag = try reader.tag();
-        const read = try read_known(T, message, field_start, bytes, tag, &reader, depth_left, mode, store);
+        const read = try read_known(T, message, field_start, bytes, tag, &reader, depth_left, mode, context);
         if (read == .field) continue;
         if (read == .absent) try reader.skip(tag, depth_left);
         if (comptime descriptor.keeps_unknown(T)) try keep_unknown(&@field(message, descriptor.unknown_field), bytes, field_start, reader.position);
@@ -80,10 +101,10 @@ const Read = enum { field, unknown_value, absent };
 
 /// `field_start` is where the field's tag starts in `bytes`, where a repeated field's view
 /// starts, so the view holds the field's records and not the whole message.
-fn read_known(comptime T: type, message: *T, field_start: usize, bytes: []const u8, tag: wire.Tag, reader: *wire.Reader, depth_left: u32, comptime mode: Mode, store: StoreOf(mode)) Error!Read {
+fn read_known(comptime T: type, message: *T, field_start: usize, bytes: []const u8, tag: wire.Tag, reader: *wire.Reader, depth_left: u32, comptime mode: Mode, context: ContextOf(mode)) Error!Read {
     @setEvalBranchQuota(comptime descriptor.branches_of(T));
     inline for (T.protobuf.fields) |field| {
-        if (tag.number == field.number) return read_field(T, field, message, field_start, bytes, tag, reader, depth_left, mode, store);
+        if (tag.number == field.number) return read_field(T, field, message, field_start, bytes, tag, reader, depth_left, mode, context);
     }
     return .absent;
 }
@@ -96,24 +117,24 @@ pub fn unknown_to_closed(comptime kind: Kind, comptime V: type, value: V) bool {
     return !V.protobuf.contains(@intFromEnum(value));
 }
 
-fn read_field(comptime T: type, comptime field: Field, message: *T, field_start: usize, bytes: []const u8, tag: wire.Tag, reader: *wire.Reader, depth_left: u32, comptime mode: Mode, store: StoreOf(mode)) Error!Read {
-    if (field.oneof) |oneof| return read_oneof(T, field, oneof, message, tag, reader, depth_left, mode, store);
+fn read_field(comptime T: type, comptime field: Field, message: *T, field_start: usize, bytes: []const u8, tag: wire.Tag, reader: *wire.Reader, depth_left: u32, comptime mode: Mode, context: ContextOf(mode)) Error!Read {
+    if (field.oneof) |oneof| return read_oneof(T, field, oneof, message, tag, reader, depth_left, mode, context);
     const F = @FieldType(T, field.name);
     const slot = &@field(message, field.name);
     if (comptime repeated.is_repeated(F)) {
-        try read_repeated_field(F, slot, field_start, bytes, field.number, tag, reader, depth_left, mode, store);
+        try read_repeated_field(F, slot, field_start, bytes, field.number, tag, reader, depth_left, mode, context);
     } else if (comptime repeated.is_lazy(F)) {
-        try read_lazy(F, field.kind, slot, tag, reader, depth_left, mode, store);
+        try read_lazy(F, field.kind, slot, tag, reader, depth_left, mode, context);
     } else if (comptime field.kind.holds_message()) {
         const Child = @typeInfo(F).optional.child;
         if (slot.* == null) slot.* = .{};
-        try read_message(Child, field.kind, &slot.*.?, tag, reader, depth_left, mode, store);
+        try read_message(Child, field.kind, &slot.*.?, tag, reader, depth_left, mode, context);
     } else {
         const V = switch (@typeInfo(F)) {
             .optional => |optional| optional.child,
             else => F,
         };
-        const value = try read_value(field.kind, V, tag, reader);
+        const value = try read_value(field.kind, V, tag, reader, string_check(mode, context));
         if (unknown_to_closed(field.kind, V, value)) return .unknown_value;
         slot.* = value;
     }
@@ -122,17 +143,18 @@ fn read_field(comptime T: type, comptime field: Field, message: *T, field_start:
 
 /// A repeated field's record: into storage in the stored mode, and into the field's view in any
 /// other. A closed enum's field passes over numbers it does not name, so it keeps its view.
-inline fn read_repeated_field(comptime F: type, slot: *F, field_start: usize, bytes: []const u8, number: u32, tag: wire.Tag, reader: *wire.Reader, depth_left: u32, comptime mode: Mode, store: StoreOf(mode)) Error!void {
-    if (comptime mode == .stored and !repeated.holds_closed(F)) return decode_run.read(F, slot, field_start, bytes, number, tag, reader, depth_left, store);
+inline fn read_repeated_field(comptime F: type, slot: *F, field_start: usize, bytes: []const u8, number: u32, tag: wire.Tag, reader: *wire.Reader, depth_left: u32, comptime mode: Mode, context: ContextOf(mode)) Error!void {
+    if (comptime mode == .stored and !repeated.holds_closed(F)) return decode_run.read(F, slot, field_start, bytes, number, tag, reader, depth_left, context);
     // Inline here whatever else calls it: `decode_run`'s fallbacks made LLVM call it out of line,
     // and `decode` took up to 39% more instructions (docs/performance.md, pitfalls).
-    return @call(.always_inline, read_repeated, .{ F, slot, field_start, bytes, number, tag, reader, depth_left, if (mode == .shallow) .shallow else .checked });
+    if (comptime mode == .shallow) return @call(.always_inline, read_repeated, .{ F, slot, field_start, bytes, number, tag, reader, depth_left, .shallow, {} });
+    return @call(.always_inline, read_repeated, .{ F, slot, field_start, bytes, number, tag, reader, depth_left, .checked, string_check(mode, context) });
 }
 
-fn read_value(comptime kind: Kind, comptime V: type, tag: wire.Tag, reader: *wire.Reader) Error!V {
+fn read_value(comptime kind: Kind, comptime V: type, tag: wire.Tag, reader: *wire.Reader, cpu_features: ?*const platform.CpuFeatures) Error!V {
     // "Message Structure": a known field whose wire type is not its kind's is malformed.
     if (tag.wire_type != kind.wire_type()) return error.WireTypeMismatch;
-    return scalar.read(kind, V, reader);
+    return scalar.read(kind, V, reader, cpu_features);
 }
 
 /// The bytes of an embedded message: after its length, or between its group tags.
@@ -144,16 +166,16 @@ pub fn message_payload(comptime kind: Kind, tag: wire.Tag, reader: *wire.Reader,
     return reader.length_delimited();
 }
 
-fn read_message(comptime M: type, comptime kind: Kind, slot: *M, tag: wire.Tag, reader: *wire.Reader, depth_left: u32, comptime mode: Mode, store: StoreOf(mode)) Error!void {
+fn read_message(comptime M: type, comptime kind: Kind, slot: *M, tag: wire.Tag, reader: *wire.Reader, depth_left: u32, comptime mode: Mode, context: ContextOf(mode)) Error!void {
     const payload = try message_payload(kind, tag, reader, depth_left);
-    try merge_depth(M, slot, payload, depth_left - 1, mode, store);
+    try merge_depth(M, slot, payload, depth_left - 1, mode, context);
 }
 
-fn read_lazy(comptime F: type, comptime kind: Kind, slot: *F, tag: wire.Tag, reader: *wire.Reader, depth_left: u32, comptime mode: Mode, store: StoreOf(mode)) Error!void {
+fn read_lazy(comptime F: type, comptime kind: Kind, slot: *F, tag: wire.Tag, reader: *wire.Reader, depth_left: u32, comptime mode: Mode, context: ContextOf(mode)) Error!void {
     const payload = try message_payload(kind, tag, reader, depth_left);
-    if (mode == .stored) return read_lazy_stored(F, slot, payload, depth_left, store);
+    if (mode == .stored) return read_lazy_stored(F, slot, payload, depth_left, context);
     // The payload is checked once here, so `Lazy.get` reads only checked bytes.
-    if (mode == .checked) _ = try decode_depth(F.Message, payload, depth_left - 1, .checked, {});
+    if (mode == .checked) _ = try decode_depth(F.Message, payload, depth_left - 1, .checked, context);
     if (slot.present()) return error.MergeUnsupported;
     slot.* = .{ .bytes = payload };
 }
@@ -172,7 +194,7 @@ fn read_lazy_stored(comptime F: type, slot: *F, payload: []const u8, depth_left:
     slot.* = .{ .bytes = payload, .value = &kept[0] };
 }
 
-pub fn read_repeated(comptime F: type, slot: *F, field_start: usize, bytes: []const u8, number: u32, tag: wire.Tag, reader: *wire.Reader, depth_left: u32, comptime mode: Mode) Error!void {
+pub fn read_repeated(comptime F: type, slot: *F, field_start: usize, bytes: []const u8, number: u32, tag: wire.Tag, reader: *wire.Reader, depth_left: u32, comptime mode: Mode, context: ContextOf(mode)) Error!void {
     if (!view_within(slot.view.bytes, bytes) or slot.items.len != 0) return error.MergeUnsupported;
     if (comptime F.kind.packable()) {
         // "Packed Repeated Fields": a parser accepts the packed form for any packable field.
@@ -182,9 +204,9 @@ pub fn read_repeated(comptime F: type, slot: *F, field_start: usize, bytes: []co
         if (tag.wire_type != F.kind.wire_type()) return error.WireTypeMismatch;
         if (comptime F.kind.holds_message()) {
             const payload = try message_payload(F.kind, tag, reader, depth_left);
-            if (mode == .checked) _ = try decode_depth(F.Element, payload, depth_left - 1, .checked, {});
+            if (mode == .checked) _ = try decode_depth(F.Element, payload, depth_left - 1, .checked, context);
         } else {
-            _ = try scalar.read(F.kind, F.Element, reader);
+            _ = try scalar.read(F.kind, F.Element, reader, string_check(mode, context));
         }
     }
     extend_view(&slot.view, bytes, field_start, reader.position, number);
@@ -220,17 +242,18 @@ fn check_packed(comptime F: type, payload: []const u8) Error!void {
     // Each element takes at least one byte.
     for (0..payload.len + 1) |_| {
         if (packed_reader.at_end()) return;
-        _ = try scalar.read(F.kind, F.Element, &packed_reader);
+        // "Packed Repeated Fields": only scalar numeric types pack, so no element is a string.
+        _ = try scalar.read(F.kind, F.Element, &packed_reader, null);
     }
     unreachable;
 }
 
-fn read_oneof(comptime T: type, comptime field: Field, comptime oneof: []const u8, message: *T, tag: wire.Tag, reader: *wire.Reader, depth_left: u32, comptime mode: Mode, store: StoreOf(mode)) Error!Read {
+fn read_oneof(comptime T: type, comptime field: Field, comptime oneof: []const u8, message: *T, tag: wire.Tag, reader: *wire.Reader, depth_left: u32, comptime mode: Mode, context: ContextOf(mode)) Error!Read {
     const U = @typeInfo(@FieldType(T, oneof)).optional.child;
     const V = @FieldType(U, field.name);
     const slot = &@field(message, oneof);
     if (comptime !field.kind.holds_message()) {
-        const value = try read_value(field.kind, V, tag, reader);
+        const value = try read_value(field.kind, V, tag, reader, string_check(mode, context));
         // A number the closed enum does not name leaves the oneof as it was.
         if (unknown_to_closed(field.kind, V, value)) return .unknown_value;
         slot.* = @unionInit(U, field.name, value);
@@ -242,11 +265,11 @@ fn read_oneof(comptime T: type, comptime field: Field, comptime oneof: []const u
         // A `Lazy` member keeps its first payload, which a second one apart in the input cannot
         // join: `read_lazy` refuses it, as it refuses a `Lazy` field's second record (decision 6).
         var lazy: V = if (same) @field(slot.*.?, field.name) else .{};
-        try read_lazy(V, field.kind, &lazy, tag, reader, depth_left, mode, store);
+        try read_lazy(V, field.kind, &lazy, tag, reader, depth_left, mode, context);
         slot.* = @unionInit(U, field.name, lazy);
         return .field;
     }
     if (!same) slot.* = @unionInit(U, field.name, .{});
-    try read_message(V, field.kind, &@field(slot.*.?, field.name), tag, reader, depth_left, mode, store);
+    try read_message(V, field.kind, &@field(slot.*.?, field.name), tag, reader, depth_left, mode, context);
     return .field;
 }

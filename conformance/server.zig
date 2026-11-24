@@ -9,6 +9,9 @@
 const std = @import("std");
 const connect = @import("connect");
 const proto = @import("protobuf");
+/// A check program decodes and encodes with the build target's CPU features: it runs on the
+/// machine it was built for, and a library takes the features its program detected.
+const protobuf_decoder: proto.Decoder = .init(.target());
 const colibri = @import("colibri");
 const tls = @import("tls");
 const server_compat = @import("connectrpc_conformance_v1_server_compat");
@@ -62,7 +65,7 @@ pub fn main(init: std.process.Init) !void {
         return error.OutOfMemory;
     const state: *State = @ptrCast(@alignCast(state_memory));
     const request_bytes = try read_request(init.io, state);
-    const request = try proto.decode(server_compat.ServerCompatRequest, request_bytes);
+    const request = try protobuf_decoder.decode(server_compat.ServerCompatRequest, request_bytes);
     // config.yaml declares no TLS, so the runner never asks for it; a request for it fails here
     // rather than serving cleartext to a client that expects TLS.
     if (request.use_tls or request.client_tls_cert.len != 0) return error.TlsUnsupported;

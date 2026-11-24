@@ -8,6 +8,9 @@
 //! descriptor of the request.
 const std = @import("std");
 const proto = @import("protobuf");
+/// A check program decodes and encodes with the build target's CPU features: it runs on the
+/// machine it was built for, and a library takes the features its program detected.
+const protobuf_decoder: proto.Decoder = .init(.target());
 const protovalidate = @import("protovalidate");
 const platform = @import("platform");
 const harness = @import("harness");
@@ -40,7 +43,7 @@ pub fn main(init: std.process.Init) !void {
     var stdin = std.Io.File.stdin().reader(init.io, &state.in_buffer);
     const len = try stdin.interface.readSliceShort(&state.request_bytes);
     if (len == state.request_bytes.len) return error.RequestTooLarge;
-    const request = try proto.decode(harness.TestConformanceRequest, state.request_bytes[0..len]);
+    const request = try protobuf_decoder.decode(harness.TestConformanceRequest, state.request_bytes[0..len]);
     const now = time_of(std.Io.Timestamp.now(init.io, .real));
     var stdout = std.Io.File.stdout().writerStreaming(init.io, &state.out_buffer);
     var each = request.cases.iterator();
@@ -110,7 +113,7 @@ fn check(comptime T: type, state: *State, value: []const u8, now: proto.wkt.Time
     // to answer with a compilation error, so the program reads the problem and never calls
     // `validate` for the type.
     if (comptime protovalidate.rules_error(T)) |problem| return .{ .compilation_error = problem };
-    const message = proto.decode(T, value) catch |failure| return .{ .unexpected_error = @errorName(failure) };
+    const message = protobuf_decoder.decode(T, value) catch |failure| return .{ .unexpected_error = @errorName(failure) };
     var report: protovalidate.Report = .init(&state.report_storage);
     protovalidate.validate(T, &message, .{ .cpu_features = state.cpu_features, .now = now }, &report) catch |failure| switch (failure) {
         error.Invalid => return .{ .validation_error = .{ .violations = .of(report.violations()) } },

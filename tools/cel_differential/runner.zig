@@ -11,6 +11,9 @@
 //! prints "refused" for the type, with the problem on standard error.
 const std = @import("std");
 const proto = @import("protobuf");
+/// A check program decodes and encodes with the build target's CPU features: it runs on the
+/// machine it was built for, and a library takes the features its program detected.
+const protobuf_decoder: proto.Decoder = .init(.target());
 const protovalidate = @import("protovalidate");
 const platform = @import("platform");
 const rules = @import("schema");
@@ -108,7 +111,7 @@ fn octets_of(line: []const u8, out: []u8) Error![]const u8 {
 /// One message's verdict as the reference writes it: "valid", "invalid:" and the violation's
 /// message, or "fails" for an expression that fails as it runs.
 fn verdict(comptime T: type, state: *State, encoded: []const u8, out: *std.Io.Writer) !void {
-    const message = proto.decode(T, encoded) catch |failure| return out.print("undecoded:{t}\n", .{failure});
+    const message = protobuf_decoder.decode(T, encoded) catch |failure| return out.print("undecoded:{t}\n", .{failure});
     var report: protovalidate.Report = .init(&state.report_storage);
     protovalidate.validate(T, &message, .{ .cpu_features = state.cpu_features }, &report) catch |failure| switch (failure) {
         error.Invalid => return out.print("invalid:{s}\n", .{report.violations()[0].message orelse ""}),

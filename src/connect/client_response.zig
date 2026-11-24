@@ -179,7 +179,7 @@ pub const Response = struct {
             return null;
         }
         response.messages_read += 1;
-        return try message_codec.decode(T, response.speaks.codec, octets, response.storage.scratch);
+        return try message_codec.decode(T, response.speaks.codec, octets, response.storage.scratch, response.decoders.cpu_features);
     }
 
     /// Whether the method answers with exactly one message: a unary call or a client stream.

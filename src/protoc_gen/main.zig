@@ -19,7 +19,9 @@ pub fn main(init: std.process.Init) !void {
     const input_buffer = try arena.alloc(u8, io_buffer_len);
     var stdin = std.Io.File.stdin().reader(init.io, input_buffer);
     const request_bytes = try stdin.interface.allocRemaining(arena, .limited(request_len_max));
-    const response = try respond(arena, request_bytes);
+    // The plugin detects the CPU's features once, as it starts, and decodes with them.
+    const decoder: proto.Decoder = .init(.detect());
+    const response = try respond(arena, &decoder, request_bytes);
     const len = try proto.encoded_len(pb.CodeGeneratorResponse, &response);
     const encoded = try proto.encode(pb.CodeGeneratorResponse, &response, try arena.alloc(u8, len));
     const output_buffer = try arena.alloc(u8, io_buffer_len);
@@ -33,8 +35,8 @@ const supported_features = pb.feature_proto3_optional | pb.feature_supports_edit
 
 /// The response to a request: the generated files, or the error that stopped the generation,
 /// which protoc prints.
-pub fn respond(arena: Allocator, request_bytes: []const u8) Allocator.Error!pb.CodeGeneratorResponse {
-    const files = generate_all(arena, request_bytes) catch |failure| switch (failure) {
+pub fn respond(arena: Allocator, decoder: *const proto.Decoder, request_bytes: []const u8) Allocator.Error!pb.CodeGeneratorResponse {
+    const files = generate_all(arena, decoder, request_bytes) catch |failure| switch (failure) {
         error.OutOfMemory => return error.OutOfMemory,
         else => return .{
             .@"error" = try std.fmt.allocPrint(arena, "protoc-gen-connect-zig: {s}", .{@errorName(failure)}),
@@ -44,8 +46,8 @@ pub fn respond(arena: Allocator, request_bytes: []const u8) Allocator.Error!pb.C
     return .{ .supported_features = supported_features, .minimum_edition = pb.edition_proto2, .maximum_edition = pb.edition_2024, .file = .of(files) };
 }
 
-fn generate_all(arena: Allocator, request_bytes: []const u8) (generate.Error || error{MissingFile})![]const pb.GeneratedFile {
-    const request = try proto.decode(pb.CodeGeneratorRequest, request_bytes);
+fn generate_all(arena: Allocator, decoder: *const proto.Decoder, request_bytes: []const u8) (generate.Error || error{MissingFile})![]const pb.GeneratedFile {
+    const request = try decoder.decode(pb.CodeGeneratorRequest, request_bytes);
     var descriptors: std.ArrayList(pb.FileDescriptorProto) = .empty;
     var proto_files = request.proto_file.iterator();
     while (try proto_files.next()) |descriptor| try descriptors.append(arena, descriptor.*);

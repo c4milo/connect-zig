@@ -35,10 +35,11 @@ pub const Transcoder = struct {
 };
 
 /// Writes the binary encoding of the one JSON text `text` holds, read as a `T`, into `binary`,
-/// with `tokens` as the reader's storage for one token's octets.
-pub fn transcode(comptime T: type, text: []const u8, binary: []u8, tokens: []u8, comptime registry: []const type) Error![]const u8 {
+/// with `tokens` as the reader's storage for one token's octets. The reader and the base64
+/// decoder run with the program's CPU features, `cpu_features`.
+pub fn transcode(comptime T: type, text: []const u8, binary: []u8, tokens: []u8, cpu_features: platform.CpuFeatures, comptime registry: []const type) Error![]const u8 {
     var transcoder: Transcoder = .{
-        .reader = json.TextReader.init(text, tokens, .text, platform.CpuFeatures.target()),
+        .reader = json.TextReader.init(text, tokens, .text, cpu_features),
         .writer = .{ .buffer = binary },
     };
     if (!transcoder.reader.next_text()) return error.UnexpectedToken;
@@ -260,7 +261,7 @@ fn write_single(comptime field: Field, comptime V: type, transcoder: *Transcoder
     try writer.tag(field.number, field.kind.wire_type());
     switch (comptime field.kind) {
         .string, .unvalidated_string => try scalar.write(field.kind, []const u8, try string_of(value), writer),
-        .bytes => try json_base64.write_base64_field(try string_of(value), writer),
+        .bytes => try json_base64.write_base64_field(try string_of(value), writer, transcoder.reader.features),
         else => try write_scalar(field, V, value, writer),
     }
 }
@@ -369,6 +370,7 @@ fn write_snake_path(writer: *wire.Writer, path: []const u8) Error!void {
 }
 
 const testing = std.testing;
+const support = @import("test_support.zig");
 
 const Chain = struct {
     next: repeated.Lazy(Chain) = .{},
@@ -382,9 +384,9 @@ test "the transcoder itself refuses nesting past its bound, before decode reads 
     const deep = "{\"next\":" ** constants.limits.json_depth_max ++ "{}" ++ "}" ** constants.limits.json_depth_max;
     var binary: [4096]u8 = undefined;
     var tokens: [64]u8 = undefined;
-    try testing.expectError(error.DepthExceeded, transcode(Chain, deep, &binary, &tokens, &.{}));
+    try testing.expectError(error.DepthExceeded, transcode(Chain, deep, &binary, &tokens, support.cpu_features, &.{}));
     const fits = "{\"next\":" ** 3 ++ "{}" ++ "}" ** 3;
-    const bytes = try transcode(Chain, fits, &binary, &tokens, &.{});
+    const bytes = try transcode(Chain, fits, &binary, &tokens, support.cpu_features, &.{});
     // Each level is a tag and a one-octet length: the placeholders shrank to fit.
     try testing.expectEqual(@as(usize, 3 * 2), bytes.len);
 }

@@ -5,6 +5,9 @@ const std = @import("std");
 const connect = @import("connect");
 const client = @import("client");
 const proto = @import("protobuf");
+/// A check program decodes and encodes with the build target's CPU features: it runs on the
+/// machine it was built for, and a library takes the features its program detected.
+const protobuf_decoder: proto.Decoder = .init(.target());
 const tls = @import("tls");
 const config = @import("connectrpc_conformance_v1_config");
 const client_compat = @import("connectrpc_conformance_v1_client_compat");
@@ -202,7 +205,7 @@ pub fn messages_of(comptime T: type, request: *const Request, messages: []T) (pr
         const any = try anys.next() orelse return messages[0..count];
         if (count == messages.len) return error.TooManyMessages;
         if (!std.mem.eql(u8, echo.type_name_of(any.type_url), T.protobuf.full_name)) return error.WrongMessageType;
-        messages[count] = try proto.decode(T, any.value);
+        messages[count] = try protobuf_decoder.decode(T, any.value);
         count += 1;
     }
     return error.TooManyMessages;
