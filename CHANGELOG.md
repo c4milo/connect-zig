@@ -10,7 +10,7 @@ change the public API, and the entry marks each change that does.
 
 ## Unreleased
 
-It builds on colibri at a88c515, on its `main`, and on stdx at 1ef992a, the commit that colibri
+It builds on colibri at f8d107a, on its `main`, and on stdx at 1ef992a, the commit that colibri
 pins. `protovalidate` takes `regex` from the same stdx: the second pin, `stdx_regex`, is gone.
 
 ### Added

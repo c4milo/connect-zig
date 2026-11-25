@@ -2306,6 +2306,9 @@ ran on Linux x86-64 with Zig 0.16.0.
     of `.paths` as a fetch of the URL does.
   - The owner had colibri's history rewritten on 2026-11-25, to name him as each commit's author.
     The commit this record first named dfc5021 is a88c515, with the same tree and package hash.
+  - colibri at f8d107a pins stdx at its rewritten 1ef992a, so connect-zig pins it in its place.
+    Its package hash changed with its `build.zig.zon`, and came from `zig fetch` over a
+    `git archive` of the commit, as before.
 
 ### Work not done yet
 
