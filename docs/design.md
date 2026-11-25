@@ -2346,6 +2346,14 @@ ran on Linux x86-64 with Zig 0.16.0.
     build bench -- --quick`, and `tools/package_check.sh` passed on x86-64 Linux, with Zig
     0.16.0. The package hash of colibri came from the colibri session, by `zig fetch` over a
     `git archive` of the commit.
+- **colibri at 64f02df4 and Rotor at af06860, whose server shares its h3 port** (colibri decision
+  173, https://github.com/c4milo/colibri/issues/155). No public name of connect-zig changes. The
+  socket server and the OTLP sink on `colibri.Server` can run several copies on one port over TLS.
+  colibri pins Rotor at af06860, so this tree and `examples/harness` pin it there too, and a
+  program links one Rotor.
+  - No check changes, so no mutation ran.
+  - `zig build test` and `zig build examples` passed on x86-64 Linux, with Zig 0.16.0. The
+    package hashes came from `zig fetch` over a `git archive` of each commit.
 
 ### Work not done yet
 

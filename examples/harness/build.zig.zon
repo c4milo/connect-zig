@@ -8,8 +8,8 @@
         // The Rotor that colibri pins, at colibri's own request, so a program links one Rotor
         // (decision 41).
         .rotor = .{
-            .url = "git+https://github.com/c4milo/rotor#f2890f5283fd5577243f6472648a05dda7a7f4e6",
-            .hash = "rotor-0.11.0-YZkxRH0dJwBgz9oa8yO6YOTVtpFTnV6Iiz7C0OwjTffl",
+            .url = "git+https://github.com/c4milo/rotor#af06860db3c56180557dc7d7e10ab51c58c43094",
+            .hash = "rotor-0.11.0-YZkxRGc9JwCI6Lyp1nPvw5o6XKWk8KoXi3ciP7CwKEtW",
         },
     },
     .paths = .{ "build.zig", "build.zig.zon", "src", "tls" },

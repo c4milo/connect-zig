@@ -10,8 +10,8 @@ change the public API, and the entry marks each change that does.
 
 ## Unreleased
 
-It builds on colibri at b53e1d3a, on its `main`, and on chapulin at bda41cf6, the commit that
-colibri pins.
+It builds on colibri at 64f02df4, on its `main`, and on chapulin at bda41cf6 and Rotor at
+af06860, the commits that colibri pins.
 
 ### Changed
 
@@ -20,6 +20,8 @@ colibri pins.
   ch_assert_fail`, or the link fails with a second definition. A program that reports a failed
   chapulin assertion its own way declares `pub fn chapulinAssertFail(condition: [*:0]const u8,
   file: [*:0]const u8, line: c_int) noreturn` in its root file.
+- Several servers on `colibri.Server` share one port over TLS, h3 included: each server's UDP
+  socket now binds with SO_REUSEPORT, as its TCP listener does (colibri decision 173).
 
 ## v0.5.0 (2026-11-25)
 

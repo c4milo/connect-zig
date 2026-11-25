@@ -6,8 +6,8 @@
     .dependencies = .{
         // The HTTP transport of `connect_colibri`, and through its `tls` module, chapulin.
         .colibri = .{
-            .url = "git+https://github.com/c4milo/colibri#b53e1d3a347f8fa0772f4c2ff6ea3f2442df86d0",
-            .hash = "colibri-0.20.0-Wo-AvhBitQQgZxNuFgEaWT6NNIxYHIP8XQs9lyCfEA1N",
+            .url = "git+https://github.com/c4milo/colibri#64f02df4e5f948052f9c459386288fa6189d482b",
+            .hash = "colibri-0.20.0-Wo-AvpFntQQCOAncQ5w0sW8tjIur6HakW2gplj0OEcZJ",
         },
         // JSON for proto3 JSON and the Connect error bodies, the compression codecs, the
         // regular expressions of `protovalidate`'s `pattern` and CEL's `matches`, and the type of
@@ -26,8 +26,8 @@
         // The event loop of the examples, at the commit colibri pins: Rotor v0.11.0. Lazy, and
         // requested only when connect-zig is the root build, like pepegrillo.
         .rotor = .{
-            .url = "git+https://github.com/c4milo/rotor#f2890f5283fd5577243f6472648a05dda7a7f4e6",
-            .hash = "rotor-0.11.0-YZkxRH0dJwBgz9oa8yO6YOTVtpFTnV6Iiz7C0OwjTffl",
+            .url = "git+https://github.com/c4milo/rotor#af06860db3c56180557dc7d7e10ab51c58c43094",
+            .hash = "rotor-0.11.0-YZkxRGc9JwCI6Lyp1nPvw5o6XKWk8KoXi3ciP7CwKEtW",
             .lazy = true,
         },
         // The `jws` calls of the `oidc` module (decision 34): chapulin v0.10.0, at the commit colibri
