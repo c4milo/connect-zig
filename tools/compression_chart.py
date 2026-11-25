@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Draws a compression chart of docs/images/ from the report of CI's fullstack-compression job
+"""Draws a compression chart from the report of CI's fullstack-compression job
 (tools/fullstack/compression.sh, design §8 step 37).
 
     tools/compression_chart.py <log> <run> <commit> <transport> [out.svg]
@@ -361,7 +361,7 @@ def draw(transport, held, peak, machine, run, commit):
 def main():
     log_path, run, commit, transport = sys.argv[1:5]
     suffix = "" if transport == "tls" else "-cleartext"
-    out = sys.argv[5] if len(sys.argv) > 5 else f"docs/images/fullstack-compression{suffix}.svg"
+    out = sys.argv[5] if len(sys.argv) > 5 else f"fullstack-compression{suffix}.svg"
     over = "over TLS" if transport == "tls" else "over cleartext h2"
     held, peak, machine = read(log_path, over)
     if ("connect-zig", "uncompressed") not in held:

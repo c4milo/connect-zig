@@ -3,7 +3,7 @@
 # tools/ci.sh for the event's jobs, and `check` runs each in a job of its own, so each shows apart
 # in GitHub's checks with its own summary: a new check joins tools/ci.sh alone. Each job's work is
 # `tools/ci.sh --only <check>`, which a person runs by hand for the same answer. Each download is
-# pinned by checksum. On a tag, `charts` commits the charts the benchmarks drew to docs/images.
+# pinned by checksum. On a tag, `charts` attaches the charts the benchmarks drew to its release.
 name: main
 on:
   push:
@@ -135,7 +135,7 @@ jobs:
         if: always()
         run: '[ -f ci-report.md ] && cat ci-report.md >>"${GITHUB_STEP_SUMMARY}" || true'
       # The charts that a benchmark drew from its own output, with that output (tools/ci.sh,
-      # draw_charts). On a tag, `charts` commits them to docs/images (decision 44 as amended).
+      # draw_charts). On a tag, `charts` attaches them to its release (decision 44 as amended).
       - name: Keep the charts
         if: always() && hashFiles('ci-charts/*.svg') != ''
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -143,8 +143,8 @@ jobs:
           name: charts-${{ matrix.check }}-${{ runner.arch }}
           path: ci-charts/
           retention-days: 90
-  # A tag's charts, once every benchmark of the tag passed: each replaces the chart of its name in
-  # docs/images on main (tools/charts_commit.sh). A push with this token starts no workflow.
+  # A tag's charts, once every benchmark of the tag passed: each is attached to the tag's GitHub
+  # release, which the README and docs/benchmarks.md show them from (tools/charts_release.sh).
   charts:
     needs: check
     if: startsWith(github.ref, 'refs/tags/')
@@ -152,14 +152,12 @@ jobs:
     permissions:
       contents: write
       actions: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: main
-          fetch-depth: 0
       - name: Take the run's charts
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh run download "${GITHUB_RUN_ID}" --repo "${GITHUB_REPOSITORY}" --pattern 'charts-*' --dir ci-charts
-      - name: Commit them to main
-        run: tools/charts_commit.sh ci-charts "${GITHUB_REF_NAME}"
+        run: gh run download "${GITHUB_RUN_ID}" --pattern 'charts-*' --dir ci-charts
+      - name: Attach them to the release
+        run: tools/charts_release.sh ci-charts "${GITHUB_REF_NAME}"

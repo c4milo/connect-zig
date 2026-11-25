@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Draws docs/images/call-routes.svg from the table of CI's bench-compare job (tools/bench_check.sh).
+"""Draws call-routes.svg from the table of CI's bench-compare job (tools/bench_check.sh).
 
     tools/routes_chart.py <table.md> <run> <commit> [out.svg]
 
@@ -263,7 +263,7 @@ def draw(times, machine, run, commit):
 
 def main():
     table_path, run, commit = sys.argv[1:4]
-    out = sys.argv[4] if len(sys.argv) > 4 else "docs/images/call-routes.svg"
+    out = sys.argv[4] if len(sys.argv) > 4 else "call-routes.svg"
     times, machine = read(table_path)
     counts = counts_of(times)
     if len(counts) < 2 or 1 not in counts:

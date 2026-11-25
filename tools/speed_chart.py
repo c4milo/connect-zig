@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Draws docs/images/speed-vs-go.svg from the table of CI's bench-compare job (tools/bench_check.sh).
+"""Draws speed-vs-go.svg from the table of CI's bench-compare job (tools/bench_check.sh).
 
     tools/speed_chart.py <table.md> <run> <commit> [out.svg]
 
@@ -278,7 +278,7 @@ def draw(zig_speed, buffa_speed, buffa_over_zig, machine, run, commit, pinned_ve
 
 def main():
     table_path, run, commit = sys.argv[1:4]
-    out = sys.argv[4] if len(sys.argv) > 4 else "docs/images/speed-vs-go.svg"
+    out = sys.argv[4] if len(sys.argv) > 4 else "speed-vs-go.svg"
     pinned_versions = versions()
     zig_speed, buffa_speed, buffa_over_zig, machine = read(table_path)
     missing = [(m, o) for m in msg_keys for o in op_keys if (m, o) not in zig_speed]

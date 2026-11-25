@@ -45,7 +45,7 @@ class MatrixTest(unittest.TestCase):
             self.assertIn((check, "ubuntu-26.04"), jobs)
 
     def test_refuses_another_event(self):
-        done = subprocess.run([str(script), "--matrix", "nightly"], capture_output=True, text=True)
+        done = subprocess.run([str(script), "--matrix", "nightly"], check=False, capture_output=True, text=True)
         self.assertEqual(done.returncode, 2)
 
 

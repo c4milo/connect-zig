@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Draws docs/images/call-vs-go.svg from the table of CI's bench-compare job (tools/bench_check.sh).
+"""Draws call-vs-go.svg from the table of CI's bench-compare job (tools/bench_check.sh).
 
     tools/call_chart.py <table.md> <run> <commit> [out.svg]
 
@@ -255,7 +255,7 @@ def draw(zig_speed, rust_speed, zig_us, machine, run, commit, pinned_versions):
 
 def main():
     table_path, run, commit = sys.argv[1:4]
-    out = sys.argv[4] if len(sys.argv) > 4 else "docs/images/call-vs-go.svg"
+    out = sys.argv[4] if len(sys.argv) > 4 else "call-vs-go.svg"
     pinned_versions = versions()
     zig_speed, rust_speed, zig_us, machine = read(table_path)
     missing = [(m, o) for m in msg_keys for o in op_keys if (m, o) not in zig_speed]

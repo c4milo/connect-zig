@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Draws a chart of docs/images/ from a production table of CI's fullstack job (decision 44).
+"""Draws a chart from a production table of CI's fullstack job (decision 44).
 
     tools/fullstack_chart.py <log> <run> <commit> <transport> [out.svg]
 
@@ -402,7 +402,7 @@ def draw(transport, held, steps, machine, run, commit):
 def main():
     log_path, run, commit, transport = sys.argv[1:5]
     suffix = {"tls": "", "cleartext": "-cleartext", "validate": "-validate"}[transport]
-    out = sys.argv[5] if len(sys.argv) > 5 else f"docs/images/fullstack{suffix}.svg"
+    out = sys.argv[5] if len(sys.argv) > 5 else f"fullstack{suffix}.svg"
     validate, over, looks = setting(transport)
     held, steps, machine = read(log_path, over, looks)
     servers = [name for name in looks if name in held]

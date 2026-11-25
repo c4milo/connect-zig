@@ -216,10 +216,11 @@ map fields: `tools/wide` has one with 1,100.
 
 One decode of a request message and one validation of it against the rules of
 its schema, beside protovalidate-go, protovalidate-es on Node.js, protovalidate-buffa, and
-prost-protovalidate. CI draws the chart on each tag, and the chart names its run.
+prost-protovalidate. CI draws the chart on each tag and attaches it to the tag's release, and the
+chart names its run.
 [benchmarks.md](benchmarks.md), "Validation", says how it is measured.
 
-![Bars of the speed of a decode with a validation through connect-zig, protovalidate-buffa, prost-protovalidate, and protovalidate-es, in multiples of protovalidate-go's, on arm64](images/validate-vs-go-arm64.svg)
+![Bars of the speed of a decode with a validation through connect-zig, protovalidate-buffa, prost-protovalidate, and protovalidate-es, in multiples of protovalidate-go's, on arm64](https://github.com/c4milo/connect-zig/releases/latest/download/validate-vs-go-arm64.svg)
 
 ## How it is checked
 

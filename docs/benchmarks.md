@@ -1,13 +1,14 @@
 # Benchmarks
 
 How connect-zig's benchmarks are measured, with their charts. CI runs the benchmarks on each tag,
-and commits the charts they draw (decision 44). Each chart names the run and the commit that drew
-it, and that run's summary holds every table, the x86-64 results included. A time compares only
+and attaches the charts they draw to the tag's GitHub release (decision 44). This page shows the
+latest release's. Each chart names the run and the commit that drew it, and that run's summary
+holds every table, the x86-64 results included. A time compares only
 with times of the same job on the same machine, as [performance.md](performance.md) asks.
 
 ## The codec
 
-![Bars of the speed of connect-zig and of Buffa, connect-rust's codec, in multiples of Go's protobuf runtime, connect-go's codec, on arm64](images/speed-vs-go-arm64.svg)
+![Bars of the speed of connect-zig and of Buffa, connect-rust's codec, in multiples of Go's protobuf runtime, connect-go's codec, on arm64](https://github.com/c4milo/connect-zig/releases/latest/download/speed-vs-go-arm64.svg)
 
 `zig build bench` times binary and JSON encoding and decoding of eight messages.
 `tools/bench_check.sh` runs the same inputs through Go's `google.golang.org/protobuf` v1.36.12 and
@@ -20,7 +21,7 @@ connect-zig parses a repeated field when it is read, so connect-zig reads with `
 
 ## Request routing
 
-![Bars of the speed of a routed unary call through connect-zig and connect-rust, in multiples of connect-go's, on arm64](images/call-vs-go-arm64.svg)
+![Bars of the speed of a routed unary call through connect-zig and connect-rust, in multiples of connect-go's, on arm64](https://github.com/c4milo/connect-zig/releases/latest/download/call-vs-go-arm64.svg)
 
 `bench/call.zig` runs one unary call in memory through each library's router, route, protocol,
 and codec, with no socket, TLS, or HTTP/2 framing. Each program builds its request once and times
@@ -34,12 +35,12 @@ segment, so connect-zig's call grows with the table. The run's summary holds tho
 An OTLP receiver on one core, over TLS and h2, takes the traffic of one gateway core for 33,000
 servers.
 
-![Bars of the spans a second one core holds with p99 under 100 ms over TLS, the median of three rounds with their range, and lines of p99 as the rate climbs, on arm64](images/fullstack-arm64.svg)
+![Bars of the spans a second one core holds with p99 under 100 ms over TLS, the median of three rounds with their range, and lines of p99 as the rate climbs, on arm64](https://github.com/c4milo/connect-zig/releases/latest/download/fullstack-arm64.svg)
 
 <details>
 <summary>The same on x86-64.</summary>
 
-![Bars of the spans a second one core holds with p99 under 100 ms over TLS, the median of three rounds with their range, and lines of p99 as the rate climbs, on x86-64](images/fullstack.svg)
+![Bars of the spans a second one core holds with p99 under 100 ms over TLS, the median of three rounds with their range, and lines of p99 as the rate climbs, on x86-64](https://github.com/c4milo/connect-zig/releases/latest/download/fullstack.svg)
 
 </details>
 
@@ -88,7 +89,7 @@ The limits of these measurements:
 Each Connect receiver runs again over TLS and checks every span against OTLP's span rules, in
 `tools/fullstack/validate`, two of them CEL.
 
-![Bars of the spans a second one core holds over TLS with p99 under 100 ms, for each Connect receiver without and with protovalidate, the median of three rounds, and lines of p99 as the rate climbs, on arm64](images/fullstack-validate-arm64.svg)
+![Bars of the spans a second one core holds over TLS with p99 under 100 ms, for each Connect receiver without and with protovalidate, the median of three rounds, and lines of p99 as the rate climbs, on arm64](https://github.com/c4milo/connect-zig/releases/latest/download/fullstack-validate-arm64.svg)
 
 connect-zig uses `protovalidate.Interceptor` (`zig build otlp-sink-validate`), connect-go
 [protovalidate-go](https://github.com/bufbuild/protovalidate-go) v1.4.1, and connect-rust
@@ -100,7 +101,7 @@ climb, the check sends an export that breaks a rule, and fails when a validating
 The three Connect receivers take the production model's exports over TLS, uncompressed and in
 gzip, zstd, and brotli.
 
-![Bars of the spans a second each Connect receiver holds over TLS with exports in gzip, zstd, and brotli, as a share of the same receiver with uncompressed exports in the same round, and of its calls a second at peak, on arm64](images/fullstack-compression-arm64.svg)
+![Bars of the spans a second each Connect receiver holds over TLS with exports in gzip, zstd, and brotli, as a share of the same receiver with uncompressed exports in the same round, and of its calls a second at peak, on arm64](https://github.com/c4milo/connect-zig/releases/latest/download/fullstack-compression-arm64.svg)
 
 `tools/fullstack/compression.sh` runs three rounds of each coding. stdx writes gzip at its default
 level, and zstd and brotli at level 1. Each receiver decodes with its library's own decoders. A
@@ -122,7 +123,7 @@ The limits of these measurements:
 
 One decode of a request message and one validation of it, through five implementations.
 
-![Bars of the speed of a decode with a validation through connect-zig, protovalidate-buffa, prost-protovalidate, and protovalidate-es, in multiples of protovalidate-go's, on arm64](images/validate-vs-go-arm64.svg)
+![Bars of the speed of a decode with a validation through connect-zig, protovalidate-buffa, prost-protovalidate, and protovalidate-es, in multiples of protovalidate-go's, on arm64](https://github.com/c4milo/connect-zig/releases/latest/download/validate-vs-go-arm64.svg)
 
 `tools/validate_compare_check.sh` times five implementations on one schema,
 `bench/validate/proto`, and fails when two give one message different verdicts:

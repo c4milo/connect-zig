@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Draws docs/images/validate-vs-go.svg from the table of CI's validate-compare job
+"""Draws validate-vs-go.svg from the table of CI's validate-compare job
 (tools/validate_compare_check.sh).
 
     tools/validate_chart.py <table.md> <run> <commit> [out.svg]
@@ -210,7 +210,7 @@ def draw(times, machine, run, commit, pinned_versions):
 
 def main():
     table_path, run, commit = sys.argv[1:4]
-    out = sys.argv[4] if len(sys.argv) > 4 else "docs/images/validate-vs-go.svg"
+    out = sys.argv[4] if len(sys.argv) > 4 else "validate-vs-go.svg"
     pinned_versions = versions()
     times, machine = read(table_path)
     missing = [case for case in cases if case not in times]

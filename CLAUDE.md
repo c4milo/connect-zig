@@ -333,6 +333,6 @@ confirm a test fails. Report `CAUGHT` or `NOT CAUGHT` per mutation in the commit
   runners do not expose. A `fullstack` check has 90 minutes, and every other check 60.
   The benchmarks draw the charts of `docs/benchmarks.md` and the README into `ci-charts/`, which
   CI keeps with the run as `charts-<check>-<arch>`. On a tag, once every benchmark passed, the
-  job `charts` commits each chart that `docs/images` holds to main (`tools/charts_commit.sh`).
-  The README and `docs/benchmarks.md` quote no measured number, so a new chart leaves no text
-  stale. A person runs the benchmarks without a tag with the workflow's `benchmarks` input.
+  job `charts` attaches each chart to the tag's GitHub release (`tools/charts_release.sh`), and
+  the README and `docs/benchmarks.md` show the latest release's. They quote no measured number,
+  so a new chart leaves no text stale. A person runs the benchmarks without a tag with the workflow's `benchmarks` input.

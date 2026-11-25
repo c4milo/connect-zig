@@ -33,9 +33,10 @@ paid for.
   on x86-64 and on arm64, and adds its tables to each job's summary.
 - **Each tag draws the charts.** CI runs the benchmarks on a tag alone. Their jobs draw the charts
   from their own output, and CI keeps them with the run as `charts-<check>-<arch>`. Once every
-  benchmark of the tag passed, the job `charts` commits each chart that `docs/images` holds
-  (`tools/charts_commit.sh`, decision 44 as amended). The README and `docs/benchmarks.md` quote
-  no measured number, so no text goes stale; the run's summary holds every table.
+  benchmark of the tag passed, the job `charts` attaches each chart to the tag's GitHub release
+  (`tools/charts_release.sh`, decision 44 as amended). The README and `docs/benchmarks.md` show
+  the latest release's charts and quote no measured number, so no text goes stale; the run's
+  summary holds every table.
 - **The smoke run.** `zig build bench -- --quick` runs every operation on every message in a few
   short batches. CI's `bench` job runs it, so a broken operation fails before anyone times it.
 - **Cycles and branch misses are a filter too.** `zig build bench-validate -- --counters <dir>`

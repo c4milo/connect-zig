@@ -14,8 +14,8 @@
 set -eu
 cd "$(dirname "$0")/.."
 checks="format citations scripts complexity commits test release package bench costs bench-compare fullstack fullstack-peak fullstack-cleartext fullstack-compression fullstack-compression-cleartext perf generated interop interop-languages interop-servers coverage line-coverage conformance protobuf-conformance protovalidate-conformance cel-differential cel-conformance compile-time validate-compare lean"
-# The checks that time connect-zig against other servers and libraries, and draw the charts of
-# docs/images. CI runs them on a tag alone, and its job `charts` commits what they drew
+# The checks that time connect-zig against other servers and libraries, and draw its charts. CI
+# runs them on a tag alone, and its job `charts` attaches what they drew to the tag's release
 # (decision 44 as amended on 2026-11-25). Every other check runs on each push and pull request.
 benchmarks="bench-compare fullstack fullstack-peak fullstack-cleartext fullstack-compression fullstack-compression-cleartext validate-compare"
 # The checks that run a second time on an arm64 runner: `test` because an aarch64 Linux link can
@@ -97,8 +97,8 @@ report_only() {
 
 # Draws the README's charts of a check from its output (the first argument), into `charts`. Each
 # chart names its run: GitHub's run number in CI, or "local". An arm64 runner's charts take the
-# README's "-arm64" names. CI uploads `charts` with the run, and on a tag its job `charts` commits
-# each one that docs/images holds (tools/charts_commit.sh, decision 44 as amended). A chart that
+# README's "-arm64" names. CI uploads `charts` with the run, and on a tag its job `charts` attaches
+# each one to the tag's release (tools/charts_release.sh, decision 44 as amended). A chart that
 # does not draw is a warning: the check measured what it must.
 charts="ci-charts"
 draw_charts() {
