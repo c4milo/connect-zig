@@ -2323,6 +2323,8 @@ ran on Linux x86-64 with Zig 0.16.0.
   - `zig build test` passed on x86-64 Linux, with Zig 0.16.0, and so did the build of every
     program `zig build test` does not run, `zig build bench -- --quick` and
     `tools/package_check.sh`.
+  - colibri c1aceb5, which v0.20.0 tags, differs from a99272f in its version and its install
+    lines alone, so connect-zig pins it in its place.
 
 - **One name for each thing in `connect_zig`** (decision 52, amended again 2026-11-25). No
   program uses the API yet, so the owner chose to change it. `CpuFeatures`, stdx's type, takes

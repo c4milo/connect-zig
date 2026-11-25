@@ -10,7 +10,7 @@ change the public API, and the entry marks each change that does.
 
 ## Unreleased
 
-It builds on colibri at a99272f, on its `main`, and on stdx at b643d58, the commit that colibri
+It builds on colibri v0.20.0, at c1aceb5, and on stdx at b643d58, the commit that colibri
 pins. `protovalidate` takes `regex` from the same stdx: the second pin, `stdx_regex`, is gone.
 stdx's package now exports one module, `stdx`, and connect-zig and colibri both build on that
 one module. colibri's `Engine.receive` writes into a `server.ReceiveResult` the program keeps,
