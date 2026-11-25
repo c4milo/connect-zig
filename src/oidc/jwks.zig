@@ -1,8 +1,8 @@
 //! The keys of a JWK Set (RFC 7517 §5), each in the form chapulin's `jws.verify` takes.
 const std = @import("std");
 const assert = std.debug.assert;
-// The TCP object of chapulin's nonblocking module, which holds the JWS calls (colibri decision 172).
-const chapulin = @import("chapulin").tcp;
+// chapulin's cryptography, through stdx (decision 34 as amended): its JWS calls and its build record.
+const crypto = @import("stdx").crypto;
 const platform = @import("stdx").platform;
 const constants = @import("constants.zig");
 const reader_file = @import("reader.zig");
@@ -178,7 +178,7 @@ const Draft = struct {
     /// or that decodes to more octets than the member's bound, leaves the member with no octet,
     /// as if the JWK did not hold it.
     fn decode(out: []u8, text: []const u8) usize {
-        const octets = chapulin.jws.base64url_decode(out, text) catch return 0;
+        const octets = crypto.jws.base64url_decode(out, text) catch return 0;
         return octets.len;
     }
 

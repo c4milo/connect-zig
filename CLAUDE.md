@@ -286,9 +286,10 @@ confirm a test fails. Report `CAUGHT` or `NOT CAUGHT` per mutation in the commit
   method on colibri's exported modules over TLS, under the test identity, on h11, h2, and h3, and
   calls it with connect-zig's client and with curl (decision 39). It needs the network, buf, and
   curl.
-- OIDC: `zig build test-oidc` runs the `oidc` module's tests. `build/chapulin.zig` asks for
-  chapulin with colibri's own request, so a program links one chapulin object (decision 34); a
-  colibri release that changes its request changes that file. `zig build example-oidc` runs a
+- OIDC: `zig build test-oidc` runs the `oidc` module's tests. `oidc` reads chapulin's JWS calls
+  from `stdx.crypto`, and the build asks stdx for colibri's request, `.crypto = true` among it, so
+  a program links one stdx and one chapulin (decision 34); a colibri release that changes its
+  request of stdx changes `build.zig`'s. `zig build example-oidc` runs a
   service behind the interceptor. `python3 tools/oidc_vectors.py` writes
   `src/oidc/rsa_vectors.zig` again: RS256 tokens that OpenSSL signs with new keys. It needs
   openssl.

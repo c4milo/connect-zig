@@ -15,7 +15,8 @@ const std = @import("std");
 const optimize: std.builtin.OptimizeMode = .ReleaseFast;
 
 pub fn add(b: *std.Build, public_names: *std.Build.Module, target: std.Build.ResolvedTarget) void {
-    const stdx = b.dependency("stdx", .{ .target = target, .release = true });
+    // colibri's own request of stdx (colibri decision 174), so the routed calls below link one stdx.
+    const stdx = b.dependency("stdx", .{ .target = target, .release = true, .crypto = true });
     var copies: Copies = .empty;
     const protobuf = b.createModule(.{
         .root_source_file = b.path("src/protobuf/protobuf.zig"),

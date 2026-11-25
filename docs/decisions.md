@@ -701,6 +701,25 @@ first. Cite an entry by number in code and commits ("decision 6").
       the owner chose. Zig exports the hook only when something references chapulin's module, so
       the module `connect_zig` references colibri whenever a program reaches it. A test binary
       that reaches no part of connect-zig, as two in this tree do, names colibri itself.
+    - Amended again on 2026-11-25, for colibri decision 174 and stdx's decision 87: chapulin
+      comes through stdx alone.
+      - stdx asks chapulin once and gives its module as `stdx.crypto`, and colibri takes its TLS
+        stack from there. `oidc` reads the JWS calls from `stdx.crypto.jws` and the build record
+        from `stdx.crypto.tls`. connect-zig names chapulin nowhere: `build/chapulin.zig` and the
+        pin are gone.
+      - connect-zig asks stdx for what colibri asks, `.target`, `.release` and `.crypto = true`,
+        whenever its module names colibri. Zig keys a dependency by its package and its
+        options, so the two requests give one stdx, and through it one chapulin. A program that
+        names stdx beside connect-zig asks the same.
+      - With `.colibri = false`, connect-zig asks stdx with no `crypto`, so the program links no
+        chapulin, and no `oidc` module exists, as decision 52 states.
+      - stdx's root keeps chapulin's hook when Zig reads it. The module `connect_zig` now
+        references stdx's root in place of colibri, so a program that reaches only `protobuf`
+        keeps the hook. A test binary that reaches no part of connect-zig still names one root
+        that reads stdx's: the github service's names `connect_zig`, and the interop client's
+        names colibri.
+      - In this tree's own build, stdx holds `crypto`, so a check over `connect_zig` without
+        colibri links chapulin's objects too. It still reaches no colibri module.
 
 35. **A call keeps values of the type the program declares.** Ruled by the owner on
     2026-11-11. What an interceptor learns about a call belongs to that call: the claims of its

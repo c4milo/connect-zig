@@ -2354,6 +2354,22 @@ ran on Linux x86-64 with Zig 0.16.0.
   - No check changes, so no mutation ran.
   - `zig build test` and `zig build examples` passed on x86-64 Linux, with Zig 0.16.0. The
     package hashes came from `zig fetch` over a `git archive` of each commit.
+- **colibri at 3ea5851d and stdx at 5de7d89f: chapulin through stdx** (decision 34 as amended
+  again on 2026-11-25; colibri decision 174; stdx's decision 87). No public name of connect-zig
+  changes. `oidc` reads its JWS calls from `stdx.crypto.jws`, and the build asks stdx with
+  colibri's request, so `build/chapulin.zig` and the chapulin pin are gone. The module
+  `connect_zig` references stdx's root, which keeps chapulin's hook. The github service's tests
+  name `connect_zig` in place of colibri, and the interop client's tests keep their reference to
+  colibri, whose root reads stdx's.
+  - Mutations, each `CAUGHT`: the module's reference to stdx removed, against `zig build
+    test-connect-zig-messages`, whose link fails on `ch_assert_fail`; the github service's and the
+    interop client's references removed, against `zig build examples` and `zig build checks`,
+    which fail the same way; and stdx asked with no `crypto` beside colibri, against `zig build
+    test-oidc`.
+  - `zig build test` passed on x86-64 Linux, with Zig 0.16.0.
+  - The package hashes were computed from each commit's tree by a script that gives Zig 0.16's
+    hashes of the pins before them, and the colibri session confirmed stdx's and chapulin's with
+    `zig fetch`.
 
 ### Work not done yet
 

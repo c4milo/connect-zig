@@ -3,8 +3,8 @@
 //! to `set_keys`, and passes the time to `set_time`.
 const std = @import("std");
 const assert = std.debug.assert;
-// The TCP object of chapulin's nonblocking module, which holds the JWS calls (colibri decision 172).
-const chapulin = @import("chapulin").tcp;
+// chapulin's cryptography, through stdx (decision 34 as amended): its JWS calls and its build record.
+const crypto = @import("stdx").crypto;
 const platform = @import("stdx").platform;
 const constants = @import("constants.zig");
 const claims_file = @import("claims.zig");
@@ -81,7 +81,7 @@ pub const Verifier = struct {
     pub fn init(verifier: *Verifier, options: *const VerifierOptions) InitError!void {
         // The object's build record matches the headers this module compiled with (chapulin's
         // build.h).
-        assert(chapulin.build_matches());
+        assert(crypto.tls.build_matches());
         if (options.issuer.len == 0 or options.issuer.len > constants.issuer_bytes_max) return error.IssuerInvalid;
         if (options.audience.len == 0 or options.audience.len > constants.audience_bytes_max) return error.AudienceInvalid;
         if (options.leeway_s > constants.leeway_s_max) return error.LeewayTooLong;
@@ -162,7 +162,7 @@ pub const Verifier = struct {
     fn key_of(verifier: *Verifier, parts: *const token_file.Parts) Error!*const jwks.Key {
         // RFC 7515 §5.2 steps 2 and 3: the header is base64url, with no padding (§2), of UTF-8
         // JSON. chapulin's decoder refuses a text that is not canonical.
-        const text = chapulin.jws.base64url_decode(&verifier.decoded, parts.header) catch return error.Malformed;
+        const text = crypto.jws.base64url_decode(&verifier.decoded, parts.header) catch return error.Malformed;
         var key_id: [constants.key_id_bytes_max]u8 = @splat(0);
         var reader: Reader = undefined;
         reader.init(text, &verifier.scratch, verifier.cpu_features);
@@ -180,17 +180,17 @@ pub const Verifier = struct {
     /// No claim is read before the signature passed.
     fn signed_payload(verifier: *Verifier, parts: *const token_file.Parts, key: *const jwks.Key, claims: *Claims) Error!void {
         assert(parts.signing_input.len < constants.token_bytes_max);
-        const signature = chapulin.jws.base64url_decode(&verifier.decoded, parts.signature) catch return error.Malformed;
+        const signature = crypto.jws.base64url_decode(&verifier.decoded, parts.signature) catch return error.Malformed;
         // RFC 7515 §5.2 step 8: the signature is over the JWS Signing Input. RFC 8725 §3.1: the
         // algorithm is the key's own, which `find` matched with the header's "alg". A key that
         // chapulin refuses verifies nothing.
-        chapulin.jws.verify(&.{
+        crypto.jws.verify(&.{
             .algorithm = key.algorithm,
             .key = key.bytes(),
             .input = parts.signing_input,
             .signature = signature,
         }) catch return error.InvalidSignature;
-        const payload = chapulin.jws.base64url_decode(&claims.payload_storage, parts.payload) catch return error.Malformed;
+        const payload = crypto.jws.base64url_decode(&claims.payload_storage, parts.payload) catch return error.Malformed;
         claims.payload_len = payload.len;
     }
 

@@ -10,13 +10,19 @@ change the public API, and the entry marks each change that does.
 
 ## Unreleased
 
-It builds on colibri at 64f02df4, on its `main`, and on chapulin at bda41cf6 and Rotor at
-af06860, the commits that colibri pins.
+It builds on colibri at 3ea5851d, on its `main`, and on stdx at 5de7d89f and Rotor at af06860,
+the commits that colibri pins. stdx brings chapulin at f29c066a.
 
 ### Changed
 
+- **Breaking.** connect-zig names chapulin no more. colibri takes chapulin through stdx, as
+  `stdx.crypto` (colibri decision 174), and `oidc` checks signatures with `stdx.crypto.jws`. A
+  program that names stdx beside connect-zig asks it for `.target`, `.release` and `.crypto =
+  true`, or Zig builds a second stdx ([decision 34](docs/decisions.md)). With `.colibri = false`,
+  stdx fetches and links no chapulin, as before.
+
 - **Breaking.** A program no longer defines chapulin's assertion hook: chapulin's module
-  defines `ch_assert_fail` itself (colibri decision 172). Delete your `export fn
+  defines `ch_assert_fail` itself (colibri decision 172), and stdx's root keeps it. Delete your `export fn
   ch_assert_fail`, or the link fails with a second definition. A program that reports a failed
   chapulin assertion its own way declares `pub fn chapulinAssertFail(condition: [*:0]const u8,
   file: [*:0]const u8, line: c_int) noreturn` in its root file.

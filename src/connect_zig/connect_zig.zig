@@ -17,16 +17,17 @@ pub const CpuFeatures = @import("stdx").platform.CpuFeatures;
 pub const buf_validate_validate = @import("buf_validate_validate");
 pub const google_protobuf_descriptor = @import("google_protobuf_descriptor");
 pub const connect_colibri = if (options.colibri) @import("connect_colibri") else without_colibri("connect_colibri");
-/// chapulin builds the `jws` calls of `oidc` for a host target alone (decision 34).
-pub const oidc = if (options.oidc) @import("oidc") else @compileError("oidc needs colibri's chapulin, on an arm64 target with NEON or an x86-64 target with SSE2 (decisions 34 and 52)");
+/// chapulin builds the `jws` calls of `oidc`, which stdx gives as `crypto.jws`, for a host target
+/// alone (decision 34).
+pub const oidc = if (options.oidc) @import("oidc") else @compileError("oidc needs stdx.crypto, which connect-zig asks for with colibri, on an arm64 target with NEON or an x86-64 target with SSE2 (decisions 34 and 52)");
 pub const colibri = if (options.colibri) @import("colibri") else without_colibri("colibri");
 
 comptime {
-    // With colibri, the module links chapulin's objects, and chapulin's module exports their hook,
-    // `ch_assert_fail`, from a comptime block that Zig runs only when something references it.
-    // colibri's root references it, and this reference runs colibri's root whenever a program
-    // reaches this module, even a test that names no colibri type (colibri decision 172).
-    if (options.colibri) _ = colibri;
+    // With colibri, the module links chapulin's objects through stdx's `crypto`, and stdx's root
+    // keeps their hook, `ch_assert_fail`, when Zig reads that root (stdx's decision 87 as
+    // amended). This reference reads it whenever a program reaches this module, even a test that
+    // names no stdx or colibri type (decision 34 as amended).
+    _ = @import("stdx");
 }
 
 fn without_colibri(comptime name: []const u8) noreturn {

@@ -5,6 +5,8 @@
 //! (decision 52). It names every library module, colibri's `server`, `client`, `http`, `tls` and
 //! `colibri`, stdx's `platform`, and the generated code of validate.proto and descriptor.proto.
 //! `.colibri = false` leaves colibri and `oidc` out of it, so a program links no chapulin.
+//! connect-zig asks stdx for what colibri asks, `.crypto = true` among it, so a program links one
+//! stdx and through it one chapulin (decision 34).
 //! `.rotor = true` builds colibri's `.private` kinds on Rotor (decision 39).
 const std = @import("std");
 const assert = std.debug.assert;
@@ -13,7 +15,6 @@ const examples = @import("build/examples.zig");
 const checks = @import("build/checks.zig");
 const bench = @import("build/bench.zig");
 const conformance = @import("build/conformance.zig");
-const chapulin = @import("build/chapulin.zig");
 const line_coverage = @import("build/line_coverage.zig");
 const lean = @import("build/lean.zig");
 const fullstack = @import("build/fullstack.zig");
@@ -30,15 +31,18 @@ pub fn build(b: *std.Build) void {
     assert(optimize == .Debug or optimize == .ReleaseSafe);
     const release = optimize == .ReleaseSafe;
 
-    const stdx = b.dependency("stdx", .{ .target = target, .release = release });
+    // Decision 52: whether the module `connect_zig` names colibri. A program that codes messages
+    // or runs the protocol on an HTTP library of its own passes `.colibri = false`.
+    const with_colibri = b.option(bool, "colibri", "Name colibri, connect_colibri and oidc in the connect_zig module, which links chapulin (decision 52)") orelse true;
+    // colibri asks stdx for chapulin's module (colibri decision 174), and Zig keys a dependency by
+    // its package and its options, so the same request gives the one stdx (decision 34). Without
+    // colibri, stdx fetches no chapulin and compiles no C.
+    const stdx = b.dependency("stdx", .{ .target = target, .release = release, .crypto = with_colibri });
     // colibri's `.private` kind of `colibri.Server`, which the example and conformance servers
     // use, runs on Rotor (colibri decision 159). connect-zig's own build asks for it, and a
     // program asks with `.rotor = true` (decision 39). The library never needs Rotor (decision 32).
     const rotor = b.option(bool, "rotor", "Build colibri's .private kinds of colibri.Server and colibri.Client, on Rotor (decision 39)") orelse (b.pkg_hash.len == 0);
     const colibri = b.dependency("colibri", .{ .target = target, .release = release, .rotor = rotor });
-    // Decision 52: whether the module `connect_zig` names colibri. A program that codes messages
-    // or runs the protocol on an HTTP library of its own passes `.colibri = false`.
-    const with_colibri = b.option(bool, "colibri", "Name colibri, connect_colibri and oidc in the connect_zig module, which links chapulin (decision 52)") orelse true;
     const graph = modules(b, stdx, colibri, with_colibri, target, optimize);
 
     const plugin = b.addExecutable(.{
@@ -118,7 +122,7 @@ fn modules(b: *std.Build, stdx: *std.Build.Dependency, colibri: *std.Build.Depen
             .{ .name = "public_names", .module = public_names },
         },
     });
-    const oidc = oidc_module(b, stdx, connect, public_names, target, optimize);
+    const oidc = if (with_colibri) oidc_module(b, stdx, connect, public_names, target, optimize) else null;
     const validate = protovalidate_module(b, protobuf, public_names, stdx, target, optimize);
     const exports: Exports = .{
         .protobuf = protobuf,
@@ -192,11 +196,12 @@ fn connect_zig_module(b: *std.Build, exports: Exports, with_colibri: bool, targe
     return module;
 }
 
-/// Decision 34: the `oidc` module, which checks a token's signature with chapulin's `jws` calls.
-/// It names no colibri module, so its interceptor serves any call type. chapulin builds those
+/// Decision 34: the `oidc` module, which checks a token's signature with chapulin's `jws` calls,
+/// as `stdx.crypto.jws`. It names no colibri module, so its interceptor serves any call type. It
+/// needs the stdx of `.crypto = true`, which connect-zig asks for with colibri. chapulin builds the
 /// calls for a host target alone, so another target has no `oidc` module.
 fn oidc_module(b: *std.Build, stdx: *std.Build.Dependency, connect: *std.Build.Module, public_names: *std.Build.Module, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode) ?*std.Build.Module {
-    if (!chapulin.host_object(target)) return null;
+    if (!host_object(target)) return null;
     return b.createModule(.{
         .root_source_file = b.path("src/oidc/oidc.zig"),
         .target = target,
@@ -204,10 +209,21 @@ fn oidc_module(b: *std.Build, stdx: *std.Build.Dependency, connect: *std.Build.M
         .imports = &.{
             .{ .name = "connect", .module = connect },
             .{ .name = "stdx", .module = stdx.module("stdx") },
-            .{ .name = "chapulin", .module = chapulin.object(b, target).module("chapulin") },
             .{ .name = "public_names", .module = public_names },
         },
     });
+}
+
+/// chapulin's host test (its build's `hostTarget`): a little-endian arm64 target with NEON, or an
+/// x86-64 target with SSE2. chapulin's RS256 check runs on a host object alone (its `jws.h`), and
+/// stdx asks for `JWS=on` on such a target alone.
+fn host_object(target: std.Build.ResolvedTarget) bool {
+    const cpu = target.result.cpu;
+    return switch (cpu.arch) {
+        .aarch64 => std.Target.aarch64.featureSetHas(cpu.features, .neon),
+        .x86_64 => std.Target.x86.featureSetHas(cpu.features, .sse2),
+        else => false,
+    };
 }
 
 /// Decision 47: the `protovalidate` module, and the generated code of validate.proto and of

@@ -1,8 +1,8 @@
 //! A token's three parts (RFC 7515 §7.1) and its header (RFC 7515 §4).
 const std = @import("std");
 const assert = std.debug.assert;
-// The TCP object of chapulin's nonblocking module, which holds the JWS calls (colibri decision 172).
-const chapulin = @import("chapulin").tcp;
+// chapulin's cryptography, through stdx (decision 34 as amended): its JWS calls and its build record.
+const crypto = @import("stdx").crypto;
 const constants = @import("constants.zig");
 const reader_file = @import("reader.zig");
 const Reader = reader_file.Reader;
@@ -11,7 +11,7 @@ pub const Error = error{Malformed};
 
 /// The signature algorithms the verifier reads: RS256 and ES256 (RFC 7518 §3.1) and EdDSA with
 /// Ed25519 (RFC 8037 §3.1).
-pub const Algorithm = chapulin.jws.Algorithm;
+pub const Algorithm = crypto.jws.Algorithm;
 
 /// The algorithms a verifier takes (RFC 8725 §3.1: the caller states them, and no other is
 /// used). Each key signs with one algorithm, which its JWK fixes, so a token cannot move a key to

@@ -270,7 +270,8 @@ fn run_calls(reporter: *Reporter, name: []const u8, run: *const Run, all: []cons
 
 test {
     _ = @import("same.zig");
-    // The tests reach no colibri type, yet the binary links chapulin's objects. Naming colibri runs
-    // its root, which keeps chapulin's hook, `ch_assert_fail`, beside them (colibri decision 172).
+    // The tests reach no colibri type, yet the binary links chapulin's objects through stdx.
+    // Naming colibri reads its root, which reads stdx's, and stdx's root keeps chapulin's hook,
+    // `ch_assert_fail`, beside them (decision 34 as amended).
     _ = client;
 }

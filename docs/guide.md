@@ -46,11 +46,13 @@ and the program links no chapulin. [examples/std_http](../examples/std_http) ser
 with no RPC.
 
 A program that takes `connect_zig` with colibri links
-[chapulin](https://github.com/c4milo/chapulin), the TLS library under colibri. A failed chapulin
-assertion panics with its condition and its source line. A program that reports it its own way
-declares `pub fn chapulinAssertFail(condition: [*:0]const u8, file: [*:0]const u8, line: c_int)
-noreturn` in its root file, and chapulin calls it (colibri decision 172). Do not export
-`ch_assert_fail` yourself: chapulin defines it, and a second definition fails the link.
+[chapulin](https://github.com/c4milo/chapulin), the TLS library under colibri, through stdx's
+`crypto` module. A failed chapulin assertion panics with its condition and its source line. A
+program that reports it its own way declares `pub fn chapulinAssertFail(condition: [*:0]const u8,
+file: [*:0]const u8, line: c_int) noreturn` in its root file, and chapulin calls it. Do not export
+`ch_assert_fail` yourself: chapulin defines it, and a second definition fails the link. A program
+that names stdx beside connect-zig asks it for `.target`, `.release` and `.crypto = true`, as
+connect-zig and colibri do, so the program builds one stdx ([decision 34](decisions.md)).
 
 ## 2. Generate code
 
@@ -312,7 +314,8 @@ if (ctx.values(Values).oidc) |*claims| {
 The verifier checks the signature with the key the token names, then the issuer, the audience,
 `exp`, and `nbf` ([decision 34](decisions.md)). A call with no valid token gets `unauthenticated` and a
 `WWW-Authenticate: Bearer` header. On an excluded path, `oidc` stays null. `oidc` checks
-signatures with chapulin, which colibri already links, so it adds no second crypto library.
+signatures with chapulin, which colibri already links through stdx, so it adds no second crypto
+library.
 
 The route table's `.Values` serves any interceptor: it is a struct you declare, and each call
 starts with its defaults ([decision 35](decisions.md)). One table names one type for all its routes, so a table
