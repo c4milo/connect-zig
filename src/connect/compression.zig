@@ -6,10 +6,10 @@
 //! lists that it holds an encoder for.
 const std = @import("std");
 const assert = std.debug.assert;
-const platform = @import("platform");
-const gzip = @import("gzip");
-const zstd = @import("zstd");
-const brotli = @import("brotli");
+const platform = @import("stdx").platform;
+const gzip = @import("stdx").compress.gzip;
+const zstd = @import("stdx").compress.zstd;
+const brotli = @import("stdx").compress.brotli;
 const constants = @import("constants.zig");
 
 pub const Coding = enum {

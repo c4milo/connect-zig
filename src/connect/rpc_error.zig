@@ -3,7 +3,7 @@
 //! google/rpc/status.proto).
 const std = @import("std");
 const proto = @import("protobuf");
-const platform = @import("platform");
+const platform = @import("stdx").platform;
 const code_file = @import("code.zig");
 const constants = @import("constants.zig");
 const Code = code_file.Code;

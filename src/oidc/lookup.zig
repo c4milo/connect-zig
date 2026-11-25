@@ -6,7 +6,7 @@
 //! than its storage reads as `.long`.
 const std = @import("std");
 const assert = std.debug.assert;
-const platform = @import("platform");
+const platform = @import("stdx").platform;
 const constants = @import("constants.zig");
 const Reader = @import("reader.zig").Reader;
 

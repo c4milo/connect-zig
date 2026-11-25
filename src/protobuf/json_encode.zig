@@ -9,7 +9,7 @@
 //! since `@call` cannot type its token literal, and only a FieldMask takes it.
 const std = @import("std");
 const assert = std.debug.assert;
-const json = @import("json");
+const json = @import("stdx").encoding.json;
 const descriptor = @import("descriptor.zig");
 const scalar = @import("scalar.zig");
 const repeated = @import("repeated.zig");

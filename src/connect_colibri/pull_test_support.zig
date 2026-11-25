@@ -6,7 +6,7 @@ const assert = std.debug.assert;
 const testing = std.testing;
 const connect = @import("connect");
 const proto = @import("protobuf");
-const platform = @import("platform");
+const platform = @import("stdx").platform;
 /// The CPU features the tests' contexts and clients state: the build target's, which a test may
 /// name where a program names the features it detected.
 pub const cpu_features = platform.CpuFeatures.target();
@@ -418,7 +418,7 @@ pub const Fixture = struct {
     }
 
     fn handle(fixture: *Fixture, received: server.Event) void {
-        const handled = fixture.pool.handle(&fixture.app, &fixture.engine, received);
+        const handled = fixture.pool.handle(&fixture.app, &fixture.engine, &received);
         assert(handled == .taken);
     }
 

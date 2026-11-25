@@ -6,8 +6,8 @@
 //! through local-exec relocations, which reach 16 MiB (`R_AARCH64_TLSLE_ADD_TPREL_HI12`). The
 //! zstd decoder alone takes about 8.7 MB, so a set in each test file overran that reach. A test
 //! uses a codec for one message at a time, so a server and a client in one test take turns.
-const brotli = @import("brotli");
-const platform = @import("platform");
+const brotli = @import("stdx").compress.brotli;
+const platform = @import("stdx").platform;
 const proto = @import("protobuf");
 const compression = @import("compression.zig");
 const Client = @import("client.zig").Client;

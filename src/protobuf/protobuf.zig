@@ -9,8 +9,8 @@
 //! the caller passes, for a program that reads every field (decision 37). The caller owns every
 //! buffer.
 const std = @import("std");
-const json = @import("json");
-const platform = @import("platform");
+const json = @import("stdx").encoding.json;
+const platform = @import("stdx").platform;
 
 pub const constants = @import("constants.zig");
 

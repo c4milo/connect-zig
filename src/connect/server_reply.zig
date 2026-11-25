@@ -9,7 +9,7 @@
 //! - gRPC-Web: envelopes, then the status in a trailers frame flagged 0x80.
 const std = @import("std");
 const assert = std.debug.assert;
-const platform = @import("platform");
+const platform = @import("stdx").platform;
 const protocol = @import("protocol.zig");
 const compression = @import("compression.zig");
 const envelope = @import("envelope.zig");

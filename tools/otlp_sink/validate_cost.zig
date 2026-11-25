@@ -17,7 +17,7 @@ const proto = @import("protobuf");
 const protobuf_decoder: proto.Decoder = .init(.target());
 const protovalidate = @import("protovalidate");
 const otlp = @import("otlp");
-const platform = @import("platform");
+const platform = @import("stdx").platform;
 
 /// The sizes of storage the program times, in octets: the route's default for the sink, 256 KiB,
 /// then 512 KiB, 768 KiB, the sink's 1 MiB, and 4 MiB.

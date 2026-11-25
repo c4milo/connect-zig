@@ -2,8 +2,8 @@
 //! makes one as it starts, with the features it detected once, and encodes with it from then on.
 //! The binary encoding uses no CPU feature, so `protobuf.encode` needs no encoder.
 const std = @import("std");
-const json = @import("json");
-const platform = @import("platform");
+const json = @import("stdx").encoding.json;
+const platform = @import("stdx").platform;
 const json_encode = @import("json_encode.zig");
 const json_scalar = @import("json_scalar.zig");
 const any = @import("any.zig");

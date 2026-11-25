@@ -10,8 +10,12 @@ change the public API, and the entry marks each change that does.
 
 ## Unreleased
 
-It builds on colibri at f8d107a, on its `main`, and on stdx at 1ef992a, the commit that colibri
+It builds on colibri at a99272f, on its `main`, and on stdx at b643d58, the commit that colibri
 pins. `protovalidate` takes `regex` from the same stdx: the second pin, `stdx_regex`, is gone.
+stdx's package now exports one module, `stdx`, and connect-zig and colibri both build on that
+one module. colibri's `Engine.receive` writes into a `server.ReceiveResult` the program keeps,
+and `Router.handle` takes `*const server.Event`: a program that drives the engine itself, as
+`examples/std_io` does, changes those calls (colibri design §8 step 58b).
 
 ### Added
 

@@ -41,7 +41,7 @@ pub fn add(b: *std.Build, graph: Graph) *std.Build.Step {
         .imports = &.{
             .{ .name = "protobuf", .module = graph.protobuf },
             .{ .name = "protovalidate", .module = graph.protovalidate },
-            .{ .name = "platform", .module = graph.platform },
+            .{ .name = "stdx", .module = graph.stdx },
             .{ .name = "harness", .module = find(generated, "buf_validate_conformance_harness_harness").module },
             .{ .name = "cases", .module = cases_module(b, graph, generated) },
         },

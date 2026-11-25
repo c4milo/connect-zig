@@ -5,8 +5,8 @@
 //! takes the CPU features the program detected once and passes in `Options` (decision 47).
 const std = @import("std");
 const assert = std.debug.assert;
-const regex = @import("regex");
-const platform = @import("platform");
+const regex = @import("stdx").regex;
+const platform = @import("stdx").platform;
 const constants = @import("constants.zig");
 
 // The CPU features a search takes are stdx's `platform.CpuFeatures`, of the stdx `regex` comes

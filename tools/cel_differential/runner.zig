@@ -15,7 +15,7 @@ const proto = @import("protobuf");
 /// machine it was built for, and a library takes the features its program detected.
 const protobuf_decoder: proto.Decoder = .init(.target());
 const protovalidate = @import("protovalidate");
-const platform = @import("platform");
+const platform = @import("stdx").platform;
 const rules = @import("schema");
 
 /// The most rules one schema of the check holds.

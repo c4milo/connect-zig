@@ -1,7 +1,7 @@
 //! Tests of `Interceptor` over a stand-in for the `connect` module: what its `on_message`
 //! answers for a message that passes, that breaks a rule, and that cannot be checked.
 const std = @import("std");
-const platform = @import("platform");
+const platform = @import("stdx").platform;
 const assert = std.debug.assert;
 const testing = std.testing;
 const proto = @import("protobuf");

@@ -10,8 +10,8 @@
 //! A client writes them in that order, so a shared cache sees one URL for one request (Connect
 //! protocol, "Query-Get"). A server reads them in any order.
 const std = @import("std");
-const base64 = @import("base64");
-const platform = @import("platform");
+const base64 = @import("stdx").encoding.base64;
+const platform = @import("stdx").platform;
 const json_read = @import("json_read.zig");
 const assert = std.debug.assert;
 const protocol = @import("protocol.zig");

@@ -5,7 +5,7 @@
 //! The JSON readers and writers and the base64 coders of stdx write the same octets on every path,
 //! so no test sees which features a call took. The rule reads the text: it reports each line of
 //! code in its scope that calls `target()`, written as `platform.CpuFeatures.target()`, through an
-//! alias, through `@import("platform")` in place, or as the declaration literal `.target()`.
+//! alias, through `@import("stdx").platform` in place, or as the declaration literal `.target()`.
 //! A comment is no call. The scope leaves out the test-support files, whose one constant gives
 //! the tests the target's features. No other line passes: no type of the library holds a
 //! default (decisions 10 and 51).
@@ -55,7 +55,7 @@ test "the target-features rule refuses each way to call target()" {
     const refused = [_][:0]const u8{
         "const f = platform.CpuFeatures.target();\n",
         "const f = Features.target();\n",
-        "const f = @import(\"platform\").CpuFeatures.target();\n",
+        "const f = @import(\"stdx\").platform.CpuFeatures.target();\n",
         "fn f() void {\n    call(.{ .cpu_features = .target() });\n}\n",
         "const S = struct {\n    options: platform.CpuFeatures = .target(),\n};\n",
     };

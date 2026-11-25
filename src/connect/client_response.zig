@@ -6,7 +6,7 @@
 //! none, a gRPC response is readable only when the server answered Trailers-Only (decision 11).
 const std = @import("std");
 const assert = std.debug.assert;
-const platform = @import("platform");
+const platform = @import("stdx").platform;
 const Client = @import("client.zig").Client;
 const protocol = @import("protocol.zig");
 const compression = @import("compression.zig");

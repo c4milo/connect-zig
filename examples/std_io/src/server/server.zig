@@ -116,6 +116,9 @@ const Entry = struct {
 /// own entry of `chunks` alone.
 const State = struct {
     engine: Engine,
+    /// What each `receive` reports, kept beside the engine so no event is copied out of a
+    /// returned value (colibri decision 165).
+    received: server.ReceiveResult,
     config: server.Config,
     router: Router,
     app: App,
@@ -347,10 +350,10 @@ fn feed(io: Io, state: *State, entry: *Entry, index: usize, now_ns: u64) bool {
     for (0..constants.events_per_step_max) |_| {
         if (!entry.attached or entry.closing) break;
         const bytes: server.StreamBytes = .{ .connection = entry.handle, .bytes = room[consumed..entry.held_len] };
-        const received = state.engine.receive(.{ .stream = bytes }, now_ns);
-        consumed += received.consumed;
-        if (received.event) |event| route(io, state, event);
-        if (received.consumed == 0 and received.event == null) break;
+        state.engine.receive(.{ .stream = bytes }, now_ns, &state.received);
+        consumed += state.received.consumed;
+        if (state.received.event) |*event| route(io, state, event);
+        if (state.received.consumed == 0 and state.received.event == null) break;
         moved = true;
     }
     std.mem.copyForwards(u8, room[0 .. entry.held_len - consumed], room[consumed..entry.held_len]);
@@ -382,19 +385,19 @@ fn flush(io: Io, state: *State, entry: *Entry, now_ns: u64) bool {
 /// Reads the engine's events until it reports none, and routes each.
 fn drain(io: Io, state: *State, now_ns: u64) void {
     for (0..constants.events_per_step_max) |_| {
-        const event = state.engine.receive(.none, now_ns).event orelse return;
-        route(io, state, event);
+        state.engine.receive(.none, now_ns, &state.received);
+        route(io, state, if (state.received.event) |*event| event else return);
     }
 }
 
 /// Hands an event to the router, which answers every request, and keeps what the connection's
 /// own events say.
-fn route(io: Io, state: *State, event: server.Event) void {
+fn route(io: Io, state: *State, event: *const server.Event) void {
     const other = switch (state.router.handle(&state.app, &state.engine, event)) {
         .taken => return,
         .event => |other| other,
     };
-    switch (other) {
+    switch (other.*) {
         .send => |handle| if (find(state, handle)) |entry| {
             entry.send_owed = true;
         },

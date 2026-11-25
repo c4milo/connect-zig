@@ -1,7 +1,7 @@
 //! Reads the JSON forms of Struct, Value, ListValue and Any into their binary encoding, beside
 //! `json_decode.zig`, which calls here from `message_body` ("JSON Mapping").
 const std = @import("std");
-const json = @import("json");
+const json = @import("stdx").encoding.json;
 const wire = @import("wire.zig");
 const scalar = @import("scalar.zig");
 const json_scalar = @import("json_scalar.zig");

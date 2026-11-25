@@ -2,8 +2,8 @@
 //! (Connect protocol, "Error End-Stream" and "Unary-Response"). A detail's value is its binary
 //! encoding in standard base64, written without padding.
 const std = @import("std");
-const json = @import("json");
-const platform = @import("platform");
+const json = @import("stdx").encoding.json;
+const platform = @import("stdx").platform;
 const rpc_error = @import("rpc_error.zig");
 const json_read = @import("json_read.zig");
 const Code = @import("code.zig").Code;

@@ -89,9 +89,7 @@ fn modules(b: *std.Build, stdx: *std.Build.Dependency, colibri: *std.Build.Depen
         .target = target,
         .optimize = optimize,
         .imports = &.{
-            .{ .name = "json", .module = stdx.module("json") },
-            .{ .name = "platform", .module = stdx.module("platform") },
-            .{ .name = "base64", .module = stdx.module("base64") },
+            .{ .name = "stdx", .module = stdx.module("stdx") },
             .{ .name = "public_names", .module = public_names },
         },
     });
@@ -101,12 +99,7 @@ fn modules(b: *std.Build, stdx: *std.Build.Dependency, colibri: *std.Build.Depen
         .optimize = optimize,
         .imports = &.{
             .{ .name = "protobuf", .module = protobuf },
-            .{ .name = "json", .module = stdx.module("json") },
-            .{ .name = "platform", .module = stdx.module("platform") },
-            .{ .name = "gzip", .module = stdx.module("gzip") },
-            .{ .name = "zstd", .module = stdx.module("zstd") },
-            .{ .name = "brotli", .module = stdx.module("brotli") },
-            .{ .name = "base64", .module = stdx.module("base64") },
+            .{ .name = "stdx", .module = stdx.module("stdx") },
             .{ .name = "public_names", .module = public_names },
         },
     });
@@ -120,8 +113,8 @@ fn modules(b: *std.Build, stdx: *std.Build.Dependency, colibri: *std.Build.Depen
             .{ .name = "connect", .module = connect },
             .{ .name = "protobuf", .module = protobuf },
             .{ .name = "colibri", .module = colibri.module("colibri") },
-            // stdx's type of CPU features, which a route reads from the program's context.
-            .{ .name = "platform", .module = stdx.module("platform") },
+            // stdx, whose `platform` holds the CPU features a route reads from the program's context.
+            .{ .name = "stdx", .module = stdx.module("stdx") },
             .{ .name = "public_names", .module = public_names },
         },
     });
@@ -134,7 +127,7 @@ fn modules(b: *std.Build, stdx: *std.Build.Dependency, colibri: *std.Build.Depen
         .protovalidate = validate,
         .oidc = oidc,
         .colibri = colibri,
-        .platform = stdx.module("platform"),
+        .stdx = stdx.module("stdx"),
         .public_names = public_names,
     };
     // The package exports the module as the program asked for it. The build's own checks build
@@ -152,7 +145,7 @@ fn modules(b: *std.Build, stdx: *std.Build.Dependency, colibri: *std.Build.Depen
         .connect_zig_core = if (with_colibri) connect_zig_module(b, exports, false, target, optimize) else connect_zig,
         .public_names = public_names,
         .colibri = colibri,
-        .platform = stdx.module("platform"),
+        .stdx = stdx.module("stdx"),
         .target = target,
         .optimize = optimize,
     };
@@ -165,7 +158,7 @@ const Exports = struct {
     protovalidate: *std.Build.Module,
     oidc: ?*std.Build.Module,
     colibri: *std.Build.Dependency,
-    platform: *std.Build.Module,
+    stdx: *std.Build.Module,
     public_names: *std.Build.Module,
 };
 
@@ -185,7 +178,7 @@ fn connect_zig_module(b: *std.Build, exports: Exports, with_colibri: bool, targe
             .{ .name = "protobuf", .module = exports.protobuf },
             .{ .name = "connect", .module = exports.connect },
             .{ .name = "protovalidate", .module = exports.protovalidate },
-            .{ .name = "platform", .module = exports.platform },
+            .{ .name = "stdx", .module = exports.stdx },
             .{ .name = "buf_validate_validate", .module = exports.protovalidate.import_table.get("buf_validate_validate").? },
             .{ .name = "google_protobuf_descriptor", .module = exports.protovalidate.import_table.get("google_protobuf_descriptor").? },
             .{ .name = "public_names", .module = exports.public_names },
@@ -210,8 +203,7 @@ fn oidc_module(b: *std.Build, stdx: *std.Build.Dependency, connect: *std.Build.M
         .optimize = optimize,
         .imports = &.{
             .{ .name = "connect", .module = connect },
-            .{ .name = "json", .module = stdx.module("json") },
-            .{ .name = "platform", .module = stdx.module("platform") },
+            .{ .name = "stdx", .module = stdx.module("stdx") },
             .{ .name = "chapulin", .module = chapulin.object(b, target).module("chapulin") },
             .{ .name = "public_names", .module = public_names },
         },
@@ -247,10 +239,9 @@ fn protovalidate_module(b: *std.Build, protobuf: *std.Build.Module, public_names
             .{ .name = "buf_validate_validate", .module = rules },
             .{ .name = "google_protobuf_descriptor", .module = descriptor },
             .{ .name = "public_names", .module = public_names },
-            // `pattern` and CEL's `matches` (design §8 step 35), and the CPU features a program
-            // passes them, stdx's `platform.CpuFeatures`.
-            .{ .name = "regex", .module = stdx.module("regex") },
-            .{ .name = "platform", .module = stdx.module("platform") },
+            // stdx: `regex` runs `pattern` and CEL's `matches` (design §8 step 35), and a program
+            // passes them `platform.CpuFeatures`.
+            .{ .name = "stdx", .module = stdx.module("stdx") },
         },
     });
 }

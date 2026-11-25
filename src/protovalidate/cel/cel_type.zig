@@ -10,7 +10,7 @@
 //!   last: an element that an index takes out of a list or a map;
 //! - a list and a map are views of a repeated field (`cel_list.zig`).
 const std = @import("std");
-const platform = @import("platform");
+const platform = @import("stdx").platform;
 const proto = @import("protobuf");
 const shape = @import("../shape.zig");
 const constants = @import("../constants.zig");

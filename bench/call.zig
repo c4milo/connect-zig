@@ -14,7 +14,7 @@
 //! other service as many. The calls never reach the other routes, which stand for the rest of
 //! an API, so a count shows what the router's match costs as a table grows.
 const std = @import("std");
-const platform = @import("platform");
+const platform = @import("stdx").platform;
 const assert = std.debug.assert;
 const connect = @import("connect");
 const rpc = @import("connect_colibri");
@@ -134,7 +134,7 @@ pub fn Calls(comptime Message: type, comptime name: []const u8, comptime routes:
             try self.exchange.prepare(octets, comptime echo.path(), self, handle);
         }
 
-        fn handle(context: *anyopaque, engine: *Engine, received: server.Event) bool {
+        fn handle(context: *anyopaque, engine: *Engine, received: *const server.Event) bool {
             const self: *Self = @ptrCast(@alignCast(context));
             return self.router.handle(&self.app, engine, received) == .taken;
         }
@@ -147,7 +147,7 @@ pub const Exchange = struct {
     engine: Engine,
     path: []const u8,
     context: *anyopaque,
-    handle_fn: *const fn (context: *anyopaque, engine: *Engine, received: server.Event) bool,
+    handle_fn: *const fn (context: *anyopaque, engine: *Engine, received: *const server.Event) bool,
     sections: [protocol_count]http.FieldSection,
     /// Each section's lines, which colibri's `Headers` reads through a pointer.
     lines: [protocol_count]http.FieldSection.Slice,
@@ -236,7 +236,7 @@ pub const Exchange = struct {
     }
 
     fn handle(exchange: *Exchange, received: server.Event) !void {
-        if (!exchange.handle_fn(exchange.context, &exchange.engine, received)) return error.EventRefused;
+        if (!exchange.handle_fn(exchange.context, &exchange.engine, &received)) return error.EventRefused;
     }
 
     /// What `measure` and the instruction count run: `iterations` calls in one protocol.

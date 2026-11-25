@@ -1,7 +1,7 @@
 //! Tests of the CEL rules through `validate`: the violation each one reports, with its field,
 //! its rule's path, its id and its message, and what a rule that cannot run ends with.
 const std = @import("std");
-const platform = @import("platform");
+const platform = @import("stdx").platform;
 const testing = std.testing;
 const proto = @import("protobuf");
 const pb = @import("buf_validate_validate");

@@ -2,9 +2,9 @@
 //! storage that keeps a token's octets past the next read, and a skip of a value no field names.
 const std = @import("std");
 const assert = std.debug.assert;
-const json = @import("json");
-const platform = @import("platform");
-const base64 = @import("base64");
+const json = @import("stdx").encoding.json;
+const platform = @import("stdx").platform;
+const base64 = @import("stdx").encoding.base64;
 const constants = @import("constants.zig");
 
 pub const Error = json.DecodeError || error{ Truncated, NoSpaceLeft, UnexpectedToken, DepthExceeded, InvalidBase64, TooManyDetails, TooManyMetadata };

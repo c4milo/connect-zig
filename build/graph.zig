@@ -17,8 +17,9 @@ pub const Graph = struct {
     connect_zig_core: *std.Build.Module,
     public_names: *std.Build.Module,
     colibri: *std.Build.Dependency,
-    /// stdx's CPU probe, which a program's TLS values take (colibri decision 97).
-    platform: *std.Build.Module,
+    /// stdx's one module, whose `platform` probes the CPU for a program's TLS values (colibri
+    /// decision 97). It is the instance colibri builds on, so a program holds one copy of stdx.
+    stdx: *std.Build.Module,
     target: std.Build.ResolvedTarget,
     optimize: std.builtin.OptimizeMode,
 };

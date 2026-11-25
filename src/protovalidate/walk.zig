@@ -1,7 +1,7 @@
 //! What every file of the walk shares: its state, what ends it, and how a broken rule is
 //! written into the report (decision 47).
 const std = @import("std");
-const platform = @import("platform");
+const platform = @import("stdx").platform;
 const proto = @import("protobuf");
 const pb = @import("buf_validate_validate");
 const report_file = @import("report.zig");

@@ -50,7 +50,7 @@ fn conformance_runner(b: *std.Build, graph: Graph, generated: []const u8) *std.B
         .imports = &.{
             .{ .name = "protobuf", .module = graph.protobuf },
             .{ .name = "cel_expression", .module = expression },
-            .{ .name = "platform", .module = graph.platform },
+            .{ .name = "stdx", .module = graph.stdx },
             .{ .name = "cases", .module = cases },
         },
     }) });
@@ -72,7 +72,7 @@ fn program(b: *std.Build, graph: Graph, name: []const u8, source: []const u8, ge
         .imports = &.{
             .{ .name = "protobuf", .module = graph.protobuf },
             .{ .name = "protovalidate", .module = graph.protovalidate },
-            .{ .name = "platform", .module = graph.platform },
+            .{ .name = "stdx", .module = graph.stdx },
             .{ .name = "schema", .module = schema },
         },
     }) });

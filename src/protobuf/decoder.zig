@@ -3,7 +3,7 @@
 //! The decode checks each string of its input for UTF-8 with those features, once: a repeated
 //! field's iterator and `Lazy.get` read the checked bytes later and check them no more.
 const std = @import("std");
-const platform = @import("platform");
+const platform = @import("stdx").platform;
 const constants = @import("constants.zig");
 const decode_file = @import("decode.zig");
 const json_decode = @import("json_decode.zig");

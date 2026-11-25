@@ -16,7 +16,7 @@ pub const key_id = "key-1";
 pub const now: i64 = 1_700_000_000;
 /// The CPU features the tests run the JSON readers with: the build target's, which a test may
 /// name in place of the features a program detects.
-pub const cpu_features = @import("platform").CpuFeatures.target();
+pub const cpu_features = @import("stdx").platform.CpuFeatures.target();
 /// Room for a token past the longest the verifier takes, and for a JWK Set of a few keys.
 const text_tokens = 3;
 pub const text_bytes = text_tokens * constants.token_bytes_max;

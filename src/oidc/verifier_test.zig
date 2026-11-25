@@ -1,7 +1,7 @@
 //! The verifier's tests: tokens of each algorithm, the RFCs' known answers, and each refusal.
 const std = @import("std");
 const testing = std.testing;
-const platform = @import("platform");
+const platform = @import("stdx").platform;
 const constants = @import("constants.zig");
 const verifier_file = @import("verifier.zig");
 const Verifier = verifier_file.Verifier;

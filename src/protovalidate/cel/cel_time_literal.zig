@@ -8,7 +8,7 @@ const constants = @import("../constants.zig");
 const timestamp_file = @import("cel_timestamp.zig");
 const duration_file = @import("cel_duration.zig");
 const type_file = @import("cel_type.zig");
-const platform = @import("platform");
+const platform = @import("stdx").platform;
 const text_file = @import("cel_text.zig");
 
 /// The longest text of `string` of a constant: a double in scientific form, or a timestamp of

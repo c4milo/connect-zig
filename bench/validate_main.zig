@@ -33,7 +33,7 @@ const proto = @import("protobuf");
 /// `tools/perf_check.sh` counts the same paths on every machine of an architecture.
 const protobuf_decoder: proto.Decoder = .init(.target());
 const protovalidate = @import("protovalidate");
-const platform = @import("platform");
+const platform = @import("stdx").platform;
 const schema = @import("bench_validate_v1");
 const measure = @import("measure.zig");
 const constants = @import("constants.zig");

@@ -9,7 +9,7 @@
 //! and a decode refuses the same inputs either way.
 const std = @import("std");
 const assert = std.debug.assert;
-const platform = @import("platform");
+const platform = @import("stdx").platform;
 const wire = @import("wire.zig");
 const descriptor = @import("descriptor.zig");
 const scalar = @import("scalar.zig");

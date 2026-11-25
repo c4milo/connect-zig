@@ -4,7 +4,7 @@ const std = @import("std");
 const testing = std.testing;
 const connect = @import("connect");
 const proto = @import("protobuf");
-const platform = @import("platform");
+const platform = @import("stdx").platform;
 const support = @import("pull_test_support.zig");
 
 /// The codecs of the test: too large for a test's stack.

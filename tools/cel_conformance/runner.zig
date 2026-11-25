@@ -10,7 +10,7 @@
 const std = @import("std");
 const proto = @import("protobuf");
 const cel = @import("cel_expression");
-const platform = @import("platform");
+const platform = @import("stdx").platform;
 const cases = @import("cases");
 
 /// The suite's expressions read no names.

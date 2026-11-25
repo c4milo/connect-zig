@@ -289,7 +289,7 @@ test "a client asked for a coding compresses even a short message, and names the
     try testing.expectError(error.NoSpaceLeft, request(&gzip_client, say, &.{ .request_coding = .gzip }, &.{.{ .text = "hi" }}, &short_room));
 }
 
-const platform = @import("platform");
+const platform = @import("stdx").platform;
 
 /// Features that differ from `cpu_features`. An encoder that starts with them shows, by its
 /// path, whether a request started it again.

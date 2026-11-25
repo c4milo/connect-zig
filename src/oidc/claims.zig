@@ -1,7 +1,7 @@
 //! The claims the verifier reads from a token's payload (RFC 7519 §4.1).
 const std = @import("std");
 const assert = std.debug.assert;
-const platform = @import("platform");
+const platform = @import("stdx").platform;
 const constants = @import("constants.zig");
 const reader_file = @import("reader.zig");
 const Reader = reader_file.Reader;

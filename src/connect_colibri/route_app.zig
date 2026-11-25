@@ -3,7 +3,7 @@
 //! lacks takes its default, but `cpu_features`, which every context states.
 const std = @import("std");
 const connect = @import("connect");
-const platform = @import("platform");
+const platform = @import("stdx").platform;
 
 /// The codings a server uses, which the program keeps in a field `codings` of its context. A
 /// context with no such field reads and writes uncompressed messages alone.

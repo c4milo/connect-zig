@@ -1,7 +1,7 @@
 //! Tests of each type's rules through `validate`: a value at each side of what a rule states,
 //! and the id of the rule it breaks.
 const std = @import("std");
-const platform = @import("platform");
+const platform = @import("stdx").platform;
 const testing = std.testing;
 const proto = @import("protobuf");
 const pb = @import("buf_validate_validate");

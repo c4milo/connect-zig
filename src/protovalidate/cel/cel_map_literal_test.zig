@@ -3,7 +3,7 @@
 const std = @import("std");
 const testing = std.testing;
 /// The build target's CPU features, which `matches` searches with in the tests.
-const testing_cpu_features = @import("platform").CpuFeatures.target();
+const testing_cpu_features = @import("stdx").platform.CpuFeatures.target();
 const proto = @import("protobuf");
 /// The tests decode and encode with the build target's CPU features.
 const protobuf_decoder: proto.Decoder = .init(.target());

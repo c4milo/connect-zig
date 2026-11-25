@@ -1,6 +1,6 @@
 //! The state the conformance server keeps, which every handler reads as its `app`.
 const std = @import("std");
-const platform = @import("platform");
+const platform = @import("stdx").platform;
 const rpc = @import("connect_colibri");
 const Echo = @import("echo.zig").Echo;
 

@@ -2,7 +2,7 @@
 //! client `ClientCall` reads what colibri wrote into its response. `zig build examples` runs both
 //! sides over colibri's h2 and h11 (design §8 step 5).
 const std = @import("std");
-const platform = @import("platform");
+const platform = @import("stdx").platform;
 const support = @import("pull_test_support.zig");
 const testing = std.testing;
 const connect = @import("connect");

@@ -5,7 +5,7 @@
 //!
 //! It is no HTTP client: it opens no connection and sends no request. The program's HTTP
 //! library does both, colibri's connection pool or another, with the request this client builds.
-const platform = @import("platform");
+const platform = @import("stdx").platform;
 const compression = @import("compression.zig");
 const client_call = @import("client_call.zig");
 const client_response = @import("client_response.zig");

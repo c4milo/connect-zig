@@ -95,7 +95,7 @@ fn add_interop_server(b: *std.Build, graph: Graph, schemas: Schemas, hooks: *std
             .optimize = graph.optimize,
             .imports = &.{
                 // stdx's type of CPU features, which the server's context holds.
-                .{ .name = "platform", .module = graph.platform },
+                .{ .name = "stdx", .module = graph.stdx },
                 .{ .name = "protobuf", .module = graph.protobuf },
                 .{ .name = "connect", .module = graph.connect },
                 .{ .name = "connect_colibri", .module = graph.connect_colibri },

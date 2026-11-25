@@ -3,8 +3,8 @@
 //! both. It reads a text whose last letter sets pad bits too, as protobuf's parsers read it.
 const std = @import("std");
 const assert = std.debug.assert;
-const platform = @import("platform");
-const base64 = @import("base64");
+const platform = @import("stdx").platform;
+const base64 = @import("stdx").encoding.base64;
 const wire = @import("wire.zig");
 const json_scalar = @import("json_scalar.zig");
 
@@ -32,7 +32,7 @@ pub fn write_base64_field(octets: []const u8, writer: *wire.Writer, cpu_features
 
 const testing = std.testing;
 const support = @import("test_support.zig");
-const json = @import("json");
+const json = @import("stdx").encoding.json;
 
 /// The JSON text `json_scalar.write` gives for bytes: base64 between quotes.
 fn encoded(octets: []const u8, buffer: []u8) ![]const u8 {

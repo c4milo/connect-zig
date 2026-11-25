@@ -1,6 +1,6 @@
 //! The state that the interop server's routes read as their `app`.
 const rpc = @import("connect_colibri");
-const platform = @import("platform");
+const platform = @import("stdx").platform;
 const service = @import("interop.zig");
 
 pub const App = struct {

@@ -17,7 +17,7 @@ const protovalidate = @import("protovalidate");
 const otlp = @import("otlp");
 const service = @import("otlp_service");
 const sink_options = @import("sink_options");
-const platform = @import("platform");
+const platform = @import("stdx").platform;
 const constants = @import("constants.zig");
 
 /// What the routes read: the export calls the sink took, and the spans they held.

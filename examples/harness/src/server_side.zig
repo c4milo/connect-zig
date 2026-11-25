@@ -38,7 +38,7 @@ pub const Error = error{ CallWrong, SendUnfinished };
 pub const RouterRef = struct {
     router: *anyopaque,
     app: *anyopaque,
-    handle_fn: *const fn (router: *anyopaque, app: *anyopaque, endpoint: *Endpoint, event: server.Event) server.Handled,
+    handle_fn: *const fn (router: *anyopaque, app: *anyopaque, endpoint: *Endpoint, event: *const server.Event) server.Handled,
 
     /// Keeps `router`, a pointer to the program's `server.Router`, and `app`, a pointer to the
     /// state its routes take.
@@ -46,7 +46,7 @@ pub const RouterRef = struct {
         const Router = @typeInfo(@TypeOf(router)).pointer.child;
         const App = @typeInfo(@TypeOf(app)).pointer.child;
         const Calls = struct {
-            fn handle(erased_router: *anyopaque, erased_app: *anyopaque, endpoint: *Endpoint, event: server.Event) server.Handled {
+            fn handle(erased_router: *anyopaque, erased_app: *anyopaque, endpoint: *Endpoint, event: *const server.Event) server.Handled {
                 const typed: *Router = @ptrCast(@alignCast(erased_router));
                 const typed_app: *App = @ptrCast(@alignCast(erased_app));
                 return typed.handle(typed_app, endpoint, event);
@@ -55,7 +55,7 @@ pub const RouterRef = struct {
         return .{ .router = @ptrCast(router), .app = @ptrCast(app), .handle_fn = Calls.handle };
     }
 
-    pub fn handle(self: RouterRef, endpoint: *Endpoint, event: server.Event) server.Handled {
+    pub fn handle(self: RouterRef, endpoint: *Endpoint, event: *const server.Event) server.Handled {
         return self.handle_fn(self.router, self.app, endpoint, event);
     }
 };
@@ -80,6 +80,9 @@ pub const ServerSide = struct {
     ticket_key: [tls.constants.protocol.server_key_len]u8,
     config: server.Config,
     endpoint: Endpoint,
+    /// What each `receive` reports, kept beside the endpoint so no event is copied out of a
+    /// returned value (colibri decision 165).
+    received: server.ReceiveResult,
     router: RouterRef,
     accepted: ?server.ConnectionHandle,
     /// The connections that ended, TCP and QUIC alike: a round is over once one more ended.
@@ -102,6 +105,7 @@ pub const ServerSide = struct {
             .ticket_key = undefined,
             .config = .{ .cpu_features = cpu_features },
             .endpoint = undefined,
+            .received = undefined,
             .router = router,
             .accepted = null,
             .ended_count = 0,
@@ -154,10 +158,10 @@ pub const ServerSide = struct {
         var consumed: usize = 0;
         for (0..constants.server_events_per_turn_max) |_| {
             const read: server.StreamBytes = .{ .connection = connection, .bytes = input[consumed..] };
-            const received = self.endpoint.receive(.{ .stream = read }, now_ns);
-            consumed += received.consumed;
-            const event = received.event orelse {
-                if (received.consumed == 0) break;
+            self.endpoint.receive(.{ .stream = read }, now_ns, &self.received);
+            consumed += self.received.consumed;
+            const event = if (self.received.event) |*reported| reported else {
+                if (self.received.consumed == 0) break;
                 continue;
             };
             try self.serve(event, now_ns);
@@ -178,16 +182,16 @@ pub const ServerSide = struct {
     fn serve_all(self: *Self, input: server.Input, now_ns: u64) !void {
         var rest = input;
         for (0..constants.server_events_per_turn_max) |_| {
-            const received = self.endpoint.receive(rest, now_ns);
+            self.endpoint.receive(rest, now_ns, &self.received);
             rest = .none;
-            try self.serve(received.event orelse return, now_ns);
+            try self.serve(if (self.received.event) |*event| event else return, now_ns);
         }
     }
 
-    fn serve(self: *Self, event: server.Event, now_ns: u64) !void {
+    fn serve(self: *Self, event: *const server.Event, now_ns: u64) !void {
         switch (self.router.handle(&self.endpoint, event)) {
             .taken => {},
-            .event => |other| switch (other) {
+            .event => |other| switch (other.*) {
                 .send => |connection| try self.flush(connection, now_ns),
                 .close => {},
                 .ended => |over| {

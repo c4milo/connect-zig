@@ -8,8 +8,8 @@ const assert = std.debug.assert;
 const wire = @import("wire.zig");
 const descriptor = @import("descriptor.zig");
 const constants = @import("constants.zig");
-const json = @import("json");
-const platform = @import("platform");
+const json = @import("stdx").encoding.json;
+const platform = @import("stdx").platform;
 const Kind = descriptor.Kind;
 
 /// Reads one value of `kind` as `V`. The caller checked the wire type. A string is checked for

@@ -8,8 +8,8 @@
 //! - an enum is its value's name, or its number when it has no name.
 const std = @import("std");
 const assert = std.debug.assert;
-const json = @import("json");
-const platform = @import("platform");
+const json = @import("stdx").encoding.json;
+const platform = @import("stdx").platform;
 const wire = @import("wire.zig");
 const descriptor = @import("descriptor.zig");
 const constants = @import("constants.zig");

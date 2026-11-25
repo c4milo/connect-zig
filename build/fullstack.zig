@@ -52,7 +52,7 @@ pub fn add(b: *std.Build, graph: Graph) void {
         .imports = &.{
             .{ .name = "protobuf", .module = graph.protobuf },
             .{ .name = "protovalidate", .module = graph.protovalidate },
-            .{ .name = "platform", .module = graph.platform },
+            .{ .name = "stdx", .module = graph.stdx },
             .{ .name = "otlp", .module = otlp },
         },
     }) });
@@ -95,7 +95,7 @@ fn sink(b: *std.Build, graph: Graph, name: []const u8, comptime gen: []const u8,
             .{ .name = "connect_colibri", .module = graph.connect_colibri },
             .{ .name = "protovalidate", .module = graph.protovalidate },
             .{ .name = "colibri", .module = graph.colibri.module("colibri") },
-            .{ .name = "platform", .module = graph.platform },
+            .{ .name = "stdx", .module = graph.stdx },
             .{ .name = "test_identity", .module = b.createModule(.{ .root_source_file = b.path("examples/harness/tls/identity.zig"), .target = graph.target, .optimize = graph.optimize }) },
             .{ .name = "hooks", .module = b.createModule(.{ .root_source_file = b.path("examples/harness/src/hooks.zig"), .target = graph.target, .optimize = graph.optimize }) },
             .{ .name = "otlp", .module = otlp },

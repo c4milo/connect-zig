@@ -7,8 +7,8 @@
 //!
 //! The library's own build offers Debug and ReleaseSafe alone. The benchmark builds its own copy
 //! of the protobuf module, and the generated code of bench/gen, in ReleaseFast. stdx's build
-//! offers ReleaseSafe at most, so the benchmark copies the stdx modules it imports, and the
-//! objects of their vector kernels, in ReleaseFast too: the JSON numbers then count no stdx
+//! offers ReleaseSafe at most, so the benchmark copies stdx's module and the modules it names,
+//! and the objects of their vector kernels, in ReleaseFast too: the JSON numbers then count no stdx
 //! assertion, as they count none of connect-zig's.
 const std = @import("std");
 
@@ -22,9 +22,7 @@ pub fn add(b: *std.Build, public_names: *std.Build.Module, target: std.Build.Res
         .target = target,
         .optimize = optimize,
         .imports = &.{
-            .{ .name = "json", .module = release_fast(b, &copies, stdx.module("json")) },
-            .{ .name = "platform", .module = release_fast(b, &copies, stdx.module("platform")) },
-            .{ .name = "base64", .module = release_fast(b, &copies, stdx.module("base64")) },
+            .{ .name = "stdx", .module = release_fast(b, &copies, stdx.module("stdx")) },
             .{ .name = "public_names", .module = public_names },
         },
     });
@@ -65,7 +63,7 @@ pub fn add(b: *std.Build, public_names: *std.Build.Module, target: std.Build.Res
                 .{ .name = "connect", .module = routed.connect },
                 .{ .name = "connect_colibri", .module = routed.connect_colibri },
                 .{ .name = "colibri", .module = routed.colibri },
-                .{ .name = "platform", .module = routed.platform },
+                .{ .name = "stdx", .module = routed.stdx },
             },
         }),
     });
@@ -81,9 +79,8 @@ pub fn add(b: *std.Build, public_names: *std.Build.Module, target: std.Build.Res
     const install = b.step("install-bench", "Install the benchmark programs into zig-out/bin");
     install.dependOn(&b.addInstallArtifact(exe, .{}).step);
     install.dependOn(&b.addInstallArtifact(call_exe, .{}).step);
-    // stdx's `regex`, and the `platform` it takes its CPU features from.
-    const regex = release_fast(b, &copies, stdx.module("regex"));
-    install.dependOn(add_validate(b, protobuf, public_names, regex, regex.import_table.get("platform").?, target));
+    // stdx, whose `regex` runs the rules and whose `platform` holds the CPU features it takes.
+    install.dependOn(add_validate(b, protobuf, public_names, release_fast(b, &copies, stdx.module("stdx")), target));
     b.step("bench", "Benchmark the protobuf runtime and a routed call, ReleaseFast: zig build bench -- [--quick] [--write <dir>]").dependOn(&call_run.step);
 
     // `zig build costs`: the costs table of docs/performance.md, timed on the machine that runs it.
@@ -99,7 +96,7 @@ pub fn add(b: *std.Build, public_names: *std.Build.Module, target: std.Build.Res
 /// `zig build bench-validate`: bench/validate_main.zig over `protovalidate` and the generated code
 /// of bench/validate, each in ReleaseFast, as the root build makes them. Returns the step that
 /// installs it, which `install-bench` takes for tools/perf_check.sh.
-fn add_validate(b: *std.Build, protobuf: *std.Build.Module, public_names: *std.Build.Module, regex: *std.Build.Module, platform: *std.Build.Module, target: std.Build.ResolvedTarget) *std.Build.Step {
+fn add_validate(b: *std.Build, protobuf: *std.Build.Module, public_names: *std.Build.Module, stdx_module: *std.Build.Module, target: std.Build.ResolvedTarget) *std.Build.Step {
     const descriptor = b.createModule(.{
         .root_source_file = b.path("src/protovalidate/gen/google/protobuf/descriptor.pb.zig"),
         .target = target,
@@ -124,14 +121,13 @@ fn add_validate(b: *std.Build, protobuf: *std.Build.Module, public_names: *std.B
             .{ .name = "buf_validate_validate", .module = rules },
             .{ .name = "google_protobuf_descriptor", .module = descriptor },
             .{ .name = "public_names", .module = public_names },
-            .{ .name = "regex", .module = regex },
-            .{ .name = "platform", .module = platform },
+            .{ .name = "stdx", .module = stdx_module },
         },
     });
     const connect_zig = without_colibri(b, &.{
         .{ .name = "protobuf", .module = protobuf },
         .{ .name = "protovalidate", .module = protovalidate },
-        .{ .name = "platform", .module = platform },
+        .{ .name = "stdx", .module = stdx_module },
         .{ .name = "buf_validate_validate", .module = rules },
         .{ .name = "google_protobuf_descriptor", .module = descriptor },
     }, target);
@@ -152,7 +148,7 @@ fn add_validate(b: *std.Build, protobuf: *std.Build.Module, public_names: *std.B
             .imports = &.{
                 .{ .name = "protobuf", .module = protobuf },
                 .{ .name = "protovalidate", .module = protovalidate },
-                .{ .name = "platform", .module = platform },
+                .{ .name = "stdx", .module = stdx_module },
                 .{ .name = "bench_validate_v1", .module = messages },
             },
         }),
@@ -184,29 +180,24 @@ const Routed = struct {
     connect_colibri: *std.Build.Module,
     /// colibri's one module, which names its others (colibri decision 170).
     colibri: *std.Build.Module,
-    /// stdx's type of CPU features, which the route's context holds.
-    platform: *std.Build.Module,
+    /// stdx, whose `platform` holds the type of CPU features the route's context holds.
+    stdx: *std.Build.Module,
 };
 
 /// `connect` and `connect_colibri` as the root build makes them, over copies of colibri's modules
 /// in ReleaseFast. colibri in ReleaseSafe asks stdx with `.release = true`, as `add` does, so both
-/// share one copy of each stdx module. The benchmark needs no Rotor.
+/// share one copy of stdx. The benchmark needs no Rotor.
 fn routed_modules(b: *std.Build, copies: *Copies, stdx: *std.Build.Dependency, protobuf: *std.Build.Module, public_names: *std.Build.Module, target: std.Build.ResolvedTarget) Routed {
     const colibri = b.dependency("colibri", .{ .target = target, .release = true, .rotor = false });
     const colibri_module = release_fast(b, copies, colibri.module("colibri"));
-    const platform = release_fast(b, copies, stdx.module("platform"));
+    const stdx_module = release_fast(b, copies, stdx.module("stdx"));
     const connect = b.createModule(.{
         .root_source_file = b.path("src/connect/connect.zig"),
         .target = target,
         .optimize = optimize,
         .imports = &.{
             .{ .name = "protobuf", .module = protobuf },
-            .{ .name = "json", .module = release_fast(b, copies, stdx.module("json")) },
-            .{ .name = "platform", .module = platform },
-            .{ .name = "gzip", .module = release_fast(b, copies, stdx.module("gzip")) },
-            .{ .name = "zstd", .module = release_fast(b, copies, stdx.module("zstd")) },
-            .{ .name = "brotli", .module = release_fast(b, copies, stdx.module("brotli")) },
-            .{ .name = "base64", .module = release_fast(b, copies, stdx.module("base64")) },
+            .{ .name = "stdx", .module = stdx_module },
             .{ .name = "public_names", .module = public_names },
         },
     });
@@ -218,11 +209,11 @@ fn routed_modules(b: *std.Build, copies: *Copies, stdx: *std.Build.Dependency, p
             .{ .name = "connect", .module = connect },
             .{ .name = "protobuf", .module = protobuf },
             .{ .name = "colibri", .module = colibri_module },
-            .{ .name = "platform", .module = platform },
+            .{ .name = "stdx", .module = stdx_module },
             .{ .name = "public_names", .module = public_names },
         },
     });
-    return .{ .connect = connect, .connect_colibri = connect_colibri, .colibri = colibri_module, .platform = platform };
+    return .{ .connect = connect, .connect_colibri = connect_colibri, .colibri = colibri_module, .stdx = stdx_module };
 }
 
 /// Each module copied so far, by its original: a module two others import is copied once, as a

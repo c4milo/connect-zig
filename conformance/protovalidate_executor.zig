@@ -12,7 +12,7 @@ const proto = @import("protobuf");
 /// machine it was built for, and a library takes the features its program detected.
 const protobuf_decoder: proto.Decoder = .init(.target());
 const protovalidate = @import("protovalidate");
-const platform = @import("platform");
+const platform = @import("stdx").platform;
 const harness = @import("harness");
 const cases = @import("cases");
 const constants = @import("constants.zig");

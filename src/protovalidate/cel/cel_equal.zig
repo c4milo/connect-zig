@@ -110,7 +110,7 @@ const testing = std.testing;
 /// The tests decode and encode with the build target's CPU features.
 const protobuf_decoder: proto.Decoder = .init(.target());
 /// The build target's CPU features, which `matches` searches with in the tests.
-const testing_cpu_features = @import("platform").CpuFeatures.target();
+const testing_cpu_features = @import("stdx").platform.CpuFeatures.target();
 const program = @import("cel_program.zig");
 
 const Message = struct {

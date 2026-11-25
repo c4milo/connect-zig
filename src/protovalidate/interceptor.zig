@@ -13,7 +13,7 @@
 //! // In the route options: .interceptors = &.{Validate}; in the route table: .Values = Values.
 //! ```
 const std = @import("std");
-const platform = @import("platform");
+const platform = @import("stdx").platform;
 const assert = std.debug.assert;
 const proto = @import("protobuf");
 const pb = @import("buf_validate_validate");

@@ -11,7 +11,7 @@ const server = @import("colibri").server;
 const http = @import("colibri").http;
 const rpc = @import("connect_colibri.zig");
 const support = @import("pull_test_support.zig");
-const platform = @import("platform");
+const platform = @import("stdx").platform;
 const Note = support.Note;
 
 fn method_of(comptime name: []const u8, comptime stream_type: connect.StreamType) connect.Method {
@@ -221,7 +221,7 @@ const Fixture = struct {
     }
 
     fn handle(fixture: *Fixture, received: server.Event) void {
-        const handled = fixture.pool.handle(&fixture.app, &fixture.engine, received);
+        const handled = fixture.pool.handle(&fixture.app, &fixture.engine, &received);
         assert(handled == .taken);
     }
 

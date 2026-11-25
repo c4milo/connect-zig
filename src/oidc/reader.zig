@@ -5,8 +5,8 @@
 //! the verifier reads nothing from it.
 const std = @import("std");
 const assert = std.debug.assert;
-const json = @import("json");
-const platform = @import("platform");
+const json = @import("stdx").encoding.json;
+const platform = @import("stdx").platform;
 const constants = @import("constants.zig");
 
 pub const Error = error{Malformed};

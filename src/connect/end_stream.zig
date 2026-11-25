@@ -2,8 +2,8 @@
 //! `{"error": {...}, "metadata": {"name": ["value", ...]}}` (Connect protocol,
 //! "Streaming-Response" and "Error End-Stream"). Both members are optional.
 const std = @import("std");
-const json = @import("json");
-const platform = @import("platform");
+const json = @import("stdx").encoding.json;
+const platform = @import("stdx").platform;
 const rpc_error = @import("rpc_error.zig");
 const error_json = @import("error_json.zig");
 const json_read = @import("json_read.zig");

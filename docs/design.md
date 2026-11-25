@@ -2310,6 +2310,20 @@ ran on Linux x86-64 with Zig 0.16.0.
     Its package hash changed with its `build.zig.zon`, and came from `zig fetch` over a
     `git archive` of the commit, as before.
 
+- **colibri at a99272f and stdx at b643d58, whose package exports `stdx` alone** (stdx decision
+  6, amended 2026-11-25; colibri decision 171). No public name of connect-zig changes:
+  `connect_zig.platform` is `@import("stdx").platform`. Each module that took stdx's `json`,
+  `platform`, `base64`, `gzip`, `zstd`, `brotli` or `regex` takes the one module `stdx`, the
+  instance colibri builds on, and reads them as its fields: `stdx.encoding.json`,
+  `stdx.compress.gzip`. The routed calls of `bench/` copy that module in ReleaseFast.
+  - colibri's design §8 step 58b changed two calls. `Engine.receive` writes into a
+    `server.ReceiveResult` that the program keeps, and `Router.handle` takes the event by
+    pointer. The harness of `examples/`, `examples/std_io`, the routed calls and the tests of
+    `connect_colibri` keep one result beside their engine, or pass the event's address.
+  - `zig build test` passed on x86-64 Linux, with Zig 0.16.0, and so did the build of every
+    program `zig build test` does not run, `zig build bench -- --quick` and
+    `tools/package_check.sh`.
+
 ### Work not done yet
 
 - A stream that waits for an event of the program once its request ended (colibri issue 130).

@@ -6,8 +6,8 @@
 //! the length takes the octets it needs and the body moves up to meet it.
 const std = @import("std");
 const assert = std.debug.assert;
-const json = @import("json");
-const platform = @import("platform");
+const json = @import("stdx").encoding.json;
+const platform = @import("stdx").platform;
 const wire = @import("wire.zig");
 const descriptor = @import("descriptor.zig");
 const scalar = @import("scalar.zig");
