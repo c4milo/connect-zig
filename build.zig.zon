@@ -6,14 +6,14 @@
     .dependencies = .{
         // The HTTP transport of `connect_colibri`, and through its `tls` module, chapulin.
         .colibri = .{
-            .url = "git+https://github.com/c4milo/colibri#dfc502136640f7dd023a4e88ec89eeea1097a74a",
+            .url = "git+https://github.com/c4milo/colibri#a88c5157b5e91913922e3c0635c64a796abed558",
             .hash = "colibri-0.19.0-Wo-AvkVxtQRbFr_G-xiQw1KZM2tP4ST_ueOGpV1il0tb",
         },
         // JSON for proto3 JSON and the Connect error bodies, the compression codecs, the
         // regular expressions of `protovalidate`'s `pattern` and CEL's `matches`, and the type of
         // CPU features each of them takes, `platform.CpuFeatures`. The commit colibri pins.
         .stdx = .{
-            .url = "git+https://github.com/c4milo/stdx#1df5f9f2fd51e8ebc1707e2e77c02afc6041f49f",
+            .url = "git+https://github.com/c4milo/stdx#1ef992a04f07ab66b6d03a164758e8e7a02da382",
             .hash = "stdx-0.3.0-BD60trf9VAAB3a_ji6iOnFA9BcC-aZPROZV2caFk9QQ4",
         },
         // Developer tooling only, never linked into the library (decision 15). Lazy, and requested
