@@ -2292,7 +2292,10 @@ ran on Linux x86-64 with Zig 0.16.0.
   - The `layering` rule leaves out `src/connect_zig`, which names colibri's modules for a
     program, as `build.zig` exported them before, and calls none of them. No library module
     imports it, so the rest of `src/` still runs on any event loop (decision 32).
-  - `zig build test` passed on x86-64 Linux, with Zig 0.16.0.
+  - `zig build test` passed on x86-64 Linux, with Zig 0.16.0, on colibri at 19a4b51.
+  - `tools/package_check.sh` passed on the same machine: the quickstart, which adds
+    `connect_zig` alone, built against connect-zig as a fetched package, and its server answered
+    its client over h2 and h3 and curl over h11.
 
 ### Work not done yet
 
