@@ -323,13 +323,16 @@ confirm a test fails. Report `CAUGHT` or `NOT CAUGHT` per mutation in the commit
   callgrind against `bench/instructions.txt` and fails past 2%; `--write` records a new baseline,
   which the commit that pays for it explains. It needs valgrind.
 - CI: `tools/ci.sh` runs every check and writes a report; `--only <check>` runs one and `--list`
-  names them. `.github/workflows/main.yml` runs each check of `--list` as a job of its own on each
-  push and pull request. A new check joins `tools/ci.sh`, never the workflow file. `test`,
-  `bench-compare`, `fullstack`, `fullstack-compression`, and `validate-compare` run a second time
-  on an arm64 runner: `test` because an aarch64 Linux link can fail where x86-64's passes, the
-  next three for the arm64 charts, and `validate-compare` for its hardware counters, which
-  GitHub's x86-64 runners do not expose. A `fullstack` check has 90 minutes, and every other
-  check 60.
-  The `fullstack` checks and `bench-compare` draw the charts of `docs/benchmarks.md` and the README into
-  `ci-charts/`, which CI keeps with the run as `charts-<check>-<arch>`. To update them, copy a
-  chosen run's charts to `docs/images` (decision 44).
+  names them. `.github/workflows/main.yml` runs each job of `tools/ci.sh --matrix push` on each
+  push and pull request, and of `--matrix tag` on each tag: the benchmarks, `bench-compare`,
+  `validate-compare`, and the `fullstack` checks, which run on a tag alone (decision 44 as
+  amended). A new check joins `tools/ci.sh`, never the workflow file. `test`, `bench-compare`,
+  `fullstack`, `fullstack-compression`, and `validate-compare` run a second time on an arm64
+  runner: `test` because an aarch64 Linux link can fail where x86-64's passes, the next three for
+  the arm64 charts, and `validate-compare` for its hardware counters, which GitHub's x86-64
+  runners do not expose. A `fullstack` check has 90 minutes, and every other check 60.
+  The benchmarks draw the charts of `docs/benchmarks.md` and the README into `ci-charts/`, which
+  CI keeps with the run as `charts-<check>-<arch>`. On a tag, once every benchmark passed, the
+  job `charts` commits each chart that `docs/images` holds to main (`tools/charts_commit.sh`).
+  The README and `docs/benchmarks.md` quote no measured number, so a new chart leaves no text
+  stale. A person runs the benchmarks without a tag with the workflow's `benchmarks` input.

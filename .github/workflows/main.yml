@@ -1,18 +1,21 @@
 # Every check of this repository, on each push to main and each pull request (docs/decisions.md
-# entry 16). `plan` asks tools/ci.sh for its checks, and `check` runs each in a job of its own, so
-# each shows apart in GitHub's checks with its own summary: a new check joins tools/ci.sh alone.
-# Each job's work is `tools/ci.sh --only <check>`, which a person runs by hand for the same
-# answer. Each download is pinned by checksum. `test`, `bench-compare`, `fullstack`,
-# `fullstack-compression` and `validate-compare` run a second time on an arm64 runner: the first
-# because an aarch64 Linux link can fail where x86-64's passes, the next three for the arm64
-# charts, and the last for the hardware counters of `bench-validate --counters`, which GitHub's
-# x86-64 runners do not expose.
+# entry 16), and the benchmarks on each tag (decision 44 as amended on 2026-11-25). `plan` asks
+# tools/ci.sh for the event's jobs, and `check` runs each in a job of its own, so each shows apart
+# in GitHub's checks with its own summary: a new check joins tools/ci.sh alone. Each job's work is
+# `tools/ci.sh --only <check>`, which a person runs by hand for the same answer. Each download is
+# pinned by checksum. On a tag, `charts` commits the charts the benchmarks drew to docs/images.
 name: main
 on:
   push:
     branches: [main]
+    tags: ["v*"]
   pull_request:
   workflow_dispatch:
+    inputs:
+      benchmarks:
+        description: Run the benchmarks in place of the other checks, and keep their charts
+        type: boolean
+        default: false
 permissions:
   contents: read
 env:
@@ -30,11 +33,13 @@ jobs:
   plan:
     runs-on: ubuntu-26.04
     outputs:
-      checks: ${{ steps.list.outputs.checks }}
+      jobs: ${{ steps.list.outputs.jobs }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - id: list
-        run: echo "checks=$(tools/ci.sh --list)" >>"${GITHUB_OUTPUT}"
+        env:
+          EVENT: ${{ (startsWith(github.ref, 'refs/tags/') || inputs.benchmarks) && 'tag' || 'push' }}
+        run: echo "jobs=$(tools/ci.sh --matrix "${EVENT}")" >>"${GITHUB_OUTPUT}"
   check:
     needs: plan
     name: ${{ matrix.check }}${{ matrix.runner == 'ubuntu-26.04-arm' && ' (arm64)' || '' }}
@@ -44,28 +49,9 @@ jobs:
     timeout-minutes: ${{ startsWith(matrix.check, 'fullstack') && 90 || 60 }}
     strategy:
       fail-fast: false
+      # tools/ci.sh names each job's check and runner, the arm64 ones included.
       matrix:
-        check: ${{ fromJSON(needs.plan.outputs.checks) }}
-        runner: [ubuntu-26.04]
-        # The comparison with Go and Buffa runs on arm64 too. Its times belong to that machine
-        # alone, as each run's do (docs/performance.md).
-        include:
-          - check: bench-compare
-            runner: ubuntu-26.04-arm
-          # aarch64 Linux reaches a test binary's thread-local data through local-exec
-          # relocations, which reach 16 MiB, and x86-64's reach 2 GiB.
-          - check: test
-            runner: ubuntu-26.04-arm
-          # The full stack on arm64, for the README's arm64 chart (decision 44).
-          - check: fullstack
-            runner: ubuntu-26.04-arm
-          # The compression chart over TLS on arm64 (decision 46 as amended).
-          - check: fullstack-compression
-            runner: ubuntu-26.04-arm
-          # The validation benchmark on arm64, whose runner gives a process its own hardware
-          # counters (docs/performance.md, "The instruments").
-          - check: validate-compare
-            runner: ubuntu-26.04-arm
+        include: ${{ fromJSON(needs.plan.outputs.jobs) }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -148,8 +134,8 @@ jobs:
       - name: Publish the report
         if: always()
         run: '[ -f ci-report.md ] && cat ci-report.md >>"${GITHUB_STEP_SUMMARY}" || true'
-      # The README's charts that a check drew from its own output, with that output (tools/ci.sh,
-      # draw_charts). A person copies a chosen run's charts to docs/images (decision 44).
+      # The charts that a benchmark drew from its own output, with that output (tools/ci.sh,
+      # draw_charts). On a tag, `charts` commits them to docs/images (decision 44 as amended).
       - name: Keep the charts
         if: always() && hashFiles('ci-charts/*.svg') != ''
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -157,3 +143,23 @@ jobs:
           name: charts-${{ matrix.check }}-${{ runner.arch }}
           path: ci-charts/
           retention-days: 90
+  # A tag's charts, once every benchmark of the tag passed: each replaces the chart of its name in
+  # docs/images on main (tools/charts_commit.sh). A push with this token starts no workflow.
+  charts:
+    needs: check
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-26.04
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          fetch-depth: 0
+      - name: Take the run's charts
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh run download "${GITHUB_RUN_ID}" --repo "${GITHUB_REPOSITORY}" --pattern 'charts-*' --dir ci-charts
+      - name: Commit them to main
+        run: tools/charts_commit.sh ci-charts "${GITHUB_REF_NAME}"

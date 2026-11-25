@@ -1,7 +1,8 @@
 # How connect-zig is checked
 
 Each check below is a script or a build step that CI runs as a job of its own, on each push and
-pull request. `tools/ci.sh` runs them all, as CI does, and writes a report.
+pull request. The benchmarks run on each tag instead (decision 44), and
+[performance.md](performance.md) describes them. `tools/ci.sh` runs them all, as CI does, and writes a report.
 
 - `zig build test` runs the lint, every module's tests, and the examples. Each check in the
   library was broken on purpose to prove a test catches it. The examples run a client against

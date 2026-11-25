@@ -1406,6 +1406,14 @@ first. Cite an entry by number in code and commits ("decision 6").
       A person copies a chosen run's charts to `docs/images`, so the README still names one run.
       Beaten: CI that commits the charts, which needs write access, and moves the README's numbers
       with each runner's CPU model.
+    - Amended on 2026-11-25, on the owner's choice: the benchmarks, `bench-compare`,
+      `validate-compare`, and the `fullstack` checks, run on each tag alone, and no longer on
+      each push. The job `charts` then commits each chart the tag's run drew to `docs/images` on
+      main, with the workflow's token. The README and `docs/benchmarks.md` quote no measured
+      number and point at the charts, each of which names its run, so the text no longer moves
+      with a runner's CPU model. A push loses these checks as gates: a wrong answer or a changed
+      octet shows at the next tag. Beaten: the charts of every push, which a person copied, and
+      CI that commits charts while the text still quotes their numbers.
     - Vector and Rotel run as they ship, with Nagle's algorithm on. Each passes its accepted
       sockets to tonic itself, and neither sets TCP_NODELAY, so their p99 stays near 40 ms, Linux's
       delayed ACK, from a low rate. colibri and Go set TCP_NODELAY. Beaten on 2026-11-17: a

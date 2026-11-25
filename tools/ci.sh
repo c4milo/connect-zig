@@ -5,14 +5,58 @@
 #   tools/ci.sh [report.md]                 every check, then exit 1 if any failed
 #   tools/ci.sh --only <check> [report.md]  one check
 #   tools/ci.sh --list                      the checks' names, as a JSON array
+#   tools/ci.sh --matrix push|tag           the jobs of CI's matrix, as a JSON array
 #
 # The report gets a line for each check, and the tables of the checks that write one: interop
 # across languages in both directions, the costs, the full stack, the instruction counts and the
-# conformance totals. CI publishes it as the job's summary, and the workflow runs each check of
-# `--list` as a job of its own, so each shows apart in GitHub.
+# conformance totals. CI publishes it as the job's summary, and the workflow runs each job of
+# `--matrix` as a job of its own, so each shows apart in GitHub.
 set -eu
 cd "$(dirname "$0")/.."
 checks="format citations scripts complexity commits test release package bench costs bench-compare fullstack fullstack-peak fullstack-cleartext fullstack-compression fullstack-compression-cleartext perf generated interop interop-languages interop-servers coverage line-coverage conformance protobuf-conformance protovalidate-conformance cel-differential cel-conformance compile-time validate-compare lean"
+# The checks that time connect-zig against other servers and libraries, and draw the charts of
+# docs/images. CI runs them on a tag alone, and its job `charts` commits what they drew
+# (decision 44 as amended on 2026-11-25). Every other check runs on each push and pull request.
+benchmarks="bench-compare fullstack fullstack-peak fullstack-cleartext fullstack-compression fullstack-compression-cleartext validate-compare"
+# The checks that run a second time on an arm64 runner: `test` because an aarch64 Linux link can
+# fail where x86-64's passes, the next three for the arm64 charts, and `validate-compare` for its
+# hardware counters, which GitHub's x86-64 runners do not expose.
+arm64_checks="test bench-compare fullstack fullstack-compression validate-compare"
+x86_64_runner="ubuntu-26.04"
+arm64_runner="ubuntu-26.04-arm"
+
+# Whether the check $1 is one of the words of $2.
+is_one_of() {
+    case " $2 " in
+        *" $1 "*) return 0 ;;
+    esac
+    return 1
+}
+
+# The jobs of CI's matrix for the event $1: `push` holds every check but the benchmarks, and `tag`
+# the benchmarks alone. Each check runs on x86-64, and the ones of `arm64_checks` on arm64 too.
+print_matrix() {
+    case "$1" in
+        push | tag) ;;
+        *)
+            echo "ci.sh: --matrix takes push or tag, not '$1'" >&2
+            return 2
+            ;;
+    esac
+    printf '['
+    separator=""
+    for check in ${checks}; do
+        benchmark=push
+        is_one_of "${check}" "${benchmarks}" && benchmark=tag
+        [ "${benchmark}" = "$1" ] || continue
+        printf '%s{"check":"%s","runner":"%s"}' "${separator}" "${check}" "${x86_64_runner}"
+        separator=","
+        is_one_of "${check}" "${arm64_checks}" || continue
+        printf ',{"check":"%s","runner":"%s"}' "${check}" "${arm64_runner}"
+    done
+    printf ']\n'
+}
+
 only=""
 case "${1:-}" in
     --list)
@@ -24,6 +68,10 @@ case "${1:-}" in
         done
         printf ']\n'
         exit 0
+        ;;
+    --matrix)
+        print_matrix "${2:-}"
+        exit $?
         ;;
     --only)
         only="$2"
@@ -49,9 +97,9 @@ report_only() {
 
 # Draws the README's charts of a check from its output (the first argument), into `charts`. Each
 # chart names its run: GitHub's run number in CI, or "local". An arm64 runner's charts take the
-# README's "-arm64" names. CI uploads `charts` with the run, and a person copies a chosen run's
-# charts to docs/images (decision 44). A chart that does not draw is a warning: the check measured
-# what it must.
+# README's "-arm64" names. CI uploads `charts` with the run, and on a tag its job `charts` commits
+# each one that docs/images holds (tools/charts_commit.sh, decision 44 as amended). A chart that
+# does not draw is a warning: the check measured what it must.
 charts="ci-charts"
 draw_charts() {
     mkdir -p "${charts}"

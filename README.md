@@ -12,8 +12,8 @@ and serve the same handlers to Connect, gRPC, and gRPC-Web clients, in binary pr
 - **Conformant.** It passes every case of [connectrpc's conformance
   suite](https://github.com/connectrpc/conformance) v1.0.7, server and client.
 - **No allocator and no hidden I/O.** Every buffer is yours, and the core reads no clock.
-- **Fast.** An OpenTelemetry receiver on connect-zig takes 7.0 times the spans a second of one on
-  connect-go. See [Performance](#performance).
+- **Fast.** An OpenTelemetry receiver on connect-zig takes more spans a second than one on
+  connect-go, connect-rust, or the OpenTelemetry Collector. See [Performance](#performance).
 - **HTTP from [colibri](https://github.com/c4milo/colibri):** HTTP/1.1, HTTP/2, and HTTP/3 (h11,
   h2, and h3), in cleartext or over TLS.
 
@@ -250,19 +250,11 @@ The benchmark loads an OpenTelemetry (OTLP) receiver on one core, over TLS and h
 core's traffic for 33,000 servers. Each bar is the highest rate held with p99 under 100 ms, the
 median of three rounds:
 
-![Bars of the spans a second one core holds with p99 under 100 ms over TLS, the median of three rounds with their range, and lines of p99 as the rate climbs, on arm64: connect-zig holds 711,570 spans a second, 7.0 times connect-go's 101,213, 2.7 times connect-rust's 263,440, 3.3 times the OpenTelemetry Collector's 215,818, and 8.6 times Vector's 82,310](docs/images/fullstack-arm64.svg)
+![Bars of the spans a second one core holds with p99 under 100 ms over TLS, the median of three rounds with their range, and lines of p99 as the rate climbs, on arm64, for connect-zig, connect-go, connect-rust, the OpenTelemetry Collector, and Vector](docs/images/fullstack-arm64.svg)
 
-On an Arm Neoverse-N2 core in CI's
-[run 266](https://github.com/c4milo/connect-zig/actions/runs/45246119951) and
-[run 265](https://github.com/c4milo/connect-zig/actions/runs/45231244610), connect-zig:
-
-- takes 7.0 times connect-go's spans a second, 2.7 times connect-rust's, and 3.3 times the
-  OpenTelemetry Collector's;
-- keeps 87% of its rate with protovalidate, 9.8 times connect-go's with protovalidate-go;
-- makes a routed unary call 9.6 to 12.4 times as fast as connect-go;
-- encodes and decodes protobuf 3.2 to 18.9 times as fast as Go's runtime.
-
-[docs/benchmarks.md](docs/benchmarks.md) holds every chart, the x86-64 results, and the method.
+CI runs the benchmarks on each tag and commits the charts they draw. Each chart names its run.
+[docs/benchmarks.md](docs/benchmarks.md) holds every chart and the method: the codec, a routed
+call, validation, and the receivers with protovalidate and with compression.
 
 ## How it is tested
 

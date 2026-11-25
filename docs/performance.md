@@ -17,9 +17,9 @@ paid for.
   `tools/bench_check.sh` runs Go's `google.golang.org/protobuf` and Rust's Buffa on the same
   inputs beside it, and checks that each writes the same octets and the same walk sum as Zig. A
   time orders candidates and never lands in a document unless every program ran in the same job
-  on the same machine. CI's `bench-compare` job runs it and adds the table to the job's summary;
-  it fails only when the octets differ, never on a time. The README's table comes from one named
-  run of that job.
+  on the same machine. CI's `bench-compare` job runs it on each tag and adds the table to the
+  job's summary; it fails only when the octets differ, never on a time. The chart
+  `speed-vs-go-arm64.svg` comes from the tag's run of that job.
 - **The full stack is a time too.** `tools/fullstack_check.sh` loads whole servers on a socket:
   connect-zig's OTLP sink, OpenTelemetry's Collector, Vector and Rotel in Rust, and receivers on
   connect-go and connect-rust, each on one core, with the load on two others (decisions 44 and
@@ -29,18 +29,19 @@ paid for.
   most 100 ms: over TLS beside Vector, and in cleartext beside Rotel. After the first step that
   fails, it halves the gap to the last step that passed five times, so a rate is known within
   1/64 of it (decision 44 as amended). It fails only when a server
-  answered an export wrongly or did not take every span. CI's `fullstack` job runs it on x86-64
-  and on arm64, and adds its tables to each job's summary.
-- **Each run draws its charts.** The `fullstack` and `bench-compare` jobs draw the README's
-  charts from their own output. CI keeps them with the run as `charts-<check>-<arch>`. To update
-  the README, copy a chosen run's charts to `docs/images`, and take its numbers into the README's
-  short text and into `docs/benchmarks.md`, which holds the method and every table.
+  answered an export wrongly or did not take every span. On each tag, CI's `fullstack` job runs it
+  on x86-64 and on arm64, and adds its tables to each job's summary.
+- **Each tag draws the charts.** CI runs the benchmarks on a tag alone. Their jobs draw the charts
+  from their own output, and CI keeps them with the run as `charts-<check>-<arch>`. Once every
+  benchmark of the tag passed, the job `charts` commits each chart that `docs/images` holds
+  (`tools/charts_commit.sh`, decision 44 as amended). The README and `docs/benchmarks.md` quote
+  no measured number, so no text goes stale; the run's summary holds every table.
 - **The smoke run.** `zig build bench -- --quick` runs every operation on every message in a few
   short batches. CI's `bench` job runs it, so a broken operation fails before anyone times it.
 - **Cycles and branch misses are a filter too.** `zig build bench-validate -- --counters <dir>`
   counts each validation's cycles, instructions, branches, and branch misses for one call, through
   Linux's hardware counters (`bench/counters.zig`). `tools/validate_compare_check.sh` prints the
-  table last, and CI's `validate-compare` job lets the process count its own events. GitHub's
+  table last, and CI's `validate-compare` job, on each tag, lets the process count its own events. GitHub's
   x86-64 runners expose no counters: run 240's printed `NOENT` on an Intel Xeon 6973P-C. So the
   job runs on arm64 too, whose runners give them. A host with no counters prints a line that
   says so. A count
