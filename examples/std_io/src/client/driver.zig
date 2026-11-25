@@ -101,12 +101,13 @@ pub const Driver = struct {
         driver.close_socket(io);
     }
 
-    /// Starts a round whose pool speaks `protocols` to the server on `server_port`.
-    pub fn begin(driver: *Driver, protocols: client.Protocols, server_port: u16) !void {
+    /// Starts a round whose pool speaks `protocols` to the server on `server_port`, with the
+    /// program's CPU features.
+    pub fn begin(driver: *Driver, protocols: client.Protocols, server_port: u16, cpu_features: client.CpuFeatures) !void {
         std.debug.assert(!protocols.h3);
         std.debug.assert(driver.stream == null);
         driver.port = server_port;
-        driver.config = .{ .authority = constants.authority, .protocols = protocols };
+        driver.config = .{ .authority = constants.authority, .protocols = protocols, .cpu_features = cpu_features };
         try driver.pool.init(&driver.pool_memory, &driver.config, &.{ .addresses = &server_addresses, .port = server_port }, null);
         driver.held_len = 0;
         driver.requested = 0;

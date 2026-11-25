@@ -78,7 +78,7 @@ pub fn main(init: std.process.Init) !void {
         .identity = .{ .chain = identity.chain_pem, .key = identity.key_pem },
         .cpu = cpu,
         .unix_seconds = unix_seconds,
-        .engine = .{ .tls_buffer = &state.tls_buffer },
+        .engine = .{ .tls_buffer = &state.tls_buffer, .cpu_features = state.app.cpu_features },
     }, &state.router, &state.app);
     defer state.http_server.deinit();
     // A script that asked for port 0 reads the port from this line.

@@ -94,6 +94,9 @@ pub const ClientSide = struct {
     anchors: []const tls.Anchor,
     output: [client.constants.limits.stream_output_len_min]u8,
     config: client.Config,
+    /// The program's CPU features, which each round's pool configuration states (colibri
+    /// decision 169).
+    cpu_features: client.CpuFeatures,
     pool: Pool,
     pool_memory: [Pool.memory_bytes(.{})]u8 align(Pool.memory_alignment),
     prng: std.Random.DefaultPrng,
@@ -110,8 +113,9 @@ pub const ClientSide = struct {
     listener_count: usize,
     read_buffers: ReadBuffers,
 
-    pub fn init(self: *Self, server: *server_side.ServerSide, link: *Link, datagram_link: *DatagramLink) !void {
+    pub fn init(self: *Self, server: *server_side.ServerSide, link: *Link, datagram_link: *DatagramLink, cpu_features: client.CpuFeatures) !void {
         self.server = server;
+        self.cpu_features = cpu_features;
         self.link = link;
         self.datagram_link = datagram_link;
         self.prng = .init(constants.client_seed);
@@ -130,10 +134,10 @@ pub const ClientSide = struct {
         if (self.quic) {
             // QUIC always runs TLS. The receive pool is what makes the pool offer QUIC.
             const trust: tls.Trust = .{ .web_pki = .{ .anchors = self.anchors, .server_name = identity.server_name } };
-            self.config = .{ .tls = .{ .trust = trust, .cpu = server_side.cpu }, .authority = identity.server_name, .protocols = protocols };
+            self.config = .{ .tls = .{ .trust = trust, .cpu = server_side.cpu }, .authority = identity.server_name, .protocols = protocols, .cpu_features = self.cpu_features };
             try self.pool.init(&self.pool_memory, &self.config, &destination, self.receive_pool.storage());
         } else {
-            self.config = .{ .authority = identity.server_name, .protocols = protocols };
+            self.config = .{ .authority = identity.server_name, .protocols = protocols, .cpu_features = self.cpu_features };
             try self.pool.init(&self.pool_memory, &self.config, &destination, null);
         }
         self.ended_before = self.server.ended();

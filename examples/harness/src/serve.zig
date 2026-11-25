@@ -42,7 +42,7 @@ fn serve(http_server: *Server, router: anytype, app: anytype, tls_buffer: []u8, 
         .identity = .{ .chain = identity.chain_pem, .key = identity.key_pem },
         .cpu = server_side.cpu,
         .unix_seconds = unix_seconds,
-        .engine = .{ .tls_buffer = tls_buffer },
+        .engine = .{ .tls_buffer = tls_buffer, .cpu_features = app.cpu_features },
     }, router, app);
     defer http_server.deinit();
     // A script that asked for port 0 reads the port from this line.

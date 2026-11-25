@@ -133,10 +133,11 @@ const State = struct {
 
     /// Starts the engine, with no socket yet.
     fn init(state: *State, io: Io) !void {
-        state.config = .{ .timeouts = .{ .first_request_ns = constants.first_request_timeout_ns } };
         state.router.init();
-        // The program detects the CPU's features once, as it starts.
+        // The program detects the CPU's features once, as it starts. Its routes read them from
+        // the App, and the engine's codecs from its configuration.
         state.app = .{ .cpu_features = .detect() };
+        state.config = .{ .cpu_features = state.app.cpu_features, .timeouts = .{ .first_request_ns = constants.first_request_timeout_ns } };
         state.entries = @splat(.{});
         state.random_source = .{ .io = io };
         state.queue = .init(&state.queue_buffer);

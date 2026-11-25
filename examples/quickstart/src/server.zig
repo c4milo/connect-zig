@@ -104,7 +104,7 @@ pub fn main(init: std.process.Init) !void {
         .identity = .{ .chain = chain, .key = key },
         .cpu = cpu,
         .unix_seconds = unix_seconds,
-        .engine = .{ .tls_buffer = &state.tls_buffer },
+        .engine = .{ .tls_buffer = &state.tls_buffer, .cpu_features = state.app.cpu_features },
     }, &state.router, &state.app);
     defer state.http_server.deinit();
     std.debug.print("listening on port {d}\n", .{state.http_server.port()});

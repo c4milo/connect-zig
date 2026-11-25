@@ -116,7 +116,7 @@ fn port_of(io: Io, stderr: Io.File, line: []u8) !u16 {
 
 fn round(io: Io, state: *State, port: u16, protocols: client.Protocols, expected: client.Protocol) !void {
     const driver = &state.driver;
-    try driver.begin(protocols, port);
+    try driver.begin(protocols, port, state.client.cpu_features);
     try state.say_proto.init(&state.client, &.{}, &.{.{ .sentence = service.said }});
     try state.say_get.init(&state.client, &.{ .codec = .json, .use_get = true }, &.{.{ .sentence = service.said }});
     try state.introduce.init(&state.client, &.{ .protocol = .grpc_web }, &.{.{ .name = service.name }});

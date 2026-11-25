@@ -2252,6 +2252,26 @@ ran on Linux x86-64 with Zig 0.16.0.
     and the GET that names no coding. Both lines are older than this step. Two tests of
     `client_call.zig` now hold them: the gzip encoder's CRC-32 path names the features each
     kind of request took, and each kind of request names the client's codings.
+- **colibri at 19a4b51, whose configurations state the CPU features** (decision 51, amended
+  2026-11-24; https://github.com/c4milo/colibri/issues/156). No public name changes, and no
+  file of `src/` changes: `zig build test-connect-colibri` passed its 77 tests on the new pin
+  as it was. colibri's `server.Config` and `client.Config` take `cpu_features` with no
+  default, so each program states it, or its build stops:
+  - A server states its App's value in `.engine`: the quickstart, the harness's `serve`, the
+    conformance server, the interop server, and the OTLP sink. `examples/std_io` and the
+    harness's in-memory server state it in the `server.Config` they hold.
+  - A client states its `connect.Client`'s value in its pool's configuration: the quickstart's
+    client, and the conformance and interop clients through `Transport.begin`, which takes it
+    as its last argument. The harness's `Rounds.init` gives both of its sides the App's value.
+  - No check of connect-zig changes, so no mutation ran: the compiler refuses a configuration
+    without the field, and colibri's own tests hold what its codecs do with the value.
+  - Run on x86-64 Linux, each passed: `zig build test`, with the examples;
+    `tools/generate_check.sh`; `tools/interop_check.sh`; and `tools/conformance_check.sh`,
+    3,714 cases against the server and 10,711 against the client. `tools/perf_check.sh` gave
+    each operation the count it gave on the pin before, the routed calls included.
+  - Those checks ran on colibri at 012b745. Its package is the package of 19a4b51, with the
+    same hash: the two commits differ in colibri's `tools/` and `docs/` alone. 012b745 failed
+    one section of colibri's CI, its consumer project, and 19a4b51 holds the fix.
 
 - **One module** (decision 52). Public names: see step 40. Each example adds `connect_zig`
   alone and names no stdx. `protobuf_messages`, `sans_io_call`, and the new `std_http` pass

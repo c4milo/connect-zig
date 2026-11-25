@@ -10,7 +10,7 @@ change the public API, and the entry marks each change that does.
 
 ## Unreleased
 
-It builds on colibri at e5dd6ba, on its `main`, and on stdx at 1df5f9f, the commit that colibri
+It builds on colibri at 19a4b51, on its `main`, and on stdx at 1df5f9f, the commit that colibri
 pins. `protovalidate` takes `regex` from the same stdx: the second pin, `stdx_regex`, is gone.
 
 ### Added
@@ -70,6 +70,14 @@ pins. `protovalidate` takes `regex` from the same stdx: the second pin, `stdx_re
   - `connect.client.Options` holds what differs from call to call. Its fields `encoders` and
     `decoders` moved to the `Client`. Each field left has a default, so `&.{}` is a call with
     the defaults.
+
+- **Breaking.** colibri's `server.Config` and `client.Config` take a field `cpu_features`, with
+  no default (colibri decision 169). A program on `colibri.Server` states it in `.engine`, and
+  one that holds a pool states it in the pool's configuration, or the build stops. Give each the
+  value your program detected once:
+  `.engine = .{ .tls_buffer = &state.tls_buffer, .cpu_features = state.app.cpu_features }` and
+  `.pool = .{ .authority = name, .cpu_features = state.client.cpu_features }`. No name of
+  connect-zig changes ([decision 51](docs/decisions.md)).
 
 - **Breaking.** `protobuf` decodes and writes JSON through a `Decoder` and an `Encoder`, each made
   once with `init(cpu_features)`, the features the program detects as it starts
