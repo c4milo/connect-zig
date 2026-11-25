@@ -693,6 +693,14 @@ first. Cite an entry by number in code and commits ("decision 6").
     which stdx's typed decoder cannot fill, since it refuses the members a struct does not name,
     and which needs a bound for each string and array; and an exclusion list read at run time,
     which a comptime list makes free for a route with none.
+    - Amended on 2026-11-25, for colibri decision 172: colibri asks chapulin once, for
+      `TRANSPORT=nonblocking`, whose one module holds the TCP object as `tcp` and the QUIC object
+      as `quic`, and defines chapulin's hook, `ch_assert_fail`. `build/chapulin.zig` asks with the
+      same request, and `oidc` reads the JWS calls from `chapulin.tcp`. No program of this tree
+      defines the hook, and a program that still does fails to link with a second definition, as
+      the owner chose. Zig exports the hook only when something references chapulin's module, so
+      the module `connect_zig` references colibri whenever a program reaches it. A test binary
+      that reaches no part of connect-zig, as two in this tree do, names colibri itself.
 
 35. **A call keeps values of the type the program declares.** Ruled by the owner on
     2026-11-11. What an interceptor learns about a call belongs to that call: the claims of its

@@ -246,6 +246,18 @@ fn protovalidate_module(b: *std.Build, protobuf: *std.Build.Module, public_names
     });
 }
 
+/// The test binary of src/connect_zig/messages_test.zig: a program's test over `connect_zig` with
+/// colibri that names no colibri type, which must still link chapulin's hook (colibri decision
+/// 172).
+fn messages_test(b: *std.Build, graph: Graph) *std.Build.Module {
+    return b.createModule(.{
+        .root_source_file = b.path("src/connect_zig/messages_test.zig"),
+        .target = graph.target,
+        .optimize = graph.optimize,
+        .imports = &.{.{ .name = "connect_zig", .module = graph.connect_zig }},
+    });
+}
+
 fn add_unit_tests(b: *std.Build, graph: Graph, plugin: *std.Build.Step.Compile, test_step: *std.Build.Step) void {
     const targets = [_]struct { name: []const u8, module: ?*std.Build.Module }{
         .{ .name = "protobuf", .module = graph.protobuf },
@@ -254,6 +266,8 @@ fn add_unit_tests(b: *std.Build, graph: Graph, plugin: *std.Build.Step.Compile, 
         .{ .name = "oidc", .module = graph.oidc },
         .{ .name = "protovalidate", .module = graph.protovalidate },
         .{ .name = "connect-zig", .module = graph.connect_zig },
+        // A program's test that codes messages alone, over the module with colibri (decision 52).
+        .{ .name = "connect-zig-messages", .module = messages_test(b, graph) },
         .{ .name = "public-names", .module = graph.public_names },
         .{ .name = "plugin", .module = plugin.root_module },
     };

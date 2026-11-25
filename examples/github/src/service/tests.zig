@@ -1,11 +1,8 @@
-//! The root of the service's unit tests. colibri's `tls` links chapulin, so the test binary
-//! defines chapulin's hook, as a program does (colibri decision 94).
-const harness = @import("harness");
-
-comptime {
-    _ = harness.hooks;
-}
+//! The root of the service's unit tests.
 
 test {
     _ = @import("service.zig");
+    // The tests reach no colibri type, yet the binary links chapulin's objects. Naming colibri runs
+    // its root, which keeps chapulin's hook, `ch_assert_fail`, beside them (colibri decision 172).
+    _ = @import("connect_zig").colibri;
 }

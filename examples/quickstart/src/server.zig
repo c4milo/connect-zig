@@ -21,10 +21,6 @@ const greet_v1 = @import("greet_v1");
 const constants = @import("constants.zig");
 const Service = greet_v1.GreetService;
 
-comptime {
-    _ = @import("hooks.zig");
-}
-
 pub const Error = error{ArgumentMissing};
 
 /// What the routes read. The verifier is never asked for a token here: its `init` is a call into

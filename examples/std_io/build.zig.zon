@@ -8,8 +8,6 @@
         .connect_zig = .{ .path = "../.." },
         // The ELIZA example, whose generated code and handlers this server serves.
         .eliza = .{ .path = "../eliza" },
-        // The examples' package, for chapulin's hook alone: this project runs on real sockets.
-        .harness = .{ .path = "../harness" },
     },
     .paths = .{ "build.zig", "build.zig.zon", "src" },
 }

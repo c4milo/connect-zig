@@ -1,7 +1,8 @@
 //! A token's three parts (RFC 7515 §7.1) and its header (RFC 7515 §4).
 const std = @import("std");
 const assert = std.debug.assert;
-const chapulin = @import("chapulin");
+// The TCP object of chapulin's nonblocking module, which holds the JWS calls (colibri decision 172).
+const chapulin = @import("chapulin").tcp;
 const constants = @import("constants.zig");
 const reader_file = @import("reader.zig");
 const Reader = reader_file.Reader;

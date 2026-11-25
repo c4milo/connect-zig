@@ -19,11 +19,6 @@ const constants = @import("constants.zig");
 const sink = @import("sink.zig");
 const App = sink.App;
 
-comptime {
-    // chapulin's hook, which every program over colibri's `tls` defines (colibri decision 94).
-    _ = @import("hooks");
-}
-
 fn on_error(_: *App, _: *server.RequestContext, _: *const server.Request, _: anyerror, response: *server.Response) void {
     response.status = .internal_server_error;
 }

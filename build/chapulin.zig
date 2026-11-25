@@ -1,20 +1,21 @@
-//! The chapulin object the `oidc` module links (docs/decisions.md entry 34).
+//! The chapulin module the `oidc` module links (docs/decisions.md entry 34).
 const std = @import("std");
 const assert = std.debug.assert;
 
-/// colibri's own request for its TCP object on a host target, key for key (colibri's
-/// `build/modules_chapulin.zig`, and its docs/usage.md, "Naming chapulin beside colibri"). Zig
-/// keys a dependency by its package and its options, so the two requests give one object. A
-/// request that differs in one value builds a second object, which defines every public name
-/// again, and the link fails with a duplicate symbol. So a release of colibri that changes its
-/// request changes this one. chapulin refuses `JWS=on` off a host target, so the caller asks
-/// `host_object` first.
+/// colibri's own request on a host target, key for key (colibri's `build/modules_chapulin.zig`,
+/// decision 172): `TRANSPORT=nonblocking`, one module whose `tcp` holds the TCP object, the JWS
+/// calls among it, and whose `quic` holds the QUIC object. The module defines chapulin's hook,
+/// `ch_assert_fail`, so no program of this tree defines it. Zig keys a dependency by its package
+/// and its options, so the two requests give one module. A request that differs in one value
+/// builds a second, which defines every public name again, and the link fails with a duplicate
+/// symbol. So a release of colibri that changes its request changes this one. chapulin refuses
+/// `JWS=on` off a host target, so the caller asks `host_object` first.
 pub fn object(b: *std.Build, target: std.Build.ResolvedTarget) *std.Build.Dependency {
     assert(host_object(target));
     return b.dependency("chapulin", .{
         .target = target,
         .RAND = .session,
-        .TRANSPORT = .@"tcp-nonblocking",
+        .TRANSPORT = .nonblocking,
         .ROLE = .both,
         .TRUST = .webpki,
         .EXPORTER = .on,

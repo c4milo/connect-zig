@@ -7,10 +7,6 @@ const connect = @import("connect_zig").connect;
 const harness = @import("harness");
 const app_file = @import("app.zig");
 
-comptime {
-    _ = harness.hooks;
-}
-
 /// All the program holds, which `main` allocates once (decision 42). An exporter sends gzip, so
 /// the receiver reads gzip and zstd.
 const State = struct {

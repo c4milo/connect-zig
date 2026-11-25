@@ -26,10 +26,6 @@ const App = app_file.App;
 const Router = app_file.Router;
 const StreamingService = streaming.StreamingService;
 
-comptime {
-    _ = harness.hooks;
-}
-
 pub const Error = error{CallWrong};
 
 pub const Rounds = harness.Rounds(App, Router);

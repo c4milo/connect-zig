@@ -15,8 +15,8 @@ const std = @import("std");
 const Graph = @import("graph.zig").Graph;
 
 pub fn add(b: *std.Build, graph: Graph) void {
-    // The sink runs colibri's TLS, which a program defines chapulin's hook for, on Rotor: a host
-    // target alone builds it, as the interop server.
+    // The sink runs colibri's TLS on Rotor: a host target alone builds it, as the interop
+    // server.
     if (graph.oidc == null) return;
     const plain = sink(b, graph, "otlp-sink", "examples/otlp/gen/opentelemetry/proto/", .plain);
     b.step("otlp-sink", "Install the full-stack benchmark's OTLP server to zig-out/bin").dependOn(&b.addInstallArtifact(plain, .{}).step);
@@ -97,7 +97,6 @@ fn sink(b: *std.Build, graph: Graph, name: []const u8, comptime gen: []const u8,
             .{ .name = "colibri", .module = graph.colibri.module("colibri") },
             .{ .name = "stdx", .module = graph.stdx },
             .{ .name = "test_identity", .module = b.createModule(.{ .root_source_file = b.path("examples/harness/tls/identity.zig"), .target = graph.target, .optimize = graph.optimize }) },
-            .{ .name = "hooks", .module = b.createModule(.{ .root_source_file = b.path("examples/harness/src/hooks.zig"), .target = graph.target, .optimize = graph.optimize }) },
             .{ .name = "otlp", .module = otlp },
             .{ .name = "otlp_service", .module = service },
             .{ .name = "sink_options", .module = options.createModule() },

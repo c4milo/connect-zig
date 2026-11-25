@@ -5,8 +5,7 @@
 //! - `zig build run` starts that server on port 0 and calls it over TCP; `zig build test` does
 //!   the same, and fails on a wrong answer.
 //!
-//! The project serves the service of the eliza project, and takes chapulin's hook from the
-//! harness.
+//! The project serves the service of the eliza project.
 const std = @import("std");
 
 pub fn build(b: *std.Build) void {
@@ -14,15 +13,12 @@ pub fn build(b: *std.Build) void {
     // Assertions stay on, as in connect-zig: Debug, or ReleaseSafe with `-Drelease`.
     const optimize = b.standardOptimizeOption(.{ .preferred_optimize_mode = .ReleaseSafe });
     const release = optimize == .ReleaseSafe;
-    // No Rotor: neither program runs on it (decision 32). The eliza project and the harness take
-    // the same `.rotor = false`, so the build holds one connect-zig.
+    // No Rotor: neither program runs on it (decision 32). The eliza project takes the same
+    // `.rotor = false`, so the build holds one connect-zig.
     const connect_zig = b.dependency("connect_zig", .{ .target = target, .release = release, .rotor = false });
     const eliza_project = b.dependency("eliza", .{ .target = target, .release = release, .rotor = false });
-    const harness = b.dependency("harness", .{ .target = target, .release = release, .rotor = false });
     const eliza = eliza_project.module("eliza");
     const eliza_service = eliza_project.module("eliza_service");
-    // chapulin's hook alone: the `harness` module runs on Rotor.
-    const hooks = harness.module("hooks");
 
     const server = b.addExecutable(.{ .name = "std-io-server", .root_module = b.createModule(.{
         .root_source_file = b.path("src/server/server.zig"),
@@ -30,7 +26,6 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
         .imports = &.{
             .{ .name = "connect_zig", .module = connect_zig.module("connect_zig") },
-            .{ .name = "hooks", .module = hooks },
             .{ .name = "eliza", .module = eliza },
             .{ .name = "eliza_service", .module = eliza_service },
         },
@@ -46,7 +41,6 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
         .imports = &.{
             .{ .name = "connect_zig", .module = connect_zig.module("connect_zig") },
-            .{ .name = "hooks", .module = hooks },
             .{ .name = "eliza", .module = eliza },
             .{ .name = "eliza_service", .module = eliza_service },
         },

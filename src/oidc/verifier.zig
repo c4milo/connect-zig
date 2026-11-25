@@ -3,7 +3,8 @@
 //! to `set_keys`, and passes the time to `set_time`.
 const std = @import("std");
 const assert = std.debug.assert;
-const chapulin = @import("chapulin");
+// The TCP object of chapulin's nonblocking module, which holds the JWS calls (colibri decision 172).
+const chapulin = @import("chapulin").tcp;
 const platform = @import("stdx").platform;
 const constants = @import("constants.zig");
 const claims_file = @import("claims.zig");

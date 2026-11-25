@@ -37,10 +37,6 @@ const Router = app_file.Router;
 const Repositories = github.RepositoryService;
 const Issues = github.IssueService;
 
-comptime {
-    _ = harness.hooks;
-}
-
 pub const Error = error{CallWrong};
 
 comptime {

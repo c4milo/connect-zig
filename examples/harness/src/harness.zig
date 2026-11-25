@@ -1,7 +1,7 @@
 //! The examples' harness (decision 41): what the in-memory examples share, and what is not an
 //! example. It stands where a program's sockets, certificate and clock would be: colibri's
 //! in-memory links, a client and a server that run a round of calls over them in h11, h2 and h3,
-//! the test identity of `tls/`, and chapulin's hook.
+//! and the test identity of `tls/`.
 //!
 //! A program allocates its `Rounds` once, with the rest of its state (decision 42):
 //!
@@ -33,14 +33,8 @@ pub const cpu = server_side.cpu;
 /// The instant the harness judges certificates at, in Unix seconds.
 pub const now_seconds = server_side.now_seconds;
 
-/// chapulin's hook, which a program that links colibri's `tls` defines. A program exports it with
-/// `comptime { _ = harness.hooks; }`.
-pub const hooks = @import("hooks.zig");
-
 pub const constants = @import("constants.zig");
 
-// Each declaration but `hooks`: `connect_colibri` defines chapulin's hook in a test binary
-// itself, so a second definition would collide.
 test {
     _ = Rounds;
     _ = Call;

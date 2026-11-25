@@ -22,10 +22,6 @@ const constants = @import("constants.zig");
 const app_file = @import("app.zig");
 const App = app_file.App;
 
-comptime {
-    _ = harness.hooks;
-}
-
 pub const Error = error{CallWrong};
 
 const ExportCall = harness.Call(otlp.TraceService.@"export", .{});

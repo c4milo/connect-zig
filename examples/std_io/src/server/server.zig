@@ -41,12 +41,6 @@ const constants = @import("constants.zig");
 const Io = std.Io;
 const net = std.Io.net;
 
-comptime {
-    // chapulin's hook, which every program over colibri's `tls` defines (colibri decision 94). The
-    // harness holds it.
-    _ = @import("hooks");
-}
-
 /// TCP connections alone: the program opens no UDP socket.
 const Engine = server.Engine(.{ .tcp_connections = constants.connections_max, .quic_connections = 0 });
 

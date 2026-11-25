@@ -1,7 +1,8 @@
 //! The keys of a JWK Set (RFC 7517 §5), each in the form chapulin's `jws.verify` takes.
 const std = @import("std");
 const assert = std.debug.assert;
-const chapulin = @import("chapulin");
+// The TCP object of chapulin's nonblocking module, which holds the JWS calls (colibri decision 172).
+const chapulin = @import("chapulin").tcp;
 const platform = @import("stdx").platform;
 const constants = @import("constants.zig");
 const reader_file = @import("reader.zig");

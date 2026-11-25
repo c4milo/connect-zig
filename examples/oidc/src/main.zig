@@ -31,10 +31,6 @@ const Router = app_file.Router;
 const issuer = service.issuer;
 const AccountService = account.AccountService;
 
-comptime {
-    _ = harness.hooks;
-}
-
 pub const Error = error{CallWrong};
 
 /// The instant the verifier judges tokens at: the instant the harness judges certificates at.

@@ -8,8 +8,8 @@ pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     // Assertions stay on, as in connect-zig: Debug, or ReleaseSafe with `-Drelease`.
     const optimize = b.standardOptimizeOption(.{ .preferred_optimize_mode = .ReleaseSafe });
-    // A project with no Rotor (decision 32) passes `.rotor = false`, and takes `hooks` alone: the
-    // `harness` module runs on Rotor. Each project passes connect-zig the same options as the
+    // A project with no Rotor (decision 32) passes `.rotor = false`, and takes no module of the
+    // harness, which runs on Rotor. Each project passes connect-zig the same options as the
     // projects it depends on, or Zig builds a second connect-zig.
     const rotor_wanted = b.option(bool, "rotor", "Build on Rotor, which the in-memory rounds and `serve` need") orelse true;
     const connect_zig = b.dependency("connect_zig", .{ .target = target, .release = optimize == .ReleaseSafe, .rotor = rotor_wanted });
@@ -30,8 +30,6 @@ pub fn build(b: *std.Build) void {
             .{ .name = "test_identity", .module = identity },
         },
     });
-    // chapulin's hook alone, for a program with no Rotor.
-    _ = b.addModule("hooks", .{ .root_source_file = b.path("src/hooks.zig"), .target = target, .optimize = optimize });
     const tests = b.addTest(.{ .root_module = harness });
     b.step("test", "Run the harness's tests").dependOn(&b.addRunArtifact(tests).step);
 }

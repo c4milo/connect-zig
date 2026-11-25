@@ -32,13 +32,12 @@ pub fn add(b: *std.Build, graph: Graph) *std.Build.Step {
     };
     add_coverage(b, graph, schemas);
     step.dependOn(add_generated(b, graph));
-    // The interop programs run colibri's TLS, which a program defines chapulin's hook for, and
-    // the server runs on Rotor: a host target alone builds them, as the examples' servers.
+    // The interop programs run colibri's TLS, and the server runs on Rotor: a host target alone
+    // builds them, as the examples' servers.
     if (graph.oidc == null) return step;
-    const hooks = b.createModule(.{ .root_source_file = b.path("examples/harness/src/hooks.zig"), .target = graph.target, .optimize = graph.optimize });
     const test_identity = b.createModule(.{ .root_source_file = b.path("examples/harness/tls/identity.zig"), .target = graph.target, .optimize = graph.optimize });
-    add_interop_server(b, graph, schemas, hooks, test_identity);
-    step.dependOn(add_interop_client(b, graph, schemas, hooks));
+    add_interop_server(b, graph, schemas, test_identity);
+    step.dependOn(add_interop_client(b, graph, schemas));
     return step;
 }
 
@@ -86,7 +85,7 @@ fn add_generated(b: *std.Build, graph: Graph) *std.Build.Step {
     return step;
 }
 
-fn add_interop_server(b: *std.Build, graph: Graph, schemas: Schemas, hooks: *std.Build.Module, test_identity: *std.Build.Module) void {
+fn add_interop_server(b: *std.Build, graph: Graph, schemas: Schemas, test_identity: *std.Build.Module) void {
     const exe = b.addExecutable(.{
         .name = "interop-server",
         .root_module = b.createModule(.{
@@ -101,7 +100,6 @@ fn add_interop_server(b: *std.Build, graph: Graph, schemas: Schemas, hooks: *std
                 .{ .name = "connect_colibri", .module = graph.connect_colibri },
                 .{ .name = "colibri", .module = graph.colibri.module("colibri") },
                 .{ .name = "test_identity", .module = test_identity },
-                .{ .name = "hooks", .module = hooks },
                 .{ .name = "coverage", .module = schemas.coverage },
                 .{ .name = "interop", .module = schemas.interop },
             },
@@ -117,7 +115,7 @@ fn add_interop_server(b: *std.Build, graph: Graph, schemas: Schemas, hooks: *std
 /// `tools/interop_servers_check.sh` runs. It drives its pool with the conformance client's
 /// transport, over TCP with `poll` (decision 32). Returns the step that runs its unit tests,
 /// which also builds it.
-fn add_interop_client(b: *std.Build, graph: Graph, schemas: Schemas, hooks: *std.Build.Module) *std.Build.Step {
+fn add_interop_client(b: *std.Build, graph: Graph, schemas: Schemas) *std.Build.Step {
     const transport = b.createModule(.{
         .root_source_file = b.path("conformance/client_transport.zig"),
         .target = graph.target,
@@ -136,7 +134,6 @@ fn add_interop_client(b: *std.Build, graph: Graph, schemas: Schemas, hooks: *std
             .{ .name = "connect_colibri", .module = graph.connect_colibri },
             .{ .name = "colibri", .module = graph.colibri.module("colibri") },
             .{ .name = "client_transport", .module = transport },
-            .{ .name = "hooks", .module = hooks },
             .{ .name = "coverage", .module = schemas.coverage },
             .{ .name = "interop", .module = schemas.interop },
         },

@@ -6,8 +6,8 @@
     .dependencies = .{
         // The HTTP transport of `connect_colibri`, and through its `tls` module, chapulin.
         .colibri = .{
-            .url = "git+https://github.com/c4milo/colibri#c1aceb5985cdc02249111597c1736ba1a0fbccf8",
-            .hash = "colibri-0.20.0-Wo-AvrJ-tQRMY5z83ydzcEb-j-Eb79x-Bj8TSr4R2-DF",
+            .url = "git+https://github.com/c4milo/colibri#b53e1d3a347f8fa0772f4c2ff6ea3f2442df86d0",
+            .hash = "colibri-0.20.0-Wo-AvhBitQQgZxNuFgEaWT6NNIxYHIP8XQs9lyCfEA1N",
         },
         // JSON for proto3 JSON and the Connect error bodies, the compression codecs, the
         // regular expressions of `protovalidate`'s `pattern` and CEL's `matches`, and the type of
@@ -30,12 +30,12 @@
             .hash = "rotor-0.11.0-YZkxRH0dJwBgz9oa8yO6YOTVtpFTnV6Iiz7C0OwjTffl",
             .lazy = true,
         },
-        // The `jws` calls of the `oidc` module (decision 34): chapulin v0.8.0, at the commit colibri
-        // pins. `build/chapulin.zig` asks for its object with colibri's own request, so a program
+        // The `jws` calls of the `oidc` module (decision 34): chapulin v0.10.0, at the commit colibri
+        // pins. `build/chapulin.zig` asks for its module with colibri's own request, so a program
         // that links colibri and `oidc` links one chapulin.
         .chapulin = .{
-            .url = "git+https://github.com/c4milo/chapulin#c45f661dd22150e5c8eee4530c77e201fcaadc75",
-            .hash = "chapulin-0.8.0-btv9NtaXPgAzJNj3yL-HBtNu5Z5jM4UBLiO4s9o3VwOh",
+            .url = "git+https://github.com/c4milo/chapulin#bda41cf6bfa38436a40c8a252610957c47eb3b5b",
+            .hash = "chapulin-0.10.0-btv9NnAVPwCZRLdko4vhTnjcqeCa034tsWHgKjn267Nl",
         },
     },
     // What a project that depends on connect-zig fetches. `build.zig` imports `build/`, so the

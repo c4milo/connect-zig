@@ -19,10 +19,6 @@ const app_file = @import("app.zig");
 const constants = @import("constants.zig");
 const issuer = service.issuer;
 
-comptime {
-    _ = harness.hooks;
-}
-
 /// All the program holds, which `main` allocates once (decision 42).
 const State = struct {
     app: app_file.App,

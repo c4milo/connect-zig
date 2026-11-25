@@ -82,8 +82,7 @@ certificate, and clock would be:
   calls over them in h11, h2, and h3;
 - `Served`, which runs an example's route table on a real socket for `zig build serve`;
 - the test-only TLS identity, whose key anyone can read, so no program outside the examples and
-  the checks presents it;
-- chapulin's hook, which a program that links colibri's `tls` defines.
+  the checks presents it.
 
 ## One connect-zig in a build
 

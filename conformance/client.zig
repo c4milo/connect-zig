@@ -24,11 +24,6 @@ const result_module = @import("client_result.zig");
 /// The types an Any in a JSON message may name (decision 21).
 pub const protobuf_any_types = @import("any_types.zig").types;
 
-comptime {
-    // chapulin's hook, which every program over colibri's `tls` defines (colibri decision 94).
-    _ = @import("hooks.zig");
-}
-
 const Service = service.ConformanceService;
 const Request = client_compat.ClientCompatRequest;
 

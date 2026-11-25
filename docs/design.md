@@ -2332,6 +2332,21 @@ ran on Linux x86-64 with Zig 0.16.0.
   `colibri` names each: a program writes `connect_zig.colibri.server`. Every example, the
   README, the guide, and docs/protovalidate.md follow.
 
+- **colibri at b53e1d3a and chapulin at bda41cf6, whose module defines its own hook** (decision
+  34 as amended on 2026-11-25; colibri decision 172). No public name of connect-zig changes. No
+  program, example, or check defines `ch_assert_fail`, and the harness exports no `hooks` module.
+  `connect_zig` references colibri when a program reaches it, so the export of chapulin's
+  module runs. The new test `zig build test-connect-zig-messages` codes a message with colibri
+  in the module and names no colibri type, as a program's own unit test does.
+  - Mutations, 4, each `CAUGHT`. Against `zig build test-connect-zig-messages`: the module's
+    reference to colibri removed. Against `zig build checks`: the interop client's test without
+    its reference. Against `zig build examples`: the github service's test without its
+    reference. Against `zig build test-oidc`: a program's own `ch_assert_fail` beside chapulin's.
+  - `zig build test`, the build of every other program, the three servers on a socket, `zig
+    build bench -- --quick`, and `tools/package_check.sh` passed on x86-64 Linux, with Zig
+    0.16.0. The package hash of colibri came from the colibri session, by `zig fetch` over a
+    `git archive` of the commit.
+
 ### Work not done yet
 
 - A stream that waits for an event of the program once its request ended (colibri issue 130).

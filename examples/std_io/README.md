@@ -20,8 +20,7 @@ most 50 ms late. It serves h11 and h2 with prior knowledge in cleartext, with no
 | [src/client/driver.zig](src/client/driver.zig) | The client's loop over a TCP socket |
 
 The project serves the ELIZA service of [eliza](../eliza), which it depends on by path. It
-passes connect-zig, eliza, and the harness `.rotor = false`, so its build holds one connect-zig
-and no Rotor.
+passes connect-zig and eliza `.rotor = false`, so its build holds one connect-zig and no Rotor.
 
 ## Run it
 

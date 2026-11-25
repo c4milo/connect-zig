@@ -46,16 +46,11 @@ and the program links no chapulin. [examples/std_http](../examples/std_http) ser
 with no RPC.
 
 A program that takes `connect_zig` with colibri links
-[chapulin](https://github.com/c4milo/chapulin), the TLS library under colibri. chapulin reports
-a failed assertion through one hook, which your program defines once:
-
-```zig
-export fn ch_assert_fail(condition: [*:0]const u8, file: [*:0]const u8, line: c_int) noreturn {
-    std.debug.panic("chapulin assertion failed: {s} ({s}:{d})", .{ condition, file, line });
-}
-```
-
-Without it, the link fails with `undefined symbol: ch_assert_fail`.
+[chapulin](https://github.com/c4milo/chapulin), the TLS library under colibri. A failed chapulin
+assertion panics with its condition and its source line. A program that reports it its own way
+declares `pub fn chapulinAssertFail(condition: [*:0]const u8, file: [*:0]const u8, line: c_int)
+noreturn` in its root file, and chapulin calls it (colibri decision 172). Do not export
+`ch_assert_fail` yourself: chapulin defines it, and a second definition fails the link.
 
 ## 2. Generate code
 

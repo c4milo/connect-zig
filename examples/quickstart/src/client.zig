@@ -18,10 +18,6 @@ const greet_v1 = @import("greet_v1");
 const constants = @import("constants.zig");
 const Service = greet_v1.GreetService;
 
-comptime {
-    _ = @import("hooks.zig");
-}
-
 pub const Error = error{ ArgumentMissing, CallWrong, ProtocolWrong };
 
 /// colibri's HTTP client, which opens the connections and sends each request.

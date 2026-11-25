@@ -18,10 +18,6 @@ const app_file = @import("app.zig");
 const App = app_file.App;
 const issuer = account_service.issuer;
 
-comptime {
-    _ = harness.hooks;
-}
-
 /// All the program holds, which `main` allocates once before the first call (decision 42).
 const State = struct {
     app: App,

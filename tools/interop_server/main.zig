@@ -16,11 +16,6 @@ const constants = @import("constants.zig");
 const service = @import("interop.zig");
 const App = @import("app.zig").App;
 
-comptime {
-    // chapulin's hook, which every program over colibri's `tls` defines (colibri decision 94).
-    _ = @import("hooks");
-}
-
 /// The types an Any in a JSON message may name: the coverage cases' (decision 21), which the
 /// interop service echoes.
 pub const protobuf_any_types: []const type = &.{ coverage.Everything, coverage.Nested, coverage.Scalars };

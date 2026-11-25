@@ -21,6 +21,14 @@ pub const connect_colibri = if (options.colibri) @import("connect_colibri") else
 pub const oidc = if (options.oidc) @import("oidc") else @compileError("oidc needs colibri's chapulin, on an arm64 target with NEON or an x86-64 target with SSE2 (decisions 34 and 52)");
 pub const colibri = if (options.colibri) @import("colibri") else without_colibri("colibri");
 
+comptime {
+    // With colibri, the module links chapulin's objects, and chapulin's module exports their hook,
+    // `ch_assert_fail`, from a comptime block that Zig runs only when something references it.
+    // colibri's root references it, and this reference runs colibri's root whenever a program
+    // reaches this module, even a test that names no colibri type (colibri decision 172).
+    if (options.colibri) _ = colibri;
+}
+
 fn without_colibri(comptime name: []const u8) noreturn {
     @compileError(name ++ " is colibri's: pass .colibri = true to connect-zig's dependency (decision 52)");
 }
@@ -33,11 +41,10 @@ test "the root exports the names a program calls" {
 }
 
 test "with colibri, each name of colibri is the module, not the refusal" {
-    // Each name is evaluated here, so one that `without_colibri` gives stops the build. The
-    // `connect_colibri` file also defines chapulin's hook in a test binary.
+    // Each name is evaluated here, so one that `without_colibri` gives stops the build.
     if (!options.colibri) return;
     const std = @import("std");
     try std.testing.expect(@hasDecl(connect_colibri, "Route"));
     try std.testing.expect(@hasDecl(colibri, "Server"));
-    // `oidc` defines the hook too, so this test leaves it to the oidc example.
+    if (options.oidc) try std.testing.expect(@hasDecl(oidc, "Verifier"));
 }

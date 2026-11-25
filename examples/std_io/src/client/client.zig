@@ -27,12 +27,6 @@ const Driver = driver_module.Driver;
 const Service = eliza.ElizaService;
 const Io = std.Io;
 
-comptime {
-    // chapulin's hook, which every program over colibri's `tls` defines (colibri decision 94). The
-    // harness holds it.
-    _ = @import("hooks");
-}
-
 const port_prefix = "listening on port ";
 
 pub const Error = error{ CallWrong, ServerSilent, ServerMissing, IdleKept, IdleClosedEarly };

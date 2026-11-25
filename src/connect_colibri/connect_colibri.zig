@@ -2,7 +2,6 @@
 //! (design §7). A server serves each `connect.Method` as a route of `server.Router`; a client
 //! writes each call as a `client.Request` for its `client.ConnectionPool`.
 const std = @import("std");
-const builtin = @import("builtin");
 
 pub const constants = @import("constants.zig");
 
@@ -45,16 +44,6 @@ pub const failure_of = files.client_call.failure_of;
 /// What a streamed call's `Sender` returns, and whether a stream over a protocol is full-duplex.
 pub const ClientSendError = files.client_call.SendError;
 pub const full_duplex = files.client_stream.full_duplex;
-
-/// chapulin's one hook, which a program that links colibri's `tls` defines (colibri decision
-/// 94). The module's own test binary defines it here; a program defines its own.
-fn test_assert_fail(condition: [*:0]const u8, file: [*:0]const u8, line: c_int) callconv(.c) noreturn {
-    std.debug.panic("chapulin assertion failed: {s} ({s}:{d})", .{ condition, file, line });
-}
-
-comptime {
-    if (builtin.is_test) @export(&test_assert_fail, .{ .name = "ch_assert_fail", .linkage = .strong });
-}
 
 test "the root exports the names a program calls" {
     try @import("public_names").expect(@This(), &.{

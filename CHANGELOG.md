@@ -8,6 +8,19 @@ are in [docs/decisions.md](docs/decisions.md), and the steps and their measureme
 connect-zig follows [Semantic Versioning](https://semver.org/). Before 1.0, a minor version may
 change the public API, and the entry marks each change that does.
 
+## Unreleased
+
+It builds on colibri at b53e1d3a, on its `main`, and on chapulin at bda41cf6, the commit that
+colibri pins.
+
+### Changed
+
+- **Breaking.** A program no longer defines chapulin's assertion hook: chapulin's module
+  defines `ch_assert_fail` itself (colibri decision 172). Delete your `export fn
+  ch_assert_fail`, or the link fails with a second definition. A program that reports a failed
+  chapulin assertion its own way declares `pub fn chapulinAssertFail(condition: [*:0]const u8,
+  file: [*:0]const u8, line: c_int) noreturn` in its root file.
+
 ## v0.5.0 (2026-11-25)
 
 It builds on colibri v0.20.0, at c1aceb5, and on stdx at b643d58, the commit that colibri

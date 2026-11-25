@@ -28,10 +28,6 @@ const App = app_file.App;
 const Router = app_file.Router;
 const ElizaService = eliza.ElizaService;
 
-comptime {
-    _ = harness.hooks;
-}
-
 pub const Error = error{CallWrong};
 
 const SayCall = harness.Call(ElizaService.say, .{});

@@ -32,11 +32,6 @@ const Verdict = @import("verdict.zig").Verdict;
 const Case = scenarios.Case;
 const Run = scenarios.Run;
 
-comptime {
-    // chapulin's hook, which every program over colibri's `tls` defines (colibri decision 94).
-    _ = @import("hooks");
-}
-
 /// An Any in the cases names coverage types, which JSON reads and writes (decision 21).
 pub const protobuf_any_types: []const type = &.{ coverage.Everything, coverage.Nested, coverage.Scalars };
 
@@ -275,4 +270,7 @@ fn run_calls(reporter: *Reporter, name: []const u8, run: *const Run, all: []cons
 
 test {
     _ = @import("same.zig");
+    // The tests reach no colibri type, yet the binary links chapulin's objects. Naming colibri runs
+    // its root, which keeps chapulin's hook, `ch_assert_fail`, beside them (colibri decision 172).
+    _ = client;
 }

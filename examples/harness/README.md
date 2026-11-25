@@ -12,7 +12,6 @@ path: `.harness = .{ .path = "../harness" }`.
 | [src/serve.zig](src/serve.zig) | `Served(App, Router)`: an example's routes on a real socket, for `zig build serve` |
 | [src/link.zig](src/link.zig), [src/link_datagram.zig](src/link_datagram.zig) | colibri's in-memory links for octet streams and for datagrams, copied unchanged |
 | `test_identity`, [tls/](tls) | The test-only TLS identity: a CA, and a leaf for `localhost` and 127.0.0.1 (decision 25) |
-| `hooks`, [src/hooks.zig](src/hooks.zig) | chapulin's hook, for a program with no Rotor |
 
 A program allocates its `Rounds` once, with the rest of its state (decision 42):
 
@@ -29,5 +28,5 @@ round over h3 runs QUIC over the datagram link, and the client trusts the test C
 certificates at the fixed instant 1_800_000_000, which a real program reads from its clock.
 
 The build option `rotor`, true by default, goes to connect-zig. A project with no Rotor, as
-`std_io` is, passes `.rotor = false` and imports `hooks` alone, since the `harness` module runs on
-Rotor.
+`std_io` is, passes `.rotor = false` and takes no module of the harness, since the `harness`
+module runs on Rotor.

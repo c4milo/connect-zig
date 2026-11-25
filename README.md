@@ -101,17 +101,6 @@ A program that codes messages, or runs the protocol on an HTTP library of its ow
 `.colibri = false`: the same module, without colibri, links no TLS library.
 [examples/std_http](examples/std_http) serves ELIZA that way on `std.http.Server`.
 
-> [!IMPORTANT]
-> A program that imports `connect_colibri` or `oidc` links
-> [chapulin](https://github.com/c4milo/chapulin), colibri's TLS library, and must define its
-> assertion hook, or the link fails with `undefined symbol: ch_assert_fail`:
->
-> ```zig
-> export fn ch_assert_fail(condition: [*:0]const u8, file: [*:0]const u8, line: c_int) noreturn {
->     std.debug.panic("chapulin assertion failed: {s} ({s}:{d})", .{ condition, file, line });
-> }
-> ```
-
 ### 2. Generate code
 
 Install the plugin, and point `buf.gen.yaml` at it:

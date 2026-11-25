@@ -52,14 +52,13 @@ pub fn build(b: *std.Build) void {
     b.installArtifact(exe);
     const run = b.addRunArtifact(exe);
     b.step("run", "Run the client against the GitHub-style services").dependOn(&run.step);
-    // The service's tests, over the service's files and the harness, whose hook chapulin needs.
+    // The service's tests, over the service's files.
     const tests = b.addTest(.{ .root_module = b.createModule(.{
         .root_source_file = b.path("src/service/tests.zig"),
         .target = target,
         .optimize = optimize,
         .imports = &.{
             .{ .name = "connect_zig", .module = connect_zig.module("connect_zig") },
-            .{ .name = "harness", .module = harness.module("harness") },
             .{ .name = "github", .module = github },
         },
     }) });

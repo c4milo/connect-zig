@@ -22,11 +22,6 @@ const Router = @import("service.zig").Router;
 /// The types an Any in a JSON message may name (decision 21).
 pub const protobuf_any_types = @import("any_types.zig").types;
 
-comptime {
-    // chapulin's hook, which every program over colibri's `tls` defines (colibri decision 94).
-    _ = @import("hooks.zig");
-}
-
 /// TCP connections alone: config.yaml declares no TLS, so the server serves no h3.
 const Server = colibri.Server(.{ .tcp_connections = constants.sockets_max, .quic_connections = 0 }, .private);
 

@@ -5,10 +5,6 @@ const std = @import("std");
 const harness = @import("harness");
 const app_file = @import("app.zig");
 
-comptime {
-    _ = harness.hooks;
-}
-
 /// All the program holds, which `main` allocates once (decision 42).
 const State = struct {
     app: app_file.App,

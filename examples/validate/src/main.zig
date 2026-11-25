@@ -27,10 +27,6 @@ const App = app_file.App;
 const Router = app_file.Router;
 const SignupService = signup.SignupService;
 
-comptime {
-    _ = harness.hooks;
-}
-
 pub const Error = error{CallWrong};
 
 const RegisterCall = harness.Call(SignupService.register, .{});

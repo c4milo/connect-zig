@@ -24,7 +24,6 @@
 //! }
 //! ```
 const std = @import("std");
-const builtin = @import("builtin");
 
 pub const constants = @import("constants.zig");
 
@@ -42,16 +41,6 @@ pub const Error = files.verifier.Error;
 pub const Interceptor = files.interceptor.Interceptor;
 pub const InterceptorOptions = files.interceptor.InterceptorOptions;
 pub const bearer_token = files.interceptor.bearer_token;
-
-/// chapulin's one hook, which a program that links chapulin defines. The module's own test
-/// binary defines it here; a program defines its own.
-fn test_assert_fail(condition: [*:0]const u8, file: [*:0]const u8, line: c_int) callconv(.c) noreturn {
-    std.debug.panic("chapulin assertion failed: {s} ({s}:{d})", .{ condition, file, line });
-}
-
-comptime {
-    if (builtin.is_test) @export(&test_assert_fail, .{ .name = "ch_assert_fail", .linkage = .strong });
-}
 
 test "the root exports the names a program calls" {
     try @import("public_names").expect(@This(), &.{

@@ -19,10 +19,6 @@ const App = app_file.App;
 const Router = app_file.Router;
 const CalculatorService = errors.CalculatorService;
 
-comptime {
-    _ = harness.hooks;
-}
-
 pub const Error = error{CallWrong};
 
 /// A method the server does not serve, which a client of an older or newer schema might call.
