@@ -8,7 +8,7 @@ are in [docs/decisions.md](docs/decisions.md), and the steps and their measureme
 connect-zig follows [Semantic Versioning](https://semver.org/). Before 1.0, a minor version may
 change the public API, and the entry marks each change that does.
 
-## Unreleased
+## v0.5.0 (2026-11-25)
 
 It builds on colibri v0.20.0, at c1aceb5, and on stdx at b643d58, the commit that colibri
 pins. `protovalidate` takes `regex` from the same stdx: the second pin, `stdx_regex`, is gone.
