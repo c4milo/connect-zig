@@ -9,8 +9,8 @@
 //! The program reads the clock and the socket; colibri reads neither (colibri non-negotiable 3).
 const std = @import("std");
 const assert = std.debug.assert;
-const client = @import("client");
-const tls = @import("tls");
+const client = @import("colibri").client;
+const tls = @import("colibri").tls;
 const constants = @import("constants.zig");
 const UdpSocket = @import("client_datagram.zig").UdpSocket;
 

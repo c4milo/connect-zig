@@ -17,10 +17,10 @@ pub const google_protobuf_descriptor = @import("google_protobuf_descriptor");
 pub const connect_colibri = if (options.colibri) @import("connect_colibri") else without_colibri("connect_colibri");
 /// chapulin builds the `jws` calls of `oidc` for a host target alone (decision 34).
 pub const oidc = if (options.oidc) @import("oidc") else @compileError("oidc needs colibri's chapulin, on an arm64 target with NEON or an x86-64 target with SSE2 (decisions 34 and 52)");
-pub const server = if (options.colibri) @import("server") else without_colibri("server");
-pub const client = if (options.colibri) @import("client") else without_colibri("client");
-pub const http = if (options.colibri) @import("http") else without_colibri("http");
-pub const tls = if (options.colibri) @import("tls") else without_colibri("tls");
+pub const server = if (options.colibri) @import("colibri").server else without_colibri("server");
+pub const client = if (options.colibri) @import("colibri").client else without_colibri("client");
+pub const http = if (options.colibri) @import("colibri").http else without_colibri("http");
+pub const tls = if (options.colibri) @import("colibri").tls else without_colibri("tls");
 pub const colibri = if (options.colibri) @import("colibri") else without_colibri("colibri");
 
 fn without_colibri(comptime name: []const u8) noreturn {

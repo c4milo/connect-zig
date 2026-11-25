@@ -9,7 +9,7 @@
 //! answers fails a scenario, not the run.
 const std = @import("std");
 const connect = @import("connect");
-const client = @import("client");
+const client = @import("colibri").client;
 const rpc = @import("connect_colibri");
 const transport = @import("client_transport");
 const constants = @import("constants.zig");

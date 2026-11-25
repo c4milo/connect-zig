@@ -64,8 +64,7 @@ pub fn add(b: *std.Build, public_names: *std.Build.Module, target: std.Build.Res
                 .{ .name = "bench_v1", .module = messages },
                 .{ .name = "connect", .module = routed.connect },
                 .{ .name = "connect_colibri", .module = routed.connect_colibri },
-                .{ .name = "server", .module = routed.server },
-                .{ .name = "http", .module = routed.http },
+                .{ .name = "colibri", .module = routed.colibri },
                 .{ .name = "platform", .module = routed.platform },
             },
         }),
@@ -183,8 +182,8 @@ fn without_colibri(b: *std.Build, imports: []const std.Build.Module.Import, targ
 const Routed = struct {
     connect: *std.Build.Module,
     connect_colibri: *std.Build.Module,
-    server: *std.Build.Module,
-    http: *std.Build.Module,
+    /// colibri's one module, which names its others (colibri decision 170).
+    colibri: *std.Build.Module,
     /// stdx's type of CPU features, which the route's context holds.
     platform: *std.Build.Module,
 };
@@ -194,8 +193,7 @@ const Routed = struct {
 /// share one copy of each stdx module. The benchmark needs no Rotor.
 fn routed_modules(b: *std.Build, copies: *Copies, stdx: *std.Build.Dependency, protobuf: *std.Build.Module, public_names: *std.Build.Module, target: std.Build.ResolvedTarget) Routed {
     const colibri = b.dependency("colibri", .{ .target = target, .release = true, .rotor = false });
-    const server = release_fast(b, copies, colibri.module("server"));
-    const http = release_fast(b, copies, colibri.module("http"));
+    const colibri_module = release_fast(b, copies, colibri.module("colibri"));
     const platform = release_fast(b, copies, stdx.module("platform"));
     const connect = b.createModule(.{
         .root_source_file = b.path("src/connect/connect.zig"),
@@ -219,14 +217,12 @@ fn routed_modules(b: *std.Build, copies: *Copies, stdx: *std.Build.Dependency, p
         .imports = &.{
             .{ .name = "connect", .module = connect },
             .{ .name = "protobuf", .module = protobuf },
-            .{ .name = "server", .module = server },
-            .{ .name = "client", .module = release_fast(b, copies, colibri.module("client")) },
-            .{ .name = "http", .module = http },
+            .{ .name = "colibri", .module = colibri_module },
             .{ .name = "platform", .module = platform },
             .{ .name = "public_names", .module = public_names },
         },
     });
-    return .{ .connect = connect, .connect_colibri = connect_colibri, .server = server, .http = http, .platform = platform };
+    return .{ .connect = connect, .connect_colibri = connect_colibri, .colibri = colibri_module, .platform = platform };
 }
 
 /// Each module copied so far, by its original: a module two others import is copied once, as a

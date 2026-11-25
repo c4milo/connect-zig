@@ -7,7 +7,7 @@
 //! 405 themselves, and on each other path colibri answers 405 for them.
 const std = @import("std");
 const connect = @import("connect");
-const server = @import("server");
+const server = @import("colibri").server;
 const constants = @import("constants.zig");
 
 /// The Allow value of a path that serves POST alone, and of one that serves GET too (RFC 9110

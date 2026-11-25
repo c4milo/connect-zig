@@ -55,15 +55,11 @@ pub fn add(b: *std.Build, graph: Graph) *std.Build.Step {
         .{ .name = "protobuf", .module = graph.protobuf },
         .{ .name = "connect", .module = graph.connect },
         .{ .name = "connect_colibri", .module = graph.connect_colibri },
-        .{ .name = "server", .module = graph.colibri.module("server") },
-        .{ .name = "http", .module = graph.colibri.module("http") },
         .{ .name = "colibri", .module = graph.colibri.module("colibri") },
-        .{ .name = "tls", .module = graph.colibri.module("tls") },
         config_import,
         service_import,
         .{ .name = "connectrpc_conformance_v1_server_compat", .module = server_compat },
         .{ .name = "connectrpc_conformance_v1_client_compat", .module = client_compat },
-        .{ .name = "client", .module = graph.colibri.module("client") },
         // stdx's type of CPU features, which the server's context holds.
         .{ .name = "platform", .module = graph.platform },
     };

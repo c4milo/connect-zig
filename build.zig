@@ -119,9 +119,7 @@ fn modules(b: *std.Build, stdx: *std.Build.Dependency, colibri: *std.Build.Depen
         .imports = &.{
             .{ .name = "connect", .module = connect },
             .{ .name = "protobuf", .module = protobuf },
-            .{ .name = "server", .module = colibri.module("server") },
-            .{ .name = "client", .module = colibri.module("client") },
-            .{ .name = "http", .module = colibri.module("http") },
+            .{ .name = "colibri", .module = colibri.module("colibri") },
             // stdx's type of CPU features, which a route reads from the program's context.
             .{ .name = "platform", .module = stdx.module("platform") },
             .{ .name = "public_names", .module = public_names },
@@ -195,9 +193,8 @@ fn connect_zig_module(b: *std.Build, exports: Exports, with_colibri: bool, targe
     });
     if (!with_colibri) return module;
     module.addImport("connect_colibri", exports.connect_colibri);
-    for ([_][]const u8{ "server", "client", "http", "tls", "colibri" }) |name| {
-        module.addImport(name, exports.colibri.module(name));
-    }
+    // colibri's package exports one module, which names each of its others (colibri decision 170).
+    module.addImport("colibri", exports.colibri.module("colibri"));
     if (exports.oidc) |oidc| module.addImport("oidc", oidc);
     return module;
 }

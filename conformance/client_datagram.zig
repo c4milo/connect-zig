@@ -3,7 +3,7 @@
 //! datagram the socket holds, with the address it came from. The transport holds one `UdpSocket`.
 const std = @import("std");
 const assert = std.debug.assert;
-const client = @import("client");
+const client = @import("colibri").client;
 const constants = @import("constants.zig");
 
 pub const UdpSocket = struct {

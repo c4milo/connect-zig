@@ -18,8 +18,8 @@ const platform = @import("platform");
 const assert = std.debug.assert;
 const connect = @import("connect");
 const rpc = @import("connect_colibri");
-const server = @import("server");
-const http = @import("http");
+const server = @import("colibri").server;
+const http = @import("colibri").http;
 const proto = @import("protobuf");
 const constants = @import("constants.zig");
 

@@ -10,7 +10,7 @@ change the public API, and the entry marks each change that does.
 
 ## Unreleased
 
-It builds on colibri at 19a4b51, on its `main`, and on stdx at 1df5f9f, the commit that colibri
+It builds on colibri at dfc5021, on its `main`, and on stdx at 1df5f9f, the commit that colibri
 pins. `protovalidate` takes `regex` from the same stdx: the second pin, `stdx_regex`, is gone.
 
 ### Added
@@ -29,6 +29,10 @@ pins. `protovalidate` takes `regex` from the same stdx: the second pin, `stdx_re
   `module.addImport("connect_zig", connect_zig.module("connect_zig"))`, give each generated file
   the same import, and remove stdx from your `build.zig.zon`. Run `buf generate` again: the
   generated code imports `connect_zig`.
+
+- colibri's package exports one module, `colibri`, which names each of its others (colibri
+  decision 170). `connect_zig` names `server`, `client`, `http`, and `tls` from it, so a program
+  that reads them through `connect_zig` changes nothing.
 
 - A program that codes messages, or runs the protocol on an HTTP library of its own, passes
   `.colibri = false` and links no chapulin. `examples/std_http` serves ELIZA so on

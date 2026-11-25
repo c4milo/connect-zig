@@ -10,7 +10,7 @@
 //! `otlp-sink-validate` builds with `sink_options.validate` set, over the schema of
 //! tools/fullstack/validate, whose spans carry OTLP's rules. `protovalidate.Interceptor` then
 //! checks each export against them before `export` runs, and refuses one that breaks a rule.
-const server = @import("server");
+const server = @import("colibri").server;
 const connect = @import("connect");
 const rpc = @import("connect_colibri");
 const protovalidate = @import("protovalidate");

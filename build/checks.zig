@@ -99,9 +99,7 @@ fn add_interop_server(b: *std.Build, graph: Graph, schemas: Schemas, hooks: *std
                 .{ .name = "protobuf", .module = graph.protobuf },
                 .{ .name = "connect", .module = graph.connect },
                 .{ .name = "connect_colibri", .module = graph.connect_colibri },
-                .{ .name = "server", .module = graph.colibri.module("server") },
                 .{ .name = "colibri", .module = graph.colibri.module("colibri") },
-                .{ .name = "tls", .module = graph.colibri.module("tls") },
                 .{ .name = "test_identity", .module = test_identity },
                 .{ .name = "hooks", .module = hooks },
                 .{ .name = "coverage", .module = schemas.coverage },
@@ -125,8 +123,7 @@ fn add_interop_client(b: *std.Build, graph: Graph, schemas: Schemas, hooks: *std
         .target = graph.target,
         .optimize = graph.optimize,
         .imports = &.{
-            .{ .name = "client", .module = graph.colibri.module("client") },
-            .{ .name = "tls", .module = graph.colibri.module("tls") },
+            .{ .name = "colibri", .module = graph.colibri.module("colibri") },
         },
     });
     const exe = b.addExecutable(.{ .name = "interop-client", .root_module = b.createModule(.{
@@ -137,8 +134,7 @@ fn add_interop_client(b: *std.Build, graph: Graph, schemas: Schemas, hooks: *std
             .{ .name = "protobuf", .module = graph.protobuf },
             .{ .name = "connect", .module = graph.connect },
             .{ .name = "connect_colibri", .module = graph.connect_colibri },
-            .{ .name = "client", .module = graph.colibri.module("client") },
-            .{ .name = "tls", .module = graph.colibri.module("tls") },
+            .{ .name = "colibri", .module = graph.colibri.module("colibri") },
             .{ .name = "client_transport", .module = transport },
             .{ .name = "hooks", .module = hooks },
             .{ .name = "coverage", .module = schemas.coverage },

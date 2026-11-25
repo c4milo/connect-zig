@@ -5,7 +5,7 @@
 const std = @import("std");
 const testing = std.testing;
 const connect = @import("connect");
-const server = @import("server");
+const server = @import("colibri").server;
 const rpc = @import("connect_colibri.zig");
 const support = @import("pull_test_support.zig");
 

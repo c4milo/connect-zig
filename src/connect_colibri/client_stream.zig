@@ -6,7 +6,7 @@
 const std = @import("std");
 const assert = std.debug.assert;
 const connect = @import("connect");
-const client = @import("client");
+const client = @import("colibri").client;
 const client_call = @import("client_call.zig");
 
 /// Whether a stream over `protocol` is full-duplex: the client reads answers while it still

@@ -3,12 +3,12 @@
 //! in the conformance suite, "Interacting with the test runner").
 const std = @import("std");
 const connect = @import("connect");
-const client = @import("client");
+const client = @import("colibri").client;
 const proto = @import("protobuf");
 /// A check program decodes and encodes with the build target's CPU features: it runs on the
 /// machine it was built for, and a library takes the features its program detected.
 const protobuf_decoder: proto.Decoder = .init(.target());
-const tls = @import("tls");
+const tls = @import("colibri").tls;
 const config = @import("connectrpc_conformance_v1_config");
 const client_compat = @import("connectrpc_conformance_v1_client_compat");
 const constants = @import("constants.zig");

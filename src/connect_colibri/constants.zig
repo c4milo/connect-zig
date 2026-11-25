@@ -1,6 +1,6 @@
 //! The connect_colibri module's named sizes.
 
-const http = @import("http");
+const http = @import("colibri").http;
 
 /// The longest message a route reads or writes by default: 64 KiB.
 pub const message_bytes_default = 64 * 1024;

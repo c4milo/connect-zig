@@ -86,6 +86,13 @@ first. Cite an entry by number in code and commits ("decision 6").
       tonic, whose transport is a default feature, and connect-zig already takes `rotor` so.
     - What it costs: two projects in one build must pass connect-zig the same `colibri` and
       `rotor`, or Zig builds two packages and the compile fails with a file in two modules.
+    - Amended on 2026-11-25, on the owner's word: colibri at dfc5021 exports one module,
+      `colibri`, which names each of its others (colibri decision 170). `connect_colibri` and
+      `connect_zig` import it, and read `server`, `client`, `http`, and `tls` from it. Decision
+      32 keeps its point: the library names none of colibri's kinds on Rotor, `colibri.Server`
+      and `colibri.Client`, and the `layering` rule still refuses a chain that starts with
+      `colibri` outside `src/connect_zig`. The text of CLAUDE.md's third non-negotiable, which
+      says that `src/` never names colibri's `colibri` module, is the owner's to change.
 
 41. **Each example is a Zig project of its own.** Ruled by the owner on 2026-11-14.
     - `examples/<name>/` holds `build.zig`, `build.zig.zon`, `buf.gen.yaml`, `proto/`, `gen/`, and

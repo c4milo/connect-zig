@@ -13,8 +13,8 @@ pub const cpu_features = platform.CpuFeatures.target();
 /// A client with no codec and the tests' CPU features, as a test's calls share one.
 pub const client: connect.Client = .{ .cpu_features = cpu_features };
 const protobuf_decoder: proto.Decoder = .init(cpu_features);
-const server = @import("server");
-const http = @import("http");
+const server = @import("colibri").server;
+const http = @import("colibri").http;
 const rpc = @import("connect_colibri.zig");
 
 pub const Note = struct {

@@ -4,8 +4,8 @@
 const std = @import("std");
 const assert = std.debug.assert;
 const connect = @import("connect");
-const server = @import("server");
-const http = @import("http");
+const server = @import("colibri").server;
+const http = @import("colibri").http;
 const constants = @import("constants.zig");
 
 /// The request's headers, copied at its head into the request's entry of the router pool, so the

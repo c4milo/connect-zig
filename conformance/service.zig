@@ -4,7 +4,7 @@
 //! Unimplemented has no route, so the router answers it as it answers any path it does not
 //! know, and the client reads `unimplemented` (Connect protocol, "Error Codes"; gRPC
 //! PROTOCOL-HTTP2.md, HTTP status 404).
-const server = @import("server");
+const server = @import("colibri").server;
 const rpc = @import("connect_colibri");
 const service = @import("connectrpc_conformance_v1_service");
 const unary = @import("unary.zig");

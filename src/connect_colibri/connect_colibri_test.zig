@@ -7,8 +7,8 @@ const support = @import("pull_test_support.zig");
 const testing = std.testing;
 const connect = @import("connect");
 const proto = @import("protobuf");
-const server = @import("server");
-const client = @import("client");
+const server = @import("colibri").server;
+const client = @import("colibri").client;
 const rpc = @import("connect_colibri.zig");
 const limits = @import("constants.zig");
 

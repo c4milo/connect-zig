@@ -5,9 +5,9 @@
 //! <port>`, and serves until it is killed.
 const std = @import("std");
 const connect = @import("connect");
-const server = @import("server");
+const server = @import("colibri").server;
 const colibri = @import("colibri");
-const tls = @import("tls");
+const tls = @import("colibri").tls;
 const rpc = @import("connect_colibri");
 const identity = @import("test_identity");
 const coverage = @import("coverage");

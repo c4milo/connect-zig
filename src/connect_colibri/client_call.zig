@@ -10,8 +10,8 @@
 const std = @import("std");
 const assert = std.debug.assert;
 const connect = @import("connect");
-const client = @import("client");
-const http = @import("http");
+const client = @import("colibri").client;
+const http = @import("colibri").http;
 const client_stream = @import("client_stream.zig");
 const constants = @import("constants.zig");
 

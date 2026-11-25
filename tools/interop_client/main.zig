@@ -17,8 +17,8 @@
 //! which the client neither runs nor prints (interop/README.md).
 const std = @import("std");
 const connect = @import("connect");
-const client = @import("client");
-const tls = @import("tls");
+const client = @import("colibri").client;
+const tls = @import("colibri").tls;
 const proto = @import("protobuf");
 /// A check program decodes and encodes with the build target's CPU features: it runs on the
 /// machine it was built for, and a library takes the features its program detected.

@@ -2297,6 +2297,14 @@ ran on Linux x86-64 with Zig 0.16.0.
     `connect_zig` alone, built against connect-zig as a fetched package, and its server answered
     its client over h2 and h3 and curl over h11.
 
+- **colibri at dfc5021, whose package exports `colibri` alone** (decision 52, amended
+  2026-11-25; colibri decision 170). No public name of connect-zig changes. `connect_colibri`,
+  `connect_zig`, the conformance programs, the interop programs, the OTLP sink, and the routed
+  calls of `bench/` import `colibri`, and read its modules as fields.
+  - `zig build test` and `tools/package_check.sh` passed on x86-64 Linux, with Zig 0.16.0. The
+    package's hash came from `zig fetch` over a `git archive` of dfc5021, which hashes the files
+    of `.paths` as a fetch of the URL does.
+
 ### Work not done yet
 
 - A stream that waits for an event of the program once its request ended (colibri issue 130).

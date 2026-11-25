@@ -13,7 +13,7 @@ const proto = @import("protobuf");
 /// machine it was built for, and a library takes the features its program detected.
 const protobuf_decoder: proto.Decoder = .init(.target());
 const colibri = @import("colibri");
-const tls = @import("tls");
+const tls = @import("colibri").tls;
 const server_compat = @import("connectrpc_conformance_v1_server_compat");
 const constants = @import("constants.zig");
 const App = @import("app.zig").App;
