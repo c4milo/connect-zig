@@ -14,7 +14,7 @@
 //! example works. Run it with `zig build run`.
 const std = @import("std");
 const connect = @import("connect_zig").connect;
-const client = @import("connect_zig").client;
+const client = @import("connect_zig").colibri.client;
 const rpc = @import("connect_zig").connect_colibri;
 const harness = @import("harness");
 const streaming = @import("streaming");

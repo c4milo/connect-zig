@@ -89,8 +89,8 @@ and its JSON form. A message keeps the fields its schema does not know.
 zig fetch --save git+https://github.com/c4milo/connect-zig#v0.4.0
 ```
 
-Then add its one module to your program in `build.zig`. It names the library, colibri's
-modules, and stdx's `platform`, each the copy connect-zig builds on:
+Then add its one module to your program in `build.zig`. It names the library, colibri, and the
+type of the CPU features your program detects, each the copy connect-zig builds on:
 
 ```zig
 const connect_zig = b.dependency("connect_zig", .{ .target = target, .rotor = true });
@@ -160,11 +160,11 @@ The routes share one context, your `App`, which holds the CPU features. Set them
 with `.cpu_features = .detect()`:
 
 ```zig
-const platform = @import("connect_zig").platform;
+const CpuFeatures = @import("connect_zig").CpuFeatures;
 
 /// What every route reads: your program's state, and the CPU features it detected as it started.
 const App = struct {
-    cpu_features: platform.CpuFeatures,
+    cpu_features: CpuFeatures,
 };
 ```
 

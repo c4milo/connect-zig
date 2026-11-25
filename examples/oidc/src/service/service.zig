@@ -11,7 +11,7 @@
 const connect = @import("connect_zig").connect;
 const rpc = @import("connect_zig").connect_colibri;
 const oidc = @import("connect_zig").oidc;
-const platform = @import("connect_zig").platform;
+const CpuFeatures = @import("connect_zig").CpuFeatures;
 const account = @import("account");
 const constants = @import("constants.zig");
 const AccountService = account.AccountService;
@@ -46,7 +46,7 @@ pub const route_options: rpc.RouteOptions = .{
 /// program calls this before the server takes a call. It calls
 /// `set_keys` again when `keys_stale` says a token named a key the verifier does not hold, and
 /// `set_time` when its clock moves. `deinit` on the verifier ends it.
-pub fn start(verifier: *oidc.Verifier, keys_text: []const u8, unix_seconds: i64, cpu_features: platform.CpuFeatures) !void {
+pub fn start(verifier: *oidc.Verifier, keys_text: []const u8, unix_seconds: i64, cpu_features: CpuFeatures) !void {
     try verifier.init(&.{ .issuer = issuer.name, .audience = audience, .leeway_s = constants.leeway_s, .cpu_features = cpu_features });
     errdefer verifier.deinit();
     try verifier.set_keys(keys_text);

@@ -10,12 +10,12 @@
 //! killed.
 const std = @import("std");
 const connect_zig = @import("connect_zig");
-const platform = connect_zig.platform;
+const CpuFeatures = connect_zig.CpuFeatures;
 const connect = connect_zig.connect;
 const rpc = connect_zig.connect_colibri;
-const server = connect_zig.server;
+const server = connect_zig.colibri.server;
 const colibri = connect_zig.colibri;
-const tls = connect_zig.tls;
+const tls = connect_zig.colibri.tls;
 const oidc = connect_zig.oidc;
 const greet_v1 = @import("greet_v1");
 const constants = @import("constants.zig");
@@ -33,7 +33,7 @@ pub const Error = error{ArgumentMissing};
 const App = struct {
     /// The CPU features the routes read and write each message with, stdx's type. The program
     /// detects them once, as it starts.
-    cpu_features: platform.CpuFeatures,
+    cpu_features: CpuFeatures,
     text: [constants.greeting_len_max]u8 = undefined,
     oidc: oidc.Verifier = undefined,
 };

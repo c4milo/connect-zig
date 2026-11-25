@@ -7,8 +7,8 @@
 //! or h11 (decision 13). A QUIC connection speaks h3 under the test identity of `tls/` (decision
 //! 25).
 const std = @import("std");
-const server = @import("connect_zig").server;
-const tls = @import("connect_zig").tls;
+const server = @import("connect_zig").colibri.server;
+const tls = @import("connect_zig").colibri.tls;
 const identity = @import("test_identity");
 const constants = @import("constants.zig");
 const Link = @import("link.zig").Link;

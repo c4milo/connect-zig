@@ -1,9 +1,9 @@
 //! What both programs of the example share: the `App` the routes read, and the route table.
 //! `main.zig` serves it in memory, and `serve.zig` on a socket.
-const server = @import("connect_zig").server;
+const server = @import("connect_zig").colibri.server;
 const rpc = @import("connect_zig").connect_colibri;
 const signup = @import("signup");
-const platform = @import("connect_zig").platform;
+const CpuFeatures = @import("connect_zig").CpuFeatures;
 const service = @import("signup_service");
 const constants = @import("constants.zig");
 
@@ -11,7 +11,7 @@ const constants = @import("constants.zig");
 /// `protovalidate.Interceptor` reads by this name. The program detects them once as it starts.
 pub const App = struct {
     signup: service.Room = .{},
-    cpu_features: platform.CpuFeatures,
+    cpu_features: CpuFeatures,
 };
 
 fn on_error(_: *App, _: *server.RequestContext, _: *const server.Request, _: anyerror, response: *server.Response) void {

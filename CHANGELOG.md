@@ -27,16 +27,16 @@ and `Router.handle` takes `*const server.Event`: a program that drives the engin
 ### Changed
 
 - **Breaking.** A program imports one module, `connect_zig`, which names the library's
-  modules, colibri's, and stdx's `platform` as its fields: `@import("connect_zig").connect`
+  modules, `colibri`, and `CpuFeatures` as its fields: `@import("connect_zig").connect`
   ([decision 52](docs/decisions.md)). The package exports no other module. Replace each
   `module.addImport(name, connect_zig.module(name))` with one
   `module.addImport("connect_zig", connect_zig.module("connect_zig"))`, give each generated file
   the same import, and remove stdx from your `build.zig.zon`. Run `buf generate` again: the
   generated code imports `connect_zig`.
 
-- colibri's package exports one module, `colibri`, which names each of its others (colibri
-  decision 170). `connect_zig` names `server`, `client`, `http`, and `tls` from it, so a program
-  that reads them through `connect_zig` changes nothing.
+- **Breaking.** colibri's package exports one module, `colibri`, which names each of its others
+  (colibri decision 170). A program reads them through it: `@import("connect_zig").colibri.server`.
+  `connect_zig` names no `server`, `client`, `http` or `tls` of its own.
 
 - A program that codes messages, or runs the protocol on an HTTP library of its own, passes
   `.colibri = false` and links no chapulin. `examples/std_http` serves ELIZA so on
@@ -44,8 +44,7 @@ and `Router.handle` takes `*const server.Event`: a program that drives the engin
 
 - **Breaking.** stdx moved its type of CPU features from `codec.Features` to
   `platform.CpuFeatures`. `protovalidate.Options.cpu_features` and an `App`'s `cpu_features` take
-  the new type. Import stdx's `platform` in place of `codec`, and pin stdx at the commit
-  connect-zig pins ([decision 47](docs/decisions.md)).
+  the new type, which `connect_zig` names as `CpuFeatures` ([decision 47](docs/decisions.md)).
 
 - **Breaking.** `connect` and `oidc` read and write JSON and base64 with the program's CPU
   features, never the build target's ([decisions 10 and 34](docs/decisions.md)):

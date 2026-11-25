@@ -371,15 +371,15 @@ Each step names the check that proves it. A step is done when its check passes i
     is not set.
 
 40. **One module.** The package exports `connect_zig` alone (decision 52). It names the library's
-    modules, stdx's `platform`, and the library's generated code, and colibri's modules unless a
+    modules, stdx's type `CpuFeatures`, and the library's generated code, and colibri unless a
     program passes `.colibri = false`. Generated code imports it. New public names: the module
-    `connect_zig`, with the fields `protobuf`, `connect`, `protovalidate`, `platform`,
-    `buf_validate_validate`, `google_protobuf_descriptor`, `connect_colibri`, `oidc`, `server`,
-    `client`, `http`, `tls`, and `colibri`, and the build option `colibri`. The exports
+    `connect_zig`, with the fields `protobuf`, `connect`, `protovalidate`, `CpuFeatures`,
+    `buf_validate_validate`, `google_protobuf_descriptor`, `connect_colibri`, `oidc`, and
+    `colibri`, and the build option `colibri`. The exports
     `protobuf`, `connect`, `connect_colibri`, `protovalidate`, `oidc`, `server`, `client`,
     `http`, `tls`, `colibri`, `buf_validate_validate`, and `google_protobuf_descriptor` leave.
     Every program needs the module; a program of messages, or one on another HTTP library,
-    needs the option. Check: `zig build test-connect-zig` holds the list and each colibri name,
+    needs the option. Check: `zig build test-connect-zig` holds the list and the colibri names,
     `zig build test-plugin` each file's imports, and `zig build examples` a program with colibri,
     and `protobuf_messages`, `sans_io_call`, and `std_http` without it.
 
@@ -2323,6 +2323,12 @@ ran on Linux x86-64 with Zig 0.16.0.
   - `zig build test` passed on x86-64 Linux, with Zig 0.16.0, and so did the build of every
     program `zig build test` does not run, `zig build bench -- --quick` and
     `tools/package_check.sh`.
+
+- **One name for each thing in `connect_zig`** (decision 52, amended again 2026-11-25). No
+  program uses the API yet, so the owner chose to change it. `CpuFeatures`, stdx's type, takes
+  the place of `platform`, the whole module. `server`, `client`, `http`, and `tls` leave, since
+  `colibri` names each: a program writes `connect_zig.colibri.server`. Every example, the
+  README, the guide, and docs/protovalidate.md follow.
 
 ### Work not done yet
 

@@ -53,7 +53,7 @@ first. Cite an entry by number in code and commits ("decision 6").
     - The package exports one module, `connect_zig`. Its fields name `protobuf`, `connect`,
       `protovalidate`, stdx's `platform`, the generated code of validate.proto and
       descriptor.proto, and, with colibri, `connect_colibri`, `oidc`, and colibri's `server`,
-      `client`, `http`, `tls`, and `colibri`. Each is the module the library builds on, so a
+      `client`, `http`, `tls`, and `colibri` (amended below). Each is the module the library builds on, so a
       program and its generated code hold one copy of each, and a program names no stdx.
     - The build option `colibri`, true by default, chooses whether the module names colibri. A
       program that codes or checks messages, or runs the protocol on an HTTP library of its
@@ -93,6 +93,13 @@ first. Cite an entry by number in code and commits ("decision 6").
       and `colibri.Client`, and the `layering` rule still refuses a chain that starts with
       `colibri` outside `src/connect_zig`. The owner had CLAUDE.md's third non-negotiable say so
       the same day.
+    - Amended again on 2026-11-25, on the owner's choice: no program uses the API yet, so each
+      name says one thing once. `connect_zig` names `CpuFeatures`, stdx's type, in place of the
+      whole `platform` module: a program needs the type alone, and connect-zig exports no other
+      part of stdx, as colibri exports nothing of chapulin (colibri decision 162). It names
+      `colibri` and no longer `server`, `client`, `http`, or `tls` beside it, so a program writes
+      `connect_zig.colibri.server`. Beaten: the whole `stdx` module, which makes stdx's API part
+      of connect-zig's; and the four names beside `colibri`, two names for each module.
 
 41. **Each example is a Zig project of its own.** Ruled by the owner on 2026-11-14.
     - `examples/<name>/` holds `build.zig`, `build.zig.zon`, `buf.gen.yaml`, `proto/`, `gen/`, and

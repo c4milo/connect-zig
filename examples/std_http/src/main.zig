@@ -16,7 +16,7 @@
 //! HTTP/1.1 alone, so the program speaks Connect and gRPC-Web, and not gRPC, which needs trailers.
 const std = @import("std");
 const connect = @import("connect_zig").connect;
-const platform = @import("connect_zig").platform;
+const CpuFeatures = @import("connect_zig").CpuFeatures;
 const eliza = @import("eliza");
 const constants = @import("constants.zig");
 const server = @import("server.zig");
@@ -38,7 +38,7 @@ pub fn main(init: std.process.Init) !void {
     const state_memory = init.arena.allocator().rawAlloc(@sizeOf(State), .of(State), @returnAddress()) orelse
         return error.OutOfMemory;
     const state: *State = @ptrCast(@alignCast(state_memory));
-    const cpu_features: platform.CpuFeatures = .detect();
+    const cpu_features: CpuFeatures = .detect();
     state.server.cpu_features = cpu_features;
     state.connect_client = .{ .cpu_features = cpu_features };
     const io = init.io;

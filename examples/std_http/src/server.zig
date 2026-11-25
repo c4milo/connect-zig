@@ -3,7 +3,7 @@
 //! `std.http.Server` sends. The program moves the bytes between the two.
 const std = @import("std");
 const connect = @import("connect_zig").connect;
-const platform = @import("connect_zig").platform;
+const CpuFeatures = @import("connect_zig").CpuFeatures;
 const eliza = @import("eliza");
 const constants = @import("constants.zig");
 const Copied = @import("headers.zig").Copied;
@@ -29,7 +29,7 @@ pub const Storage = struct {
     error_storage: [constants.buffer_len]u8,
     response_headers: [constants.headers_max]std.http.Header,
     sentence: [constants.buffer_len]u8,
-    cpu_features: platform.CpuFeatures,
+    cpu_features: CpuFeatures,
 };
 
 /// Serves `connections` connections one after another, each until its client closes it.

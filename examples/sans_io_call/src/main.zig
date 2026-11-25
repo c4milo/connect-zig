@@ -15,7 +15,7 @@
 //! outcome, and exits with an error otherwise. Run it with `zig build run`.
 const std = @import("std");
 const connect = @import("connect_zig").connect;
-const platform = @import("connect_zig").platform;
+const CpuFeatures = @import("connect_zig").CpuFeatures;
 const eliza = @import("eliza");
 const constants = @import("constants.zig");
 const Service = eliza.ElizaService;
@@ -53,7 +53,7 @@ const Wire = struct {
 /// its own.
 const State = struct {
     /// The CPU's features, which the program detects once and gives the client and the server.
-    cpu_features: platform.CpuFeatures,
+    cpu_features: CpuFeatures,
     /// What the program's calls share: those features, and no codec.
     client: connect.Client,
     request_body: [constants.buffer_len]u8,

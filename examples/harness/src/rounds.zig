@@ -12,7 +12,7 @@
 //!    call finished and the connection closed;
 //! 4. `read` on each client call, with `storage()`, to check what arrived.
 const connect = @import("connect_zig").connect;
-const client = @import("connect_zig").client;
+const client = @import("connect_zig").colibri.client;
 const Link = @import("link.zig").Link;
 const DatagramLink = @import("link_datagram.zig").DatagramLink;
 const server_side = @import("server_side.zig");

@@ -9,7 +9,7 @@
 //!   one before, and reads the sum and the status from the trailers.
 const std = @import("std");
 const connect = @import("connect_zig").connect;
-const client = @import("connect_zig").client;
+const client = @import("connect_zig").colibri.client;
 const rpc = @import("connect_zig").connect_colibri;
 const harness = @import("harness");
 const streaming = @import("streaming");

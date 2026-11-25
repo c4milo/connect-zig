@@ -18,7 +18,7 @@
 //! it with `zig build run`.
 const std = @import("std");
 const connect = @import("connect_zig").connect;
-const client = @import("connect_zig").client;
+const client = @import("connect_zig").colibri.client;
 const harness = @import("harness");
 const interceptors = @import("interceptors");
 const constants = @import("constants.zig");

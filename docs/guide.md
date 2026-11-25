@@ -17,18 +17,18 @@ const connect_zig = b.dependency("connect_zig", .{ .target = target, .rotor = tr
 module.addImport("connect_zig", connect_zig.module("connect_zig"));
 ```
 
-The module names each part of the library, colibri's modules, and stdx's `platform`, each the copy
-connect-zig builds on. Your program reaches them as fields: `@import("connect_zig").connect`.
+The module names each part of the library, colibri, and the type of the CPU features your program
+detects, each the copy connect-zig builds on. Your program reaches them as fields: `@import("connect_zig").connect`.
 
 | Name | What it is |
 | --- | --- |
 | `protobuf` | The binary encoding and the proto3 JSON mapping, over generated structs |
 | `connect` | The Connect, gRPC, and gRPC-Web rules, as functions over headers and bytes |
 | `protovalidate` | The check of a message against the rules of its schema |
-| `platform` | stdx's `platform`: the type of the CPU features your program detects and states |
+| `CpuFeatures` | stdx's type of the CPU features your program detects and states |
 | `connect_colibri` | Routes for colibri's server, and calls for colibri's client |
 | `oidc` | The check of an OpenID Connect bearer token, on a host target |
-| `server`, `client`, `http`, `tls`, `colibri` | colibri's modules, which `connect_colibri` is built on |
+| `colibri` | colibri, whose `server`, `client`, `http` and `tls` `connect_colibri` is built on |
 | `buf_validate_validate`, `google_protobuf_descriptor` | The generated code of validate.proto and descriptor.proto |
 
 Do not add colibri or stdx to your own `build.zig.zon`: a second copy of either fails the build
@@ -37,7 +37,7 @@ and `colibri.Client` on [Rotor](https://github.com/c4milo/rotor), colibri's even
 it, your program drives colibri's engine and pool on its own loop ([decision 32](decisions.md)).
 
 connect-zig probes no CPU. Your program detects its CPU's features once, as it starts, with
-`platform.CpuFeatures.detect()`, and states them in a field of its routes' context.
+`CpuFeatures.detect()`, and states them in a field of its routes' context.
 
 A program that codes messages, checks them, or runs the protocol on an HTTP library of its own
 passes `.colibri = false`. Its module then holds no `connect_colibri`, `oidc` or colibri module,
@@ -140,11 +140,11 @@ your program detected: each route reads and writes its messages with them. An `A
 field `cpu_features` stops the build.
 
 ```zig
-const platform = @import("connect_zig").platform;
+const CpuFeatures = @import("connect_zig").CpuFeatures;
 
 /// What every route reads: your program's state, and the CPU features it detected as it started.
 const App = struct {
-    cpu_features: platform.CpuFeatures,
+    cpu_features: CpuFeatures,
 };
 ```
 

@@ -29,10 +29,10 @@ nothing: your program passes the report's storage.
 
 ```zig
 const protovalidate = @import("connect_zig").protovalidate;
-const platform = @import("connect_zig").platform;
+const CpuFeatures = @import("connect_zig").CpuFeatures;
 
 // Once, as the program starts: the CPU features a rule's regular expression may use.
-const cpu_features: platform.CpuFeatures = .detect();
+const cpu_features: CpuFeatures = .detect();
 
 var storage: [protovalidate.constants.report_bytes_default]u8 align(@alignOf(protovalidate.Violation)) = undefined;
 var report: protovalidate.Report = .init(&storage);
@@ -52,11 +52,11 @@ that holds rules imports too. A program that validates and serves no RPC takes t
 checks `required`, `ignore`, a oneof's `required`, a message's `oneof` rules, and each type's
 standard rules, and walks nested messages, repeated fields, and maps. A rule that reads the time,
 such as `timestamp.lt_now`, takes it from `.{ .now = ... }`. A rule's regular expression
-searches with the CPU features in `.cpu_features`, stdx's `platform.CpuFeatures`. The module
-probes no CPU, so your program calls `platform.CpuFeatures.detect()` once as it starts.
-`platform` is stdx's, and `connect_zig` names the copy connect-zig builds on.
-`platform.CpuFeatures.target()` names what the build target guarantees, and
-`platform.CpuFeatures.none()` keeps each search on its plain path.
+searches with the CPU features in `.cpu_features`, stdx's `CpuFeatures`. The module
+probes no CPU, so your program calls `CpuFeatures.detect()` once as it starts.
+`CpuFeatures` is stdx's, and `connect_zig` names the copy connect-zig builds on.
+`CpuFeatures.target()` names what the build target guarantees, and
+`CpuFeatures.none()` keeps each search on its plain path.
 `report.encode` writes the violations as a `buf.validate.Violations`, which an error carries as
 a detail.
 
@@ -84,7 +84,7 @@ The route table names `Values` as its `.Values`. A message that breaks a rule en
 valid email address (and 1 more)", and its detail is a `buf.validate.Violations` that holds each
 one. A message type with no rule costs its call no instruction. The interceptor takes the
 `connect` module as a parameter, because `protovalidate` imports none. It reads the CPU features
-from a field `cpu_features: platform.CpuFeatures` of your `App`, which your
+from a field `cpu_features: CpuFeatures` of your `App`, which your
 program sets once as it starts, and the time from a field `protovalidate_now`. An `App` with no
 `cpu_features` stops the build.
 [examples/validate](../examples/validate) serves a service behind it.

@@ -4,8 +4,8 @@
 //! judges the server by the CA of `tls/` (decision 25).
 const std = @import("std");
 const connect = @import("connect_zig").connect;
-const client = @import("connect_zig").client;
-const tls = @import("connect_zig").tls;
+const client = @import("connect_zig").colibri.client;
+const tls = @import("connect_zig").colibri.tls;
 const identity = @import("test_identity");
 const rpc = @import("connect_zig").connect_colibri;
 const constants = @import("constants.zig");
