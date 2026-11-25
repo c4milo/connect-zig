@@ -30,9 +30,11 @@ code. The same holds for colibri's and stdx's `docs/decisions.md`.
    `src/protoc_gen/`, which is a program (decision 4). The `io` lint rule enforces it.
 2. **No allocator in the library.** The caller owns every buffer. The plugin uses `init.arena`.
    The `heap` lint rule enforces it.
-3. **Any event loop drives the library.** `src/` builds on colibri's protocol modules alone and
-   never names Rotor or colibri's `colibri` module; Rotor reaches the examples only
-   (decision 32). The `layering` lint rule enforces it.
+3. **Any event loop drives the library.** `src/` reads colibri's protocol modules alone, through
+   its one module `colibri` (colibri decision 170), and never names Rotor or colibri's kinds on
+   a loop, `colibri.Server` and `colibri.Client`; Rotor reaches the examples only (decisions 32
+   and 52). The `layering` lint rule enforces it, outside `src/connect_zig`, which names them for
+   a program.
 4. **Time is a value.** No clock read and no randomness anywhere in `src/`. A deadline is an
    instant the caller passes. The `determinism` lint rule enforces it.
 5. **TigerStyle.** Every loop bounded. Every limit a named constant in its module's

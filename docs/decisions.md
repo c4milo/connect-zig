@@ -91,8 +91,8 @@ first. Cite an entry by number in code and commits ("decision 6").
       `connect_zig` import it, and read `server`, `client`, `http`, and `tls` from it. Decision
       32 keeps its point: the library names none of colibri's kinds on Rotor, `colibri.Server`
       and `colibri.Client`, and the `layering` rule still refuses a chain that starts with
-      `colibri` outside `src/connect_zig`. The text of CLAUDE.md's third non-negotiable, which
-      says that `src/` never names colibri's `colibri` module, is the owner's to change.
+      `colibri` outside `src/connect_zig`. The owner had CLAUDE.md's third non-negotiable say so
+      the same day.
 
 41. **Each example is a Zig project of its own.** Ruled by the owner on 2026-11-14.
     - `examples/<name>/` holds `build.zig`, `build.zig.zon`, `buf.gen.yaml`, `proto/`, `gen/`, and
