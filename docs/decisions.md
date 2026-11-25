@@ -1416,6 +1416,15 @@ first. Cite an entry by number in code and commits ("decision 6").
       every push, which a person copied; CI that commits charts while the text still quotes their
       numbers; and CI that commits them to `main`, which lands a commit after the tag and needs
       the workflow to push to `main`.
+    - Amended again the same day, on the owner's choice: each chart compares connect-zig's bars
+      with the previous tag's. A chart writes the values of its connect-zig bars beside it, as
+      `<chart>.json`, which the release holds too. Drawn with the previous tag's file, it crosses
+      each bar with a dashed line at the previous value and marks a change of 5% or more with ▲
+      or ▼ (`tools/chart_change.py`). The full stack's three rounds spread less than 5% on arm64.
+      A chart whose CPU model differs from the previous tag's marks nothing, since x86-64 runners
+      change their CPU from job to job. `tools/charts_compare.py` writes the same comparison as a
+      table, which the release's notes and the run's summary take. Beaten: a threshold of 2%,
+      which a time on a shared runner passes by chance, and of 10%, which hides a real change.
     - Vector and Rotel run as they ship, with Nagle's algorithm on. Each passes its accepted
       sockets to tonic itself, and neither sets TCP_NODELAY, so their p99 stays near 40 ms, Linux's
       delayed ACK, from a low rate. colibri and Go set TCP_NODELAY. Beaten on 2026-11-17: a

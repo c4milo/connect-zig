@@ -36,7 +36,8 @@ paid for.
   benchmark of the tag passed, the job `charts` attaches each chart to the tag's GitHub release
   (`tools/charts_release.sh`, decision 44 as amended). The README and `docs/benchmarks.md` show
   the latest release's charts and quote no measured number, so no text goes stale; the run's
-  summary holds every table.
+  summary holds every table. Each chart marks what changed since the previous tag by 5% or more,
+  and the release's notes list it (`tools/chart_change.py`, `tools/charts_compare.py`).
 - **The smoke run.** `zig build bench -- --quick` runs every operation on every message in a few
   short batches. CI's `bench` job runs it, so a broken operation fails before anyone times it.
 - **Cycles and branch misses are a filter too.** `zig build bench-validate -- --counters <dir>`

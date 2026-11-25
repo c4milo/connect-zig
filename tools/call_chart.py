@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Draws call-vs-go.svg from the table of CI's bench-compare job (tools/bench_check.sh).
 
-    tools/call_chart.py <table.md> <run> <commit> [out.svg]
+    tools/call_chart.py <table.md> <run> <commit> [out.svg] [--previous <call-vs-go.json>]
 
 <table.md> holds the job's table, or the job's whole output, as for tools/speed_chart.py. The
 chart draws the routed unary call of bench/call.zig: one call in memory through the router, the
@@ -17,6 +17,8 @@ import pathlib
 import re
 import sys
 import types
+
+import chart_change
 
 # The time GitHub writes before each line of a job's log, which a log saved from a run holds.
 stamp = re.compile(r"^\d{4}-\d\d-\d\dT[0-9:.]+Z ")
@@ -96,7 +98,8 @@ def title_of(zig_speed, rust_speed):
 
 
 # The chart's style sheet: its colors in light and dark, and its fonts.
-style = """<style>
+style = (
+    """<style>
 svg { --surface:#fcfcfb; --ink:#0b0b0b; --ink2:#52514e; --muted:#8a8984; --grid:#e4e3df; --zig:#2a78d6; --rust:#eb6834; --unit:#52514e; }
 @media (prefers-color-scheme: dark) {
   svg { --surface:#1a1a19; --ink:#f0efec; --ink2:#c3c2b7; --muted:#8f8e86; --grid:#33332f; --zig:#3987e5; --rust:#d95926; --unit:#c3c2b7; }
@@ -110,7 +113,10 @@ text { font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; fil
 .tick { font-size: 11px; fill: var(--muted); }
 .note { font-size: 11.5px; fill: var(--ink2); }
 .legend { font-size: 12.5px; fill: var(--ink2); }
-</style>"""
+"""
+    + chart_change.style
+    + "\n</style>"
+)
 
 
 def layout_of(zig_speed, rust_speed):
@@ -207,8 +213,13 @@ def draw_group(a, lay, chart, y, ox, key):
             continue
         w = max(sx(lay, v), 1)
         a(bar(lay, ox, by, w, fill))
-        label = f"{v:.1f}×, {chart.zig_us[key]:.2f} µs" if s == 0 else f"{v:.1f}×"
-        a(f'<text class="val" x="{ox + w + 5:.1f}" y="{by + lay.bar_h - 3}">{label}</text>')
+        label, end = f"{v:.1f}×", ox + w
+        if s == 0:
+            name = f"{key[0]}, {key[1]}"
+            place = (lambda value: ox + sx(lay, value), by, lay.bar_h, end)
+            mark, end = chart.change.bar(a, name, f"{name}, speed in multiples of connect-go's", v, place)
+            label = f"{v:.1f}×, {chart.zig_us[key]:.2f} µs{mark}"
+        a(f'<text class="val" x="{end + 5:.1f}" y="{by + lay.bar_h - 3}">{label}</text>')
 
 
 def draw_panel(a, lay, chart, k, protocol, op):
@@ -234,9 +245,11 @@ def draw_panel(a, lay, chart, k, protocol, op):
         a(f'<text class="note" x="{x1 + 4:.1f}" y="{top - 10}">1× = as fast as connect-go</text>')
 
 
-def draw(zig_speed, rust_speed, zig_us, machine, run, commit, pinned_versions):
-    """The chart's SVG text."""
+def draw(zig_speed, rust_speed, zig_us, machine, run, commit, pinned_versions, change=None):
+    """The chart's SVG text. `change` is the chart's `chart_change.Change`, which keeps the values
+    connect-zig's bars draw."""
     chart = types.SimpleNamespace(zig_speed=zig_speed, rust_speed=rust_speed, zig_us=zig_us, machine=machine)
+    chart.change = change or chart_change.Change(None, machine)
     chart.run, chart.commit, chart.versions = run, commit, pinned_versions
     chart.series = [
         (zig_speed, "connect-zig", "--zig"),
@@ -244,18 +257,21 @@ def draw(zig_speed, rust_speed, zig_us, machine, run, commit, pinned_versions):
     ]
     chart.title = title_of(zig_speed, rust_speed)
     lay = layout_of(zig_speed, rust_speed)
+    lay.H += chart_change.note_height(chart.change)
     parts = []
     a = parts.append
     draw_head(a, lay, chart)
     for k, (protocol, op) in enumerate(zip(protocols, op_keys, strict=True)):
         draw_panel(a, lay, chart, k, protocol, op)
+    chart_change.draw_note(a, chart.change, lay.pad_l, lay.H)
     a("</svg>")
     return "\n".join(parts) + "\n"
 
 
 def main():
-    table_path, run, commit = sys.argv[1:4]
-    out = sys.argv[4] if len(sys.argv) > 4 else "call-vs-go.svg"
+    arguments, previous = chart_change.split_arguments(sys.argv)
+    table_path, run, commit = arguments[1:4]
+    out = arguments[4] if len(arguments) > 4 else "call-vs-go.svg"
     pinned_versions = versions()
     zig_speed, rust_speed, zig_us, machine = read(table_path)
     missing = [(m, o) for m in msg_keys for o in op_keys if (m, o) not in zig_speed]
@@ -263,7 +279,9 @@ def main():
         sys.exit(f"{table_path}: no row for {missing[0][0]}, {missing[0][1]}")
     if None in zig_speed.values():
         sys.exit(f"{table_path}: connect-go did not run, and its time is the chart's unit")
-    pathlib.Path(out).write_text(draw(zig_speed, rust_speed, zig_us, machine, run, commit, pinned_versions))
+    change = chart_change.Change(previous, machine)
+    pathlib.Path(out).write_text(draw(zig_speed, rust_speed, zig_us, machine, run, commit, pinned_versions, change))
+    change.write(out, "call-vs-go", run, commit)
 
 
 if __name__ == "__main__":

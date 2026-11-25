@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Draws speed-vs-go.svg from the table of CI's bench-compare job (tools/bench_check.sh).
 
-    tools/speed_chart.py <table.md> <run> <commit> [out.svg]
+    tools/speed_chart.py <table.md> <run> <commit> [out.svg] [--previous <speed-vs-go.json>]
 
 <table.md> holds the job's table, or the job's whole output: its "Machine:" line then names the
 machine in the chart's subtitle, so an x86-64 chart and an arm64 chart read apart. The chart
@@ -21,6 +21,8 @@ import pathlib
 import re
 import sys
 import types
+
+import chart_change
 
 # The time GitHub writes before each line of a job's log, which a log saved from a run holds.
 stamp = re.compile(r"^\d{4}-\d\d-\d\dT[0-9:.]+Z ")
@@ -119,7 +121,8 @@ def title_of(zig_speed, buffa_over_zig):
 
 
 # The chart's style sheet: its colors in light and dark, and its fonts.
-style = """<style>
+style = (
+    """<style>
 svg { --surface:#fcfcfb; --ink:#0b0b0b; --ink2:#52514e; --muted:#8a8984; --grid:#e4e3df; --zig:#2a78d6; --rust:#eb6834; --unit:#52514e; }
 @media (prefers-color-scheme: dark) {
   svg { --surface:#1a1a19; --ink:#f0efec; --ink2:#c3c2b7; --muted:#8f8e86; --grid:#33332f; --zig:#3987e5; --rust:#d95926; --unit:#c3c2b7; }
@@ -133,7 +136,10 @@ text { font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; fil
 .tick { font-size: 11px; fill: var(--muted); }
 .note { font-size: 11.5px; fill: var(--ink2); }
 .legend { font-size: 12.5px; fill: var(--ink2); }
-</style>"""
+"""
+    + chart_change.style
+    + "\n</style>"
+)
 
 
 def layout_of(zig_speed, buffa_speed):
@@ -220,7 +226,8 @@ def draw_head(a, lay, chart):
 
 
 def draw_group(a, lay, chart, y, ox, key):
-    """A message's bars in a panel: one for each runtime, each with its label."""
+    """A message's bars in a panel: one for each runtime, each with its label. connect-zig's bar,
+    the first, carries its change since the previous tag."""
     for s, (speeds, _, fill) in enumerate(chart.series):
         by = y + s * (lay.bar_h + lay.bar_gap)
         v = speeds[key]
@@ -229,7 +236,12 @@ def draw_group(a, lay, chart, y, ox, key):
             continue
         w = max(sx(lay, v), 1)
         a(bar(lay, ox, by, w, fill))
-        a(f'<text class="val" x="{ox + w + 5:.1f}" y="{by + lay.bar_h - 3}">{v:.1f}×</text>')
+        mark, end = "", ox + w
+        if s == 0:
+            name = f"{key[0]}, {key[1]}"
+            place = (lambda value: ox + sx(lay, value), by, lay.bar_h, end)
+            mark, end = chart.change.bar(a, name, f"{name}, speed in multiples of Go's", v, place)
+        a(f'<text class="val" x="{end + 5:.1f}" y="{by + lay.bar_h - 3}">{v:.1f}×{mark}</text>')
 
 
 def draw_panel(a, lay, chart, k, op):
@@ -256,9 +268,11 @@ def draw_panel(a, lay, chart, k, op):
         a(f'<text class="note" x="{x1 + 4:.1f}" y="{top - 10}">1× = as fast as Go</text>')
 
 
-def draw(zig_speed, buffa_speed, buffa_over_zig, machine, run, commit, pinned_versions):
-    """The chart's SVG text."""
+def draw(zig_speed, buffa_speed, buffa_over_zig, machine, run, commit, pinned_versions, change=None):
+    """The chart's SVG text. `change` is the chart's `chart_change.Change`, which keeps the values
+    connect-zig's bars draw."""
     chart = types.SimpleNamespace(zig_speed=zig_speed, buffa_speed=buffa_speed, machine=machine, run=run)
+    chart.change = change or chart_change.Change(None, machine)
     chart.commit, chart.versions = commit, pinned_versions
     # The two runtimes the chart draws: their speeds, the legend's name, and the CSS variable of the bar.
     chart.series = [
@@ -267,18 +281,21 @@ def draw(zig_speed, buffa_speed, buffa_over_zig, machine, run, commit, pinned_ve
     ]
     chart.title = title_of(zig_speed, buffa_over_zig)
     lay = layout_of(zig_speed, buffa_speed)
+    lay.H += chart_change.note_height(chart.change)
     parts = []
     a = parts.append
     draw_head(a, lay, chart)
     for k, op in enumerate(ops):
         draw_panel(a, lay, chart, k, op)
+    chart_change.draw_note(a, chart.change, lay.pad_l, lay.H)
     a("</svg>")
     return "\n".join(parts) + "\n"
 
 
 def main():
-    table_path, run, commit = sys.argv[1:4]
-    out = sys.argv[4] if len(sys.argv) > 4 else "speed-vs-go.svg"
+    arguments, previous = chart_change.split_arguments(sys.argv)
+    table_path, run, commit = arguments[1:4]
+    out = arguments[4] if len(arguments) > 4 else "speed-vs-go.svg"
     pinned_versions = versions()
     zig_speed, buffa_speed, buffa_over_zig, machine = read(table_path)
     missing = [(m, o) for m in msg_keys for o in op_keys if (m, o) not in zig_speed]
@@ -286,8 +303,10 @@ def main():
         sys.exit(f"{table_path}: no row for {missing[0][0]}, {missing[0][1]}")
     if None in zig_speed.values():
         sys.exit(f"{table_path}: Go did not run, and Go's time is the chart's unit")
-    text = draw(zig_speed, buffa_speed, buffa_over_zig, machine, run, commit, pinned_versions)
+    change = chart_change.Change(previous, machine)
+    text = draw(zig_speed, buffa_speed, buffa_over_zig, machine, run, commit, pinned_versions, change)
     pathlib.Path(out).write_text(text)
+    change.write(out, "speed-vs-go", run, commit)
 
 
 if __name__ == "__main__":

@@ -2,7 +2,7 @@
 """Draws validate-vs-go.svg from the table of CI's validate-compare job
 (tools/validate_compare_check.sh).
 
-    tools/validate_chart.py <table.md> <run> <commit> [out.svg]
+    tools/validate_chart.py <table.md> <run> <commit> [out.svg] [--previous <validate-vs-go.json>]
 
 <table.md> holds the job's output. The chart draws its first table: for each message, the
 nanoseconds of one decode with one validation of what it gives, which a server runs for each
@@ -17,6 +17,8 @@ import math
 import pathlib
 import re
 import sys
+
+import chart_change
 
 # The time GitHub writes before each line of a job's log, which a log saved from a run holds.
 stamp = re.compile(r"^\d{4}-\d\d-\d\dT[0-9:.]+Z ")
@@ -77,7 +79,8 @@ def speed_of(times):
 
 
 # The chart's style sheet: its colors in light and dark, and its fonts.
-style = """<style>
+style = (
+    """<style>
 svg { --surface:#fcfcfb; --ink:#0b0b0b; --ink2:#52514e; --muted:#8a8984; --grid:#e4e3df; --zig:#2a78d6; --buffa:#eb6834; --prost:#c79a2c; --es:#3a9b6c; --unit:#52514e; }
 @media (prefers-color-scheme: dark) {
   svg { --surface:#1a1a19; --ink:#f0efec; --ink2:#c3c2b7; --muted:#8f8e86; --grid:#33332f; --zig:#3987e5; --buffa:#d95926; --prost:#d6aa3e; --es:#4caf7d; --unit:#c3c2b7; }
@@ -90,11 +93,32 @@ text { font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; fil
 .tick { font-size: 11px; fill: var(--muted); }
 .note { font-size: 11.5px; fill: var(--ink2); }
 .legend { font-size: 12.5px; fill: var(--ink2); }
-</style>"""
+"""
+    + chart_change.style
+    + "\n</style>"
+)
 
 
-def draw(times, machine, run, commit, pinned_versions):
-    """The chart's SVG text."""
+def multiple(v):
+    """A speed as the bars' labels print it."""
+    return f"{v:.0f}×" if v >= 10 else f"{v:.1f}×" if v >= 1 else f"{v:.2f}×"
+
+
+def label_of(a, change, bar, values, place):
+    """A bar's label and where it starts. connect-zig's bar also gets its line at the previous
+    tag's speed and its mark after the label (tools/chart_change.py). `bar` is the case and the
+    implementation, `values` the speed and the nanoseconds, and `place` as `Change.bar` takes it."""
+    (case, label), (speed, nanoseconds) = bar, values
+    if label != "Zig":
+        return multiple(speed), place[3]
+    mark, end = change.bar(a, case, f"{case}, speed in multiples of protovalidate-go's", speed, place)
+    return f"{multiple(speed)}, {nanoseconds:,.0f} ns{mark}", end
+
+
+def draw(times, machine, run, commit, pinned_versions, change=None):
+    """The chart's SVG text. `change` is the chart's `chart_change.Change`, which keeps the values
+    connect-zig's bars draw."""
+    change = change or chart_change.Change(None, machine)
     go_version, es_version, buffa_version, prost_version = pinned_versions
     series = [
         ("Zig", "connect-zig", "--zig"),
@@ -113,13 +137,14 @@ def draw(times, machine, run, commit, pinned_versions):
     legend_y = 128
     pad_t = 170
     label_w = 140
-    plot_w = W - pad_l - label_w - 96
+    # The longest label, connect-zig's, takes room for its change since the previous tag too.
+    plot_w = W - pad_l - label_w - 96 - (40 if change.previous is not None else 0)
     low = math.floor(math.log10(min(everything + [1])))
     high = math.ceil(math.log10(max(everything + [1])))
     bar_h, bar_gap, group_gap = 12, 2, 14
     group_h = len(series) * bar_h + (len(series) - 1) * bar_gap
     row_h = group_h + group_gap
-    H = pad_t + 16 + row_h * len(cases) + 40
+    H = pad_t + 16 + row_h * len(cases) + 40 + chart_change.note_height(change)
 
     def sx(v):
         return (math.log10(v) - low) / (high - low) * plot_w
@@ -132,9 +157,6 @@ def draw(times, machine, run, commit, pinned_versions):
             f"v{bar_h - 2 * radius:.1f} a{radius:.1f},{radius:.1f} 0 0 1 {-radius:.1f},{radius:.1f} "
             f'h{-(width - radius):.1f} z" fill="var({fill})"/>'
         )
-
-    def multiple(v):
-        return f"{v:.0f}×" if v >= 10 else f"{v:.1f}×" if v >= 1 else f"{v:.2f}×"
 
     def tick(e):
         return f"{10**e:g}×"
@@ -197,26 +219,32 @@ def draw(times, machine, run, commit, pinned_versions):
             v = speed[case][label]
             w = max(sx(v), 1)
             a(bar(ox, by, w, fill))
-            text = f"{multiple(v)}, {times[case][label]:,.0f} ns" if label == "Zig" else multiple(v)
-            a(f'<text class="val" x="{ox + w + 5:.1f}" y="{by + bar_h - 2}">{text}</text>')
+            text, end = label_of(
+                a, change, (case, label), (v, times[case][label]), (lambda value: ox + sx(value), by, bar_h, ox + w)
+            )
+            a(f'<text class="val" x="{end + 5:.1f}" y="{by + bar_h - 2}">{text}</text>')
     x1 = ox + sx(1)
     a(
         f'<line x1="{x1:.1f}" y1="{top - 8}" x2="{x1:.1f}" y2="{bottom + 4}" stroke="var(--unit)" stroke-width="1.5" stroke-dasharray="4 3"/>'
     )
     a(f'<text class="note" x="{x1 + 4:.1f}" y="{top - 10}">1× = as fast as protovalidate-go</text>')
+    chart_change.draw_note(a, change, pad_l, H)
     a("</svg>")
     return "\n".join(parts) + "\n"
 
 
 def main():
-    table_path, run, commit = sys.argv[1:4]
-    out = sys.argv[4] if len(sys.argv) > 4 else "validate-vs-go.svg"
+    arguments, previous = chart_change.split_arguments(sys.argv)
+    table_path, run, commit = arguments[1:4]
+    out = arguments[4] if len(arguments) > 4 else "validate-vs-go.svg"
     pinned_versions = versions()
     times, machine = read(table_path)
     missing = [case for case in cases if case not in times]
     if missing:
         sys.exit(f"{table_path}: no row for {missing[0]}")
-    pathlib.Path(out).write_text(draw(times, machine, run, commit, pinned_versions))
+    change = chart_change.Change(previous, machine)
+    pathlib.Path(out).write_text(draw(times, machine, run, commit, pinned_versions, change))
+    change.write(out, "validate-vs-go", run, commit)
 
 
 if __name__ == "__main__":

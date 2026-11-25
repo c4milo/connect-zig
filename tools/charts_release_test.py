@@ -1,6 +1,7 @@
 """Tests of tools/charts_release.sh (tools/scripts_test.sh): every chart a run drew is attached to
-the tag's release, a tag with no release gets one first, and two charts of one name or no chart
-at all attach nothing. A stub `gh` on the path writes each call it gets to a log."""
+the tag's release with its file of values, a tag with no release gets one first, two files of one
+name or no chart at all attach nothing, and the comparison replaces the notes' section of an
+earlier run. A stub `gh` on the path writes each call it gets to a log."""
 
 import os
 import pathlib
@@ -9,10 +10,16 @@ import tempfile
 import unittest
 
 script = pathlib.Path(__file__).resolve().parent / "charts_release.sh"
-# The stub: `release view` succeeds when RELEASE_EXISTS is set, and each call joins the log.
+root = script.parent.parent
+heading = "## Benchmarks since the previous tag"
+# The stub: `release view` succeeds when RELEASE_EXISTS is set and prints RELEASE_BODY, `release
+# edit` keeps the notes it gets in NOTES_OUT, and each call joins the log.
 stub = """#!/bin/sh
 echo "$*" >>"${GH_LOG}"
-[ "$1 $2" != "release view" ] || [ -n "${RELEASE_EXISTS:-}" ]
+case "$1 $2" in
+    "release view") [ -n "${RELEASE_EXISTS:-}" ] && printf '%s\\n' "${RELEASE_BODY:-}" ;;
+    "release edit") cp "$5" "${NOTES_OUT}" ;;
+esac
 """
 
 
@@ -41,13 +48,20 @@ def release(work, files, exists):
 class ChartsReleaseTest(unittest.TestCase):
     def test_attaches_every_chart_to_a_release_that_exists(self):
         with tempfile.TemporaryDirectory() as work:
-            files = {"charts-fullstack-ARM64/fullstack-arm64.svg": "a", "charts-bench-compare-X64/speed-vs-go.svg": "b"}
+            files = {
+                "charts-fullstack-ARM64/fullstack-arm64.svg": "a",
+                "charts-fullstack-ARM64/fullstack-arm64.json": "{}",
+                "charts-bench-compare-X64/speed-vs-go.svg": "b",
+                "charts-bench-compare-X64/bench-compare.log": "not attached",
+            }
             done, calls = release(work, files, exists=True)
             self.assertEqual(done.returncode, 0, done.stderr)
             self.assertEqual(len(calls), 2)
             self.assertTrue(calls[1].startswith("release upload v1.2.3 "))
             self.assertIn("fullstack-arm64.svg", calls[1])
             self.assertIn("speed-vs-go.svg", calls[1])
+            self.assertIn("fullstack-arm64.json", calls[1])
+            self.assertNotIn("bench-compare.log", calls[1])
             self.assertTrue(calls[1].endswith("--clobber"))
 
     def test_creates_the_release_a_tag_lacks(self):
@@ -70,6 +84,33 @@ class ChartsReleaseTest(unittest.TestCase):
             done, calls = release(work, {"charts-a/log.txt": "a"}, exists=True)
             self.assertNotEqual(done.returncode, 0)
             self.assertEqual(calls, [])
+
+
+class NotesTest(unittest.TestCase):
+    def test_replaces_the_section_of_an_earlier_run_and_keeps_the_rest(self):
+        with tempfile.TemporaryDirectory() as work:
+            work = pathlib.Path(work)
+            (work / "bin").mkdir()
+            gh = work / "bin" / "gh"
+            gh.write_text(stub)
+            gh.chmod(0o755)
+            text = work / "compare.md"
+            text.write_text(f"{heading}\n\nnew table\n")
+            summary = work / "summary.md"
+            environment = dict(
+                os.environ,
+                PATH=f"{work / 'bin'}:{os.environ['PATH']}",
+                GH_LOG=str(work / "gh.log"),
+                RELEASE_EXISTS="1",
+                RELEASE_BODY=f"What changed\n\n{heading}\n\nold table",
+                NOTES_OUT=str(work / "notes.md"),
+                GITHUB_STEP_SUMMARY=str(summary),
+            )
+            body = f'. "{script}"\ncharts_notes "{text}" v1.2.3\n'
+            subprocess.run(["sh", "-c", body], cwd=root, env=environment, capture_output=True, text=True, check=True)
+            notes = (work / "notes.md").read_text()
+            self.assertEqual(notes, f"What changed\n\n{heading}\n\nnew table\n")
+            self.assertEqual(summary.read_text(), f"{heading}\n\nnew table\n")
 
 
 if __name__ == "__main__":

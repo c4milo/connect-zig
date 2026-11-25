@@ -98,11 +98,15 @@ report_only() {
 # Draws the README's charts of a check from its output (the first argument), into `charts`. Each
 # chart names its run: GitHub's run number in CI, or "local". An arm64 runner's charts take the
 # README's "-arm64" names. CI uploads `charts` with the run, and on a tag its job `charts` attaches
-# each one to the tag's release (tools/charts_release.sh, decision 44 as amended). A chart that
-# does not draw is a warning: the check measured what it must.
+# each one to the tag's release (tools/charts_release.sh, decision 44 as amended). With
+# CHARTS_PREVIOUS naming a folder of the previous tag's files of values (tools/charts_previous.sh),
+# each chart marks what changed since that tag (tools/chart_change.py). A chart that does not draw
+# is a warning: the check measured what it must.
 charts="ci-charts"
 draw_charts() {
     mkdir -p "${charts}"
+    # The loop below sets the positional parameters to each chart's own arguments.
+    drawn_check="$2"
     log="${charts}/$2.log"
     printf '%s\n' "$1" >"${log}"
     run_name="${GITHUB_RUN_NUMBER:-local}"
@@ -121,9 +125,12 @@ draw_charts() {
         name="${rest%%:*}" transport=""
         [ "${rest}" = "${name}" ] || transport="${rest#*:}"
         out="${charts}/${name}${suffix}.svg"
-        if ! python3 "tools/${script}.py" "${log}" "${run_name}" "${commit}" ${transport:+"${transport}"} "${out}" >&2; then
+        previous="${CHARTS_PREVIOUS:-}/${name}${suffix}.json"
+        set -- "${out}"
+        [ -z "${CHARTS_PREVIOUS:-}" ] || [ ! -f "${previous}" ] || set -- "${out}" --previous "${previous}"
+        if ! python3 "tools/${script}.py" "${log}" "${run_name}" "${commit}" ${transport:+"${transport}"} "$@" >&2; then
             echo "ci: tools/${script}.py drew no ${name}${suffix}.svg" >&2
-            [ -z "${GITHUB_ACTIONS:-}" ] || echo "::warning title=$2::tools/${script}.py drew no ${name}${suffix}.svg"
+            [ -z "${GITHUB_ACTIONS:-}" ] || echo "::warning title=${drawn_check}::tools/${script}.py drew no ${name}${suffix}.svg"
         fi
     done
 }

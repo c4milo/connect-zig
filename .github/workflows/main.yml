@@ -127,6 +127,16 @@ jobs:
           key: deps-${{ matrix.check }}-${{ runner.arch }}-${{ hashFiles('interop/*/go.sum', 'interop/*/package-lock.json', 'interop/*/Cargo.lock', 'interop/*/requirements.txt', 'tools/*.txt', 'bench/go/go.sum', 'bench/rust/Cargo.lock', 'tools/fullstack/*/go.sum', 'tools/fullstack/*/Cargo.lock') }}
           restore-keys: |
             deps-${{ matrix.check }}-${{ runner.arch }}-
+      # On a tag, the previous tag's files of values, so that each chart marks what changed since
+      # it (tools/chart_change.py).
+      - name: Take the previous tag's values
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          tools/charts_previous.sh "${GITHUB_REF_NAME}" charts-previous
+          echo "CHARTS_PREVIOUS=${PWD}/charts-previous" >>"${GITHUB_ENV}"
       - name: Run the check
         env:
           COMMIT_RANGE: ${{ github.event_name == 'pull_request' && format('{0}..{1}', github.event.pull_request.base.sha, github.event.pull_request.head.sha) || (github.event.before && github.event.before != '0000000000000000000000000000000000000000' && format('{0}..{1}', github.event.before, github.sha)) || format('{0}~1..{0}', github.sha) }}
@@ -144,7 +154,9 @@ jobs:
           path: ci-charts/
           retention-days: 90
   # A tag's charts, once every benchmark of the tag passed: each is attached to the tag's GitHub
-  # release, which the README and docs/benchmarks.md show them from (tools/charts_release.sh).
+  # release, which the README and docs/benchmarks.md show them from, with its file of values, and
+  # what changed since the previous tag goes to the release's notes and this job's summary
+  # (tools/charts_release.sh).
   charts:
     needs: check
     if: startsWith(github.ref, 'refs/tags/')
@@ -157,6 +169,9 @@ jobs:
       GH_REPO: ${{ github.repository }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # tools/charts_previous.sh finds the previous tag in the history.
+          fetch-depth: 0
       - name: Take the run's charts
         run: gh run download "${GITHUB_RUN_ID}" --pattern 'charts-*' --dir ci-charts
       - name: Attach them to the release

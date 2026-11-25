@@ -2,6 +2,7 @@
 """Draws a chart from a production table of CI's fullstack job (decision 44).
 
     tools/fullstack_chart.py <log> <run> <commit> <transport> [out.svg]
+        [--previous <chart>.json]
 
 <log> holds the job's whole output, or the reports of tools/fullstack/production.sh. <transport>
 picks the table: `tls`, connect-zig against the Collector and Vector, or `cleartext`, against the
@@ -20,6 +21,7 @@ import re
 import sys
 import types
 
+import chart_change
 from fullstack_chart_text import bar_ratio, limit_ms, subtitle_of, title_of
 
 # A lighter shade is too faint against the surface to show a bar's edge or a line, so a bar of one
@@ -200,7 +202,8 @@ def edge(fill):
 
 
 # The chart's style sheet: its colors in light and dark, and its fonts.
-style = """<style>
+style = (
+    """<style>
 svg { --surface:#fcfcfb; --ink:#0b0b0b; --ink2:#52514e; --muted:#8a8984; --grid:#e4e3df; --zig:#2a78d6; --zigv:#8db8ea; --otel:#b07d00; --vector:#b8407f; --rotel:#722626; --go:#1a8a82; --gov:#8ccfc9; --rust:#b5562b; --rustv:#dfa283; }
 @media (prefers-color-scheme: dark) {
   svg { --surface:#1a1a19; --ink:#f0efec; --ink2:#c3c2b7; --muted:#8f8e86; --grid:#33332f; --zig:#3987e5; --zigv:#1f5596; --otel:#c99512; --vector:#d0599a; --rotel:#b84545; --go:#2fa59c; --gov:#1d625d; --rust:#d06d3f; --rustv:#8a4524; }
@@ -213,7 +216,10 @@ text { font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; fil
 .val { font-size: 11px; font-weight: 600; paint-order: stroke; stroke: var(--surface); stroke-width: 3px; stroke-linejoin: round; }
 .tick { font-size: 11px; fill: var(--muted); }
 .legend { font-size: 12.5px; fill: var(--ink2); }
-</style>"""
+"""
+    + chart_change.style
+    + "\n</style>"
+)
 
 
 def description(title, held, steps, servers):
@@ -298,9 +304,13 @@ def draw_bars(a, lay, chart, looks):
         if line:
             draw_whisker(a, line, y + bar_h / 2)
         floor = "≥" if held[name]["floor"] else ""
+        mark = ""
+        if name.startswith("connect-zig"):
+            place = (lambda value: bar_left + value / spans_high * lay.bar_w, y, bar_h, bar_left + width)
+            mark, _ = chart.change.bar(a, name, f"{name}, spans a second {chart.over}", held[name]["spans"], place)
         a(
             f'<text class="val" x="{bar_left + 4:.1f}" y="{y + bar_h + 13}">{floor}{held[name]["spans"]:,.0f} spans/s, '
-            f"p99 {held[name]['p99']:g} ms{bar_ratio(held, name, chart.validate)}</text>"
+            f"p99 {held[name]['p99']:g} ms{bar_ratio(held, name, chart.validate)}{mark}</text>"
         )
 
 
@@ -378,15 +388,18 @@ def place_labels(lay, labels):
     return placed
 
 
-def draw(transport, held, steps, machine, run, commit):
-    """The chart's SVG text."""
+def draw(transport, held, steps, machine, run, commit, change=None):
+    """The chart's SVG text. `change` is the chart's `chart_change.Change`, which keeps the values
+    connect-zig's bars draw."""
     validate, over, looks = setting(transport)
     chart = types.SimpleNamespace(held=held, steps=steps, machine=machine, run=run, commit=commit, validate=validate)
+    chart.change = change or chart_change.Change(None, machine)
     chart.over = over
     chart.servers = [name for name in looks if name in held]
     chart.title = title_of(held, chart.servers, validate)
     chart.subtitle = subtitle_of(held, validate, chart.over)
     lay = layout_of(held, steps, chart.servers, looks, validate, chart.subtitle)
+    lay.H += chart_change.note_height(chart.change)
     parts = []
     a = parts.append
     draw_head(a, lay, chart)
@@ -395,14 +408,16 @@ def draw(transport, held, steps, machine, run, commit):
     draw_axes(a, lay)
     for y, left, _, text in place_labels(lay, draw_climbs(a, lay, chart, looks)):
         a(f'<text class="val" x="{left:.1f}" y="{y:.1f}">{text}</text>')
+    chart_change.draw_note(a, chart.change, lay.pad_l, lay.H)
     a("</svg>")
     return "\n".join(parts) + "\n"
 
 
 def main():
-    log_path, run, commit, transport = sys.argv[1:5]
+    arguments, previous = chart_change.split_arguments(sys.argv)
+    log_path, run, commit, transport = arguments[1:5]
     suffix = {"tls": "", "cleartext": "-cleartext", "validate": "-validate"}[transport]
-    out = sys.argv[5] if len(sys.argv) > 5 else f"fullstack{suffix}.svg"
+    out = arguments[5] if len(arguments) > 5 else f"fullstack{suffix}.svg"
     validate, over, looks = setting(transport)
     held, steps, machine = read(log_path, over, looks)
     servers = [name for name in looks if name in held]
@@ -410,7 +425,9 @@ def main():
         sys.exit(f"{log_path}: no production table {over} with connect-zig and another server")
     if validate and "connect-zig + protovalidate" not in held:
         sys.exit(f"{log_path}: no production table {over} with connect-zig + protovalidate")
-    pathlib.Path(out).write_text(draw(transport, held, steps, machine, run, commit))
+    change = chart_change.Change(previous, machine)
+    pathlib.Path(out).write_text(draw(transport, held, steps, machine, run, commit, change))
+    change.write(out, pathlib.Path(out).stem, run, commit)
 
 
 if __name__ == "__main__":

@@ -3,6 +3,7 @@
 (tools/fullstack/compression.sh, design §8 step 37).
 
     tools/compression_chart.py <log> <run> <commit> <transport> [out.svg]
+        [--previous <chart>.json]
 
 <log> holds the job's whole output, or the report of tools/fullstack/compression_report.py.
 <transport> picks the report: `tls` or `cleartext`. Each row is one Connect receiver with exports
@@ -15,9 +16,12 @@ whisker over the range of the rounds. <run> and <commit> name the run in the sub
 asks of a published number.
 """
 
+import pathlib
 import re
 import sys
 import types
+
+import chart_change
 
 # Each receiver's color, as in every chart of the README. A row's label names its coding.
 colors = {"connect-zig": "--zig", "connect-go": "--go", "connect-rust": "--rust"}
@@ -148,7 +152,8 @@ def caps(share, low, upper):
 
 
 # The chart's style sheet: its colors in light and dark, and its fonts.
-style = """<style>
+style = (
+    """<style>
 svg { --surface:#fcfcfb; --ink:#0b0b0b; --ink2:#52514e; --muted:#8a8984; --grid:#e4e3df; --zig:#2a78d6; --go:#1a8a82; --rust:#b5562b; }
 @media (prefers-color-scheme: dark) {
   svg { --surface:#1a1a19; --ink:#f0efec; --ink2:#c3c2b7; --muted:#8f8e86; --grid:#33332f; --zig:#3987e5; --go:#2fa59c; --rust:#d06d3f; }
@@ -161,7 +166,10 @@ text { font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; fil
 .row { font-size: 12.5px; fill: var(--ink2); }
 .val { font-size: 11px; font-weight: 600; fill: var(--ink2); }
 .tick { font-size: 11px; fill: var(--muted); }
-</style>"""
+"""
+    + chart_change.style
+    + "\n</style>"
+)
 
 
 def joined(words):
@@ -205,13 +213,15 @@ def subtitle_of(held, transport, over):
     return subtitle
 
 
-def layout_of(held, peak, rows, subtitle):
-    """Where each part of the chart goes, and each panel's greatest share."""
+def layout_of(held, peak, rows, subtitle, marks=False):
+    """Where each part of the chart goes, and each panel's greatest share. With `marks`, the climb's
+    bars give their labels room for a change since the previous tag."""
     lay = types.SimpleNamespace(W=840, pad_l=24, line_h=18, row_h=18, row_gap=8, group_gap=14, heading_h=22)
     lay.top = 56 + (len(subtitle) + 1) * lay.line_h + 40
     lay.label_right = lay.pad_l + 110
-    lay.climb_left, lay.climb_w = lay.label_right + 12, 170
-    lay.peak_left, lay.peak_w = lay.climb_left + lay.climb_w + 200, 160
+    mark_room = 40 if marks else 0
+    lay.climb_left, lay.climb_w = lay.label_right + 12, 170 - mark_room
+    lay.peak_left, lay.peak_w = lay.climb_left + lay.climb_w + 200 + mark_room, 160
     groups = len({server for server, _ in rows})
     lay.H = (
         lay.top
@@ -276,9 +286,10 @@ def draw_axis(a, lay, left, width, high, bottom):
     a(f'<text class="tick" x="{x:.1f}" y="{lay.top - 8}" text-anchor="middle">100%</text>')
 
 
-def draw_bar(a, lay, panel, y, fill, shares, label):
+def draw_bar(a, lay, panel, y, fill, shares, label, was=None):
     """A bar to the share, a whisker from its low end to its upper end, and the label past the
-    whisker. `panel` is the panel's left edge, its width, and its greatest share."""
+    whisker. `panel` is the panel's left edge, its width, and its greatest share. `was` is the
+    previous tag's share, which the label starts past too."""
     left, width, high = panel
     share, low, upper = shares
     scale = width / high
@@ -295,7 +306,8 @@ def draw_bar(a, lay, panel, y, fill, shares, label):
                 f'<line x1="{left + end * scale:.1f}" y1="{middle - 4}" x2="{left + end * scale:.1f}" y2="{middle + 4}" '
                 f'stroke="var(--ink)" stroke-width="1.5"/>'
             )
-    a(f'<text class="val" x="{left + max(share, upper) * scale + 8:.1f}" y="{middle + 4:.1f}">{label}</text>')
+    label_at = max(share, upper, was or 0)
+    a(f'<text class="val" x="{left + label_at * scale + 8:.1f}" y="{middle + 4:.1f}">{label}</text>')
 
 
 def climb_label(item, share, coding):
@@ -307,6 +319,21 @@ def climb_label(item, share, coding):
     return label + " · slots full" if item["refused"] else label
 
 
+def changed(a, lay, chart, row, bar):
+    """The mark after a bar's label and the previous tag's share, for a connect-zig row in a coding:
+    a row uncompressed is the unit of its coding's shares. `bar` is the panel's name, its left
+    edge, its width, its greatest share, the bar's share, and its top."""
+    server, coding = row
+    if server != "connect-zig" or coding == "uncompressed":
+        return "", None
+    name, left, width, high, share, top = bar
+    key = f"{coding}, {name}"
+    place = (lambda value: left + value * width / high, top, lay.row_h, left)
+    label = f"{coding}, {name} as a share of uncompressed {chart.over}"
+    mark, _ = chart.change.bar(a, key, label, share, place)
+    return mark, chart.change.was(key)
+
+
 def draw_row(a, lay, chart, row, y):
     """A row's bars: its climb's and its peak's."""
     server, coding = row
@@ -314,13 +341,17 @@ def draw_row(a, lay, chart, row, y):
     a(f'<text class="row" x="{lay.label_right}" y="{y + lay.row_h / 2 + 4:.1f}" text-anchor="end">{coding}</text>')
     share = climb_share(chart.held, server, coding)
     if share:
-        label = climb_label(chart.held[row], share, coding)
-        draw_bar(a, lay, (lay.climb_left, lay.climb_w, lay.climb_high), y, fill, share, label)
+        bar = ("spans a second", lay.climb_left, lay.climb_w, lay.climb_high, share[0], y)
+        mark, was = changed(a, lay, chart, row, bar)
+        label = climb_label(chart.held[row], share, coding) + mark
+        draw_bar(a, lay, (lay.climb_left, lay.climb_w, lay.climb_high), y, fill, share, label, was)
     rates = peak_share(chart.peak, server, coding)
     if rates:
+        bar = ("calls a second at peak", lay.peak_left, lay.peak_w, lay.peak_high, rates[0], y)
+        mark, was = changed(a, lay, chart, row, bar)
         calls = f"{chart.peak[row]['rate']:,.0f}/s"
-        label = calls if coding == "uncompressed" else f"{rates[0]:.0f}% · {calls}"
-        draw_bar(a, lay, (lay.peak_left, lay.peak_w, lay.peak_high), y, fill, rates, label)
+        label = (calls if coding == "uncompressed" else f"{rates[0]:.0f}% · {calls}") + mark
+        draw_bar(a, lay, (lay.peak_left, lay.peak_w, lay.peak_high), y, fill, rates, label, was)
 
 
 def draw_rows(a, lay, chart):
@@ -338,37 +369,42 @@ def draw_rows(a, lay, chart):
         previous = server
 
 
-def draw(transport, held, peak, machine, run, commit):
-    """The chart's SVG text."""
+def draw(transport, held, peak, machine, run, commit, change=None):
+    """The chart's SVG text. `change` is the chart's `chart_change.Change`, which keeps the values
+    connect-zig's bars draw."""
     chart = types.SimpleNamespace(held=held, peak=peak, machine=machine, run=run, commit=commit)
+    chart.change = change or chart_change.Change(None, machine)
     chart.over = "over TLS" if transport == "tls" else "over cleartext h2"
     chart.rows = rows_of(held)
     chart.title = title_of(held, chart.over)
     chart.subtitle = subtitle_of(held, transport, chart.over)
-    lay = layout_of(held, peak, chart.rows, chart.subtitle)
+    lay = layout_of(held, peak, chart.rows, chart.subtitle, chart.change.previous is not None)
+    bottom = lay.H - 16
+    lay.H += chart_change.note_height(chart.change)
     parts = []
     a = parts.append
     draw_head(a, lay, chart)
-    bottom = lay.H - 16
     draw_axis(a, lay, lay.climb_left, lay.climb_w, lay.climb_high, bottom)
     if peak:
         draw_axis(a, lay, lay.peak_left, lay.peak_w, lay.peak_high, bottom)
     draw_rows(a, lay, chart)
+    chart_change.draw_note(a, chart.change, lay.pad_l, lay.H)
     a("</svg>")
     return "\n".join(parts) + "\n"
 
 
 def main():
-    log_path, run, commit, transport = sys.argv[1:5]
+    arguments, previous = chart_change.split_arguments(sys.argv)
+    log_path, run, commit, transport = arguments[1:5]
     suffix = "" if transport == "tls" else "-cleartext"
-    out = sys.argv[5] if len(sys.argv) > 5 else f"fullstack-compression{suffix}.svg"
+    out = arguments[5] if len(arguments) > 5 else f"fullstack-compression{suffix}.svg"
     over = "over TLS" if transport == "tls" else "over cleartext h2"
     held, peak, machine = read(log_path, over)
     if ("connect-zig", "uncompressed") not in held:
         sys.exit(f"{log_path}: no compression report {over} with connect-zig uncompressed")
-    text = draw(transport, held, peak, machine, run, commit)
-    with open(out, "w") as file:
-        file.write(text)
+    change = chart_change.Change(previous, machine)
+    pathlib.Path(out).write_text(draw(transport, held, peak, machine, run, commit, change))
+    change.write(out, pathlib.Path(out).stem, run, commit)
     print(f"{out}: {len(rows_of(held))} rows {over}, run {run}", file=sys.stderr)
 
 

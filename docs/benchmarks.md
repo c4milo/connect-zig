@@ -3,7 +3,12 @@
 How connect-zig's benchmarks are measured, with their charts. CI runs the benchmarks on each tag,
 and attaches the charts they draw to the tag's GitHub release (decision 44). This page shows the
 latest release's. Each chart names the run and the commit that drew it, and that run's summary
-holds every table, the x86-64 results included. A time compares only
+holds every table, the x86-64 results included.
+
+Each chart also compares connect-zig's bars with the previous tag's. A dashed line crosses a bar
+at the previous tag's value, and ▲ or ▼ after its label marks a value 5% or more better or worse.
+A chart whose CPU model differs from the previous tag's marks nothing, since its times do not
+compare. The release's notes and the run's summary list the same changes as a table. A time compares only
 with times of the same job on the same machine, as [performance.md](performance.md) asks.
 
 ## The codec
