@@ -6,7 +6,7 @@
     .dependencies = .{
         // The HTTP transport of `connect_colibri`, which takes chapulin through stdx.crypto.
         .colibri = .{
-            .url = "git+https://github.com/c4milo/colibri#3ea5851da665765927f5b45c911598539be67031",
+            .url = "git+https://github.com/c4milo/colibri#2ab4362341cdb3737e6ae3ab8b219007db97602a",
             .hash = "colibri-0.21.0-Wo-AvtpptQS1nRsUon6VbvGDj10LxohVnb9jA5qwF4j3",
         },
         // JSON for proto3 JSON and the Connect error bodies, the compression codecs, the
