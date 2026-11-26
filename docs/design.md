@@ -2404,6 +2404,12 @@ ran on Linux x86-64 with Zig 0.16.0.
   decision 40 as amended a sixth time). So a program on them that sets PSTATE.DIT runs AES-GCM
   and chapulin's other constant-time paths. colibri's commits since e7e001f7 change its simulator
   and test programs alone. No code of connect-zig changes.
+- **colibri v0.22.0 and stdx v0.4.0: the first releases that pin each other** (2026-11-26). stdx's
+  hash and signature calls take no value now: a program calls them through the value that
+  `stdx.crypto.init` returns, which alone builds a `Context` (stdx decision 87 as amended a tenth
+  time). connect-zig builds each `Context` with `init` and calls no hash or signer of stdx's, and
+  colibri renames `qlog.Log`'s field `features` to `cpu_features`, which connect-zig does not
+  name. So no code of connect-zig changes.
 
 ### Work not done yet
 
