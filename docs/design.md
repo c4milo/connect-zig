@@ -2392,6 +2392,13 @@ ran on Linux x86-64 with Zig 0.16.0.
     on `9dd95be`, every one of the 68 rows was within 2% of the baseline, and the validation rows
     2.4% to 6.6% under it. Those counts are under callgrind on x86-64 Linux, built for x86-64-v3.
   - `zig build test` passed on x86-64 Linux, with Zig 0.16.0.
+- **colibri at e7e001f7 and stdx at a11db0b: the reader's fix** (2026-11-26). colibri's `main`
+  pins stdx's fix of `TextReader` from `ac57be7c` on, and `e7e001f7` changes its simulator alone.
+  No code of connect-zig changes.
+  - `tools/perf_check.sh` passed: each of the 68 rows was within 2% of the baseline, small JSON
+    decode 0.19% over it and the medium validations 2.3% and 3.9% under it. Those counts are
+    under callgrind on x86-64 Linux, built for x86-64-v3.
+  - `zig build test` passed on x86-64 Linux, with Zig 0.16.0.
 
 ### Work not done yet
 
