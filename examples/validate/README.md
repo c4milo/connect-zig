@@ -6,7 +6,7 @@ options:
 
 - [signup.proto](proto/signup/v1/signup.proto) states the rules of `RegisterRequest`: an email
   address, a name of 1 to 64 characters, an age from 13 to 149, and at most 4 tags, each one
-  different;
+  different and a lowercase word, which a `pattern`, a regular expression, states;
 - the plugin writes the rules beside the generated message, and the interceptor reads them when
   the program compiles, so no rule is parsed at run time;
 - a message that breaks a rule ends its call with `invalid_argument` before a handler takes it.

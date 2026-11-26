@@ -27,7 +27,11 @@ message RegisterRequest {
     max_items: 4
     unique: true
     items: {
-      string: {min_len: 1}
+      string: {
+        min_len: 1
+        // A tag is a lowercase word: a letter, then letters, digits and hyphens.
+        pattern: "^[a-z][a-z0-9-]*$"
+      }
     }
   }];
 }
