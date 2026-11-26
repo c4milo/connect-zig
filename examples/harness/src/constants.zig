@@ -35,10 +35,6 @@ pub const piece_len = 16;
 pub const read_len = 4096;
 pub const entries_max = 8;
 
-/// A test draws no secret, so a seeded generator stands in for entropy on each side: each run
-/// replays.
-pub const server_seed = 0x656c697a61;
-pub const client_seed = 0x636c69656e74;
 
 /// The octets of the DER in a PEM file of `pem_len` octets, at most: base64 writes 3 octets as 4
 /// letters (RFC 7468 §2).

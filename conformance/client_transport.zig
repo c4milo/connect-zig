@@ -53,16 +53,11 @@ pub const Transport = struct {
     listener: ?Listener,
     udp: UdpSocket,
     io: std.Io,
-    /// The source each TLS session draws from, seeded from the system once.
-    csprng: std.Random.DefaultCsprng,
 
-    /// Starts the transport in place with the program's I/O, and seeds the random source from
-    /// the system.
+    /// Starts the transport in place with the program's I/O. Each TLS session draws from the
+    /// context its plan's TLS value holds (colibri decision 175).
     pub fn init(self: *Self, io: std.Io) void {
         self.io = io;
-        var seed: [std.Random.DefaultCsprng.secret_seed_length]u8 = @splat(0);
-        io.random(&seed);
-        self.csprng = .init(seed);
         self.stream = null;
         self.tcp = .{ .slot = 0, .generation = 0 };
         self.input_len = 0;
@@ -205,7 +200,7 @@ pub const Transport = struct {
         switch (event) {
             .open => |asked| switch (asked.transport) {
                 .tcp => self.open_tcp(asked),
-                .quic => self.pool.start_quic(self.csprng.random(), self.unix_seconds(), now, null) catch {},
+                .quic => self.pool.start_quic(self.unix_seconds(), now, null) catch {},
             },
             .send => |connection| self.send_owed(connection, now),
             // The pool is done with the connection: the octets still held are its, and go too.
@@ -232,7 +227,7 @@ pub const Transport = struct {
         const on: c_int = 1;
         // A socket that refuses the option is used as it is.
         std.posix.setsockopt(connected.socket.handle, std.posix.IPPROTO.TCP, std.posix.TCP.NODELAY, std.mem.asBytes(&on)) catch {};
-        self.pool.start_tcp(self.tcp, self.csprng.random(), self.unix_seconds(), null) catch self.failed();
+        self.pool.start_tcp(self.tcp, self.unix_seconds(), null) catch self.failed();
     }
 
     /// The seconds since 1970 by the system's clock, at which TLS judges the server's certificate

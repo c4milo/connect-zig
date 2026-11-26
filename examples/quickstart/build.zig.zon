@@ -6,6 +6,12 @@
     .dependencies = .{
         // A project of your own names connect-zig by URL: `zig fetch --save git+https://github.com/c4milo/connect-zig`.
         .connect_zig = .{ .path = "../.." },
+        // The stdx that connect-zig pins, at connect-zig's own request, so a program links one
+        // stdx: the client's TLS sessions draw from its `crypto.Context` (colibri decision 175).
+        .stdx = .{
+            .url = "git+https://github.com/c4milo/stdx#9dd95be8e994a7a600aa1df6635ae0dc00b0bf5a",
+            .hash = "stdx-0.3.0-BD60thJKXQDGoqyQKYSMUIPbMfsfR5A7sTlN-srIjq2d",
+        },
     },
     .paths = .{ "build.zig", "build.zig.zon", "buf.gen.yaml", "check.sh", "proto", "gen", "src" },
 }

@@ -79,7 +79,6 @@ pub const Driver = struct {
     held: [constants.held_len_max]u8,
     held_len: usize,
     read_buffers: ReadBuffers,
-    random_source: std.Random.IoSource,
     /// The socket of the round's connection, while it is open.
     stream: ?net.Stream,
     tcp: client.ConnectionHandle,
@@ -90,8 +89,7 @@ pub const Driver = struct {
     spoken: ?client.Protocol,
 
     /// Starts a driver with no socket. `deinit` closes the socket a failed round left open.
-    pub fn init(driver: *Driver, io: Io) void {
-        driver.random_source = .{ .io = io };
+    pub fn init(driver: *Driver) void {
         driver.stream = null;
         driver.tcp = .{ .slot = 0, .generation = 0 };
         driver.held_len = 0;
@@ -224,7 +222,7 @@ pub const Driver = struct {
             driver.pool.transport_closed(open.connection);
             return;
         };
-        try driver.pool.start_tcp(open.connection, driver.random_source.interface(), 0, null);
+        try driver.pool.start_tcp(open.connection, 0, null);
     }
 
     fn send_owed(driver: *Driver, io: Io, connection: client.ConnectionHandle, now: u64) !void {

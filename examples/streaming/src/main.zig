@@ -74,7 +74,7 @@ pub fn main(init: std.process.Init) !void {
     state.app = .{ .cpu_features = .detect() };
     // One client for every call, with the CPU features the program detected.
     state.client = .{ .cpu_features = state.app.cpu_features };
-    try state.rounds.init(&state.app);
+    try state.rounds.init(&state.app, init.io);
     defer state.rounds.deinit();
     try round(state, .{ .h11 = false, .h3 = false }, .h2);
     try round(state, .{ .h2 = false, .h3 = false }, .h11);

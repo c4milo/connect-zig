@@ -20,6 +20,7 @@ const Buffers = @import("client_buffers.zig").Buffers;
 const plan_module = @import("client_plan.zig");
 const Invocation = @import("client_invoke.zig").Invocation;
 const result_module = @import("client_result.zig");
+const crypto = @import("stdx").crypto;
 
 /// The types an Any in a JSON message may name (decision 21).
 pub const protobuf_any_types = @import("any_types.zig").types;
@@ -48,6 +49,11 @@ const Slots = struct {
 
 /// All the program holds, which `main` allocates once before the first case (decision 42).
 const State = struct {
+    /// The source each TLS session draws from, which stays here while they run.
+    secure: SecureRandom,
+    /// One context of the client's CPU features and the system's entropy, which each case's TLS
+    /// value holds (colibri decision 175).
+    crypto: crypto.Context,
     transport: Transport,
     buffers: Buffers,
     plan_memory: plan_module.Memory,
@@ -80,6 +86,8 @@ pub fn main(init: std.process.Init) !void {
         .encoders = .{ .gzip = &state.gzip_encoder, .zstd = &state.zstd_encoder, .brotli = &state.brotli_encoder },
         .decoders = .{ .gzip = &state.gzip_decoder, .zstd = &state.zstd_decoder, .brotli = &state.brotli_decoder },
     };
+    state.secure = .{ .io = init.io };
+    state.crypto = crypto.init(state.client.cpu_features, state.secure.random());
     var stdin = std.Io.File.stdin().reader(init.io, &state.stdin_buffer);
     var stdout = std.Io.File.stdout().writerStreaming(init.io, &state.stdout_buffer);
     for (0..constants.client_cases_max) |_| {
@@ -90,6 +98,22 @@ pub fn main(init: std.process.Init) !void {
     }
     return error.TooManyCases;
 }
+
+/// The operating system's entropy as a `std.Random`. Each draw calls `io.randomSecure`, which is
+/// thread-safe, keeps no state a fork copies, and has no weaker fallback. A draw that fails halts
+/// the program, so no session runs on bytes the system did not give.
+const SecureRandom = struct {
+    io: std.Io,
+
+    fn fill(pointer: *anyopaque, bytes: []u8) void {
+        const self: *SecureRandom = @ptrCast(@alignCast(pointer));
+        self.io.randomSecure(bytes) catch |err| std.debug.panic("no entropy: {t}", .{err});
+    }
+
+    fn random(self: *SecureRandom) std.Random {
+        return .{ .ptr = self, .fillFn = fill };
+    }
+};
 
 /// Reads one length-prefixed ClientCompatRequest, or null at the end of stdin.
 fn read_request(state: *State, stdin: *std.Io.Reader) !?[]const u8 {
@@ -124,7 +148,7 @@ fn dispatch(state: *State, request: *const Request, result: *result_module.Resul
         if (!std.mem.eql(u8, name, Service.service_name)) return error.UnknownService;
     }
     const name = request.method orelse return error.NoMethod;
-    const plan = try plan_module.plan_of(request, &state.client, &state.plan_memory);
+    const plan = try plan_module.plan_of(request, &state.client, &state.plan_memory, state.crypto);
     try state.transport.begin(request.host, std.math.cast(u16, request.port) orelse return error.InvalidPort, plan.protocols, plan.tls, state.client.cpu_features);
     defer state.transport.end();
     inline for (@typeInfo(Slots).@"struct".fields) |field| {

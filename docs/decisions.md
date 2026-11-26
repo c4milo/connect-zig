@@ -100,6 +100,14 @@ first. Cite an entry by number in code and commits ("decision 6").
       `colibri` and no longer `server`, `client`, `http`, or `tls` beside it, so a program writes
       `connect_zig.colibri.server`. Beaten: the whole `stdx` module, which makes stdx's API part
       of connect-zig's; and the four names beside `colibri`, two names for each module.
+    - Amended on 2026-11-26, on the owner's choice: colibri's TLS takes a `stdx.crypto.Context`,
+      the program's CPU features and its random source, which `stdx.crypto.init` makes once
+      (colibri at e9ffbac1, stdx's decision 87 as amended). So a program that runs colibri over
+      TLS names stdx: it depends on stdx itself and asks it as connect-zig does (decision 34).
+      `connect_zig` still names `CpuFeatures` alone of stdx. A server may pass no context, and
+      colibri then makes one of `Engine.cpu_features` and the system's entropy. Beaten:
+      `connect_zig` naming `stdx.crypto` too, which makes more of stdx's API part of
+      connect-zig's.
 
 41. **Each example is a Zig project of its own.** Ruled by the owner on 2026-11-14.
     - `examples/<name>/` holds `build.zig`, `build.zig.zon`, `buf.gen.yaml`, `proto/`, `gen/`, and
@@ -136,6 +144,11 @@ first. Cite an entry by number in code and commits ("decision 6").
     - A project that depends on another passes connect-zig the same options, or Zig builds a
       second `connect` module. `eliza` and the harness take a `rotor` option for a project with
       no Rotor, such as `std_io` (decision 32).
+    - Amended on 2026-11-26, on the owner's choice (decision 52 as amended that day):
+      `examples/harness` and `examples/quickstart` depend on stdx, at the commit the root pins,
+      and ask it with `.target`, `.release` and `.crypto = true`, as connect-zig asks it. Each
+      calls `stdx.crypto.init` once, with its CPU features and a `std.Random` over
+      `io.randomSecure`, and hands the value to colibri's TLS.
 
 42. **Every tree of hand-written Zig takes the library's rules.** Ruled by the owner on
     2026-11-14.
@@ -720,6 +733,12 @@ first. Cite an entry by number in code and commits ("decision 6").
         names colibri.
       - In this tree's own build, stdx holds `crypto`, so a check over `connect_zig` without
         colibri links chapulin's objects too. It still reaches no colibri module.
+    - Amended on 2026-11-26: the benchmark's codec and validation programs ask stdx with no
+      `crypto`, so they link no chapulin and no libc, and only the routed calls ask what colibri
+      asks. Zig builds a program that links glibc as position-independent code, which cost a
+      binary decode up to 9.6% more instructions once the codec's program linked chapulin
+      (docs/performance.md, "The pitfalls"). A count then compares programs that link the same
+      libraries.
 
 35. **A call keeps values of the type the program declares.** Ruled by the owner on
     2026-11-11. What an interceptor learns about a call belongs to that call: the claims of its

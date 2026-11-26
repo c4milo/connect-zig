@@ -28,10 +28,12 @@ pub const Tokens = struct {
     /// Where octets that outlive their token are copied.
     storage: []u8,
     used: usize = 0,
+    /// The program's CPU features, which the base64 decoder of a detail's value takes.
+    cpu_features: platform.CpuFeatures,
 
     /// Reads `text` with the program's CPU features, `cpu_features`.
     pub fn init(text: []const u8, tokens: []u8, storage: []u8, cpu_features: platform.CpuFeatures) Tokens {
-        return .{ .reader = json.TextReader.init(text, tokens, .text, cpu_features), .storage = storage };
+        return .{ .reader = json.TextReader.init(text, tokens, .text, cpu_features), .storage = storage, .cpu_features = cpu_features };
     }
 
     pub fn start(self: *Tokens) Error!void {
@@ -71,7 +73,7 @@ pub const Tokens = struct {
             .string => |octets| octets,
             else => return error.UnexpectedToken,
         };
-        const kept = try decode_base64(.standard, octets, self.storage[self.used..], self.reader.features);
+        const kept = try decode_base64(.standard, octets, self.storage[self.used..], self.cpu_features);
         self.used += kept.len;
         return kept;
     }

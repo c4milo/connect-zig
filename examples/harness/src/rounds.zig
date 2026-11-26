@@ -17,6 +17,9 @@ const Link = @import("link.zig").Link;
 const DatagramLink = @import("link_datagram.zig").DatagramLink;
 const server_side = @import("server_side.zig");
 const client_side = @import("client_side.zig");
+const std = @import("std");
+const stdx_crypto = @import("stdx").crypto;
+const SecureRandom = @import("entropy.zig").SecureRandom;
 
 /// The rounds of a program whose route table `Router` serves calls with `*App`. It holds a
 /// megabyte and more, and points into itself, so it stays where the program placed it.
@@ -29,16 +32,22 @@ pub fn Rounds(comptime App: type, comptime Router: type) type {
         router: Router,
         server: server_side.ServerSide,
         client: client_side.ClientSide,
+        /// The source both sides' TLS sessions draw from, over the program's `io`.
+        secure: SecureRandom,
 
-        /// Starts both sides. The server's routes take `app`, which the program owns.
-        pub fn init(self: *Self, app: *App) !void {
+        /// Starts both sides. The server's routes take `app`, which the program owns. `io` is the
+        /// program's, whose entropy the TLS sessions draw from.
+        pub fn init(self: *Self, app: *App, io: std.Io) !void {
             try self.link.init();
             // The datagram link runs on the stream link's loops, so each side reads one clock.
             self.datagram_link.init(&self.link.loops);
             self.router.init();
-            // Both sides state the CPU features the program detected once, which its App holds.
-            try self.server.init(&self.link, &self.datagram_link, .of(&self.router, app), app.cpu_features);
-            try self.client.init(&self.server, &self.link, &self.datagram_link, app.cpu_features);
+            // Both sides state the CPU features the program detected once, which its App holds,
+            // and hold one context of them and the system's entropy.
+            self.secure = .{ .io = io };
+            const crypto = stdx_crypto.init(app.cpu_features, self.secure.random());
+            try self.server.init(&self.link, &self.datagram_link, .of(&self.router, app), app.cpu_features, crypto);
+            try self.client.init(&self.server, &self.link, &self.datagram_link, app.cpu_features, crypto);
         }
 
         pub fn deinit(self: *Self) void {

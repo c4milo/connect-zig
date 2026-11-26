@@ -133,6 +133,8 @@ fn add_interop_client(b: *std.Build, graph: Graph, schemas: Schemas) *std.Build.
             .{ .name = "connect", .module = graph.connect },
             .{ .name = "connect_colibri", .module = graph.connect_colibri },
             .{ .name = "colibri", .module = graph.colibri.module("colibri") },
+            // stdx's `crypto.Context`, which the client's TLS value holds (colibri decision 175).
+            .{ .name = "stdx", .module = graph.stdx },
             .{ .name = "client_transport", .module = transport },
             .{ .name = "coverage", .module = schemas.coverage },
             .{ .name = "interop", .module = schemas.interop },

@@ -9,6 +9,7 @@
 const std = @import("std");
 const server = @import("connect_zig").colibri.server;
 const tls = @import("connect_zig").colibri.tls;
+const Context = @import("stdx").crypto.Context;
 const identity = @import("test_identity");
 const constants = @import("constants.zig");
 const Link = @import("link.zig").Link;
@@ -22,13 +23,6 @@ const chain_der_len = constants.der_len_max(identity.chain_pem.len);
 pub const now_seconds = identity.now_seconds;
 
 const client_address: server.Address = .init(&constants.loopback, constants.client_port);
-
-/// What a program probes once and passes every TLS configuration: here no CPU feature is known
-/// and the thread's timing mode is not stated, so each session runs ChaCha20 alone.
-pub const cpu: tls.Cpu = .{
-    .probe = .{ .aes_clmul = .not_known, .dit = .not_known, .sha256 = .not_known, .sha512 = .not_known, .sha3 = .not_known, .sve2 = .not_known, .ssse3 = .not_known, .sse4_1 = .not_known, .avx2 = .not_known, .vaes = .not_known, .midr = null },
-    .timing = .not_stated,
-};
 
 pub const Error = error{ CallWrong, SendUnfinished };
 
@@ -87,11 +81,11 @@ pub const ServerSide = struct {
     accepted: ?server.ConnectionHandle,
     /// The connections that ended, TCP and QUIC alike: a round is over once one more ended.
     ended_count: u32,
-    prng: std.Random.DefaultPrng,
 
     /// Starts the endpoint. `cpu_features` are the program's, which its App holds: the engine's
-    /// codecs run on them (colibri decision 169).
-    pub fn init(self: *Self, link: *Link, datagram_link: *DatagramLink, router: RouterRef, cpu_features: server.CpuFeatures) !void {
+    /// codecs run on them (colibri decision 169). `crypto` holds the same features and the source
+    /// each TLS session draws from (colibri decision 175).
+    pub fn init(self: *Self, link: *Link, datagram_link: *DatagramLink, router: RouterRef, cpu_features: server.CpuFeatures, crypto: Context) !void {
         self.* = .{
             .link = link,
             .datagram_link = datagram_link,
@@ -109,13 +103,12 @@ pub const ServerSide = struct {
             .router = router,
             .accepted = null,
             .ended_count = 0,
-            .prng = .init(constants.server_seed),
         };
-        self.prng.random().bytes(&self.cookie_key);
-        self.prng.random().bytes(&self.ticket_key);
+        crypto.random.bytes(&self.cookie_key);
+        crypto.random.bytes(&self.ticket_key);
         // The chain, the end-entity first, and the P-256 key the end-entity certificate carries.
         const chain = try tls.pem.chain(identity.chain_pem, &self.chain_der, &self.chain_room);
-        try tls.pem.key(cpu, identity.key_pem, chain[0], &self.key);
+        try tls.pem.key(crypto, identity.key_pem, chain[0], &self.key);
         self.identities[0] = .{ .chain = chain, .key = &self.key };
         // The identity serves QUIC, which names h3. A TCP socket the program accepts with `.tls =
         // false` stays in cleartext.
@@ -123,9 +116,9 @@ pub const ServerSide = struct {
             .identities = &self.identities,
             .cookie_key = &self.cookie_key,
             .ticket_key = &self.ticket_key,
-            .cpu = cpu,
+            .crypto = crypto,
         } };
-        try self.endpoint.init(&self.config, self.prng.random(), .{ .unix_seconds = now_seconds, .monotonic_ns = link.now_ns(.server) });
+        try self.endpoint.init(&self.config, .{ .unix_seconds = now_seconds, .monotonic_ns = link.now_ns(.server) });
     }
 
     /// Wipes the key's scalar, which no session uses any more.

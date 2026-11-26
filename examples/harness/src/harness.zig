@@ -7,7 +7,7 @@
 //!
 //! ```zig
 //! const Rounds = harness.Rounds(App, Router);
-//! try state.rounds.init(&state.app);
+//! try state.rounds.init(&state.app, init.io);
 //! try state.rounds.begin(.{ .h11 = false, .h3 = false });
 //! try state.rounds.request(&call.request, &call.response);
 //! try state.rounds.finish(.h2);
@@ -28,8 +28,8 @@ pub const expect_end = client_side.expect_end;
 pub const expect_trailer = client_side.expect_trailer;
 
 const server_side = @import("server_side.zig");
-/// The CPU the harness's TLS sessions run on, which probes nothing.
-pub const cpu = server_side.cpu;
+/// The source of the rounds' TLS sessions, over the program's `io`.
+pub const SecureRandom = @import("entropy.zig").SecureRandom;
 /// The instant the harness judges certificates at, in Unix seconds.
 pub const now_seconds = server_side.now_seconds;
 
@@ -46,7 +46,7 @@ test {
     _ = Listener;
     _ = expect_end;
     _ = expect_trailer;
-    _ = cpu;
+    _ = SecureRandom;
     _ = now_seconds;
     _ = constants;
 }

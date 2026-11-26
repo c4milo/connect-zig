@@ -13,7 +13,6 @@ const proto = @import("protobuf");
 /// machine it was built for, and a library takes the features its program detected.
 const protobuf_decoder: proto.Decoder = .init(.target());
 const colibri = @import("colibri");
-const tls = @import("colibri").tls;
 const server_compat = @import("connectrpc_conformance_v1_server_compat");
 const constants = @import("constants.zig");
 const App = @import("app.zig").App;
@@ -24,12 +23,6 @@ pub const protobuf_any_types = @import("any_types.zig").types;
 
 /// TCP connections alone: config.yaml declares no TLS, so the server serves no h3.
 const Server = colibri.Server(.{ .tcp_connections = constants.sockets_max, .quic_connections = 0 }, .private);
-
-/// The server speaks cleartext, so no TLS session runs on this CPU description.
-const cpu: tls.Cpu = .{
-    .probe = .{ .aes_clmul = .not_known, .dit = .not_known, .sha256 = .not_known, .sha512 = .not_known, .sha3 = .not_known, .sve2 = .not_known, .ssse3 = .not_known, .sse4_1 = .not_known, .avx2 = .not_known, .vaes = .not_known, .midr = null },
-    .timing = .not_stated,
-};
 
 /// All the program holds, which `main` allocates once before the server starts (decision 42).
 const State = struct {
@@ -78,7 +71,6 @@ pub fn main(init: std.process.Init) !void {
     try state.http_server.init(&.{
         .host = host,
         .port = 0,
-        .cpu = cpu,
         // colibri issues TLS session tickets with it; this server runs no TLS, so 0 serves.
         .unix_seconds = 0,
         .engine = .{ .cpu_features = state.app.cpu_features, .timeouts = .{ .first_request_ns = constants.first_request_timeout_ns, .idle_ns = constants.idle_timeout_ns } },

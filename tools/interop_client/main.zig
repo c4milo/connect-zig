@@ -19,6 +19,7 @@ const std = @import("std");
 const connect = @import("connect");
 const client = @import("colibri").client;
 const tls = @import("colibri").tls;
+const stdx_crypto = @import("stdx").crypto;
 const proto = @import("protobuf");
 /// A check program decodes and encodes with the build target's CPU features: it runs on the
 /// machine it was built for, and a library takes the features its program detected.
@@ -62,6 +63,8 @@ const leave_out_option = "--leave-out=";
 
 /// All the program holds, which `main` allocates once before the first call (decision 42).
 const State = struct {
+    /// The source each TLS session draws from, which stays here while they run.
+    secure: SecureRandom,
     case_octets: [constants.cases_bytes]u8,
     case_names: [constants.names_bytes]u8,
     cases: [constants.cases_max]Case,
@@ -81,10 +84,20 @@ const State = struct {
     room: scenarios.Room,
 };
 
-/// No CPU feature is known, so each TLS session runs chapulin's portable code.
-const cpu: tls.Cpu = .{
-    .probe = .{ .aes_clmul = .not_known, .dit = .not_known, .sha256 = .not_known, .sha512 = .not_known, .sha3 = .not_known, .sve2 = .not_known, .ssse3 = .not_known, .sse4_1 = .not_known, .avx2 = .not_known, .vaes = .not_known, .midr = null },
-    .timing = .not_stated,
+/// The operating system's entropy as a `std.Random`. Each draw calls `io.randomSecure`, which is
+/// thread-safe, keeps no state a fork copies, and has no weaker fallback. A draw that fails halts
+/// the program, so no session runs on bytes the system did not give.
+const SecureRandom = struct {
+    io: std.Io,
+
+    fn fill(pointer: *anyopaque, bytes: []u8) void {
+        const self: *SecureRandom = @ptrCast(@alignCast(pointer));
+        self.io.randomSecure(bytes) catch |err| std.debug.panic("no entropy: {t}", .{err});
+    }
+
+    fn random(self: *SecureRandom) std.Random {
+        return .{ .ptr = self, .fillFn = fill };
+    }
 };
 
 /// What the program reports to: stdout, and the server's name.
@@ -188,7 +201,10 @@ fn trust_of(state: *State, io: std.Io, path: []const u8) !tls.Client {
     const pem = try std.Io.Dir.cwd().readFile(io, path, &state.ca_pem);
     const anchors = try tls.pem.anchors(pem, &state.anchor_der, &state.anchor_room);
     if (anchors.len == 0) return error.NoAnchor;
-    return .{ .trust = .{ .web_pki = .{ .anchors = anchors, .server_name = server_name } }, .cpu = cpu };
+    // One context of the client's CPU features and the system's entropy (colibri decision 175).
+    state.secure = .{ .io = io };
+    const crypto = stdx_crypto.init(state.client.cpu_features, state.secure.random());
+    return .{ .trust = .{ .web_pki = .{ .anchors = anchors, .server_name = server_name } }, .crypto = crypto };
 }
 
 /// Reads each `<name>.binpb` of `path`, a `coverage.v1.Everything`, in the order of their names.

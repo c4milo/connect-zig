@@ -10,10 +10,22 @@ change the public API, and the entry marks each change that does.
 
 ## Unreleased
 
-It builds on colibri at 3ea5851d, on its `main`, and on stdx at 5de7d89f and Rotor at af06860,
+It builds on colibri at e9ffbac1, on its `main`, and on stdx at 9dd95be8 and Rotor at af06860,
 the commits that colibri pins. stdx brings chapulin at f29c066a.
 
 ### Changed
+
+- **Breaking.** colibri's TLS takes a `stdx.crypto.Context` in place of a `tls.Cpu`, and draws
+  its randomness from it. A program makes the context once, with `stdx.crypto.init(features,
+  random)`: `features` is `connect_zig.CpuFeatures.detect()`, and `random` a `std.Random` over
+  `io.randomSecure`. It passes the context as `tls.Client.crypto` and `ServerConfig.crypto`, and
+  to `tls.pem.key`. A server may pass none: colibri then makes one of `Engine.cpu_features` and
+  the system's entropy. Such a program depends on stdx itself, as `examples/quickstart` does,
+  and asks it as connect-zig does ([decision 52](docs/decisions.md); colibri decision 175).
+- **Breaking.** `connect_zig.CpuFeatures` holds what stdx's `platform.probe` returned: the
+  instructions chapulin runs, and the core's MIDR_EL1 on arm64 Linux. `probe` and `Cpu` are gone.
+- colibri's `Engine.init`, `ConnectionPool.start_tcp` and `start_quic` take no random source:
+  `examples/std_io` shows each call.
 
 - **Breaking.** connect-zig names chapulin no more. colibri takes chapulin through stdx, as
   `stdx.crypto` (colibri decision 174), and `oidc` checks signatures with `stdx.crypto.jws`. A

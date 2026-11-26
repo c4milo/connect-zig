@@ -31,10 +31,21 @@ const greeting = "Hello, Ada";
 
 const addresses = [_]client.Address{.init(&constants.loopback, 0)};
 
-/// The CPU, which this program does not probe, so each TLS session runs ChaCha20 alone.
-const cpu: tls.Cpu = .{
-    .probe = .{ .aes_clmul = .not_known, .dit = .not_known, .sha256 = .not_known, .sha512 = .not_known, .sha3 = .not_known, .sve2 = .not_known, .ssse3 = .not_known, .sse4_1 = .not_known, .avx2 = .not_known, .vaes = .not_known, .midr = null },
-    .timing = .not_stated,
+/// The random source of each TLS session: the operating system's entropy. Each draw calls
+/// `io.randomSecure`, which is thread-safe, keeps no state a fork copies, and has no weaker
+/// fallback. A draw that fails halts the program, so no session runs on bytes the system did not
+/// give.
+const SecureRandom = struct {
+    io: std.Io,
+
+    fn fill(pointer: *anyopaque, bytes: []u8) void {
+        const self: *SecureRandom = @ptrCast(@alignCast(pointer));
+        self.io.randomSecure(bytes) catch |err| std.debug.panic("no entropy: {t}", .{err});
+    }
+
+    fn random(self: *SecureRandom) std.Random {
+        return .{ .ptr = self, .fillFn = fill };
+    }
 };
 
 /// A round's protocols, and the one it must speak: h2 over TLS on TCP, then h3 on QUIC.
@@ -107,6 +118,8 @@ const State = struct {
     /// Connect's client, which the program's calls share: the CPU features it detects once, as
     /// it starts.
     client: connect.Client,
+    /// The source the context's TLS sessions draw from, which stays here while they run.
+    secure: SecureRandom,
     /// colibri's HTTP clients, one a round.
     http_clients: [rounds.len]HttpClient,
     handler: Handler,
@@ -130,22 +143,26 @@ pub fn main(init: std.process.Init) !void {
         return error.OutOfMemory;
     const state: *State = @ptrCast(@alignCast(state_memory));
     state.client = .{ .cpu_features = .detect() };
+    // One context of the program's CPU features and the system's entropy, which every TLS value
+    // holds (colibri decision 175).
+    state.secure = .{ .io = init.io };
+    const crypto = @import("stdx").crypto.init(state.client.cpu_features, state.secure.random());
     const ca = try std.Io.Dir.cwd().readFile(init.io, ca_path, &state.ca_pem);
     // The client judges the server's chain at this instant (RFC 5280 §4.1.2.5).
     const unix_seconds: u64 = @intCast(@max(std.Io.Clock.real.now(init.io).toSeconds(), 0));
     const anchors = try tls.pem.anchors(ca, &state.anchor_der, &state.anchor_room);
     const trust: tls.Trust = .{ .web_pki = .{ .anchors = anchors, .server_name = server_name } };
     for (&state.http_clients, rounds) |*running, round| {
-        try run_round(state, running, round, trust, port, unix_seconds);
+        try run_round(state, running, round, .{ .trust = trust, .crypto = crypto }, port, unix_seconds);
     }
 }
 
-fn run_round(state: *State, running: *HttpClient, round: Round, trust: tls.Trust, port: u16, unix_seconds: u64) !void {
+fn run_round(state: *State, running: *HttpClient, round: Round, client_tls: tls.Client, port: u16, unix_seconds: u64) !void {
     state.handler = .{ .expected_calls = constants.calls_per_round };
     try running.init(&.{
         .destination = .{ .addresses = &addresses, .port = port },
         .pool = .{
-            .tls = .{ .trust = trust, .cpu = cpu },
+            .tls = client_tls,
             .authority = server_name,
             .protocols = round.protocols,
             .cpu_features = state.client.cpu_features,

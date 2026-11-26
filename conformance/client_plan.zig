@@ -9,6 +9,7 @@ const proto = @import("protobuf");
 /// machine it was built for, and a library takes the features its program detected.
 const protobuf_decoder: proto.Decoder = .init(.target());
 const tls = @import("colibri").tls;
+const Context = @import("stdx").crypto.Context;
 const config = @import("connectrpc_conformance_v1_config");
 const client_compat = @import("connectrpc_conformance_v1_client_compat");
 const constants = @import("constants.zig");
@@ -69,7 +70,7 @@ pub const Memory = struct {
 };
 
 /// Reads the plan of `request`. The plan points into `memory`.
-pub fn plan_of(request: *const Request, shared: *const connect.Client, memory: *Memory) (Refusal || proto.Error)!Plan {
+pub fn plan_of(request: *const Request, shared: *const connect.Client, memory: *Memory, crypto: Context) (Refusal || proto.Error)!Plan {
     // docs/testing_clients.md: raw_request is for the reference client alone.
     if (request.raw_request != null) return error.RawRequestUnsupported;
     // client_compat.proto: client_tls_creds asks for a client certificate, which the client
@@ -94,7 +95,7 @@ pub fn plan_of(request: *const Request, shared: *const connect.Client, memory: *
         .delay_ns = @as(u64, request.request_delay_ms) * constants.nanos_per_milli,
         .full_duplex = request.stream_type == .stream_type_full_duplex_bidi_stream,
         .receive_limit = request.message_receive_limit,
-        .tls = try tls_of(request.server_tls_cert, memory),
+        .tls = try tls_of(request.server_tls_cert, memory, crypto),
     };
 }
 
@@ -102,20 +103,15 @@ pub fn plan_of(request: *const Request, shared: *const connect.Client, memory: *
 /// "treat this certificate as a trusted certificate authority"), or null for cleartext. The
 /// runner's certificate names "localhost" (connectconformance v1.0.7, internal/tls.go), which
 /// the client sends as server_name and checks the certificate against (RFC 6125 §6).
-fn tls_of(certificate: []const u8, memory: *Memory) Refusal!?tls.Client {
+fn tls_of(certificate: []const u8, memory: *Memory, crypto: Context) Refusal!?tls.Client {
     if (certificate.len == 0) return null;
     const anchors = tls.pem.anchors(certificate, &memory.anchor_der, &memory.anchors) catch return error.InvalidServerCertificate;
     if (anchors.len == 0) return error.InvalidServerCertificate;
-    return .{ .trust = .{ .web_pki = .{ .anchors = anchors, .server_name = server_name } }, .cpu = cpu };
+    return .{ .trust = .{ .web_pki = .{ .anchors = anchors, .server_name = server_name } }, .crypto = crypto };
 }
 
 const server_name = "localhost";
 
-/// The client states nothing of the CPU, so each TLS session runs chapulin's portable code.
-const cpu: tls.Cpu = .{
-    .probe = .{ .aes_clmul = .not_known, .dit = .not_known, .sha256 = .not_known, .sha512 = .not_known, .sha3 = .not_known, .sve2 = .not_known, .ssse3 = .not_known, .sse4_1 = .not_known, .avx2 = .not_known, .vaes = .not_known, .midr = null },
-    .timing = .not_stated,
-};
 
 /// The codings the client compresses and decompresses with.
 fn timeout_ns_of(request: *const Request) ?u64 {

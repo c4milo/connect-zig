@@ -2370,6 +2370,28 @@ ran on Linux x86-64 with Zig 0.16.0.
   - The package hashes were computed from each commit's tree by a script that gives Zig 0.16's
     hashes of the pins before them, and the colibri session confirmed stdx's and chapulin's with
     `zig fetch`.
+- **colibri at e9ffbac1 and stdx at 9dd95be8: one crypto context** (decisions 34, 41 and 52 as
+  amended on 2026-11-26; colibri decision 175; stdx's decision 87 as amended). No public name of
+  connect-zig changes. `CpuFeatures` takes the fields of stdx's removed `probe`. The harness, the
+  quickstart, the conformance client and the interop client each make one `stdx.crypto.Context`
+  of their CPU features and a `std.Random` over `io.randomSecure`, and hand it to colibri's TLS.
+  The servers pass none. `protovalidate`'s kept searcher compared `CpuFeatures` by its octets,
+  and `midr`'s padding holds no value, so it compares the boolean fields. The JSON transcoder and
+  the end-stream reader keep the CPU features themselves for base64, since stdx's reader keeps
+  none. The benchmark's codec and validation programs ask stdx with no `crypto`, and link no
+  libc.
+  - Mutations, each `CAUGHT` by three tests of `zig build test-protovalidate`: the kept searcher's
+    comparison always equal, and comparing the first field alone. The codec program asking stdx
+    with `crypto` again fails 11 binary rows of `tools/perf_check.sh`, by 1.2% to 9.6%.
+  - `tools/perf_check.sh` did not build from `6c19fff` on, since the codec program's
+    `connect_zig` had no stdx import. With the import, the binary rows were 1.2% to 9.6% over the
+    baseline at `6c19fff`, at both stdx pins, and at `6cb943b` they matched it within 0.3%.
+    Linking libc alone gave the same counts (docs/performance.md, "The pitfalls").
+  - At stdx `9dd95be`, small JSON decode took 2,892 instructions against 2,684 at `5de7d89`,
+    since stdx's `TextReader.init` copied the reader through memcpy. With stdx's fix, `a11db0b`
+    on `9dd95be`, every one of the 68 rows was within 2% of the baseline, and the validation rows
+    2.4% to 6.6% under it. Those counts are under callgrind on x86-64 Linux, built for x86-64-v3.
+  - `zig build test` passed on x86-64 Linux, with Zig 0.16.0.
 
 ### Work not done yet
 

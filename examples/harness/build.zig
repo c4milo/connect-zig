@@ -15,6 +15,8 @@ pub fn build(b: *std.Build) void {
     const connect_zig = b.dependency("connect_zig", .{ .target = target, .release = optimize == .ReleaseSafe, .rotor = rotor_wanted });
     // colibri asks for Rotor with these two options, so Zig gives both requests one package.
     const rotor = b.dependency("rotor", .{ .target = target, .release = optimize == .ReleaseSafe });
+    // connect-zig asks for stdx with these three options, so Zig gives both requests one package.
+    const stdx = b.dependency("stdx", .{ .target = target, .release = optimize == .ReleaseSafe, .crypto = true });
     const identity = b.addModule("test_identity", .{
         .root_source_file = b.path("tls/identity.zig"),
         .target = target,
@@ -27,6 +29,7 @@ pub fn build(b: *std.Build) void {
         .imports = &.{
             .{ .name = "connect_zig", .module = connect_zig.module("connect_zig") },
             .{ .name = "rotor", .module = rotor.module("rotor") },
+            .{ .name = "stdx", .module = stdx.module("stdx") },
             .{ .name = "test_identity", .module = identity },
         },
     });

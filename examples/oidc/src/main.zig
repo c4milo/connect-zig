@@ -106,7 +106,7 @@ pub fn main(init: std.process.Init) !void {
     // and reads its clock.
     try service.start(&state.app.oidc, issuer.jwks(&state.jwks_text, &.{state.first_key}), now, state.app.cpu_features);
     defer state.app.oidc.deinit();
-    try state.rounds.init(&state.app);
+    try state.rounds.init(&state.app, init.io);
     defer state.rounds.deinit();
     try round_first_key(state);
     try change_keys(state);
