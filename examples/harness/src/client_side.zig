@@ -6,6 +6,7 @@ const std = @import("std");
 const connect = @import("connect_zig").connect;
 const client = @import("connect_zig").colibri.client;
 const tls = @import("connect_zig").colibri.tls;
+const stdx = @import("stdx");
 const identity = @import("test_identity");
 const rpc = @import("connect_zig").connect_colibri;
 const constants = @import("constants.zig");
@@ -100,6 +101,10 @@ pub const ClientSide = struct {
     pool: Pool,
     pool_memory: [Pool.memory_bytes(.{})]u8 align(Pool.memory_alignment),
     prng: std.Random.DefaultPrng,
+    /// The one `stdx.crypto` context the pool's TLS value holds (colibri decision 175). It draws
+    /// from `prng`, so one seed replays a round, and states no CPU feature, so each session runs
+    /// ChaCha20 alone.
+    crypto: stdx.crypto.Context,
     tcp: client.ConnectionHandle,
     /// Whether the round runs QUIC, which speaks h3, rather than TCP.
     quic: bool,
@@ -119,6 +124,7 @@ pub const ClientSide = struct {
         self.link = link;
         self.datagram_link = datagram_link;
         self.prng = .init(constants.client_seed);
+        self.crypto = stdx.crypto.init(.{}, self.prng.random());
         self.tcp = .{ .slot = 0, .generation = 0 };
         self.listener_count = 0;
         // The CA the client trusts: its subject Name and SubjectPublicKeyInfo.
@@ -134,7 +140,7 @@ pub const ClientSide = struct {
         if (self.quic) {
             // QUIC always runs TLS. The receive pool is what makes the pool offer QUIC.
             const trust: tls.Trust = .{ .web_pki = .{ .anchors = self.anchors, .server_name = identity.server_name } };
-            self.config = .{ .tls = .{ .trust = trust, .cpu = server_side.cpu }, .authority = identity.server_name, .protocols = protocols, .cpu_features = self.cpu_features };
+            self.config = .{ .tls = .{ .trust = trust, .crypto = self.crypto }, .authority = identity.server_name, .protocols = protocols, .cpu_features = self.cpu_features };
             try self.pool.init(&self.pool_memory, &self.config, &destination, self.receive_pool.storage());
         } else {
             self.config = .{ .authority = identity.server_name, .protocols = protocols, .cpu_features = self.cpu_features };
@@ -275,11 +281,11 @@ pub const ClientSide = struct {
         // The round checks the protocol it spoke when it ends, so a transport it did not ask
         // for fails there.
         switch (open.transport) {
-            .quic => try self.pool.start_quic(self.prng.random(), server_side.now_seconds, now_ns, null),
+            .quic => try self.pool.start_quic(server_side.now_seconds, now_ns, null),
             .tcp => {
                 self.tcp = open.connection;
                 try self.server.accept();
-                try self.pool.start_tcp(open.connection, self.prng.random(), server_side.now_seconds, null);
+                try self.pool.start_tcp(open.connection, server_side.now_seconds, null);
             },
         }
     }

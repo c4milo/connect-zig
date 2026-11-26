@@ -31,8 +31,11 @@ detects, each the copy connect-zig builds on. Your program reaches them as field
 | `colibri` | colibri, whose `server`, `client`, `http` and `tls` `connect_colibri` is built on |
 | `buf_validate_validate`, `google_protobuf_descriptor` | The generated code of validate.proto and descriptor.proto |
 
-Do not add colibri or stdx to your own `build.zig.zon`: a second copy of either fails the build
-with a file in two modules ([decision 39](decisions.md)). `.rotor = true` builds `colibri.Server`
+Do not add colibri to your own `build.zig.zon`: a second copy fails the build with a file in two
+modules ([decision 39](decisions.md)). A program that calls a server over TLS adds stdx, for the
+context of section 5, at the commit and hash connect-zig's `build.zig.zon` pins, and asks it for
+`.target`, `.release` and `.crypto = true`. Zig then builds one stdx for both
+([decision 34](decisions.md)). `.rotor = true` builds `colibri.Server`
 and `colibri.Client` on [Rotor](https://github.com/c4milo/rotor), colibri's event loop. Without
 it, your program drives colibri's engine and pool on its own loop ([decision 32](decisions.md)).
 
@@ -199,7 +202,6 @@ state.app = .{ .cpu_features = .detect() };
 try state.http_server.init(&.{
     .port = 8443,
     .identity = .{ .chain = chain_pem, .key = key_pem },
-    .cpu = cpu,
     .unix_seconds = unix_seconds,
     .engine = .{ .tls_buffer = &state.tls_buffer, .cpu_features = state.app.cpu_features },
 }, &state.router, &state.app);
@@ -216,8 +218,9 @@ the program first writes it, and the sink starts in 6 MiB ([decision 48](decisio
 default value, which the program's image then holds: in the OTLP sink of the benchmarks, 155 MB.
 
 It serves h11 and h2 over TLS on a TCP socket, and h3 on the UDP socket of the same port.
-`chain_pem` and `key_pem` are your certificate chain and its key, as PEM text, and `cpu` is what
-your program probed of its CPU. `tls_buffer` holds the TLS session of each TCP connection over
+`chain_pem` and `key_pem` are your certificate chain and its key, as PEM text. The server makes
+its TLS sessions' `stdx.crypto` context of the engine's CPU features and the system's entropy;
+`.crypto` gives it one of your own (colibri decision 175). `tls_buffer` holds the TLS session of each TCP connection over
 TLS, about 83 KB each, for as many connections as it serves at once. With no `identity`, it serves
 h11 and h2 in cleartext and no h3, and needs no `tls_buffer`.
 
@@ -252,13 +255,17 @@ if (response.failure) |failure| std.debug.print("{s}\n", .{failure.message});
 
 `.protocol` picks Connect (the default), gRPC, or gRPC-Web, and the rest of the call stays the same.
 On Rotor, `colibri.Client(.{}, .private)` holds the pool. Over TLS, the pool's configuration
-names what it trusts:
+names what it trusts, and holds the program's one `stdx.crypto` context: the CPU features it
+detected, and a source of secure randomness, which each TLS session draws its secrets from
+(colibri decision 175). [examples/quickstart](../examples/quickstart) makes its source of
+`io.randomSecure`:
 
 ```zig
+const crypto = @import("stdx").crypto.init(state.client.cpu_features, secure.random());
 const anchors = try tls.pem.anchors(ca_pem, &anchor_der, &anchor_room);
 const trust: tls.Trust = .{ .web_pki = .{ .anchors = anchors, .server_name = "api.example.com" } };
 const config: client.Config = .{
-    .tls = .{ .trust = trust, .cpu = cpu },
+    .tls = .{ .trust = trust, .crypto = crypto },
     .authority = "api.example.com",
     .cpu_features = state.client.cpu_features,
 };

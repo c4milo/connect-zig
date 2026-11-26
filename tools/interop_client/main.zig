@@ -81,12 +81,6 @@ const State = struct {
     room: scenarios.Room,
 };
 
-/// No CPU feature is known, so each TLS session runs chapulin's portable code.
-const cpu: tls.Cpu = .{
-    .probe = .{ .aes_clmul = .not_known, .dit = .not_known, .sha256 = .not_known, .sha512 = .not_known, .sha3 = .not_known, .sve2 = .not_known, .ssse3 = .not_known, .sse4_1 = .not_known, .avx2 = .not_known, .vaes = .not_known, .midr = null },
-    .timing = .not_stated,
-};
-
 /// What the program reports to: stdout, and the server's name.
 const Reporter = struct {
     writer: *std.Io.Writer,
@@ -135,8 +129,10 @@ pub fn main(init: std.process.Init) !void {
     const origin = try Origin.parse(base_url);
     const ca_path = args.next() orelse return error.UsageWrong;
     // Over TLS the client trusts the CA alone; in cleartext it names none.
-    const trust: ?tls.Client = if (origin.secure) try trust_of(state, io, ca_path) else null;
+    // The transport holds the one `stdx.crypto` context, which the TLS value takes: it states no
+    // CPU feature, so each TLS session runs chapulin's portable code.
     state.transport.init(io);
+    const trust: ?tls.Client = if (origin.secure) try trust_of(state, io, ca_path) else null;
     var stdout = std.Io.File.stdout().writerStreaming(io, &state.output);
     var reporter: Reporter = .{ .writer = &stdout.interface, .server = left.server, .left_out = left.left_out, .verdict = &state.room.verdict };
     for (0..known.len + 1) |_| {
@@ -188,7 +184,7 @@ fn trust_of(state: *State, io: std.Io, path: []const u8) !tls.Client {
     const pem = try std.Io.Dir.cwd().readFile(io, path, &state.ca_pem);
     const anchors = try tls.pem.anchors(pem, &state.anchor_der, &state.anchor_room);
     if (anchors.len == 0) return error.NoAnchor;
-    return .{ .trust = .{ .web_pki = .{ .anchors = anchors, .server_name = server_name } }, .cpu = cpu };
+    return .{ .trust = .{ .web_pki = .{ .anchors = anchors, .server_name = server_name } }, .crypto = state.transport.crypto };
 }
 
 /// Reads each `<name>.binpb` of `path`, a `coverage.v1.Everything`, in the order of their names.

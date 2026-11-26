@@ -8,6 +8,27 @@ are in [docs/decisions.md](docs/decisions.md), and the steps and their measureme
 connect-zig follows [Semantic Versioning](https://semver.org/). Before 1.0, a minor version may
 change the public API, and the entry marks each change that does.
 
+## Unreleased
+
+It builds on colibri v0.22.0, at 3ac8c7bc, and on stdx v0.4.0, at fdfbb709, the commit that
+colibri pins, and Rotor at af06860.
+
+### Changed
+
+- **Breaking.** A TLS client takes the program's one `stdx.crypto.Context`, of its CPU features
+  and a secure random source (colibri decision 175). Add stdx to your `build.zig.zon` at the
+  commit and hash connect-zig pins, ask it for `.target`, `.release` and `.crypto = true`, and
+  replace `.cpu = cpu` with `.crypto = stdx.crypto.init(cpu_features, secure.random())`, as
+  [examples/quickstart](examples/quickstart) does ([decision 34](docs/decisions.md)). `tls.Cpu`
+  is gone.
+- **Breaking.** `colibri.Server` takes no `.cpu`. It makes its context of `engine.cpu_features`
+  and the system's entropy, or takes yours in `.crypto`.
+- **Breaking.** A program that drives colibri's pool or engine itself passes no random source:
+  `start_tcp`, `start_quic` and `Engine.init` draw from the context in `tls`.
+- [examples/validate](examples/validate) states a `pattern` for each tag, and the full-stack
+  check's span rules state one for each attribute key, so its validation numbers include a
+  regular expression.
+
 ## v0.6.0 (2026-11-26)
 
 It builds on colibri v0.21.0, at 2ab43623, and on stdx at 5de7d89f and Rotor at af06860, the

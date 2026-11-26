@@ -25,8 +25,8 @@ pub fn matches(comptime pattern: []const u8, text: []const u8, cpu_features: pla
     const Kept = Searcher(pattern);
     // A searcher is made ready again for features that its last check did not name, so each
     // check searches with its caller's. A program passes the one value it detected, so a thread
-    // makes each searcher ready once, and each later check compares the features' octets.
-    if (!Kept.ready or !std.mem.eql(u8, octets_of(&Kept.ready_with), octets_of(&cpu_features))) make_ready(Kept, cpu_features);
+    // makes each searcher ready once, and each later check compares the features field by field.
+    if (!Kept.ready or !std.meta.eql(Kept.ready_with, cpu_features)) make_ready(Kept, cpu_features);
     return Kept.searcher.is_match(text);
 }
 
@@ -34,14 +34,6 @@ fn make_ready(comptime Kept: type, cpu_features: platform.CpuFeatures) void {
     Kept.searcher.init(&Kept.program, &.{ .features = cpu_features }, &Kept.memory);
     Kept.ready_with = cpu_features;
     Kept.ready = true;
-}
-
-/// A set of features as its octets. Each field is a bool, one octet that holds 0 or 1, so the
-/// struct holds no padding and two equal sets hold equal octets.
-fn octets_of(cpu_features: *const platform.CpuFeatures) *const [@sizeOf(platform.CpuFeatures)]u8 {
-    comptime assert(@sizeOf(platform.CpuFeatures) == std.meta.fields(platform.CpuFeatures).len);
-    comptime for (std.meta.fields(platform.CpuFeatures)) |field| assert(field.type == bool);
-    return @ptrCast(cpu_features);
 }
 
 /// The features this thread's searcher of `pattern` was made ready with, or null before its

@@ -10,7 +10,6 @@ const colibri = @import("connect_zig").colibri;
 const server = @import("connect_zig").colibri.server;
 const identity = @import("test_identity");
 const constants = @import("constants.zig");
-const server_side = @import("server_side.zig");
 
 const Server = colibri.Server(.{ .tcp_connections = constants.serve_tcp_connections, .quic_connections = constants.serve_quic_connections }, .private);
 
@@ -40,7 +39,8 @@ fn serve(http_server: *Server, router: anytype, app: anytype, tls_buffer: []u8, 
     try http_server.init(&.{
         .port = port,
         .identity = .{ .chain = identity.chain_pem, .key = identity.key_pem },
-        .cpu = server_side.cpu,
+        // No `crypto`: the server makes its `stdx.crypto` context of `engine.cpu_features` and the
+        // system's entropy (colibri decision 175).
         .unix_seconds = unix_seconds,
         .engine = .{ .tls_buffer = tls_buffer, .cpu_features = app.cpu_features },
     }, router, app);

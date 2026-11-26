@@ -9,6 +9,7 @@
 //! It exits with an error unless each answer is right and each round spoke its protocol.
 const std = @import("std");
 const connect_zig = @import("connect_zig");
+const stdx = @import("stdx");
 const connect = connect_zig.connect;
 const rpc = connect_zig.connect_colibri;
 const client = connect_zig.colibri.client;
@@ -31,10 +32,19 @@ const greeting = "Hello, Ada";
 
 const addresses = [_]client.Address{.init(&constants.loopback, 0)};
 
-/// The CPU, which this program does not probe, so each TLS session runs ChaCha20 alone.
-const cpu: tls.Cpu = .{
-    .probe = .{ .aes_clmul = .not_known, .dit = .not_known, .sha256 = .not_known, .sha512 = .not_known, .sha3 = .not_known, .sve2 = .not_known, .ssse3 = .not_known, .sse4_1 = .not_known, .avx2 = .not_known, .vaes = .not_known, .midr = null },
-    .timing = .not_stated,
+/// The system's secure entropy, through the program's I/O: the random source of the program's
+/// `stdx.crypto` context, which each TLS session draws its secrets from.
+const SecureRandom = struct {
+    io: std.Io,
+
+    fn fill(pointer: *anyopaque, bytes: []u8) void {
+        const self: *SecureRandom = @ptrCast(@alignCast(pointer));
+        self.io.randomSecure(bytes) catch |failure| std.debug.panic("no entropy: {t}", .{failure});
+    }
+
+    fn random(self: *SecureRandom) std.Random {
+        return .{ .ptr = self, .fillFn = fill };
+    }
 };
 
 /// A round's protocols, and the one it must speak: h2 over TLS on TCP, then h3 on QUIC.
@@ -130,22 +140,29 @@ pub fn main(init: std.process.Init) !void {
         return error.OutOfMemory;
     const state: *State = @ptrCast(@alignCast(state_memory));
     state.client = .{ .cpu_features = .detect() };
+    // One `stdx.crypto` context of the features the program detected and the system's entropy,
+    // which each TLS value holds (colibri decision 175). On arm64 the thread sets PSTATE.DIT where
+    // the core has FEAT_DIT, and stdx then states its timing; on x86-64 stdx states it for every
+    // core. Under that statement the sessions may run AES-GCM.
+    var secure: SecureRandom = .{ .io = init.io };
+    _ = stdx.platform.set_data_independent_timing(state.client.cpu_features, true);
+    const crypto = stdx.crypto.init(state.client.cpu_features, secure.random());
     const ca = try std.Io.Dir.cwd().readFile(init.io, ca_path, &state.ca_pem);
     // The client judges the server's chain at this instant (RFC 5280 §4.1.2.5).
     const unix_seconds: u64 = @intCast(@max(std.Io.Clock.real.now(init.io).toSeconds(), 0));
     const anchors = try tls.pem.anchors(ca, &state.anchor_der, &state.anchor_room);
     const trust: tls.Trust = .{ .web_pki = .{ .anchors = anchors, .server_name = server_name } };
     for (&state.http_clients, rounds) |*running, round| {
-        try run_round(state, running, round, trust, port, unix_seconds);
+        try run_round(state, running, round, .{ .trust = trust, .crypto = crypto }, port, unix_seconds);
     }
 }
 
-fn run_round(state: *State, running: *HttpClient, round: Round, trust: tls.Trust, port: u16, unix_seconds: u64) !void {
+fn run_round(state: *State, running: *HttpClient, round: Round, tls_client: tls.Client, port: u16, unix_seconds: u64) !void {
     state.handler = .{ .expected_calls = constants.calls_per_round };
     try running.init(&.{
         .destination = .{ .addresses = &addresses, .port = port },
         .pool = .{
-            .tls = .{ .trust = trust, .cpu = cpu },
+            .tls = tls_client,
             .authority = server_name,
             .protocols = round.protocols,
             .cpu_features = state.client.cpu_features,

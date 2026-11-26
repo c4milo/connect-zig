@@ -120,7 +120,6 @@ const State = struct {
     /// The octets each socket read that the engine has not consumed yet.
     held: [constants.connections_max][constants.held_len_max]u8,
     output: [constants.output_len]u8,
-    random_source: std.Random.IoSource,
     /// Each reader's room for one read, which it copies into its message.
     chunks: [constants.connections_max]ReadRoom,
     queue_buffer: [constants.queue_len]Message,
@@ -136,10 +135,9 @@ const State = struct {
         state.app = .{ .cpu_features = .detect() };
         state.config = .{ .cpu_features = state.app.cpu_features, .timeouts = .{ .first_request_ns = constants.first_request_timeout_ns } };
         state.entries = @splat(.{});
-        state.random_source = .{ .io = io };
         state.queue = .init(&state.queue_buffer);
         state.free_sockets = .{ .permits = constants.connections_max };
-        try state.engine.init(&state.config, state.random_source.interface(), instant(io));
+        try state.engine.init(&state.config, instant(io));
     }
 };
 

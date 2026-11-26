@@ -7,7 +7,6 @@ const std = @import("std");
 const connect = @import("connect");
 const server = @import("colibri").server;
 const colibri = @import("colibri");
-const tls = @import("colibri").tls;
 const rpc = @import("connect_colibri");
 const identity = @import("test_identity");
 const coverage = @import("coverage");
@@ -31,13 +30,6 @@ const Router = server.Router(App, .{
 }, .{ .requests = constants.requests, .response_bytes = constants.response_bytes, .body_bytes = constants.body_bytes, .header_bytes = 0 });
 
 const Server = colibri.Server(.{ .tcp_connections = constants.tcp_connections, .quic_connections = constants.quic_connections }, .private);
-
-/// What a program probes once and passes every TLS configuration. This one probes nothing, so
-/// each session runs ChaCha20 alone.
-const cpu: tls.Cpu = .{
-    .probe = .{ .aes_clmul = .not_known, .dit = .not_known, .sha256 = .not_known, .sha512 = .not_known, .sha3 = .not_known, .sve2 = .not_known, .ssse3 = .not_known, .sse4_1 = .not_known, .avx2 = .not_known, .vaes = .not_known, .midr = null },
-    .timing = .not_stated,
-};
 
 /// All the program holds, which `main` allocates once before the first call (decision 42).
 const State = struct {
@@ -71,7 +63,8 @@ pub fn main(init: std.process.Init) !void {
     try state.http_server.init(&.{
         .port = port,
         .identity = .{ .chain = identity.chain_pem, .key = identity.key_pem },
-        .cpu = cpu,
+        // No `crypto`: the server makes its `stdx.crypto` context of `engine.cpu_features` and the
+        // system's entropy (colibri decision 175).
         .unix_seconds = unix_seconds,
         .engine = .{ .tls_buffer = &state.tls_buffer, .cpu_features = state.app.cpu_features },
     }, &state.router, &state.app);

@@ -59,7 +59,7 @@ pub fn main(init: std.process.Init) !void {
     const state_memory = init.arena.allocator().rawAlloc(@sizeOf(State), .of(State), @returnAddress()) orelse
         return error.OutOfMemory;
     const state: *State = @ptrCast(@alignCast(state_memory));
-    state.driver.init(io);
+    state.driver.init();
     state.client = .{ .cpu_features = .detect() };
     defer state.driver.deinit(io);
     var args = try init.minimal.args.iterateAllocator(init.arena.allocator());

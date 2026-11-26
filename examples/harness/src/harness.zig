@@ -28,8 +28,6 @@ pub const expect_end = client_side.expect_end;
 pub const expect_trailer = client_side.expect_trailer;
 
 const server_side = @import("server_side.zig");
-/// The CPU the harness's TLS sessions run on, which probes nothing.
-pub const cpu = server_side.cpu;
 /// The instant the harness judges certificates at, in Unix seconds.
 pub const now_seconds = server_side.now_seconds;
 
@@ -46,7 +44,6 @@ test {
     _ = Listener;
     _ = expect_end;
     _ = expect_trailer;
-    _ = cpu;
     _ = now_seconds;
     _ = constants;
 }

@@ -720,6 +720,16 @@ first. Cite an entry by number in code and commits ("decision 6").
         names colibri.
       - In this tree's own build, stdx holds `crypto`, so a check over `connect_zig` without
         colibri links chapulin's objects too. It still reaches no colibri module.
+    - Amended on 2026-11-26, on the owner's choice, for colibri v0.22.0 and stdx v0.4.0: each TLS
+      value takes the program's one `stdx.crypto.Context`, of its CPU features and a secure random
+      source (colibri decision 175). A program that holds a TLS client depends on stdx itself, at
+      the commit and hash connect-zig pins, with connect-zig's options, and calls
+      `stdx.crypto.init`. `connect_zig` names nothing of `stdx.crypto`. A server may take no
+      context: `colibri.Server` then makes one of its engine's CPU features and the system's
+      entropy. The examples' harness, the quickstart, the conformance client and the interop client
+      each make theirs; the harness's and the conformance client's draw from their seeded
+      generators and state no CPU feature, as their TLS ran before. Beaten: `connect_zig` naming
+      stdx's `crypto`, a public name that would move with each stdx release.
 
 35. **A call keeps values of the type the program declares.** Ruled by the owner on
     2026-11-11. What an interceptor learns about a call belongs to that call: the claims of its

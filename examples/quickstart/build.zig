@@ -16,6 +16,9 @@ pub fn build(b: *std.Build) void {
     const optimize = b.standardOptimizeOption(.{ .preferred_optimize_mode = .ReleaseSafe });
     const identity = b.option([]const u8, "identity", "The folder of chain.pem, key.pem and ca.pem that `zig build test` uses") orelse "../harness/tls";
     const connect_zig = b.dependency("connect_zig", .{ .target = target, .release = optimize == .ReleaseSafe, .rotor = true });
+    // stdx with the options connect-zig asks for when it builds colibri, so Zig gives both requests
+    // one stdx, and the program links one chapulin (connect-zig decision 34).
+    const stdx = b.dependency("stdx", .{ .target = target, .release = optimize == .ReleaseSafe, .crypto = true });
     // The plugin alone, which `buf generate` runs before the programs can build.
     const plugin = b.addInstallArtifact(connect_zig.artifact("protoc-gen-connect-zig"), .{});
     b.step("plugin", "Install connect-zig's protoc plugin to zig-out/bin").dependOn(&plugin.step);
@@ -24,6 +27,8 @@ pub fn build(b: *std.Build) void {
     greet.addImport("connect_zig", connect_zig.module("connect_zig"));
     const server = program(b, connect_zig, greet, "greet-server", "src/server.zig", target, optimize);
     const client = program(b, connect_zig, greet, "greet-client", "src/client.zig", target, optimize);
+    // The client makes the program's `stdx.crypto` context, which its TLS value holds.
+    client.root_module.addImport("stdx", stdx.module("stdx"));
     const check = b.addSystemCommand(&.{"sh"});
     check.addFileArg(b.path("check.sh"));
     check.addArtifactArg(server);

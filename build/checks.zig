@@ -122,6 +122,8 @@ fn add_interop_client(b: *std.Build, graph: Graph, schemas: Schemas) *std.Build.
         .optimize = graph.optimize,
         .imports = &.{
             .{ .name = "colibri", .module = graph.colibri.module("colibri") },
+            // stdx's `crypto`, whose context each TLS value holds (colibri decision 175).
+            .{ .name = "stdx", .module = graph.stdx },
         },
     });
     const exe = b.addExecutable(.{ .name = "interop-client", .root_module = b.createModule(.{

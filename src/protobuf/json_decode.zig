@@ -27,6 +27,9 @@ const wkt_forms = @import("json_decode_wkt.zig");
 pub const Transcoder = struct {
     reader: json.TextReader,
     writer: wire.Writer,
+    /// The program's CPU features, which a `bytes` field's base64 decoder takes. stdx's reader
+    /// keeps no copy of them.
+    cpu_features: platform.CpuFeatures,
 
     pub fn next(transcoder: *Transcoder) Error!json.TextReader.Item {
         const item = try transcoder.reader.next();
@@ -41,6 +44,7 @@ pub fn transcode(comptime T: type, text: []const u8, binary: []u8, tokens: []u8,
     var transcoder: Transcoder = .{
         .reader = json.TextReader.init(text, tokens, .text, cpu_features),
         .writer = .{ .buffer = binary },
+        .cpu_features = cpu_features,
     };
     if (!transcoder.reader.next_text()) return error.UnexpectedToken;
     const first = try transcoder.next();
@@ -261,7 +265,7 @@ fn write_single(comptime field: Field, comptime V: type, transcoder: *Transcoder
     try writer.tag(field.number, field.kind.wire_type());
     switch (comptime field.kind) {
         .string, .unvalidated_string => try scalar.write(field.kind, []const u8, try string_of(value), writer),
-        .bytes => try json_base64.write_base64_field(try string_of(value), writer, transcoder.reader.features),
+        .bytes => try json_base64.write_base64_field(try string_of(value), writer, transcoder.cpu_features),
         else => try write_scalar(field, V, value, writer),
     }
 }

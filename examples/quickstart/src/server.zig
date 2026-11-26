@@ -15,7 +15,6 @@ const connect = connect_zig.connect;
 const rpc = connect_zig.connect_colibri;
 const server = connect_zig.colibri.server;
 const colibri = connect_zig.colibri;
-const tls = connect_zig.colibri.tls;
 const oidc = connect_zig.oidc;
 const greet_v1 = @import("greet_v1");
 const constants = @import("constants.zig");
@@ -56,13 +55,6 @@ const Router = server.Router(App, .{
 
 const Server = colibri.Server(.{ .tcp_connections = constants.tcp_connections, .quic_connections = constants.quic_connections }, .private);
 
-/// The CPU, which this program does not probe, so each TLS session runs ChaCha20 alone. A
-/// program that depends on stdx calls its `probe()` instead.
-const cpu: tls.Cpu = .{
-    .probe = .{ .aes_clmul = .not_known, .dit = .not_known, .sha256 = .not_known, .sha512 = .not_known, .sha3 = .not_known, .sve2 = .not_known, .ssse3 = .not_known, .sse4_1 = .not_known, .avx2 = .not_known, .vaes = .not_known, .midr = null },
-    .timing = .not_stated,
-};
-
 /// All the program holds, which `main` allocates once before the first call (decision 42).
 const State = struct {
     http_server: Server,
@@ -98,7 +90,8 @@ pub fn main(init: std.process.Init) !void {
     try state.http_server.init(&.{
         .port = port,
         .identity = .{ .chain = chain, .key = key },
-        .cpu = cpu,
+        // No `crypto`: the server makes its `stdx.crypto` context of `engine.cpu_features` and the
+        // system's entropy (colibri decision 175).
         .unix_seconds = unix_seconds,
         .engine = .{ .tls_buffer = &state.tls_buffer, .cpu_features = state.app.cpu_features },
     }, &state.router, &state.app);

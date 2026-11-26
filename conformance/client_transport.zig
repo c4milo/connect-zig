@@ -11,6 +11,7 @@ const std = @import("std");
 const assert = std.debug.assert;
 const client = @import("colibri").client;
 const tls = @import("colibri").tls;
+const stdx = @import("stdx");
 const constants = @import("constants.zig");
 const UdpSocket = @import("client_datagram.zig").UdpSocket;
 
@@ -55,6 +56,9 @@ pub const Transport = struct {
     io: std.Io,
     /// The source each TLS session draws from, seeded from the system once.
     csprng: std.Random.DefaultCsprng,
+    /// The one `stdx.crypto` context each TLS value holds (colibri decision 175). It draws from
+    /// `csprng`, and states no CPU feature, so each TLS session runs chapulin's portable code.
+    crypto: stdx.crypto.Context,
 
     /// Starts the transport in place with the program's I/O, and seeds the random source from
     /// the system.
@@ -63,6 +67,7 @@ pub const Transport = struct {
         var seed: [std.Random.DefaultCsprng.secret_seed_length]u8 = @splat(0);
         io.random(&seed);
         self.csprng = .init(seed);
+        self.crypto = stdx.crypto.init(.{}, self.csprng.random());
         self.stream = null;
         self.tcp = .{ .slot = 0, .generation = 0 };
         self.input_len = 0;
@@ -205,7 +210,7 @@ pub const Transport = struct {
         switch (event) {
             .open => |asked| switch (asked.transport) {
                 .tcp => self.open_tcp(asked),
-                .quic => self.pool.start_quic(self.csprng.random(), self.unix_seconds(), now, null) catch {},
+                .quic => self.pool.start_quic(self.unix_seconds(), now, null) catch {},
             },
             .send => |connection| self.send_owed(connection, now),
             // The pool is done with the connection: the octets still held are its, and go too.
@@ -232,7 +237,7 @@ pub const Transport = struct {
         const on: c_int = 1;
         // A socket that refuses the option is used as it is.
         std.posix.setsockopt(connected.socket.handle, std.posix.IPPROTO.TCP, std.posix.TCP.NODELAY, std.mem.asBytes(&on)) catch {};
-        self.pool.start_tcp(self.tcp, self.csprng.random(), self.unix_seconds(), null) catch self.failed();
+        self.pool.start_tcp(self.tcp, self.unix_seconds(), null) catch self.failed();
     }
 
     /// The seconds since 1970 by the system's clock, at which TLS judges the server's certificate
