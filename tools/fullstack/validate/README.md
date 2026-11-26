@@ -18,7 +18,13 @@ OpenTelemetry wrote them, so each export's octets and the path of `Export` are t
 | `Span` | `kind` | a defined `SpanKind` |
 | `Span` | the message | `end_time_unix_nano` not before `start_time_unix_nano`, as CEL |
 | `Status` | `code` | a defined `StatusCode` |
-| `KeyValue` | `key` | not empty |
+| `KeyValue` | `key` | not empty, and lowercase snake_case names joined by dots, as a `pattern` |
+
+Each rule but one is a rule the specification states. The `pattern` of `KeyValue.key` is
+connect-zig's choice: OpenTelemetry's specification recommends such names in "Attribute Naming",
+and does not require them. It puts a regular expression into each attribute's validation, so the
+full-stack numbers measure one, as a schema that checks names does. Every key the check's exports
+send matches it.
 
 `trace.proto` and `common.proto` say at their top that connect-zig changed them. `gen/` holds the
 Zig code that `tools/generate_check.sh` writes from `proto/`, with `buf.gen.yaml`. The root's

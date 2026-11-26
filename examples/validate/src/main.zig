@@ -8,6 +8,8 @@
 //!
 //! - an account that keeps the rules is taken, over Connect;
 //! - an account with a wrong email is refused, over Connect in JSON, with one violation;
+//! - an account with a tag that is not a lowercase word is refused, over Connect, with one
+//!   violation of the tag's `pattern`, a regular expression;
 //! - an account that breaks three rules is refused, over gRPC, with three violations;
 //! - a stream of two accounts is taken, over gRPC-Web;
 //! - a stream whose second account breaks a rule is refused there, and its third is never read.
@@ -36,6 +38,8 @@ const ada: signup.RegisterRequest = .{ .email = "ada@example.com", .name = "Ada"
 const grace: signup.RegisterRequest = .{ .email = "grace@example.com", .name = "Grace", .age = constants.age_grace };
 /// An email with no "@".
 const wrong_email: signup.RegisterRequest = .{ .email = "ada.example.com", .name = "Ada", .age = constants.age_ada };
+/// A tag with a capital letter, which its `pattern` refuses.
+const wrong_tag: signup.RegisterRequest = .{ .email = "ada@example.com", .name = "Ada", .age = constants.age_ada, .tags = .of(&.{ "math", "Math" }) };
 /// No name, an age under 13, and a tag twice.
 const three_wrong: signup.RegisterRequest = .{ .email = "kid@example.com", .name = "", .age = constants.age_too_young, .tags = .of(&.{ "a", "a" }) };
 
@@ -50,6 +54,7 @@ const State = struct {
     rounds: harness.Rounds(App, Router),
     valid: RegisterCall,
     email: RegisterCall,
+    tag: RegisterCall,
     three: RegisterCall,
     many: RegisterManyCall,
     many_cut: RegisterManyCall,
@@ -73,7 +78,7 @@ pub fn main(init: std.process.Init) !void {
     std.debug.print("validate: every call answered as expected over h2, h11 and h3\n", .{});
 }
 
-/// Runs the five calls over `expected`. The server's count goes on across rounds, so the round
+/// Runs the six calls over `expected`. The server's count goes on across rounds, so the round
 /// checks what it added to it.
 fn round(state: *State, protocols: client.Protocols, expected: client.Protocol) !void {
     const accepted_before = state.app.signup.accepted;
@@ -81,10 +86,11 @@ fn round(state: *State, protocols: client.Protocols, expected: client.Protocol) 
     try rounds.begin(protocols);
     try state.valid.init(&state.client, {}, &.{}, &.{ada});
     try state.email.init(&state.client, {}, &.{ .codec = .json }, &.{wrong_email});
+    try state.tag.init(&state.client, {}, &.{}, &.{wrong_tag});
     try state.three.init(&state.client, {}, &.{ .protocol = .grpc }, &.{three_wrong});
     try state.many.init(&state.client, {}, &.{ .protocol = .grpc_web }, &.{ ada, grace });
     try state.many_cut.init(&state.client, {}, &.{}, &.{ ada, wrong_email, grace });
-    inline for (.{ "valid", "email", "three", "many", "many_cut" }) |field| {
+    inline for (.{ "valid", "email", "tag", "three", "many", "many_cut" }) |field| {
         const call = &@field(state, field).call;
         try rounds.request(&call.request, &call.response);
     }
@@ -92,6 +98,7 @@ fn round(state: *State, protocols: client.Protocols, expected: client.Protocol) 
 
     try expect_taken(state);
     try expect_refused(state, &state.email, signup.RegisterResponse, &.{"string.email"});
+    try expect_refused(state, &state.tag, signup.RegisterResponse, &.{"string.pattern"});
     try expect_refused(state, &state.three, signup.RegisterResponse, &.{ "string.min_len", "int32.gte_lt", "repeated.unique" });
     try expect_count(state);
     try expect_refused(state, &state.many_cut, signup.RegisterManyResponse, &.{"string.email"});

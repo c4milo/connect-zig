@@ -1,7 +1,7 @@
 // The schema of the validation benchmark (tools/validate_compare_check.sh). Each implementation
 // validates the same messages against its rules: connect-zig's protovalidate, protovalidate-go,
-// protovalidate-es on Node.js, and protovalidate-buffa and prost-protovalidate in Rust. The rules
-// hold no `pattern`, which connect-zig does not read yet.
+// protovalidate-es on Node.js, and protovalidate-buffa and prost-protovalidate in Rust. `Medium`'s
+// `name` holds a `pattern`, so the medium cases match a regular expression.
 syntax = "proto3";
 
 package bench.validate.v1;

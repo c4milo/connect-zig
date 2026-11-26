@@ -39,7 +39,7 @@ pub const RegisterRequest = struct {
             .{ .number = @intFromEnum(@This().FieldNumber.email), .rules = .{ .type = .{ .string = .{ .well_known = .{ .email = true } } } } },
             .{ .number = @intFromEnum(@This().FieldNumber.name), .rules = .{ .type = .{ .string = .{ .min_len = 1, .max_len = @This().RuleNumber.@"name.string.max_len" } } } },
             .{ .number = @intFromEnum(@This().FieldNumber.age), .rules = .{ .type = .{ .int32 = .{ .less_than = .{ .lt = @This().RuleNumber.@"age.int32.lt" }, .greater_than = .{ .gte = @This().RuleNumber.@"age.int32.gte" } } } } },
-            .{ .number = @intFromEnum(@This().FieldNumber.tags), .rules = .{ .type = .{ .repeated = .of(&.{ .max_items = @This().RuleNumber.@"tags.repeated.max_items", .unique = true, .items = .of(&.{ .type = .{ .string = .{ .min_len = 1 } } }) }) } } },
+            .{ .number = @intFromEnum(@This().FieldNumber.tags), .rules = .{ .type = .{ .repeated = .of(&.{ .max_items = @This().RuleNumber.@"tags.repeated.max_items", .unique = true, .items = .of(&.{ .type = .{ .string = .{ .min_len = 1, .pattern = "^[a-z][a-z0-9-]*$" } } }) }) } } },
         },
     };
 
