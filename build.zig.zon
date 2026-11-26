@@ -6,16 +6,16 @@
     .dependencies = .{
         // The HTTP transport of `connect_colibri`, which takes chapulin through stdx.crypto.
         .colibri = .{
-            .url = "git+https://github.com/c4milo/colibri#e7e001f7bc2ba7a9f3952217c16595913c8d0b0a",
-            .hash = "colibri-0.21.0-Wo-Avkp3tQQCuUxitwx0-hkF7-bjALOR3gARcEZZ2vrw",
+            .url = "git+https://github.com/c4milo/colibri#7df385cd74d5a2dee8dbcb1ac5aa148ca3e1ceb8",
+            .hash = "colibri-0.21.0-Wo-AvmtxtQRmIma4g5ZQEeGOfEl3e9i7I4SnCkTykbbo",
         },
         // JSON for proto3 JSON and the Connect error bodies, the compression codecs, the
         // regular expressions of `protovalidate`'s `pattern` and CEL's `matches`, the type of CPU
         // features each of them takes, `platform.CpuFeatures`, and `crypto.jws`, the JWS calls of
         // the `oidc` module (decision 34). The commit colibri pins.
         .stdx = .{
-            .url = "git+https://github.com/c4milo/stdx#a11db0bfcf5acb176b504e60789fa731c42b0252",
-            .hash = "stdx-0.3.0-BD60to9OXQCZwP25ZzE67Ihvtvq1DoksAepvn5CBet3T",
+            .url = "git+https://github.com/c4milo/stdx#953c24cc3a9ecb150191531f359ebb471d065109",
+            .hash = "stdx-0.3.0-BD60tjRdXQDRAL6x5HhzmBgLApdXv1q4k-PHrftpw-T9",
         },
         // Developer tooling only, never linked into the library (decision 15). Lazy, and requested
         // only when connect-zig is the root build.

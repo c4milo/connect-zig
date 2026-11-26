@@ -2399,6 +2399,11 @@ ran on Linux x86-64 with Zig 0.16.0.
     decode 0.19% over it and the medium validations 2.3% and 3.9% under it. Those counts are
     under callgrind on x86-64 Linux, built for x86-64-v3.
   - `zig build test` passed on x86-64 Linux, with Zig 0.16.0.
+- **colibri at 7df385cd and stdx at 953c24c: FEAT_DIT on a hidden N2** (2026-11-26). stdx reports
+  FEAT_DIT by the core's MIDR where a hypervisor hides it, as GitHub's arm64 runners do (stdx
+  decision 40 as amended a sixth time). So a program on them that sets PSTATE.DIT runs AES-GCM
+  and chapulin's other constant-time paths. colibri's commits since e7e001f7 change its simulator
+  and test programs alone. No code of connect-zig changes.
 
 ### Work not done yet
 

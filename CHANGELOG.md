@@ -10,7 +10,7 @@ change the public API, and the entry marks each change that does.
 
 ## Unreleased
 
-It builds on colibri at e7e001f7, on its `main`, and on stdx at a11db0bf and Rotor at af06860,
+It builds on colibri at 7df385cd, on its `main`, and on stdx at 953c24cc and Rotor at af06860,
 the commits that colibri pins. stdx brings chapulin at f29c066a.
 
 ### Changed
