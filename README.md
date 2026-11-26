@@ -86,7 +86,7 @@ and its JSON form. A message keeps the fields its schema does not know.
 ### 1. Add the package
 
 ```sh
-zig fetch --save git+https://github.com/c4milo/connect-zig#v0.6.0
+zig fetch --save git+https://github.com/c4milo/connect-zig#v0.7.0
 ```
 
 Then add its one module to your program in `build.zig`. It names the library, colibri, and the
