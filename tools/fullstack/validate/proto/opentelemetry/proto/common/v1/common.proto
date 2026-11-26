@@ -1,6 +1,7 @@
 // Changed by connect-zig: the protovalidate rules of the OTLP specification, which the
-// full-stack check validates (tools/fullstack/validate/README.md). The fields and their
-// numbers are as OpenTelemetry wrote them.
+// full-stack check validates, and one rule of OpenTelemetry's attribute naming
+// (tools/fullstack/validate/README.md). The fields and their numbers are as OpenTelemetry wrote
+// them.
 
 // Copyright 2019, OpenTelemetry Authors
 //
@@ -85,7 +86,13 @@ message KeyValueList {
 message KeyValue {
   // The key name of the pair.
   // key_strindex MUST NOT be set if key is used.
-  string key = 1 [(buf.validate.field).string.min_len = 1];
+  // connect-zig's rule: lowercase snake_case names joined by dots, as OpenTelemetry's
+  // specification, "Attribute Naming", recommends. The full-stack check's validation then
+  // matches a regular expression for each attribute.
+  string key = 1 [(buf.validate.field).string = {
+    min_len: 1
+    pattern: "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$"
+  }];
 
   // The value of the pair.
   AnyValue value = 2;

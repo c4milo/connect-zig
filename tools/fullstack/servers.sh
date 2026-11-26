@@ -93,10 +93,14 @@ sinks:
     address: 127.0.0.1:${vector_metrics_port}
 YAML
 
-# An export whose first span breaks one of tools/fullstack/validate's rules: its trace_id holds 3
-# octets, where OTLP's holds 16. A validating receiver must refuse it.
+# Two exports whose first span breaks one of tools/fullstack/validate's rules. A validating
+# receiver must refuse each. The first's trace_id holds 3 octets, where OTLP's holds 16. The
+# second's attribute key, HTTP.Method, breaks the `pattern` of KeyValue.key.
 cat >"${work}/broken.json" <<'JSON'
 {"resourceSpans":[{"scopeSpans":[{"spans":[{"traceId":"AAEC","spanId":"AAECAwQFBgc=","name":"GET /","kind":"SPAN_KIND_SERVER","startTimeUnixNano":"100","endTimeUnixNano":"200"}]}]}]}
+JSON
+cat >"${work}/broken_key.json" <<'JSON'
+{"resourceSpans":[{"scopeSpans":[{"spans":[{"traceId":"AAECAwQFBgcICQoLDA0ODw==","spanId":"AAECAwQFBgc=","name":"GET /","kind":"SPAN_KIND_SERVER","startTimeUnixNano":"100","endTimeUnixNano":"200","attributes":[{"key":"HTTP.Method","value":{"stringValue":"GET"}}]}]}]}]}
 JSON
 
 # A receiver that validates each export runs on its twin's port: the servers run one at a time.
@@ -238,22 +242,29 @@ probe() {
     return 1
 }
 
-# A receiver that validates must refuse the export of `broken.json` with `invalid_argument`
-# (Connect protocol, "Error Codes"), so a run never times a server that checks no rule. The
-# refused export adds no span to its count.
+# A receiver that validates must refuse the exports of `broken.json` and `broken_key.json` with
+# `invalid_argument` (Connect protocol, "Error Codes"), so a run never times a server that checks
+# no rule, or none of the `pattern`. A refused export adds no span to its count.
 probe_refused() {
     case "$1" in
         *-validate) ;;
         *) return 0 ;;
     esac
+    for broken in broken broken_key; do
+        probe_refused_one "$1" "${broken}" || return 1
+    done
+}
+
+# Requires the server $1 to refuse the export of `$2.json` with `invalid_argument`.
+probe_refused_one() {
     # shellcheck disable=SC2046 # reach prints curl's options, one argument each
-    if "${buf}" curl --schema examples/otlp/proto --protocol grpc $(reach) -d @"${work}/broken.json" \
+    if "${buf}" curl --schema examples/otlp/proto --protocol grpc $(reach) -d @"${work}/$2.json" \
         "$(url_of "$1" "${export_path}")" >"${work}/refused.log" 2>&1; then
-        echo "fullstack: $1 took an export that breaks a rule" >&2
+        echo "fullstack: $1 took the export $2.json, which breaks a rule" >&2
         return 1
     fi
     grep -q '"code": "invalid_argument"' "${work}/refused.log" && return 0
-    echo "fullstack: $1 refused an export that breaks a rule, but not with invalid_argument" >&2
+    echo "fullstack: $1 refused the export $2.json, but not with invalid_argument" >&2
     cat "${work}/refused.log" >&2
     return 1
 }

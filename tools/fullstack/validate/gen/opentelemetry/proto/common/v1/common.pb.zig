@@ -111,7 +111,7 @@ pub const KeyValue = struct {
 
     pub const protovalidate: validate.Rules = .{
         .fields = &.{
-            .{ .number = @intFromEnum(@This().FieldNumber.key), .rules = .{ .type = .{ .string = .{ .min_len = 1 } } } },
+            .{ .number = @intFromEnum(@This().FieldNumber.key), .rules = .{ .type = .{ .string = .{ .min_len = 1, .pattern = "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$" } } } },
         },
     };
 };
