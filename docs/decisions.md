@@ -1452,6 +1452,15 @@ first. Cite an entry by number in code and commits ("decision 6").
       change their CPU from job to job. `tools/charts_compare.py` writes the same comparison as a
       table, which the release's notes and the run's summary take. Beaten: a threshold of 2%,
       which a time on a shared runner passes by chance, and of 10%, which hides a real change.
+    - Amended on 2026-11-26, on the owner's choice: the job `charts` also writes the tag's charts
+      as the one commit of the branch `charts`, which it pushes over the last tag's, and the
+      README and `docs/benchmarks.md` show them from raw.githubusercontent.com on that branch.
+      GitHub serves each file of a release as `application/octet-stream`, with `Content-Disposition:
+      attachment`, whatever type the upload names, so no page shows a release's SVG as an image:
+      the links of the amendment of 2026-11-25 never drew a chart. A branch's file is served as
+      `image/svg+xml`. The release keeps each tag's charts and their values, which
+      `tools/charts_previous.sh` reads. Beaten: GitHub Pages, which needs the site turned on and
+      a deploy of its own, and `docs/images` on `main`, which a person copies by hand.
     - Vector and Rotel run as they ship, with Nagle's algorithm on. Each passes its accepted
       sockets to tonic itself, and neither sets TCP_NODELAY, so their p99 stays near 40 ms, Linux's
       delayed ACK, from a low rate. colibri and Go set TCP_NODELAY. Beaten on 2026-11-17: a

@@ -34,8 +34,9 @@ paid for.
 - **Each tag draws the charts.** CI runs the benchmarks on a tag alone. Their jobs draw the charts
   from their own output, and CI keeps them with the run as `charts-<check>-<arch>`. Once every
   benchmark of the tag passed, the job `charts` attaches each chart to the tag's GitHub release
-  (`tools/charts_release.sh`, decision 44 as amended). The README and `docs/benchmarks.md` show
-  the latest release's charts and quote no measured number, so no text goes stale; the run's
+  and writes them to the branch `charts` (`tools/charts_release.sh`, decision 44 as amended). The
+  README and `docs/benchmarks.md` show the latest tag's charts from that branch and quote no
+  measured number, so no text goes stale; the run's
   summary holds every table. Each chart marks what changed since the previous tag by 5% or more,
   and the release's notes list it (`tools/chart_change.py`, `tools/charts_compare.py`).
 - **The smoke run.** `zig build bench -- --quick` runs every operation on every message in a few

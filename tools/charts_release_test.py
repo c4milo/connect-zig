@@ -1,7 +1,8 @@
 """Tests of tools/charts_release.sh (tools/scripts_test.sh): every chart a run drew is attached to
 the tag's release with its file of values, a tag with no release gets one first, two files of one
-name or no chart at all attach nothing, and the comparison replaces the notes' section of an
-earlier run. A stub `gh` on the path writes each call it gets to a log."""
+name or no chart at all attach nothing, the comparison replaces the notes' section of an earlier
+run, and the branch `charts` holds the latest tag's charts alone. A stub `gh` on the path writes
+each call it gets to a log."""
 
 import os
 import pathlib
@@ -111,6 +112,55 @@ class NotesTest(unittest.TestCase):
             notes = (work / "notes.md").read_text()
             self.assertEqual(notes, f"What changed\n\n{heading}\n\nnew table\n")
             self.assertEqual(summary.read_text(), f"{heading}\n\nnew table\n")
+
+
+def git(directory, *arguments):
+    """Runs git in `directory` and returns what it printed, stripped."""
+    done = subprocess.run(["git", "-C", str(directory), *arguments], capture_output=True, text=True, check=True)
+    return done.stdout.strip()
+
+
+def push_charts(checkout, folder, tag):
+    """Runs the script's `charts_branch` over `folder` in `checkout`, for `tag`."""
+    body = f'. "{script}"\ncharts_branch "{folder}" {tag}\n'
+    subprocess.run(["sh", "-c", body], cwd=checkout, capture_output=True, text=True, check=True)
+
+
+def checkout_with_remote(work):
+    """A checkout with one commit, whose remote `origin` is a bare repository beside it."""
+    remote, checkout = work / "remote.git", work / "checkout"
+    git(work, "init", "-q", "--bare", str(remote))
+    git(work, "init", "-q", "-b", "main", str(checkout))
+    (checkout / "README.md").write_text("main\n")
+    git(checkout, "add", "README.md")
+    git(checkout, "-c", "user.name=t", "-c", "user.email=t@example.com", "commit", "-q", "-m", "main")
+    git(checkout, "remote", "add", "origin", str(remote))
+    return remote, checkout
+
+
+def charts_folder(work, name, files):
+    """A folder of gathered charts, each file's name to its text."""
+    folder = work / name
+    folder.mkdir()
+    for file, text in files.items():
+        (folder / file).write_text(text)
+    return folder
+
+
+class BranchTest(unittest.TestCase):
+    def test_the_branch_holds_the_latest_tags_charts_alone(self):
+        with tempfile.TemporaryDirectory() as work:
+            work = pathlib.Path(work)
+            remote, checkout = checkout_with_remote(work)
+            head = git(checkout, "rev-parse", "HEAD")
+            push_charts(checkout, charts_folder(work, "first", {"a.svg": "1", "a.json": "{}", "b.svg": "2"}), "v1.0.0")
+            push_charts(checkout, charts_folder(work, "second", {"a.svg": "3", "a.json": "{}"}), "v1.1.0")
+            self.assertEqual(git(remote, "ls-tree", "--name-only", "charts").split(), ["a.json", "a.svg"])
+            self.assertEqual(git(remote, "show", "charts:a.svg"), "3")
+            self.assertEqual(git(remote, "rev-list", "--count", "charts"), "1")
+            self.assertEqual(git(remote, "log", "-1", "--format=%s", "charts"), "chore: draw the charts of v1.1.0")
+            self.assertEqual(git(checkout, "rev-parse", "HEAD"), head)
+            self.assertEqual(git(checkout, "status", "--porcelain"), "")
 
 
 if __name__ == "__main__":

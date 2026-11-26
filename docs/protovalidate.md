@@ -220,7 +220,7 @@ prost-protovalidate. CI draws the chart on each tag and attaches it to the tag's
 chart names its run.
 [benchmarks.md](benchmarks.md), "Validation", says how it is measured.
 
-![Bars of the speed of a decode with a validation through connect-zig, protovalidate-buffa, prost-protovalidate, and protovalidate-es, in multiples of protovalidate-go's, on arm64](https://github.com/c4milo/connect-zig/releases/latest/download/validate-vs-go-arm64.svg)
+![Bars of the speed of a decode with a validation through connect-zig, protovalidate-buffa, prost-protovalidate, and protovalidate-es, in multiples of protovalidate-go's, on arm64](https://raw.githubusercontent.com/c4milo/connect-zig/charts/validate-vs-go-arm64.svg)
 
 ## How it is checked
 
