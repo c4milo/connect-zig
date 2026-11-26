@@ -15,17 +15,16 @@ const std = @import("std");
 const optimize: std.builtin.OptimizeMode = .ReleaseFast;
 
 pub fn add(b: *std.Build, public_names: *std.Build.Module, target: std.Build.ResolvedTarget) void {
-    // The codec's and validation's programs ask stdx for no chapulin, so they link no libc. A
-    // program that links glibc gets position-independent code, which reads each table through one
-    // more instruction: up to 9.6% of a decode (docs/performance.md, "Pitfalls"). Their rows then
-    // count the code alone. The routed calls take colibri's own request of stdx (colibri decision
-    // 174), so they link one stdx, and their own copy of the codec over it.
-    const stdx = b.dependency("stdx", .{ .target = target, .release = true });
-    const stdx_colibri = b.dependency("stdx", .{ .target = target, .release = true, .crypto = true });
     var copies: Copies = .empty;
-    const codec = codec_modules(b, &copies, stdx, public_names, target);
-    const routed_codec = codec_modules(b, &copies, stdx_colibri, public_names, target);
-    const routed = routed_modules(b, &copies, stdx_colibri, routed_codec.protobuf, public_names, target);
+    // The codec's program and the validation's are programs without colibri, which the root build
+    // gives a stdx with no `crypto` (decision 52): no chapulin, so no libc and no PIC code.
+    const plain = codec_modules(b, &copies, b.dependency("stdx", .{ .target = target, .release = true }), public_names, target);
+    // colibri's own request of stdx (colibri decision 174), so the routed calls link one stdx.
+    const stdx = b.dependency("stdx", .{ .target = target, .release = true, .crypto = true });
+    const with_tls = codec_modules(b, &copies, stdx, public_names, target);
+    const protobuf = with_tls.protobuf;
+    const messages = with_tls.messages;
+    const routed = routed_modules(b, &copies, stdx, protobuf, public_names, target);
     const exe = b.addExecutable(.{
         .name = "bench",
         .root_module = b.createModule(.{
@@ -38,8 +37,8 @@ pub fn add(b: *std.Build, public_names: *std.Build.Module, target: std.Build.Res
             // run on, such as arm64 macOS, where the benchmark must still build.
             .valgrind = if (target.result.os.tag == .linux) true else null,
             .imports = &.{
-                .{ .name = "protobuf", .module = codec.protobuf },
-                .{ .name = "bench_v1", .module = codec.messages },
+                .{ .name = "protobuf", .module = plain.protobuf },
+                .{ .name = "bench_v1", .module = plain.messages },
             },
         }),
     });
@@ -51,8 +50,8 @@ pub fn add(b: *std.Build, public_names: *std.Build.Module, target: std.Build.Res
             .optimize = optimize,
             .valgrind = if (target.result.os.tag == .linux) true else null,
             .imports = &.{
-                .{ .name = "protobuf", .module = routed_codec.protobuf },
-                .{ .name = "bench_v1", .module = routed_codec.messages },
+                .{ .name = "protobuf", .module = protobuf },
+                .{ .name = "bench_v1", .module = messages },
                 .{ .name = "connect", .module = routed.connect },
                 .{ .name = "connect_colibri", .module = routed.connect_colibri },
                 .{ .name = "colibri", .module = routed.colibri },
@@ -73,7 +72,7 @@ pub fn add(b: *std.Build, public_names: *std.Build.Module, target: std.Build.Res
     install.dependOn(&b.addInstallArtifact(exe, .{}).step);
     install.dependOn(&b.addInstallArtifact(call_exe, .{}).step);
     // stdx, whose `regex` runs the rules and whose `platform` holds the CPU features it takes.
-    install.dependOn(add_validate(b, codec.protobuf, public_names, release_fast(b, &copies, stdx.module("stdx")), target));
+    install.dependOn(add_validate(b, plain.protobuf, public_names, plain.stdx, target));
     b.step("bench", "Benchmark the protobuf runtime and a routed call, ReleaseFast: zig build bench -- [--quick] [--write <dir>]").dependOn(&call_run.step);
 
     // `zig build costs`: the costs table of docs/performance.md, timed on the machine that runs it.
@@ -155,24 +154,8 @@ fn add_validate(b: *std.Build, protobuf: *std.Build.Module, public_names: *std.B
     return &install.step;
 }
 
-/// The module `connect_zig` without colibri (decision 52), over the benchmark's ReleaseFast copies
-/// in `imports`. Generated code imports it; a name the benchmark does not read needs no import.
-/// The root reads `stdx` whenever Zig reads it (decision 34 as amended), so `imports` names stdx.
-fn without_colibri(b: *std.Build, imports: []const std.Build.Module.Import, target: std.Build.ResolvedTarget) *std.Build.Module {
-    const options = b.addOptions();
-    options.addOption(bool, "colibri", false);
-    options.addOption(bool, "oidc", false);
-    const module = b.createModule(.{ .root_source_file = b.path("src/connect_zig/connect_zig.zig"), .target = target, .optimize = optimize });
-    module.addImport("connect_zig_options", options.createModule());
-    for (imports) |import| module.addImport(import.name, import.module);
-    return module;
-}
-
-/// The protobuf module and the generated code of bench/gen, in ReleaseFast, over `stdx`.
-const Codec = struct {
-    protobuf: *std.Build.Module,
-    messages: *std.Build.Module,
-};
+/// The protobuf module and the generated code of bench/gen, in ReleaseFast, over one stdx.
+const Codec = struct { stdx: *std.Build.Module, protobuf: *std.Build.Module, messages: *std.Build.Module };
 
 fn codec_modules(b: *std.Build, copies: *Copies, stdx: *std.Build.Dependency, public_names: *std.Build.Module, target: std.Build.ResolvedTarget) Codec {
     const stdx_module = release_fast(b, copies, stdx.module("stdx"));
@@ -189,12 +172,25 @@ fn codec_modules(b: *std.Build, copies: *Copies, stdx: *std.Build.Dependency, pu
         .root_source_file = b.path("bench/gen/bench/v1/bench.pb.zig"),
         .target = target,
         .optimize = optimize,
+        // `connect_zig` reads stdx whatever a program names (decision 34 as amended).
         .imports = &.{.{ .name = "connect_zig", .module = without_colibri(b, &.{
             .{ .name = "protobuf", .module = protobuf },
             .{ .name = "stdx", .module = stdx_module },
         }, target) }},
     });
-    return .{ .protobuf = protobuf, .messages = messages };
+    return .{ .stdx = stdx_module, .protobuf = protobuf, .messages = messages };
+}
+
+/// The module `connect_zig` without colibri (decision 52), over the benchmark's ReleaseFast copies
+/// in `imports`. Generated code imports it; a name the benchmark does not read needs no import.
+fn without_colibri(b: *std.Build, imports: []const std.Build.Module.Import, target: std.Build.ResolvedTarget) *std.Build.Module {
+    const options = b.addOptions();
+    options.addOption(bool, "colibri", false);
+    options.addOption(bool, "oidc", false);
+    const module = b.createModule(.{ .root_source_file = b.path("src/connect_zig/connect_zig.zig"), .target = target, .optimize = optimize });
+    module.addImport("connect_zig_options", options.createModule());
+    for (imports) |import| module.addImport(import.name, import.module);
+    return module;
 }
 
 /// The modules a routed call runs (bench/call.zig), in ReleaseFast.
@@ -208,7 +204,7 @@ const Routed = struct {
 };
 
 /// `connect` and `connect_colibri` as the root build makes them, over copies of colibri's modules
-/// in ReleaseFast. colibri in ReleaseSafe asks stdx as `add` asks for `stdx_colibri`, so both
+/// in ReleaseFast. colibri in ReleaseSafe asks stdx with `.release = true`, as `add` does, so both
 /// share one copy of stdx. The benchmark needs no Rotor.
 fn routed_modules(b: *std.Build, copies: *Copies, stdx: *std.Build.Dependency, protobuf: *std.Build.Module, public_names: *std.Build.Module, target: std.Build.ResolvedTarget) Routed {
     const colibri = b.dependency("colibri", .{ .target = target, .release = true, .rotor = false });

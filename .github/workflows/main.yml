@@ -154,9 +154,9 @@ jobs:
           path: ci-charts/
           retention-days: 90
   # A tag's charts, once every benchmark of the tag passed: each is attached to the tag's GitHub
-  # release, which the README and docs/benchmarks.md show them from, with its file of values, and
-  # what changed since the previous tag goes to the release's notes and this job's summary
-  # (tools/charts_release.sh).
+  # release with its file of values, and written to the branch `charts`, which the README and
+  # docs/benchmarks.md show them from. What changed since the previous tag goes to the release's
+  # notes and this job's summary (tools/charts_release.sh).
   charts:
     needs: check
     if: startsWith(github.ref, 'refs/tags/')

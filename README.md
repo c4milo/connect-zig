@@ -86,7 +86,7 @@ and its JSON form. A message keeps the fields its schema does not know.
 ### 1. Add the package
 
 ```sh
-zig fetch --save git+https://github.com/c4milo/connect-zig#v0.5.0
+zig fetch --save git+https://github.com/c4milo/connect-zig#v0.6.0
 ```
 
 Then add its one module to your program in `build.zig`. It names the library, colibri, and the
@@ -239,7 +239,7 @@ The benchmark loads an OpenTelemetry (OTLP) receiver on one core, over TLS and h
 core's traffic for 33,000 servers. Each bar is the highest rate held with p99 under 100 ms, the
 median of three rounds:
 
-![Bars of the spans a second one core holds with p99 under 100 ms over TLS, the median of three rounds with their range, and lines of p99 as the rate climbs, on arm64, for connect-zig, connect-go, connect-rust, the OpenTelemetry Collector, and Vector](https://github.com/c4milo/connect-zig/releases/latest/download/fullstack-arm64.svg)
+![Bars of the spans a second one core holds with p99 under 100 ms over TLS, the median of three rounds with their range, and lines of p99 as the rate climbs, on arm64, for connect-zig, connect-go, connect-rust, the OpenTelemetry Collector, and Vector](https://raw.githubusercontent.com/c4milo/connect-zig/charts/fullstack-arm64.svg)
 
 CI runs the benchmarks on each tag and attaches the charts to the tag's
 [release](https://github.com/c4milo/connect-zig/releases). Each chart names its run.

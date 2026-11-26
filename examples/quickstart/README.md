@@ -24,7 +24,7 @@ connect-zig on each push, so the README's steps stay true.
 Copy this folder, then name connect-zig by URL in place of the path:
 
 ```sh
-zig fetch --save=connect_zig git+https://github.com/c4milo/connect-zig#v0.5.0
+zig fetch --save=connect_zig git+https://github.com/c4milo/connect-zig#v0.6.0
 ```
 
 Then generate the code and build:

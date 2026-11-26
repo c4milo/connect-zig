@@ -334,9 +334,10 @@ confirm a test fails. Report `CAUGHT` or `NOT CAUGHT` per mutation in the commit
   runners do not expose. A `fullstack` check has 90 minutes, and every other check 60.
   The benchmarks draw the charts of `docs/benchmarks.md` and the README into `ci-charts/`, which
   CI keeps with the run as `charts-<check>-<arch>`. On a tag, once every benchmark passed, the
-  job `charts` attaches each chart to the tag's GitHub release (`tools/charts_release.sh`), and
-  the README and `docs/benchmarks.md` show the latest release's. They quote no measured number,
-  so a new chart leaves no text stale. Each chart writes its connect-zig values beside it as
+  job `charts` attaches each chart to the tag's GitHub release and writes them to the branch
+  `charts` (`tools/charts_release.sh`). The README and `docs/benchmarks.md` show the latest tag's
+  from that branch, since GitHub serves a release's files as downloads. They quote no measured
+  number, so a new chart leaves no text stale. Each chart writes its connect-zig values beside it as
   `<chart>.json`, which the release holds too. On a tag, `tools/charts_previous.sh` takes the
   previous tag's, and each chart marks a change of 5% or more with ▲ or ▼
   (`tools/chart_change.py`). `tools/charts_compare.py` writes the same changes into the release's
