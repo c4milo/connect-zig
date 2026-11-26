@@ -18,12 +18,13 @@ pub fn add(b: *std.Build, public_names: *std.Build.Module, target: std.Build.Res
     // colibri's own request of stdx (colibri decision 174), so the routed calls below link one stdx.
     const stdx = b.dependency("stdx", .{ .target = target, .release = true, .crypto = true });
     var copies: Copies = .empty;
+    const stdx_module = release_fast(b, &copies, stdx.module("stdx"));
     const protobuf = b.createModule(.{
         .root_source_file = b.path("src/protobuf/protobuf.zig"),
         .target = target,
         .optimize = optimize,
         .imports = &.{
-            .{ .name = "stdx", .module = release_fast(b, &copies, stdx.module("stdx")) },
+            .{ .name = "stdx", .module = stdx_module },
             .{ .name = "public_names", .module = public_names },
         },
     });
@@ -31,7 +32,11 @@ pub fn add(b: *std.Build, public_names: *std.Build.Module, target: std.Build.Res
         .root_source_file = b.path("bench/gen/bench/v1/bench.pb.zig"),
         .target = target,
         .optimize = optimize,
-        .imports = &.{.{ .name = "connect_zig", .module = without_colibri(b, &.{.{ .name = "protobuf", .module = protobuf }}, target) }},
+        // `connect_zig` reads stdx whatever a program names (decision 34 as amended).
+        .imports = &.{.{ .name = "connect_zig", .module = without_colibri(b, &.{
+            .{ .name = "protobuf", .module = protobuf },
+            .{ .name = "stdx", .module = stdx_module },
+        }, target) }},
     });
     const routed = routed_modules(b, &copies, stdx, protobuf, public_names, target);
     const exe = b.addExecutable(.{
@@ -81,7 +86,7 @@ pub fn add(b: *std.Build, public_names: *std.Build.Module, target: std.Build.Res
     install.dependOn(&b.addInstallArtifact(exe, .{}).step);
     install.dependOn(&b.addInstallArtifact(call_exe, .{}).step);
     // stdx, whose `regex` runs the rules and whose `platform` holds the CPU features it takes.
-    install.dependOn(add_validate(b, protobuf, public_names, release_fast(b, &copies, stdx.module("stdx")), target));
+    install.dependOn(add_validate(b, protobuf, public_names, stdx_module, target));
     b.step("bench", "Benchmark the protobuf runtime and a routed call, ReleaseFast: zig build bench -- [--quick] [--write <dir>]").dependOn(&call_run.step);
 
     // `zig build costs`: the costs table of docs/performance.md, timed on the machine that runs it.
