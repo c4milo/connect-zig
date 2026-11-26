@@ -7,7 +7,7 @@ fetched copy of connect-zig on each push.
 ## 1. Add the package
 
 ```sh
-zig fetch --save git+https://github.com/c4milo/connect-zig#v0.5.0
+zig fetch --save git+https://github.com/c4milo/connect-zig#v0.6.0
 ```
 
 Then add its one module, `connect_zig`, to your program in `build.zig` ([decision 52](decisions.md)):

@@ -8,7 +8,7 @@ are in [docs/decisions.md](docs/decisions.md), and the steps and their measureme
 connect-zig follows [Semantic Versioning](https://semver.org/). Before 1.0, a minor version may
 change the public API, and the entry marks each change that does.
 
-## Unreleased
+## v0.6.0 (2026-11-26)
 
 It builds on colibri v0.21.0, at 2ab43623, and on stdx at 5de7d89f and Rotor at af06860, the
 commits that colibri pins. stdx brings chapulin at f29c066a.
