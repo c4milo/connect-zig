@@ -8,6 +8,7 @@
 const std = @import("std");
 const colibri = @import("connect_zig").colibri;
 const server = @import("connect_zig").colibri.server;
+const stdx = @import("stdx");
 const identity = @import("test_identity");
 const constants = @import("constants.zig");
 
@@ -32,15 +33,32 @@ pub fn Served(comptime App: type, comptime Router: type) type {
     };
 }
 
+/// The system's secure entropy, through the program's I/O: the random source of the server's
+/// `stdx.crypto` context, which each TLS session draws its secrets from.
+const SecureRandom = struct {
+    io: std.Io,
+
+    fn fill(pointer: *anyopaque, bytes: []u8) void {
+        const self: *SecureRandom = @ptrCast(@alignCast(pointer));
+        self.io.randomSecure(bytes) catch |failure| std.debug.panic("no entropy: {t}", .{failure});
+    }
+
+    fn random(self: *SecureRandom) std.Random {
+        return .{ .ptr = self, .fillFn = fill };
+    }
+};
+
 fn serve(http_server: *Server, router: anytype, app: anytype, tls_buffer: []u8, init: std.process.Init) !void {
     const port = try port_of(init);
     // The Unix time when the server starts, which its TLS session tickets carry.
     const unix_seconds: u64 = @intCast(@max(std.Io.Clock.real.now(init.io).toSeconds(), 0));
+    // The server's `stdx.crypto` context states no CPU feature, so each TLS session runs ChaCha20
+    // alone, as the in-memory rounds do (colibri decision 175).
+    var secure: SecureRandom = .{ .io = init.io };
     try http_server.init(&.{
         .port = port,
         .identity = .{ .chain = identity.chain_pem, .key = identity.key_pem },
-        // No `crypto`: the server makes its `stdx.crypto` context of `engine.cpu_features` and the
-        // system's entropy (colibri decision 175).
+        .crypto = stdx.crypto.init(.none(), secure.random()),
         .unix_seconds = unix_seconds,
         .engine = .{ .tls_buffer = tls_buffer, .cpu_features = app.cpu_features },
     }, router, app);

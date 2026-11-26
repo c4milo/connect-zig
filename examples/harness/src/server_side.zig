@@ -110,7 +110,7 @@ pub const ServerSide = struct {
             .prng = .init(constants.server_seed),
             .crypto = undefined,
         };
-        self.crypto = stdx.crypto.init(.{}, self.prng.random());
+        self.crypto = stdx.crypto.init(.none(), self.prng.random());
         self.prng.random().bytes(&self.cookie_key);
         self.prng.random().bytes(&self.ticket_key);
         // The chain, the end-entity first, and the P-256 key the end-entity certificate carries.

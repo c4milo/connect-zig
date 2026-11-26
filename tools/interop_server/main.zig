@@ -7,6 +7,7 @@ const std = @import("std");
 const connect = @import("connect");
 const server = @import("colibri").server;
 const colibri = @import("colibri");
+const stdx = @import("stdx");
 const rpc = @import("connect_colibri");
 const identity = @import("test_identity");
 const coverage = @import("coverage");
@@ -30,6 +31,21 @@ const Router = server.Router(App, .{
 }, .{ .requests = constants.requests, .response_bytes = constants.response_bytes, .body_bytes = constants.body_bytes, .header_bytes = 0 });
 
 const Server = colibri.Server(.{ .tcp_connections = constants.tcp_connections, .quic_connections = constants.quic_connections }, .private);
+
+/// The system's secure entropy, through the program's I/O: the random source of the server's
+/// `stdx.crypto` context, which each TLS session draws its secrets from.
+const SecureRandom = struct {
+    io: std.Io,
+
+    fn fill(pointer: *anyopaque, bytes: []u8) void {
+        const self: *SecureRandom = @ptrCast(@alignCast(pointer));
+        self.io.randomSecure(bytes) catch |failure| std.debug.panic("no entropy: {t}", .{failure});
+    }
+
+    fn random(self: *SecureRandom) std.Random {
+        return .{ .ptr = self, .fillFn = fill };
+    }
+};
 
 /// All the program holds, which `main` allocates once before the first call (decision 42).
 const State = struct {
@@ -60,11 +76,13 @@ pub fn main(init: std.process.Init) !void {
     } };
     // The Unix time when the server starts, which its TLS session tickets carry.
     const unix_seconds: u64 = @intCast(@max(std.Io.Clock.real.now(init.io).toSeconds(), 0));
+    // The server's `stdx.crypto` context states no CPU feature, so each TLS session runs ChaCha20
+    // alone (colibri decision 175).
+    var secure: SecureRandom = .{ .io = init.io };
     try state.http_server.init(&.{
         .port = port,
         .identity = .{ .chain = identity.chain_pem, .key = identity.key_pem },
-        // No `crypto`: the server makes its `stdx.crypto` context of `engine.cpu_features` and the
-        // system's entropy (colibri decision 175).
+        .crypto = stdx.crypto.init(.none(), secure.random()),
         .unix_seconds = unix_seconds,
         .engine = .{ .tls_buffer = &state.tls_buffer, .cpu_features = state.app.cpu_features },
     }, &state.router, &state.app);

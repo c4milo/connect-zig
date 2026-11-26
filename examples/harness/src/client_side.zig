@@ -124,7 +124,7 @@ pub const ClientSide = struct {
         self.link = link;
         self.datagram_link = datagram_link;
         self.prng = .init(constants.client_seed);
-        self.crypto = stdx.crypto.init(.{}, self.prng.random());
+        self.crypto = stdx.crypto.init(.none(), self.prng.random());
         self.tcp = .{ .slot = 0, .generation = 0 };
         self.listener_count = 0;
         // The CA the client trusts: its subject Name and SubjectPublicKeyInfo.

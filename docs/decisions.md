@@ -728,7 +728,8 @@ first. Cite an entry by number in code and commits ("decision 6").
       context: `colibri.Server` then makes one of its engine's CPU features and the system's
       entropy. The examples' harness, the quickstart, the conformance client and the interop client
       each make theirs; the harness's and the conformance client's draw from their seeded
-      generators and state no CPU feature, as their TLS ran before. Beaten: `connect_zig` naming
+      generators. Each test program's context, the harness's `serve` and the interop server's
+      included, states `CpuFeatures.none()`, so its TLS runs ChaCha20 alone, as it ran before. Beaten: `connect_zig` naming
       stdx's `crypto`, a public name that would move with each stdx release.
 
 35. **A call keeps values of the type the program declares.** Ruled by the owner on

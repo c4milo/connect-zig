@@ -67,7 +67,7 @@ pub const Transport = struct {
         var seed: [std.Random.DefaultCsprng.secret_seed_length]u8 = @splat(0);
         io.random(&seed);
         self.csprng = .init(seed);
-        self.crypto = stdx.crypto.init(.{}, self.csprng.random());
+        self.crypto = stdx.crypto.init(.none(), self.csprng.random());
         self.stream = null;
         self.tcp = .{ .slot = 0, .generation = 0 };
         self.input_len = 0;
