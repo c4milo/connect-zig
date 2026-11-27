@@ -1,0 +1,90 @@
+{
+ "version": 1,
+ "chart": "speed-vs-go",
+ "machine": "x86_64, AMD EPYC 7763 64-Core Processor",
+ "run": "313",
+ "commit": "c6cce91",
+ "tag": "v0.7.0",
+ "values": {
+  "small, binary encode": {
+   "label": "small, binary encode, speed in multiples of Go's",
+   "value": 10.05,
+   "higher_is_better": true
+  },
+  "medium, binary encode": {
+   "label": "medium, binary encode, speed in multiples of Go's",
+   "value": 11.12,
+   "higher_is_better": true
+  },
+  "large, binary encode": {
+   "label": "large, binary encode, speed in multiples of Go's",
+   "value": 3.32,
+   "higher_is_better": true
+  },
+  "deep, binary encode": {
+   "label": "deep, binary encode, speed in multiples of Go's",
+   "value": 3.5,
+   "higher_is_better": true
+  },
+  "small, binary decode+walk": {
+   "label": "small, binary decode+walk, speed in multiples of Go's",
+   "value": 6.51,
+   "higher_is_better": true
+  },
+  "medium, binary decode+walk": {
+   "label": "medium, binary decode+walk, speed in multiples of Go's",
+   "value": 10.07,
+   "higher_is_better": true
+  },
+  "large, binary decode+walk": {
+   "label": "large, binary decode+walk, speed in multiples of Go's",
+   "value": 4.43,
+   "higher_is_better": true
+  },
+  "deep, binary decode+walk": {
+   "label": "deep, binary decode+walk, speed in multiples of Go's",
+   "value": 4.91,
+   "higher_is_better": true
+  },
+  "small, JSON encode": {
+   "label": "small, JSON encode, speed in multiples of Go's",
+   "value": 10.48,
+   "higher_is_better": true
+  },
+  "medium, JSON encode": {
+   "label": "medium, JSON encode, speed in multiples of Go's",
+   "value": 9.4,
+   "higher_is_better": true
+  },
+  "large, JSON encode": {
+   "label": "large, JSON encode, speed in multiples of Go's",
+   "value": 8.15,
+   "higher_is_better": true
+  },
+  "deep, JSON encode": {
+   "label": "deep, JSON encode, speed in multiples of Go's",
+   "value": 17.8,
+   "higher_is_better": true
+  },
+  "small, JSON decode+walk": {
+   "label": "small, JSON decode+walk, speed in multiples of Go's",
+   "value": 11.74,
+   "higher_is_better": true
+  },
+  "medium, JSON decode+walk": {
+   "label": "medium, JSON decode+walk, speed in multiples of Go's",
+   "value": 14.57,
+   "higher_is_better": true
+  },
+  "large, JSON decode+walk": {
+   "label": "large, JSON decode+walk, speed in multiples of Go's",
+   "value": 11.95,
+   "higher_is_better": true
+  },
+  "deep, JSON decode+walk": {
+   "label": "deep, JSON decode+walk, speed in multiples of Go's",
+   "value": 13.04,
+   "higher_is_better": true
+  }
+ }
+}

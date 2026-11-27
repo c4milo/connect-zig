@@ -1,0 +1,108 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 840 656" width="840" height="656" role="img" aria-labelledby="t d">
+<title id="t">A decode and a validation of one message by five protovalidate implementations, against protovalidate-go</title>
+<desc id="d">connect-zig decodes and validates 13 to 58 times as fast as protovalidate-go. Each bar is an implementation's speed in multiples of protovalidate-go v1.4.1's, which is protovalidate-go's time over the implementation's, on a logarithmic axis. small valid: connect-zig 16×, protovalidate-buffa 0.8.0 6.4×, prost-protovalidate 0.6.1 0.99×, protovalidate-es 1.3.0 0.63×; small invalid: connect-zig 36×, protovalidate-buffa 0.8.0 17×, prost-protovalidate 0.6.1 0.93×, protovalidate-es 1.3.0 0.51×; medium valid: connect-zig 13×, protovalidate-buffa 0.8.0 7.6×, prost-protovalidate 0.6.1 0.22×, protovalidate-es 1.3.0 0.19×; medium invalid: connect-zig 29×, protovalidate-buffa 0.8.0 11×, prost-protovalidate 0.6.1 0.32×, protovalidate-es 1.3.0 0.35×; rules valid: connect-zig 52×, protovalidate-buffa 0.8.0 29×, prost-protovalidate 0.6.1 0.43×, protovalidate-es 1.3.0 0.40×; rules invalid: connect-zig 58×, protovalidate-buffa 0.8.0 27×, prost-protovalidate 0.6.1 0.51×, protovalidate-es 1.3.0 0.42×.</desc>
+<style>
+svg { --surface:#fcfcfb; --ink:#0b0b0b; --ink2:#52514e; --muted:#8a8984; --grid:#e4e3df; --zig:#2a78d6; --buffa:#eb6834; --prost:#c79a2c; --es:#3a9b6c; --unit:#52514e; }
+@media (prefers-color-scheme: dark) {
+  svg { --surface:#1a1a19; --ink:#f0efec; --ink2:#c3c2b7; --muted:#8f8e86; --grid:#33332f; --zig:#3987e5; --buffa:#d95926; --prost:#d6aa3e; --es:#4caf7d; --unit:#c3c2b7; }
+}
+text { font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; fill: var(--ink); }
+.title { font-size: 17px; font-weight: 600; }
+.sub { font-size: 12.5px; fill: var(--ink2); }
+.row { font-size: 12.5px; fill: var(--ink2); }
+.val { font-size: 11px; font-weight: 600; paint-order: stroke; stroke: var(--surface); stroke-width: 3px; stroke-linejoin: round; }
+.tick { font-size: 11px; fill: var(--muted); }
+.note { font-size: 11.5px; fill: var(--ink2); }
+.legend { font-size: 12.5px; fill: var(--ink2); }
+.better { fill: #1a7f37; } .worse { fill: #cf222e; }
+@media (prefers-color-scheme: dark) { .better { fill: #3fb950; } .worse { fill: #f85149; } }
+.was { stroke: var(--ink2); stroke-width: 1.5; stroke-dasharray: 2 2; }
+</style>
+<rect width="840" height="656" rx="8" fill="var(--surface)"/>
+<text class="title" x="24" y="34">connect-zig decodes and validates 13 to 58 times as fast as protovalidate-go</text>
+<text class="sub" x="24" y="56">One decode of a request message and one validation of it against the rules of its schema, in memory.</text>
+<text class="sub" x="24" y="74">Each bar is a speed in multiples of protovalidate-go v1.4.1's: its time over the bar's time, on a logarithmic axis.</text>
+<text class="sub" x="24" y="92">connect-zig is the fastest in 6 of 6 cases. Each implementation gave each message the same verdict.</text>
+<text class="sub" x="24" y="110">One CI job ran all five: run 313, commit c6cce91, AMD EPYC 9V74 80-Core Processor, x86_64.</text>
+<rect x="24" y="118" width="12" height="12" rx="2" fill="var(--zig)"/>
+<text class="legend" x="42" y="128">connect-zig</text>
+<rect x="139" y="118" width="12" height="12" rx="2" fill="var(--buffa)"/>
+<text class="legend" x="157" y="128">protovalidate-buffa 0.8.0</text>
+<rect x="352" y="118" width="12" height="12" rx="2" fill="var(--prost)"/>
+<text class="legend" x="370" y="128">prost-protovalidate 0.6.1</text>
+<rect x="565" y="118" width="12" height="12" rx="2" fill="var(--es)"/>
+<text class="legend" x="583" y="128">protovalidate-es 1.3.0</text>
+<line x1="24" y1="144" x2="40" y2="144" stroke="var(--unit)" stroke-width="1.5" stroke-dasharray="4 3"/>
+<text class="legend" x="46" y="148">protovalidate-go v1.4.1: the unit</text>
+<line x1="164.0" y1="182" x2="164.0" y2="584" stroke="var(--grid)" stroke-width="1"/>
+<text class="tick" x="164.0" y="598" text-anchor="middle">0.1×</text>
+<line x1="357.3" y1="182" x2="357.3" y2="584" stroke="var(--grid)" stroke-width="1"/>
+<text class="tick" x="357.3" y="598" text-anchor="middle">1×</text>
+<line x1="550.7" y1="182" x2="550.7" y2="584" stroke="var(--grid)" stroke-width="1"/>
+<text class="tick" x="550.7" y="598" text-anchor="middle">10×</text>
+<line x1="744.0" y1="182" x2="744.0" y2="584" stroke="var(--grid)" stroke-width="1"/>
+<text class="tick" x="744.0" y="598" text-anchor="middle">100×</text>
+<text class="row" x="154" y="217.0" text-anchor="end">small valid</text>
+<path d="M164.0,186 h422.8 a4.0,4.0 0 0 1 4.0,4.0 v4.0 a4.0,4.0 0 0 1 -4.0,4.0 h-422.8 z" fill="var(--zig)"/>
+
+<text class="val" x="595.8" y="196">16×, 40 ns</text>
+<path d="M164.0,200 h345.0 a4.0,4.0 0 0 1 4.0,4.0 v4.0 a4.0,4.0 0 0 1 -4.0,4.0 h-345.0 z" fill="var(--buffa)"/>
+<text class="val" x="518.0" y="210">6.4×</text>
+<path d="M164.0,214 h188.3 a4.0,4.0 0 0 1 4.0,4.0 v4.0 a4.0,4.0 0 0 1 -4.0,4.0 h-188.3 z" fill="var(--prost)"/>
+<text class="val" x="361.3" y="224">0.99×</text>
+<path d="M164.0,228 h150.1 a4.0,4.0 0 0 1 4.0,4.0 v4.0 a4.0,4.0 0 0 1 -4.0,4.0 h-150.1 z" fill="var(--es)"/>
+<text class="val" x="323.1" y="238">0.63×</text>
+<text class="row" x="154" y="285.0" text-anchor="end">small invalid</text>
+<path d="M164.0,254 h489.2 a4.0,4.0 0 0 1 4.0,4.0 v4.0 a4.0,4.0 0 0 1 -4.0,4.0 h-489.2 z" fill="var(--zig)"/>
+
+<text class="val" x="662.2" y="264">36×, 58 ns</text>
+<path d="M164.0,268 h426.5 a4.0,4.0 0 0 1 4.0,4.0 v4.0 a4.0,4.0 0 0 1 -4.0,4.0 h-426.5 z" fill="var(--buffa)"/>
+<text class="val" x="599.5" y="278">17×</text>
+<path d="M164.0,282 h183.5 a4.0,4.0 0 0 1 4.0,4.0 v4.0 a4.0,4.0 0 0 1 -4.0,4.0 h-183.5 z" fill="var(--prost)"/>
+<text class="val" x="356.5" y="292">0.93×</text>
+<path d="M164.0,296 h133.6 a4.0,4.0 0 0 1 4.0,4.0 v4.0 a4.0,4.0 0 0 1 -4.0,4.0 h-133.6 z" fill="var(--es)"/>
+<text class="val" x="306.6" y="306">0.51×</text>
+<text class="row" x="154" y="353.0" text-anchor="end">medium valid</text>
+<path d="M164.0,322 h407.4 a4.0,4.0 0 0 1 4.0,4.0 v4.0 a4.0,4.0 0 0 1 -4.0,4.0 h-407.4 z" fill="var(--zig)"/>
+
+<text class="val" x="580.4" y="332">13×, 487 ns</text>
+<path d="M164.0,336 h359.2 a4.0,4.0 0 0 1 4.0,4.0 v4.0 a4.0,4.0 0 0 1 -4.0,4.0 h-359.2 z" fill="var(--buffa)"/>
+<text class="val" x="532.2" y="346">7.6×</text>
+<path d="M164.0,350 h62.9 a4.0,4.0 0 0 1 4.0,4.0 v4.0 a4.0,4.0 0 0 1 -4.0,4.0 h-62.9 z" fill="var(--prost)"/>
+<text class="val" x="235.9" y="360">0.22×</text>
+<path d="M164.0,364 h49.1 a4.0,4.0 0 0 1 4.0,4.0 v4.0 a4.0,4.0 0 0 1 -4.0,4.0 h-49.1 z" fill="var(--es)"/>
+<text class="val" x="222.1" y="374">0.19×</text>
+<text class="row" x="154" y="421.0" text-anchor="end">medium invalid</text>
+<path d="M164.0,390 h471.7 a4.0,4.0 0 0 1 4.0,4.0 v4.0 a4.0,4.0 0 0 1 -4.0,4.0 h-471.7 z" fill="var(--zig)"/>
+
+<text class="val" x="644.7" y="400">29×, 413 ns</text>
+<path d="M164.0,404 h388.7 a4.0,4.0 0 0 1 4.0,4.0 v4.0 a4.0,4.0 0 0 1 -4.0,4.0 h-388.7 z" fill="var(--buffa)"/>
+<text class="val" x="561.7" y="414">11×</text>
+<path d="M164.0,418 h92.6 a4.0,4.0 0 0 1 4.0,4.0 v4.0 a4.0,4.0 0 0 1 -4.0,4.0 h-92.6 z" fill="var(--prost)"/>
+<text class="val" x="265.6" y="428">0.32×</text>
+<path d="M164.0,432 h100.6 a4.0,4.0 0 0 1 4.0,4.0 v4.0 a4.0,4.0 0 0 1 -4.0,4.0 h-100.6 z" fill="var(--es)"/>
+<text class="val" x="273.6" y="442">0.35×</text>
+<text class="row" x="154" y="489.0" text-anchor="end">rules valid</text>
+<path d="M164.0,458 h520.9 a4.0,4.0 0 0 1 4.0,4.0 v4.0 a4.0,4.0 0 0 1 -4.0,4.0 h-520.9 z" fill="var(--zig)"/>
+
+<text class="val" x="693.9" y="468">52×, 159 ns</text>
+<path d="M164.0,472 h471.2 a4.0,4.0 0 0 1 4.0,4.0 v4.0 a4.0,4.0 0 0 1 -4.0,4.0 h-471.2 z" fill="var(--buffa)"/>
+<text class="val" x="644.2" y="482">29×</text>
+<path d="M164.0,486 h118.6 a4.0,4.0 0 0 1 4.0,4.0 v4.0 a4.0,4.0 0 0 1 -4.0,4.0 h-118.6 z" fill="var(--prost)"/>
+<text class="val" x="291.6" y="496">0.43×</text>
+<path d="M164.0,500 h111.9 a4.0,4.0 0 0 1 4.0,4.0 v4.0 a4.0,4.0 0 0 1 -4.0,4.0 h-111.9 z" fill="var(--es)"/>
+<text class="val" x="284.9" y="510">0.40×</text>
+<text class="row" x="154" y="557.0" text-anchor="end">rules invalid</text>
+<path d="M164.0,526 h530.3 a4.0,4.0 0 0 1 4.0,4.0 v4.0 a4.0,4.0 0 0 1 -4.0,4.0 h-530.3 z" fill="var(--zig)"/>
+
+<text class="val" x="703.3" y="536">58×, 156 ns</text>
+<path d="M164.0,540 h465.0 a4.0,4.0 0 0 1 4.0,4.0 v4.0 a4.0,4.0 0 0 1 -4.0,4.0 h-465.0 z" fill="var(--buffa)"/>
+<text class="val" x="638.0" y="550">27×</text>
+<path d="M164.0,554 h132.1 a4.0,4.0 0 0 1 4.0,4.0 v4.0 a4.0,4.0 0 0 1 -4.0,4.0 h-132.1 z" fill="var(--prost)"/>
+<text class="val" x="305.1" y="564">0.51×</text>
+<path d="M164.0,568 h116.9 a4.0,4.0 0 0 1 4.0,4.0 v4.0 a4.0,4.0 0 0 1 -4.0,4.0 h-116.9 z" fill="var(--es)"/>
+<text class="val" x="289.9" y="578">0.42×</text>
+<line x1="357.3" y1="178" x2="357.3" y2="584" stroke="var(--unit)" stroke-width="1.5" stroke-dasharray="4 3"/>
+<text class="note" x="361.3" y="176">1× = as fast as protovalidate-go</text>
+<text class="sub" x="24" y="644">v0.6.0 ran on another CPU model, so this chart marks no change since it.</text>
+</svg>

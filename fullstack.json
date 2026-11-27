@@ -1,0 +1,15 @@
+{
+ "version": 1,
+ "chart": "fullstack",
+ "machine": "AMD EPYC 7763 64-Core Processor, 4 CPUs",
+ "run": "313",
+ "commit": "c6cce91",
+ "tag": "v0.7.0",
+ "values": {
+  "connect-zig": {
+   "label": "connect-zig, spans a second over TLS",
+   "value": 607418.0,
+   "higher_is_better": true
+  }
+ }
+}

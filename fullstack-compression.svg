@@ -1,0 +1,166 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 840 646" width="840" height="646" role="img" aria-labelledby="t d">
+<title id="t">What gzip, zstd and brotli leave of each Connect receiver's rate over TLS, as a share of the same receiver uncompressed</title>
+<desc id="d">In gzip, zstd and brotli, connect-zig holds 111%, 113% and 88% of its uncompressed rate. connect-zig uncompressed: 693,288 spans a second held, 1,563 calls a second at peak; connect-zig gzip: 766,312 spans a second held, 111% of uncompressed, 1,884 calls a second at peak; connect-zig zstd: 784,542 spans a second held, 113% of uncompressed, 1,923 calls a second at peak; connect-zig brotli: 638,582 spans a second held, 88% of uncompressed, 1,698 calls a second at peak; connect-go uncompressed: 166,355 spans a second held, 461 calls a second at peak; connect-go gzip: 138,840 spans a second held, 77% of uncompressed, 413 calls a second at peak; connect-go zstd: 157,018 spans a second held, 94% of uncompressed, 435 calls a second at peak; connect-go brotli: 131,720 spans a second held, 79% of uncompressed, 402 calls a second at peak; connect-rust uncompressed: 445,414 spans a second held, 1,152 calls a second at peak; connect-rust gzip: 322,995 spans a second held, 73% of uncompressed, 919 calls a second at peak; connect-rust zstd: 424,982 spans a second held, 95% of uncompressed, 1,070 calls a second at peak; connect-rust brotli: 368,158 spans a second held, 83% of uncompressed, 932 calls a second at peak.</desc>
+<style>
+svg { --surface:#fcfcfb; --ink:#0b0b0b; --ink2:#52514e; --muted:#8a8984; --grid:#e4e3df; --zig:#2a78d6; --go:#1a8a82; --rust:#b5562b; }
+@media (prefers-color-scheme: dark) {
+  svg { --surface:#1a1a19; --ink:#f0efec; --ink2:#c3c2b7; --muted:#8f8e86; --grid:#33332f; --zig:#3987e5; --go:#2fa59c; --rust:#d06d3f; }
+}
+text { font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; fill: var(--ink); }
+.title { font-size: 16px; font-weight: 600; }
+.sub { font-size: 12.5px; fill: var(--ink2); }
+.panel { font-size: 13px; font-weight: 600; }
+.server { font-size: 12.5px; font-weight: 600; }
+.row { font-size: 12.5px; fill: var(--ink2); }
+.val { font-size: 11px; font-weight: 600; fill: var(--ink2); }
+.tick { font-size: 11px; fill: var(--muted); }
+.better { fill: #1a7f37; } .worse { fill: #cf222e; }
+@media (prefers-color-scheme: dark) { .better { fill: #3fb950; } .worse { fill: #f85149; } }
+.was { stroke: var(--ink2); stroke-width: 1.5; stroke-dasharray: 2 2; }
+</style>
+<rect width="840" height="646" rx="8" fill="var(--surface)"/>
+<text class="title" x="24" y="34">In gzip, zstd and brotli, connect-zig holds 111%, 113% and 88% of its uncompressed rate</text>
+<text class="sub" x="24" y="56">Each receiver runs on one core over TLS, on its library's own decoders. stdx's encoders wrote each export as a</text>
+<text class="sub" x="24" y="74">connect-zig client does: gzip at stdx's default level, zstd and brotli at level 1. Each bar is a share of the</text>
+<text class="sub" x="24" y="92">same receiver uncompressed, net of the kernel, TLS, and HTTP/2 work a smaller export saves. A whisker spans the rounds: in the climb,</text>
+<text class="sub" x="24" y="110">each round's share of uncompressed in the same round.</text>
+<text class="sub" x="24" y="128">One CI job ran all, and checked every span: run 313, commit c6cce91, AMD EPYC 9V74 80-Core Processor, 4 CPUs.</text>
+<text class="panel" x="146" y="164">Spans a second held in the climb</text>
+<text class="panel" x="516" y="164">Calls a second at peak, 512 spans</text>
+<line x1="294.8" y1="180" x2="294.8" y2="608" stroke="var(--muted)" stroke-width="1" stroke-dasharray="4 3"/>
+<text class="tick" x="294.8" y="178" text-anchor="middle">100%</text>
+<line x1="645.6" y1="180" x2="645.6" y2="608" stroke="var(--muted)" stroke-width="1" stroke-dasharray="4 3"/>
+<text class="tick" x="645.6" y="178" text-anchor="middle">100%</text>
+<text class="server" x="24" y="211.0">connect-zig</text>
+<text class="row" x="134" y="233.0" text-anchor="end">uncompressed</text>
+<rect x="146" y="220" width="148.8" height="18" rx="3" fill="var(--zig)"/>
+<line x1="294.8" y1="229.0" x2="302.6" y2="229.0" stroke="var(--ink)" stroke-width="1.5"/>
+<line x1="302.6" y1="225.0" x2="302.6" y2="233.0" stroke="var(--ink)" stroke-width="1.5"/>
+<text class="val" x="310.6" y="233.0">693,288/s</text>
+<rect x="516" y="220" width="129.6" height="18" rx="3" fill="var(--zig)"/>
+<line x1="640.7" y1="229.0" x2="649.3" y2="229.0" stroke="var(--ink)" stroke-width="1.5"/>
+<line x1="640.7" y1="225.0" x2="640.7" y2="233.0" stroke="var(--ink)" stroke-width="1.5"/>
+<line x1="649.3" y1="225.0" x2="649.3" y2="233.0" stroke="var(--ink)" stroke-width="1.5"/>
+<text class="val" x="657.3" y="233.0">1,563/s</text>
+<text class="row" x="134" y="259.0" text-anchor="end">gzip</text>
+
+<rect x="146" y="246" width="165.1" height="18" rx="3" fill="var(--zig)"/>
+<line x1="302.2" y1="255.0" x2="311.1" y2="255.0" stroke="var(--ink)" stroke-width="1.5"/>
+<line x1="302.2" y1="251.0" x2="302.2" y2="259.0" stroke="var(--ink)" stroke-width="1.5"/>
+<text class="val" x="319.1" y="259.0">111% · 766,312/s</text>
+
+<rect x="516" y="246" width="156.3" height="18" rx="3" fill="var(--zig)"/>
+<line x1="671.0" y1="255.0" x2="673.7" y2="255.0" stroke="var(--ink)" stroke-width="1.5"/>
+<line x1="671.0" y1="251.0" x2="671.0" y2="259.0" stroke="var(--ink)" stroke-width="1.5"/>
+<line x1="673.7" y1="251.0" x2="673.7" y2="259.0" stroke="var(--ink)" stroke-width="1.5"/>
+<text class="val" x="681.7" y="259.0">121% · 1,884/s</text>
+<text class="row" x="134" y="285.0" text-anchor="end">zstd</text>
+
+<rect x="146" y="272" width="168.1" height="18" rx="3" fill="var(--zig)"/>
+<line x1="306.7" y1="281.0" x2="314.1" y2="281.0" stroke="var(--ink)" stroke-width="1.5"/>
+<line x1="306.7" y1="277.0" x2="306.7" y2="285.0" stroke="var(--ink)" stroke-width="1.5"/>
+<text class="val" x="322.1" y="285.0">113% · 784,542/s</text>
+
+<rect x="516" y="272" width="159.5" height="18" rx="3" fill="var(--zig)"/>
+<line x1="672.4" y1="281.0" x2="676.0" y2="281.0" stroke="var(--ink)" stroke-width="1.5"/>
+<line x1="672.4" y1="277.0" x2="672.4" y2="285.0" stroke="var(--ink)" stroke-width="1.5"/>
+<line x1="676.0" y1="277.0" x2="676.0" y2="285.0" stroke="var(--ink)" stroke-width="1.5"/>
+<text class="val" x="684.0" y="285.0">123% · 1,923/s</text>
+<text class="row" x="134" y="311.0" text-anchor="end">brotli</text>
+
+<rect x="146" y="298" width="130.9" height="18" rx="3" fill="var(--zig)"/>
+<line x1="272.5" y1="307.0" x2="282.9" y2="307.0" stroke="var(--ink)" stroke-width="1.5"/>
+<line x1="272.5" y1="303.0" x2="272.5" y2="311.0" stroke="var(--ink)" stroke-width="1.5"/>
+<line x1="282.9" y1="303.0" x2="282.9" y2="311.0" stroke="var(--ink)" stroke-width="1.5"/>
+<text class="val" x="290.9" y="311.0">88% · 638,582/s</text>
+
+<rect x="516" y="298" width="140.8" height="18" rx="3" fill="var(--zig)"/>
+<line x1="655.3" y1="307.0" x2="658.6" y2="307.0" stroke="var(--ink)" stroke-width="1.5"/>
+<line x1="655.3" y1="303.0" x2="655.3" y2="311.0" stroke="var(--ink)" stroke-width="1.5"/>
+<line x1="658.6" y1="303.0" x2="658.6" y2="311.0" stroke="var(--ink)" stroke-width="1.5"/>
+<text class="val" x="666.6" y="311.0">109% · 1,698/s</text>
+<text class="server" x="24" y="351.0">connect-go</text>
+<text class="row" x="134" y="373.0" text-anchor="end">uncompressed</text>
+<rect x="146" y="360" width="148.8" height="18" rx="3" fill="var(--go)"/>
+<line x1="294.8" y1="369.0" x2="316.0" y2="369.0" stroke="var(--ink)" stroke-width="1.5"/>
+<line x1="316.0" y1="365.0" x2="316.0" y2="373.0" stroke="var(--ink)" stroke-width="1.5"/>
+<text class="val" x="324.0" y="373.0">166,355/s</text>
+<rect x="516" y="360" width="129.6" height="18" rx="3" fill="var(--go)"/>
+<line x1="641.4" y1="369.0" x2="651.5" y2="369.0" stroke="var(--ink)" stroke-width="1.5"/>
+<line x1="641.4" y1="365.0" x2="641.4" y2="373.0" stroke="var(--ink)" stroke-width="1.5"/>
+<line x1="651.5" y1="365.0" x2="651.5" y2="373.0" stroke="var(--ink)" stroke-width="1.5"/>
+<text class="val" x="659.5" y="373.0">461/s</text>
+<text class="row" x="134" y="399.0" text-anchor="end">gzip</text>
+<rect x="146" y="386" width="114.6" height="18" rx="3" fill="var(--go)"/>
+<line x1="257.6" y1="395.0" x2="269.5" y2="395.0" stroke="var(--ink)" stroke-width="1.5"/>
+<line x1="257.6" y1="391.0" x2="257.6" y2="399.0" stroke="var(--ink)" stroke-width="1.5"/>
+<line x1="269.5" y1="391.0" x2="269.5" y2="399.0" stroke="var(--ink)" stroke-width="1.5"/>
+<text class="val" x="277.5" y="399.0">77% · 138,840/s</text>
+<rect x="516" y="386" width="116.1" height="18" rx="3" fill="var(--go)"/>
+<line x1="632.1" y1="395.0" x2="632.4" y2="395.0" stroke="var(--ink)" stroke-width="1.5"/>
+<line x1="632.4" y1="391.0" x2="632.4" y2="399.0" stroke="var(--ink)" stroke-width="1.5"/>
+<text class="val" x="640.4" y="399.0">90% · 413/s</text>
+<text class="row" x="134" y="425.0" text-anchor="end">zstd</text>
+<rect x="146" y="412" width="139.8" height="18" rx="3" fill="var(--go)"/>
+<line x1="263.5" y1="421.0" x2="285.8" y2="421.0" stroke="var(--ink)" stroke-width="1.5"/>
+<line x1="263.5" y1="417.0" x2="263.5" y2="425.0" stroke="var(--ink)" stroke-width="1.5"/>
+<text class="val" x="293.8" y="425.0">94% · 157,018/s</text>
+<rect x="516" y="412" width="122.3" height="18" rx="3" fill="var(--go)"/>
+<line x1="632.7" y1="421.0" x2="642.5" y2="421.0" stroke="var(--ink)" stroke-width="1.5"/>
+<line x1="632.7" y1="417.0" x2="632.7" y2="425.0" stroke="var(--ink)" stroke-width="1.5"/>
+<line x1="642.5" y1="417.0" x2="642.5" y2="425.0" stroke="var(--ink)" stroke-width="1.5"/>
+<text class="val" x="650.5" y="425.0">94% · 435/s</text>
+<text class="row" x="134" y="451.0" text-anchor="end">brotli</text>
+<rect x="146" y="438" width="117.5" height="18" rx="3" fill="var(--go)"/>
+<line x1="257.6" y1="447.0" x2="263.5" y2="447.0" stroke="var(--ink)" stroke-width="1.5"/>
+<line x1="257.6" y1="443.0" x2="257.6" y2="451.0" stroke="var(--ink)" stroke-width="1.5"/>
+<text class="val" x="271.5" y="451.0">79% · 131,720/s</text>
+<rect x="516" y="438" width="113.1" height="18" rx="3" fill="var(--go)"/>
+<line x1="628.2" y1="447.0" x2="631.9" y2="447.0" stroke="var(--ink)" stroke-width="1.5"/>
+<line x1="628.2" y1="443.0" x2="628.2" y2="451.0" stroke="var(--ink)" stroke-width="1.5"/>
+<line x1="631.9" y1="443.0" x2="631.9" y2="451.0" stroke="var(--ink)" stroke-width="1.5"/>
+<text class="val" x="639.9" y="451.0">87% · 402/s</text>
+<text class="server" x="24" y="491.0">connect-rust</text>
+<text class="row" x="134" y="513.0" text-anchor="end">uncompressed</text>
+<rect x="146" y="500" width="148.8" height="18" rx="3" fill="var(--rust)"/>
+<line x1="294.8" y1="509.0" x2="298.6" y2="509.0" stroke="var(--ink)" stroke-width="1.5"/>
+<line x1="298.6" y1="505.0" x2="298.6" y2="513.0" stroke="var(--ink)" stroke-width="1.5"/>
+<text class="val" x="306.6" y="513.0">445,414/s</text>
+<rect x="516" y="500" width="129.6" height="18" rx="3" fill="var(--rust)"/>
+<line x1="642.5" y1="509.0" x2="647.1" y2="509.0" stroke="var(--ink)" stroke-width="1.5"/>
+<line x1="642.5" y1="505.0" x2="642.5" y2="513.0" stroke="var(--ink)" stroke-width="1.5"/>
+<line x1="647.1" y1="505.0" x2="647.1" y2="513.0" stroke="var(--ink)" stroke-width="1.5"/>
+<text class="val" x="655.1" y="513.0">1,152/s</text>
+<text class="row" x="134" y="539.0" text-anchor="end">gzip</text>
+<rect x="146" y="526" width="108.6" height="18" rx="3" fill="var(--rust)"/>
+<line x1="248.7" y1="535.0" x2="256.1" y2="535.0" stroke="var(--ink)" stroke-width="1.5"/>
+<line x1="248.7" y1="531.0" x2="248.7" y2="539.0" stroke="var(--ink)" stroke-width="1.5"/>
+<line x1="256.1" y1="531.0" x2="256.1" y2="539.0" stroke="var(--ink)" stroke-width="1.5"/>
+<text class="val" x="264.1" y="539.0">73% · 322,995/s</text>
+<rect x="516" y="526" width="103.4" height="18" rx="3" fill="var(--rust)"/>
+<line x1="618.4" y1="535.0" x2="619.4" y2="535.0" stroke="var(--ink)" stroke-width="1.5"/>
+<line x1="618.4" y1="531.0" x2="618.4" y2="539.0" stroke="var(--ink)" stroke-width="1.5"/>
+<text class="val" x="627.4" y="539.0">80% · 919/s</text>
+<text class="row" x="134" y="565.0" text-anchor="end">zstd</text>
+<rect x="146" y="552" width="141.3" height="18" rx="3" fill="var(--rust)"/>
+<line x1="284.4" y1="561.0" x2="291.8" y2="561.0" stroke="var(--ink)" stroke-width="1.5"/>
+<line x1="284.4" y1="557.0" x2="284.4" y2="565.0" stroke="var(--ink)" stroke-width="1.5"/>
+<line x1="291.8" y1="557.0" x2="291.8" y2="565.0" stroke="var(--ink)" stroke-width="1.5"/>
+<text class="val" x="299.8" y="565.0">95% · 424,982/s</text>
+<rect x="516" y="552" width="120.4" height="18" rx="3" fill="var(--rust)"/>
+<line x1="636.0" y1="561.0" x2="637.4" y2="561.0" stroke="var(--ink)" stroke-width="1.5"/>
+<line x1="636.0" y1="557.0" x2="636.0" y2="565.0" stroke="var(--ink)" stroke-width="1.5"/>
+<line x1="637.4" y1="557.0" x2="637.4" y2="565.0" stroke="var(--ink)" stroke-width="1.5"/>
+<text class="val" x="645.4" y="565.0">93% · 1,070/s</text>
+<text class="row" x="134" y="591.0" text-anchor="end">brotli</text>
+<rect x="146" y="578" width="123.5" height="18" rx="3" fill="var(--rust)"/>
+<line x1="260.6" y1="587.0" x2="269.5" y2="587.0" stroke="var(--ink)" stroke-width="1.5"/>
+<line x1="260.6" y1="583.0" x2="260.6" y2="591.0" stroke="var(--ink)" stroke-width="1.5"/>
+<text class="val" x="277.5" y="591.0">83% · 368,158/s</text>
+<rect x="516" y="578" width="104.9" height="18" rx="3" fill="var(--rust)"/>
+<line x1="620.7" y1="587.0" x2="623.0" y2="587.0" stroke="var(--ink)" stroke-width="1.5"/>
+<line x1="620.7" y1="583.0" x2="620.7" y2="591.0" stroke="var(--ink)" stroke-width="1.5"/>
+<line x1="623.0" y1="583.0" x2="623.0" y2="591.0" stroke="var(--ink)" stroke-width="1.5"/>
+<text class="val" x="631.0" y="591.0">81% · 932/s</text>
+<text class="sub" x="24" y="634">v0.6.0 ran on another CPU model, so this chart marks no change since it.</text>
+</svg>

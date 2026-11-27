@@ -1,0 +1,40 @@
+{
+ "version": 1,
+ "chart": "fullstack-compression",
+ "machine": "AMD EPYC 9V74 80-Core Processor, 4 CPUs",
+ "run": "313",
+ "commit": "c6cce91",
+ "tag": "v0.7.0",
+ "values": {
+  "gzip, spans a second": {
+   "label": "gzip, spans a second as a share of uncompressed over TLS",
+   "value": 111.0,
+   "higher_is_better": true
+  },
+  "gzip, calls a second at peak": {
+   "label": "gzip, calls a second at peak as a share of uncompressed over TLS",
+   "value": 120.53742802303262,
+   "higher_is_better": true
+  },
+  "zstd, spans a second": {
+   "label": "zstd, spans a second as a share of uncompressed over TLS",
+   "value": 113.0,
+   "higher_is_better": true
+  },
+  "zstd, calls a second at peak": {
+   "label": "zstd, calls a second at peak as a share of uncompressed over TLS",
+   "value": 123.03262955854126,
+   "higher_is_better": true
+  },
+  "brotli, spans a second": {
+   "label": "brotli, spans a second as a share of uncompressed over TLS",
+   "value": 88.0,
+   "higher_is_better": true
+  },
+  "brotli, calls a second at peak": {
+   "label": "brotli, calls a second at peak as a share of uncompressed over TLS",
+   "value": 108.63723608445297,
+   "higher_is_better": true
+  }
+ }
+}

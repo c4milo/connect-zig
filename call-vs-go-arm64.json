@@ -1,0 +1,30 @@
+{
+ "version": 1,
+ "chart": "call-vs-go",
+ "machine": "aarch64, Neoverse-N2",
+ "run": "313",
+ "commit": "c6cce91",
+ "tag": "v0.7.0",
+ "values": {
+  "small, Connect unary call": {
+   "label": "small, Connect unary call, speed in multiples of connect-go's",
+   "value": 9.98,
+   "higher_is_better": true
+  },
+  "medium, Connect unary call": {
+   "label": "medium, Connect unary call, speed in multiples of connect-go's",
+   "value": 12.31,
+   "higher_is_better": true
+  },
+  "small, gRPC unary call": {
+   "label": "small, gRPC unary call, speed in multiples of connect-go's",
+   "value": 11.17,
+   "higher_is_better": true
+  },
+  "medium, gRPC unary call": {
+   "label": "medium, gRPC unary call, speed in multiples of connect-go's",
+   "value": 12.56,
+   "higher_is_better": true
+  }
+ }
+}

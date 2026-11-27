@@ -1,0 +1,20 @@
+{
+ "version": 1,
+ "chart": "fullstack-validate-arm64",
+ "machine": "Neoverse-N2, 4 CPUs",
+ "run": "313",
+ "commit": "c6cce91",
+ "tag": "v0.7.0",
+ "values": {
+  "connect-zig": {
+   "label": "connect-zig, spans a second over TLS",
+   "value": 743128.0,
+   "higher_is_better": true
+  },
+  "connect-zig + protovalidate": {
+   "label": "connect-zig + protovalidate, spans a second over TLS",
+   "value": 525107.0,
+   "higher_is_better": true
+  }
+ }
+}

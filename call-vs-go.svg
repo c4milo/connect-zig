@@ -1,0 +1,87 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 840 294" width="840" height="294" role="img" aria-labelledby="t d">
+<title id="t">A routed unary call through connect-zig and connect-rust, against connect-go</title>
+<desc id="d">connect-zig is 8.2 to 10.7 times as fast as connect-go, 2.8 to 4.0 times connect-rust. Each bar is an implementation's speed in multiples of connect-go v1.21.1's, which is connect-go's time a call over the implementation's, for a small and a medium message in Connect and gRPC. connect-zig: Connect: Small, 40 B 8.2x, Medium, 1 KB 10.7x; gRPC: Small, 40 B 8.8x, Medium, 1 KB 10.7x. connect-rust 0.9.1: Connect: Small, 40 B 2.1x, Medium, 1 KB 3.8x; gRPC: Small, 40 B 2.2x, Medium, 1 KB 3.7x.</desc>
+<style>
+svg { --surface:#fcfcfb; --ink:#0b0b0b; --ink2:#52514e; --muted:#8a8984; --grid:#e4e3df; --zig:#2a78d6; --rust:#eb6834; --unit:#52514e; }
+@media (prefers-color-scheme: dark) {
+  svg { --surface:#1a1a19; --ink:#f0efec; --ink2:#c3c2b7; --muted:#8f8e86; --grid:#33332f; --zig:#3987e5; --rust:#d95926; --unit:#c3c2b7; }
+}
+text { font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; fill: var(--ink); }
+.title { font-size: 17px; font-weight: 600; }
+.sub { font-size: 12.5px; fill: var(--ink2); }
+.panel { font-size: 14px; font-weight: 600; }
+.row { font-size: 12.5px; fill: var(--ink2); }
+.val { font-size: 11px; font-weight: 600; paint-order: stroke; stroke: var(--surface); stroke-width: 3px; stroke-linejoin: round; }
+.tick { font-size: 11px; fill: var(--muted); }
+.note { font-size: 11.5px; fill: var(--ink2); }
+.legend { font-size: 12.5px; fill: var(--ink2); }
+.better { fill: #1a7f37; } .worse { fill: #cf222e; }
+@media (prefers-color-scheme: dark) { .better { fill: #3fb950; } .worse { fill: #f85149; } }
+.was { stroke: var(--ink2); stroke-width: 1.5; stroke-dasharray: 2 2; }
+</style>
+<rect width="840" height="294" rx="8" fill="var(--surface)"/>
+<text class="title" x="24" y="34">connect-zig is 8.2 to 10.7 times as fast as connect-go, 2.8 to 4.0 times connect-rust</text>
+<text class="sub" x="24" y="56">One unary call in memory: router, route, protocol and codec, with no socket, no TLS and no HTTP/2 framing.</text>
+<text class="sub" x="24" y="74">Each bar is a speed in multiples of connect-go's: its time over the bar's time. A longer bar is faster.</text>
+<text class="sub" x="24" y="92">One CI job ran all three, and each answered the same octets: run 313, commit c6cce91, x86_64, AMD EPYC 7763 64-Core Processor.</text>
+<rect x="24" y="100" width="12" height="12" rx="2" fill="var(--zig)"/>
+<text class="legend" x="42" y="110">connect-zig</text>
+<rect x="143" y="100" width="12" height="12" rx="2" fill="var(--rust)"/>
+<text class="legend" x="161" y="110">connect-rust 0.9.1</text>
+<line x1="311" y1="106" x2="327" y2="106" stroke="var(--unit)" stroke-width="1.5" stroke-dasharray="4 3"/>
+<text class="legend" x="333" y="110">connect-go v1.21.1: the unit</text>
+<text class="panel" x="24" y="148">Connect</text>
+<line x1="136.0" y1="160" x2="136.0" y2="234" stroke="var(--grid)" stroke-width="1"/>
+<text class="tick" x="136.0" y="248" text-anchor="middle">0×</text>
+<line x1="168.7" y1="160" x2="168.7" y2="234" stroke="var(--grid)" stroke-width="1"/>
+<text class="tick" x="168.7" y="248" text-anchor="middle">2×</text>
+<line x1="201.5" y1="160" x2="201.5" y2="234" stroke="var(--grid)" stroke-width="1"/>
+<text class="tick" x="201.5" y="248" text-anchor="middle">4×</text>
+<line x1="234.2" y1="160" x2="234.2" y2="234" stroke="var(--grid)" stroke-width="1"/>
+<text class="tick" x="234.2" y="248" text-anchor="middle">6×</text>
+<line x1="266.9" y1="160" x2="266.9" y2="234" stroke="var(--grid)" stroke-width="1"/>
+<text class="tick" x="266.9" y="248" text-anchor="middle">8×</text>
+<line x1="299.6" y1="160" x2="299.6" y2="234" stroke="var(--grid)" stroke-width="1"/>
+<text class="tick" x="299.6" y="248" text-anchor="middle">10×</text>
+<text class="row" x="126" y="182.0" text-anchor="end">Small, 40 B</text>
+<path d="M136.0,164 h129.7 a4.0,4.0 0 0 1 4.0,4.0 v5.0 a4.0,4.0 0 0 1 -4.0,4.0 h-129.7 z" fill="var(--zig)"/>
+<line class="was" x1="273.9" y1="162.0" x2="273.9" y2="179.0"/>
+<text class="val" x="280.9" y="174">8.2×, 0.44 µs</text>
+<path d="M136.0,179 h31.1 a4.0,4.0 0 0 1 4.0,4.0 v5.0 a4.0,4.0 0 0 1 -4.0,4.0 h-31.1 z" fill="var(--rust)"/>
+<text class="val" x="176.1" y="189">2.1×</text>
+<text class="row" x="126" y="220.0" text-anchor="end">Medium, 1 KB</text>
+<path d="M136.0,202 h171.1 a4.0,4.0 0 0 1 4.0,4.0 v5.0 a4.0,4.0 0 0 1 -4.0,4.0 h-171.1 z" fill="var(--zig)"/>
+<line class="was" x1="328.1" y1="200.0" x2="328.1" y2="217.0"/>
+<text class="val" x="335.1" y="212">10.7×, 2.27 µs <tspan class="worse">▼9%</tspan></text>
+<path d="M136.0,217 h57.8 a4.0,4.0 0 0 1 4.0,4.0 v5.0 a4.0,4.0 0 0 1 -4.0,4.0 h-57.8 z" fill="var(--rust)"/>
+<text class="val" x="202.8" y="227">3.8×</text>
+<line x1="152.4" y1="156" x2="152.4" y2="234" stroke="var(--unit)" stroke-width="1.5" stroke-dasharray="4 3"/>
+<text class="note" x="156.4" y="154">1× = as fast as connect-go</text>
+<text class="panel" x="432" y="148">gRPC</text>
+<line x1="544.0" y1="160" x2="544.0" y2="234" stroke="var(--grid)" stroke-width="1"/>
+<text class="tick" x="544.0" y="248" text-anchor="middle">0×</text>
+<line x1="576.7" y1="160" x2="576.7" y2="234" stroke="var(--grid)" stroke-width="1"/>
+<text class="tick" x="576.7" y="248" text-anchor="middle">2×</text>
+<line x1="609.5" y1="160" x2="609.5" y2="234" stroke="var(--grid)" stroke-width="1"/>
+<text class="tick" x="609.5" y="248" text-anchor="middle">4×</text>
+<line x1="642.2" y1="160" x2="642.2" y2="234" stroke="var(--grid)" stroke-width="1"/>
+<text class="tick" x="642.2" y="248" text-anchor="middle">6×</text>
+<line x1="674.9" y1="160" x2="674.9" y2="234" stroke="var(--grid)" stroke-width="1"/>
+<text class="tick" x="674.9" y="248" text-anchor="middle">8×</text>
+<line x1="707.6" y1="160" x2="707.6" y2="234" stroke="var(--grid)" stroke-width="1"/>
+<text class="tick" x="707.6" y="248" text-anchor="middle">10×</text>
+<text class="row" x="534" y="182.0" text-anchor="end">Small, 40 B</text>
+<path d="M544.0,164 h139.2 a4.0,4.0 0 0 1 4.0,4.0 v5.0 a4.0,4.0 0 0 1 -4.0,4.0 h-139.2 z" fill="var(--zig)"/>
+<line class="was" x1="692.9" y1="162.0" x2="692.9" y2="179.0"/>
+<text class="val" x="699.9" y="174">8.8×, 0.48 µs</text>
+<path d="M544.0,179 h31.8 a4.0,4.0 0 0 1 4.0,4.0 v5.0 a4.0,4.0 0 0 1 -4.0,4.0 h-31.8 z" fill="var(--rust)"/>
+<text class="val" x="584.8" y="189">2.2×</text>
+<text class="row" x="534" y="220.0" text-anchor="end">Medium, 1 KB</text>
+<path d="M544.0,202 h171.4 a4.0,4.0 0 0 1 4.0,4.0 v5.0 a4.0,4.0 0 0 1 -4.0,4.0 h-171.4 z" fill="var(--zig)"/>
+<line class="was" x1="736.6" y1="200.0" x2="736.6" y2="217.0"/>
+<text class="val" x="743.6" y="212">10.7×, 2.36 µs <tspan class="worse">▼9%</tspan></text>
+<path d="M544.0,217 h57.0 a4.0,4.0 0 0 1 4.0,4.0 v5.0 a4.0,4.0 0 0 1 -4.0,4.0 h-57.0 z" fill="var(--rust)"/>
+<text class="val" x="610.0" y="227">3.7×</text>
+<line x1="560.4" y1="156" x2="560.4" y2="234" stroke="var(--unit)" stroke-width="1.5" stroke-dasharray="4 3"/>
+<text class="sub" x="24" y="282">▲ marks a value 5% or more better than v0.6.0's, ▼ one that much worse, and a dashed line v0.6.0's value.</text>
+</svg>

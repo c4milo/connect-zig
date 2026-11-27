@@ -1,0 +1,40 @@
+{
+ "version": 1,
+ "chart": "validate-vs-go",
+ "machine": "AMD EPYC 9V74 80-Core Processor, x86_64",
+ "run": "313",
+ "commit": "c6cce91",
+ "tag": "v0.7.0",
+ "values": {
+  "small valid": {
+   "label": "small valid, speed in multiples of protovalidate-go's",
+   "value": 16.123762376237625,
+   "higher_is_better": true
+  },
+  "small invalid": {
+   "label": "small invalid, speed in multiples of protovalidate-go's",
+   "value": 35.55593803786575,
+   "higher_is_better": true
+  },
+  "medium valid": {
+   "label": "medium valid, speed in multiples of protovalidate-go's",
+   "value": 13.430478537687412,
+   "higher_is_better": true
+  },
+  "medium invalid": {
+   "label": "medium invalid, speed in multiples of protovalidate-go's",
+   "value": 28.884149297140087,
+   "higher_is_better": true
+  },
+  "rules valid": {
+   "label": "rules valid, speed in multiples of protovalidate-go's",
+   "value": 51.888888888888886,
+   "higher_is_better": true
+  },
+  "rules invalid": {
+   "label": "rules invalid, speed in multiples of protovalidate-go's",
+   "value": 58.02879078694817,
+   "higher_is_better": true
+  }
+ }
+}
